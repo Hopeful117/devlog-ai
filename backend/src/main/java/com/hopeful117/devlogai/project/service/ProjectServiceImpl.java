@@ -8,6 +8,7 @@ import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.project.exception.ProjectSlugAlreadyExistsException;
 import com.hopeful117.devlogai.project.mapper.ProjectMapper;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.service.SlugService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -37,21 +38,48 @@ public class ProjectServiceImpl implements ProjectService{
 
     @Override
     public ProjectResponse getBySlug(String slug) {
-        return null;
+        Project project = projectRepository.findBySlug(slug)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Project", slug)
+                );
+
+        return projectMapper.toResponse(project);
     }
 
     @Override
     public List<ProjectResponse> getAll() {
-        return List.of();
+
+        return projectRepository.findAll()
+                .stream()
+                .map(projectMapper::toResponse)
+                .toList();
     }
 
     @Override
     public ProjectResponse update(String slug, UpdateProjectRequest request) {
-        return null;
+        Project project = projectRepository.findBySlug(slug)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Project", slug)
+                );
+
+
+        projectMapper.updateProject(request, project);
+
+        project = projectRepository.save(project);
+
+        return projectMapper.toResponse(project);
     }
 
     @Override
     public void archive(String slug) {
+        Project project = projectRepository.findBySlug(slug)
+                .orElseThrow(() ->
+                        new EntityNotFoundException("Project", slug)
+                );
+
+        project.setStatus(ProjectStatus.ARCHIVED);
+
+        projectRepository.save(project);
 
     }
 }
