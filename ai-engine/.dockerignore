@@ -1,0 +1,8 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.idea/
+*.iml
+devlog_ai_engine.egg-info/
+tests/
