@@ -10,9 +10,12 @@ import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.shared.exception.ConflictException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -66,6 +69,44 @@ public class AnalysisServiceImpl implements AnalysisService {
                         );
 
         return analysisMapper.toResponse(analysis);
+    }
+
+    @Override
+    @Transactional
+    public AnalysisResponse start(UUID id) {
+        Analysis analysis = findForTransition(id);
+        if (analysis.getStatus() != AnalysisStatus.PENDING) {
+            throw new ConflictException(
+                    "Analysis cannot transition from %s to IN_PROGRESS"
+                            .formatted(analysis.getStatus())
+            );
+        }
+
+        analysis.setStatus(AnalysisStatus.IN_PROGRESS);
+        analysis.setStartedAt(Instant.now());
+        analysis.setCompletedAt(null);
+        return analysisMapper.toResponse(analysisRepository.save(analysis));
+    }
+
+    @Override
+    @Transactional
+    public AnalysisResponse fail(UUID id) {
+        Analysis analysis = findForTransition(id);
+        if (analysis.getStatus() != AnalysisStatus.IN_PROGRESS) {
+            throw new ConflictException(
+                    "Analysis cannot transition from %s to FAILED"
+                            .formatted(analysis.getStatus())
+            );
+        }
+
+        analysis.setStatus(AnalysisStatus.FAILED);
+        analysis.setCompletedAt(Instant.now());
+        return analysisMapper.toResponse(analysisRepository.save(analysis));
+    }
+
+    private Analysis findForTransition(UUID id) {
+        return analysisRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new EntityNotFoundException("Analysis", id));
     }
 
 

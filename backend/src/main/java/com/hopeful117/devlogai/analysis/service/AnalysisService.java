@@ -14,6 +14,10 @@ public interface AnalysisService {
 
     AnalysisResponse getById(UUID id);
 
+    AnalysisResponse start(UUID id);
+
+    AnalysisResponse fail(UUID id);
+
     List<AnalysisResponse> getByProject(UUID projectId);
 
     List<AnalysisResponse> getByProjectAndType(

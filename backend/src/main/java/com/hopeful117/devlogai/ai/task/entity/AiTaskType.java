@@ -1,0 +1,9 @@
+package com.hopeful117.devlogai.ai.task.entity;
+
+public enum AiTaskType {
+    DECISION_PROPOSAL_GENERATION,
+    EVENT_PROPOSAL_GENERATION,
+    INSIGHT_GENERATION,
+    DOCUMENTATION_GENERATION,
+    CHALLENGE_PROPOSAL_GENERATION
+}

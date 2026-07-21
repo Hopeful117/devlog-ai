@@ -10,6 +10,7 @@ import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.shared.exception.ConflictException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -38,6 +39,51 @@ public class AnalysisServiceTest {
 
     @InjectMocks
     AnalysisServiceImpl analysisService;
+
+    @Test
+    void shouldStartPendingAnalysis() {
+        UUID id = UUID.randomUUID();
+        Analysis analysis = new Analysis();
+        analysis.setStatus(AnalysisStatus.PENDING);
+        AnalysisResponse response = mock(AnalysisResponse.class);
+        when(analysisRepository.findByIdForUpdate(id))
+                .thenReturn(Optional.of(analysis));
+        when(analysisRepository.save(analysis)).thenReturn(analysis);
+        when(analysisMapper.toResponse(analysis)).thenReturn(response);
+
+        assertSame(response, analysisService.start(id));
+        assertEquals(AnalysisStatus.IN_PROGRESS, analysis.getStatus());
+        assertNotNull(analysis.getStartedAt());
+        assertNull(analysis.getCompletedAt());
+    }
+
+    @Test
+    void shouldRejectStartingAnalysisThatIsNotPending() {
+        UUID id = UUID.randomUUID();
+        Analysis analysis = new Analysis();
+        analysis.setStatus(AnalysisStatus.IN_PROGRESS);
+        when(analysisRepository.findByIdForUpdate(id))
+                .thenReturn(Optional.of(analysis));
+
+        assertThrows(ConflictException.class, () -> analysisService.start(id));
+        verify(analysisRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldFailInProgressAnalysis() {
+        UUID id = UUID.randomUUID();
+        Analysis analysis = new Analysis();
+        analysis.setStatus(AnalysisStatus.IN_PROGRESS);
+        AnalysisResponse response = mock(AnalysisResponse.class);
+        when(analysisRepository.findByIdForUpdate(id))
+                .thenReturn(Optional.of(analysis));
+        when(analysisRepository.save(analysis)).thenReturn(analysis);
+        when(analysisMapper.toResponse(analysis)).thenReturn(response);
+
+        assertSame(response, analysisService.fail(id));
+        assertEquals(AnalysisStatus.FAILED, analysis.getStatus());
+        assertNotNull(analysis.getCompletedAt());
+    }
 
 
     @Test

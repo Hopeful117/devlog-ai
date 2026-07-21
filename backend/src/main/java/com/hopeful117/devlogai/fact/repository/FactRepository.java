@@ -9,6 +9,8 @@ import java.util.UUID;
 
 public interface FactRepository extends JpaRepository<Fact, UUID> {
 
+    long countByAnalysisId(UUID analysisId);
+
     List<Fact> findByAnalysisIdOrderByDetectedAtDesc(UUID analysisId);
 
     List<Fact> findByAnalysisIdOrderByDetectedAtDescIdDesc(

@@ -5,6 +5,9 @@ import com.hopeful117.devlogai.analysis.dto.response.AnalysisResponse;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.service.AnalysisService;
+import com.hopeful117.devlogai.analysis.workflow.AnalysisWorkflowService;
+import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
+import com.hopeful117.devlogai.analysis.workflow.dto.StartAnalysisWorkflowRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +22,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AnalysisController {
     private final AnalysisService analysisService;
+    private final AnalysisWorkflowService analysisWorkflowService;
 
     @PostMapping
     public ResponseEntity<AnalysisResponse> create(
@@ -42,6 +46,16 @@ public class AnalysisController {
 
         return ResponseEntity.ok(
                 analysisService.getById(id)
+        );
+    }
+
+    @PostMapping("/{id}/workflow")
+    public ResponseEntity<AnalysisWorkflowResult> startWorkflow(
+            @PathVariable UUID id,
+            @Valid @RequestBody StartAnalysisWorkflowRequest request
+    ) {
+        return ResponseEntity.ok(
+                analysisWorkflowService.start(id, request.taskType())
         );
     }
 
