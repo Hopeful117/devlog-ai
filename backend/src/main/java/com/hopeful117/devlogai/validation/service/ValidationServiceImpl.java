@@ -1,0 +1,104 @@
+package com.hopeful117.devlogai.validation.service;
+
+import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
+import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
+import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
+import com.hopeful117.devlogai.validation.dto.request.CreateValidationRequest;
+import com.hopeful117.devlogai.validation.dto.response.ValidationResponse;
+import com.hopeful117.devlogai.validation.entity.Validation;
+import com.hopeful117.devlogai.validation.entity.ValidationDecision;
+import com.hopeful117.devlogai.validation.mapper.ValidationMapper;
+import com.hopeful117.devlogai.validation.repository.ValidationRepository;
+import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class ValidationServiceImpl implements ValidationService {
+    private final ValidationRepository validationRepository;
+
+    private final ValidatableProposalRepository proposalRepository;
+
+    private final ValidationMapper validationMapper;
+
+    @Override
+    @Transactional
+    public ValidationResponse validate(
+            CreateValidationRequest request
+    ) {
+
+        ValidatableProposal proposal =
+                proposalRepository.findById(request.proposalId())
+                        .orElseThrow(() ->
+                                new IllegalArgumentException(
+                                        "Proposal not found: "
+                                                + request.proposalId()
+                                )
+                        );
+
+        if (proposal.getStatus() != ProposalStatus.PROPOSED) {
+            throw new IllegalArgumentException(
+                    "Proposal has already been decided"
+            );
+        }
+
+        if (validationRepository.existsByProposalId(
+                request.proposalId()
+        )) {
+            throw new IllegalArgumentException(
+                    "Proposal has already been validated"
+            );
+        }
+
+        Validation validation =
+                validationMapper.toEntity(request);
+
+        validation.setProposal(proposal);
+
+        proposal.setStatus(
+                request.decision() == ValidationDecision.ACCEPTED
+                        ? ProposalStatus.ACCEPTED
+                        : ProposalStatus.REJECTED
+        );
+
+
+        proposalRepository.save(proposal);
+
+        Validation savedValidation =
+                validationRepository.save(validation);
+
+        return validationMapper.toResponse(savedValidation);
+    }
+
+    @Override
+    public ValidationResponse getById(UUID id) {
+
+        return validationRepository.findById(id)
+                .map(validationMapper::toResponse)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Validation not found: " + id
+                        )
+                );
+    }
+
+    @Override
+    public ValidationResponse getByProposalId(
+            UUID proposalId
+    ) {
+
+        return validationRepository
+                .findByProposalId(proposalId)
+                .map(validationMapper::toResponse)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Validation not found for proposal: "
+                                        + proposalId
+                        )
+                );
+    }
+}
