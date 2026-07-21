@@ -16,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,6 +55,9 @@ public class AnalysisServiceTest {
         Project project = new Project();
 
         Analysis analysis = new Analysis();
+        analysis.setStatus(AnalysisStatus.IN_PROGRESS);
+        analysis.setStartedAt(Instant.now());
+        analysis.setCompletedAt(Instant.now());
 
         AnalysisResponse response =
                 mock(AnalysisResponse.class);

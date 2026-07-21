@@ -43,6 +43,8 @@ public class AnalysisServiceImpl implements AnalysisService {
 
         analysis.setProject(project);
         analysis.setStatus(AnalysisStatus.PENDING);
+        analysis.setStartedAt(null);
+        analysis.setCompletedAt(null);
 
         Analysis saved =
                 analysisRepository.save(analysis);

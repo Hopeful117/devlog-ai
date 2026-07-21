@@ -35,7 +35,8 @@ public class Analysis {
     @Column(nullable = false)
     private AnalysisStatus status;
 
-    @Column(nullable = false)
+    // An analysis is pending until deterministic processing starts.
+    @Column
     private Instant startedAt;
 
     private Instant completedAt;
