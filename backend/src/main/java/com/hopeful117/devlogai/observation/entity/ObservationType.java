@@ -1,0 +1,10 @@
+package com.hopeful117.devlogai.observation.entity;
+
+public enum ObservationType {
+    ASYNCHRONOUS_COMMUNICATION,
+    HTTP_SERVICE_COMMUNICATION,
+    ARCHITECTURE_MODULARIZATION,
+    AUTHENTICATION_LAYER,
+    TEST_COVERAGE_DECREASE,
+    OTHER
+}
