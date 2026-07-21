@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.artifact.repository;
 
 import com.hopeful117.devlogai.artifact.entity.Artifact;
 import com.hopeful117.devlogai.artifact.entity.ArtifactType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -13,5 +14,11 @@ public interface ArtifactRepository extends JpaRepository<Artifact, UUID> {
     List<Artifact> findByProjectIdAndTypeOrderByCreatedAtDesc(
             UUID projectId,
             ArtifactType type
+    );
+
+    List<Artifact> findByProjectIdAndTypeInOrderByCreatedAtDescIdDesc(
+            UUID projectId,
+            List<ArtifactType> types,
+            Pageable pageable
     );
 }

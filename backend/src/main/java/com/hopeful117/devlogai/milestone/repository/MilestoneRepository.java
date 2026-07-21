@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.milestone.repository;
 
 import com.hopeful117.devlogai.milestone.entity.Milestone;
 import com.hopeful117.devlogai.milestone.entity.MilestoneStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -16,5 +17,10 @@ public interface MilestoneRepository extends JpaRepository<Milestone, UUID> {
     List<Milestone> findByProjectIdAndStatusOrderByStartedAtDesc(
             UUID projectId,
             MilestoneStatus status
+    );
+
+    List<Milestone> findByProjectIdOrderByStartedAtDescIdDesc(
+            UUID projectId,
+            Pageable pageable
     );
 }
