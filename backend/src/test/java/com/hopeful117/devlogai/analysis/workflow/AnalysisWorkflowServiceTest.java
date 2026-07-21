@@ -1,10 +1,15 @@
 package com.hopeful117.devlogai.analysis.workflow;
 
 import com.hopeful117.devlogai.ai.task.dto.request.CreateAiTaskRequest;
+import com.hopeful117.devlogai.ai.task.dto.request.FailAiTaskRequest;
+import com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.response.AiTaskResponse;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.ai.engine.client.AIEngineClient;
+import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionRequest;
+import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.context.AnalysisContextService;
 import com.hopeful117.devlogai.analysis.deterministic.DeterministicAnalysisResult;
@@ -23,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.UUID;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -42,6 +48,9 @@ class AnalysisWorkflowServiceTest {
     @Mock
     private AiTaskService aiTaskService;
 
+    @Mock
+    private AIEngineClient aiEngineClient;
+
     @InjectMocks
     private AnalysisWorkflowServiceImpl workflowService;
 
@@ -53,7 +62,24 @@ class AnalysisWorkflowServiceTest {
         AiTaskType taskType = AiTaskType.DECISION_PROPOSAL_GENERATION;
         AnalysisResponse analysis = analysisResponse(analysisId, AnalysisStatus.IN_PROGRESS);
         AnalysisContext context = mock(AnalysisContext.class);
-        AiTaskResponse task = aiTaskResponse(taskId, analysisId, correlationId);
+        AiTaskResponse task = aiTaskResponse(
+                taskId,
+                analysisId,
+                correlationId,
+                AiTaskStatus.CREATED
+        );
+        AiTaskResponse submittedTask = aiTaskResponse(
+                taskId,
+                analysisId,
+                correlationId,
+                AiTaskStatus.SUBMITTED
+        );
+        AiTaskSubmissionResponse submission = new AiTaskSubmissionResponse(
+                correlationId,
+                true,
+                "engine-job-42",
+                Instant.now()
+        );
 
         when(analysisService.start(analysisId)).thenReturn(analysis);
         when(deterministicAnalysisService.analyze(analysisId))
@@ -63,6 +89,16 @@ class AnalysisWorkflowServiceTest {
                 new CreateAiTaskRequest(analysisId, taskType),
                 context
         )).thenReturn(task);
+        when(aiEngineClient.submit(new AiTaskSubmissionRequest(
+                correlationId,
+                taskType,
+                analysisId,
+                context
+        ))).thenReturn(submission);
+        when(aiTaskService.submit(
+                taskId,
+                new SubmitAiTaskRequest("engine-job-42")
+        )).thenReturn(submittedTask);
 
         AnalysisWorkflowResult result = workflowService.start(analysisId, taskType);
 
@@ -71,14 +107,15 @@ class AnalysisWorkflowServiceTest {
         assertEquals(4, result.factCount());
         assertEquals(2, result.observationCount());
         assertEquals(taskId, result.aiTaskId());
-        assertEquals(AiTaskStatus.CREATED, result.aiTaskStatus());
+        assertEquals(AiTaskStatus.SUBMITTED, result.aiTaskStatus());
         assertEquals(correlationId, result.correlationId());
 
         InOrder order = inOrder(
                 analysisService,
                 deterministicAnalysisService,
                 analysisContextService,
-                aiTaskService
+                aiTaskService,
+                aiEngineClient
         );
         order.verify(analysisService).start(analysisId);
         order.verify(deterministicAnalysisService).analyze(analysisId);
@@ -86,6 +123,16 @@ class AnalysisWorkflowServiceTest {
         order.verify(aiTaskService).create(
                 new CreateAiTaskRequest(analysisId, taskType),
                 context
+        );
+        order.verify(aiEngineClient).submit(new AiTaskSubmissionRequest(
+                correlationId,
+                taskType,
+                analysisId,
+                context
+        ));
+        order.verify(aiTaskService).submit(
+                taskId,
+                new SubmitAiTaskRequest("engine-job-42")
         );
         verify(analysisService, never()).fail(any());
     }
@@ -157,6 +204,48 @@ class AnalysisWorkflowServiceTest {
     }
 
     @Test
+    void shouldFailTaskAndAnalysisWhenSubmissionFails() {
+        UUID analysisId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID correlationId = UUID.randomUUID();
+        AiTaskType taskType = AiTaskType.DECISION_PROPOSAL_GENERATION;
+        AnalysisContext context = mock(AnalysisContext.class);
+        AiTaskResponse task = aiTaskResponse(
+                taskId,
+                analysisId,
+                correlationId,
+                AiTaskStatus.CREATED
+        );
+        RuntimeException failure = new RuntimeException("engine unavailable");
+        when(analysisService.start(analysisId))
+                .thenReturn(analysisResponse(analysisId, AnalysisStatus.IN_PROGRESS));
+        when(deterministicAnalysisService.analyze(analysisId))
+                .thenReturn(new DeterministicAnalysisResult(2, 1));
+        when(analysisContextService.build(analysisId)).thenReturn(context);
+        when(aiTaskService.create(
+                new CreateAiTaskRequest(analysisId, taskType),
+                context
+        )).thenReturn(task);
+        when(aiEngineClient.submit(any())).thenThrow(failure);
+
+        RuntimeException result = assertThrows(
+                RuntimeException.class,
+                () -> workflowService.start(analysisId, taskType)
+        );
+
+        assertSame(failure, result);
+        verify(aiTaskService).failSubmission(
+                taskId,
+                new FailAiTaskRequest(
+                        "AI_ENGINE_SUBMISSION_FAILED",
+                        "engine unavailable"
+                )
+        );
+        verify(analysisService).fail(analysisId);
+        verify(aiTaskService, never()).submit(any(), any());
+    }
+
+    @Test
     void shouldRejectDuplicateStartWithoutChangingAnalysisToFailed() {
         UUID analysisId = UUID.randomUUID();
         ConflictException conflict = new ConflictException("already started");
@@ -175,7 +264,8 @@ class AnalysisWorkflowServiceTest {
         verifyNoInteractions(
                 deterministicAnalysisService,
                 analysisContextService,
-                aiTaskService
+                aiTaskService,
+                aiEngineClient
         );
     }
 
@@ -219,14 +309,15 @@ class AnalysisWorkflowServiceTest {
     private AiTaskResponse aiTaskResponse(
             UUID id,
             UUID analysisId,
-            UUID correlationId
+            UUID correlationId,
+            AiTaskStatus status
     ) {
         return new AiTaskResponse(
                 id,
                 analysisId,
                 correlationId,
                 AiTaskType.DECISION_PROPOSAL_GENERATION,
-                AiTaskStatus.CREATED,
+                status,
                 null,
                 null,
                 0,

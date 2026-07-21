@@ -199,6 +199,31 @@ class AiTaskServiceTest {
     }
 
     @Test
+    void shouldRecordSubmissionFailureFromCreatedState() {
+        UUID id = UUID.randomUUID();
+        AiTask task = AiTask.builder().status(AiTaskStatus.CREATED).build();
+        AiTaskResponse response = mock(AiTaskResponse.class);
+        when(aiTaskRepository.findById(id)).thenReturn(Optional.of(task));
+        when(aiTaskRepository.save(task)).thenReturn(task);
+        when(aiTaskMapper.toResponse(task)).thenReturn(response);
+
+        AiTaskResponse result = aiTaskService.failSubmission(
+                id,
+                new FailAiTaskRequest(
+                        "AI_ENGINE_SUBMISSION_FAILED",
+                        "Connection refused"
+                )
+        );
+
+        assertSame(response, result);
+        assertEquals(AiTaskStatus.FAILED, task.getStatus());
+        assertEquals(1, task.getAttemptCount());
+        assertEquals("AI_ENGINE_SUBMISSION_FAILED", task.getFailureCode());
+        assertEquals("Connection refused", task.getFailureMessage());
+        assertNotNull(task.getCompletedAt());
+    }
+
+    @Test
     void shouldRejectInvalidTransitionWithoutPersisting() {
         UUID id = UUID.randomUUID();
         AiTask task = AiTask.builder().status(AiTaskStatus.SUBMITTED).build();

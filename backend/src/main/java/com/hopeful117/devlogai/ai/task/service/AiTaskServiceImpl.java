@@ -127,6 +127,20 @@ public class AiTaskServiceImpl implements AiTaskService {
     }
 
     @Override
+    public AiTaskResponse failSubmission(UUID id, FailAiTaskRequest request) {
+        AiTask task = findTask(id);
+        requireStatus(task, AiTaskStatus.CREATED, AiTaskStatus.FAILED);
+
+        task.setStatus(AiTaskStatus.FAILED);
+        task.setAttemptCount(task.getAttemptCount() + 1);
+        task.setFailureCode(request.failureCode());
+        task.setFailureMessage(request.failureMessage());
+        task.setCompletedAt(Instant.now());
+
+        return saveAndMap(task);
+    }
+
+    @Override
     public AiTaskResponse complete(UUID id) {
         AiTask task = findTask(id);
         requireStatus(task, AiTaskStatus.PROCESSING, AiTaskStatus.COMPLETED);

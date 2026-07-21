@@ -23,6 +23,8 @@ public interface AiTaskService {
 
     AiTaskResponse submit(UUID id, SubmitAiTaskRequest request);
 
+    AiTaskResponse failSubmission(UUID id, FailAiTaskRequest request);
+
     AiTaskResponse startProcessing(UUID id);
 
     AiTaskResponse complete(UUID id);

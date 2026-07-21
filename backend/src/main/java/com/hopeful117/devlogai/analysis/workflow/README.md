@@ -22,6 +22,9 @@ Build immutable AnalysisContext
       |
       v
 Create AiTask (CREATED)
+      |
+      v
+Submit to AI Engine (SUBMITTED)
 ```
 
 Each state-changing specialized service owns its own short transaction. The
@@ -48,5 +51,6 @@ POST /api/v1/analyses/{analysisId}/workflow
 The request selects one `AiTaskType`. The response contains the analysis state,
 deterministic result counts, AI task identifier and correlation identifier.
 
-No AI Engine call, callback, retry, cancellation, proposal creation or
-knowledge promotion is performed by this increment.
+The AI Engine call only expects a `202 Accepted` acknowledgement. Callback,
+retry, cancellation, proposal creation and knowledge promotion remain outside
+this increment.
