@@ -27,6 +27,14 @@ services:
       dockerfile: Dockerfile
     container_name: devlog-ai-engine
     restart: unless-stopped
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4.1-mini}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
+      LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-2000}
+      CORE_BASE_URL: http://backend:8080
+      CORE_CALLBACK_TIMEOUT_SECONDS: ${CORE_CALLBACK_TIMEOUT_SECONDS:-5}
     ports:
       - "${AI_ENGINE_PORT:-8000}:8000"
     healthcheck:

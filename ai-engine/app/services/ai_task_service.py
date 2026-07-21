@@ -5,7 +5,7 @@ from app.schemas.ai_task import AiTaskSubmissionRequest, AiTaskSubmissionRespons
 
 
 class AiTaskAcceptanceService:
-    """Acknowledges a task without starting AI processing."""
+    """Creates the acknowledgement before background processing starts."""
 
     def accept(
         self,

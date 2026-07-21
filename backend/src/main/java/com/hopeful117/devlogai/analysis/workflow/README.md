@@ -51,6 +51,6 @@ POST /api/v1/analyses/{analysisId}/workflow
 The request selects one `AiTaskType`. The response contains the analysis state,
 deterministic result counts, AI task identifier and correlation identifier.
 
-The AI Engine call only expects a `202 Accepted` acknowledgement. Callback,
-retry, cancellation, proposal creation and knowledge promotion remain outside
-this increment.
+The AI Engine call only expects a `202 Accepted` acknowledgement. Final results
+return through the ADR-020 callback boundary. Retry, cancellation, real AI
+processing and knowledge promotion remain outside this increment.

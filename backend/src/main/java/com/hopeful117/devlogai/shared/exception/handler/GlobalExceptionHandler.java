@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.shared.exception.handler;
 
 import com.hopeful117.devlogai.shared.exception.ConflictException;
+import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.response.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,6 +9,8 @@ import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -15,6 +18,38 @@ import java.time.Instant;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex,
+            HttpServletRequest request
+    ) {
+        String message = "Invalid value for parameter '" + ex.getName() + "'.";
+        return badRequest(message, request);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnreadableMessage(
+            HttpMessageNotReadableException ex,
+            HttpServletRequest request
+    ) {
+        return badRequest("Malformed or invalid JSON request.", request);
+    }
+
+    @ExceptionHandler(InvalidAiTaskResultException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidAiTaskResult(
+            InvalidAiTaskResultException ex,
+            HttpServletRequest request
+    ) {
+        ApiErrorResponse response = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.badRequest().body(response);
+    }
+
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleEntityNotFound(
             EntityNotFoundException ex,
@@ -59,16 +94,7 @@ public class GlobalExceptionHandler {
                 .map(DefaultMessageSourceResolvable::getDefaultMessage)
                 .orElse("Validation failed");
 
-        ApiErrorResponse response = new ApiErrorResponse(
-                Instant.now(),
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                message,
-                request.getRequestURI()
-        );
-
-        return ResponseEntity.badRequest()
-                .body(response);
+        return badRequest(message, request);
     }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(
@@ -85,5 +111,19 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.internalServerError()
                 .body(response);
+    }
+
+    private ResponseEntity<ApiErrorResponse> badRequest(
+            String message,
+            HttpServletRequest request
+    ) {
+        ApiErrorResponse response = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                message,
+                request.getRequestURI()
+        );
+        return ResponseEntity.badRequest().body(response);
     }
 }

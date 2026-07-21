@@ -2,9 +2,9 @@
 
 FastAPI service responsible for the AI-processing boundary of DevLog AI.
 
-The current increment implements health reporting and the ADR-019 task
-acceptance contract. It does not execute AI processing, call the Java Core,
-send callbacks or start asynchronous workers.
+The service implements health reporting, ADR-019 task acceptance, the ADR-020
+callback contract, and the ADR-022 structured `INSIGHT_GENERATION` workflow.
+It interprets only the immutable `AnalysisContext` supplied by the Java Core.
 
 ## Local development
 
@@ -18,3 +18,27 @@ pytest
 
 - `GET /health`
 - `POST /api/v1/ai/tasks`
+
+## LLM configuration
+
+The default provider is deterministic and requires no API key:
+
+```bash
+LLM_PROVIDER=mock uvicorn app.main:app --reload
+```
+
+OpenAI can be enabled explicitly:
+
+```bash
+LLM_PROVIDER=openai \
+LLM_MODEL=gpt-4.1-mini \
+LLM_API_KEY=... \
+uvicorn app.main:app --reload
+```
+
+Additional settings are `LLM_TIMEOUT_SECONDS`, `LLM_MAX_OUTPUT_TOKENS`,
+`CORE_BASE_URL`, and `CORE_CALLBACK_TIMEOUT_SECONDS`.
+
+The HTTP acknowledgement remains `202 Accepted`. V1 processing uses FastAPI
+in-process background tasks and then sends the ADR-020 callback. This executor
+is not a durable queue and can lose an in-flight task if the process stops.

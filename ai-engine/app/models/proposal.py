@@ -1,0 +1,14 @@
+from enum import Enum
+
+
+class ProposalType(str, Enum):
+    INSIGHT = "INSIGHT"
+    ENGINEERING_DECISION = "ENGINEERING_DECISION"
+    ENGINEERING_EVENT = "ENGINEERING_EVENT"
+    CHALLENGE = "CHALLENGE"
+    DOCUMENTATION = "DOCUMENTATION"
+
+
+class AiTaskResultStatus(str, Enum):
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"

@@ -29,5 +29,12 @@ ai-engine.connect-timeout=${AI_ENGINE_CONNECT_TIMEOUT:2s}
 ai-engine.read-timeout=${AI_ENGINE_READ_TIMEOUT:5s}
 ```
 
-This increment does not implement result callbacks, retries, cancellation or
-AI result conversion.
+Result callbacks are accepted by the Core at:
+
+```text
+POST /api/v1/ai/tasks/{correlationId}/result
+```
+
+The callback creates only `ValidatableProposal` records and atomically moves
+the task to a terminal state. Automatic retries, cancellation, real AI
+processing and knowledge promotion remain outside this increment.

@@ -23,6 +23,12 @@ The goal is to reduce the time spent writing documentation while preserving engi
 - Spring Boot
 - Spring Security
 
+The Java Core exposes its interactive OpenAPI documentation when the backend is running:
+
+- Swagger UI: http://localhost:8080/swagger-ui.html
+- OpenAPI JSON: http://localhost:8080/v3/api-docs
+- OpenAPI YAML: http://localhost:8080/v3/api-docs.yaml
+
 ### AI Service
 
 - Python

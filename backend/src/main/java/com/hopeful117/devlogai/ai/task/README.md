@@ -33,7 +33,9 @@ The domain is responsible for:
 The domain is not responsible for:
 
 - communicating with the Python AI Engine;
-- handling asynchronous callbacks;
 - retrying tasks automatically;
-- creating proposals from AI results;
 - changing the lifecycle of the originating analysis.
+
+ADR-020 callbacks are handled by the application-level AI Engine callback
+service. That service coordinates proposal persistence and the task terminal
+transition atomically while this domain remains the owner of task state.

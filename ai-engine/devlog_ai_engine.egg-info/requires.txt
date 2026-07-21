@@ -1,4 +1,6 @@
 fastapi[standard]<1.0,>=0.116
+httpx<1.0,>=0.28
+openai<3.0,>=2.0
 
 [dev]
 pytest<10.0,>=8.0

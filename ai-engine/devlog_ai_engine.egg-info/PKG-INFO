@@ -5,7 +5,54 @@ Summary: AI interpretation engine for DevLog AI
 Requires-Python: >=3.10
 Description-Content-Type: text/markdown
 Requires-Dist: fastapi[standard]<1.0,>=0.116
+Requires-Dist: httpx<1.0,>=0.28
+Requires-Dist: openai<3.0,>=2.0
 Provides-Extra: dev
 Requires-Dist: pytest<10.0,>=8.0; extra == "dev"
 Requires-Dist: pytest-asyncio<2.0,>=0.24; extra == "dev"
 Requires-Dist: httpx<1.0,>=0.28; extra == "dev"
+
+# DevLog AI Engine
+
+FastAPI service responsible for the AI-processing boundary of DevLog AI.
+
+The service implements health reporting, ADR-019 task acceptance, the ADR-020
+callback contract, and the ADR-022 structured `INSIGHT_GENERATION` workflow.
+It interprets only the immutable `AnalysisContext` supplied by the Java Core.
+
+## Local development
+
+```bash
+python -m pip install -e ".[dev]"
+uvicorn app.main:app --reload
+pytest
+```
+
+## Endpoints
+
+- `GET /health`
+- `POST /api/v1/ai/tasks`
+
+## LLM configuration
+
+The default provider is deterministic and requires no API key:
+
+```bash
+LLM_PROVIDER=mock uvicorn app.main:app --reload
+```
+
+OpenAI can be enabled explicitly:
+
+```bash
+LLM_PROVIDER=openai \
+LLM_MODEL=gpt-4.1-mini \
+LLM_API_KEY=... \
+uvicorn app.main:app --reload
+```
+
+Additional settings are `LLM_TIMEOUT_SECONDS`, `LLM_MAX_OUTPUT_TOKENS`,
+`CORE_BASE_URL`, and `CORE_CALLBACK_TIMEOUT_SECONDS`.
+
+The HTTP acknowledgement remains `202 Accepted`. V1 processing uses FastAPI
+in-process background tasks and then sends the ADR-020 callback. This executor
+is not a durable queue and can lose an in-flight task if the process stops.
