@@ -1,0 +1,46 @@
+services:
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: devlog-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-devlog_ai}
+      DB_USERNAME: ${POSTGRES_USER:-devlog}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-devlog}
+      AI_ENGINE_BASE_URL: ${AI_ENGINE_BASE_URL:-http://host.docker.internal:8000}
+      AI_ENGINE_CONNECT_TIMEOUT: ${AI_ENGINE_CONNECT_TIMEOUT:-2s}
+      AI_ENGINE_READ_TIMEOUT: ${AI_ENGINE_READ_TIMEOUT:-5s}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+  postgres:
+    image: postgres:17
+    container_name: devlog-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-devlog_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-devlog}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devlog}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - devlog-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  devlog-postgres-data:

@@ -1,0 +1,11 @@
+Metadata-Version: 2.4
+Name: devlog-ai-engine
+Version: 0.1.0
+Summary: AI interpretation engine for DevLog AI
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi[standard]<1.0,>=0.116
+Provides-Extra: dev
+Requires-Dist: pytest<10.0,>=8.0; extra == "dev"
+Requires-Dist: pytest-asyncio<2.0,>=0.24; extra == "dev"
+Requires-Dist: httpx<1.0,>=0.28; extra == "dev"

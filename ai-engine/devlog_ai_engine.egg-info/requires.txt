@@ -1,0 +1,6 @@
+fastapi[standard]<1.0,>=0.116
+
+[dev]
+pytest<10.0,>=8.0
+pytest-asyncio<2.0,>=0.24
+httpx<1.0,>=0.28
