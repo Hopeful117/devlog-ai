@@ -6,6 +6,11 @@ prompts are not accepted. The prompt builder only supports registered template
 versions and validates generated Insight categories against the Intent before
 returning proposals for human validation.
 
+Submissions may include structured User Guidance (`focus`, `audience`,
+`levelOfDetail`, `writingStyle`, `outputContext`, and ordered `priorities`). It is
+validated as a closed schema and inserted into the prompt at the lowest priority:
+Intent and AnalysisContext constraints always win.
+
 FastAPI service responsible for the AI-processing boundary of DevLog AI.
 
 The service implements health reporting, ADR-019 task acceptance, the ADR-020

@@ -38,7 +38,9 @@ class InsightGenerationService:
         external_job_id: UUID,
     ) -> None:
         try:
-            prompt = self._prompt_builder.build(submission.intent, submission.context)
+            prompt = self._prompt_builder.build(
+                submission.intent, submission.context, submission.user_guidance
+            )
         except ValueError as intent_error:
             await self._send_failure(
                 submission, external_job_id, "INVALID_INTENT", intent_error

@@ -19,6 +19,7 @@ import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
 import com.hopeful117.devlogai.collection.service.KnowledgeCollectionService;
 import com.hopeful117.devlogai.profile.service.ProjectProfileService;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +66,7 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
                             createdTask.taskType(),
                             analysisId,
                             intent,
+                            UserGuidance.from(analysis.userGuidance()),
                             context
                     )
             );

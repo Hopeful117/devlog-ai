@@ -115,6 +115,7 @@ class AnalysisWorkflowServiceTest {
                 taskType,
                 analysisId,
                 intent(),
+                com.hopeful117.devlogai.intent.model.UserGuidance.from(guidance()),
                 context
         ))).thenReturn(submission);
         when(aiTaskService.submit(
@@ -155,6 +156,7 @@ class AnalysisWorkflowServiceTest {
                 taskType,
                 analysisId,
                 intent(),
+                com.hopeful117.devlogai.intent.model.UserGuidance.from(guidance()),
                 context
         ));
         order.verify(aiTaskService).submit(
@@ -365,8 +367,13 @@ class AnalysisWorkflowServiceTest {
                 null,
                 null,
                 null,
-                null
+                null,
+                guidance()
         );
+    }
+
+    private java.util.Map<String, Object> guidance() {
+        return java.util.Map.of("focus", "architecture", "priorities", java.util.List.of("Docker first"));
     }
 
     private IntentDefinition intent() {

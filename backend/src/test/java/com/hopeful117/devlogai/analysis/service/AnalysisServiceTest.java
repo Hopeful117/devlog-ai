@@ -14,6 +14,8 @@ import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
+import com.hopeful117.devlogai.intent.model.UserGuidance;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -24,6 +26,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -42,6 +45,9 @@ public class AnalysisServiceTest {
 
     @Mock
     IntentCatalog intentCatalog;
+
+    @Mock
+    ObjectMapper objectMapper;
 
     @InjectMocks
     AnalysisServiceImpl analysisService;
@@ -104,6 +110,9 @@ public class AnalysisServiceTest {
         request.setProjectId(projectId);
         request.setType(AnalysisType.ARCHITECTURE_REVIEW);
         request.setIntentId("describe-project-v1");
+        request.setUserGuidance(new UserGuidance(
+                "architecture", "developers", "detailed", "technical",
+                "internal documentation", List.of("Docker first")));
 
         Project project = new Project();
 
@@ -125,6 +134,13 @@ public class AnalysisServiceTest {
 
         when(analysisMapper.toEntity(request))
                 .thenReturn(analysis);
+        Map<String, Object> guidanceSnapshot = Map.of(
+                "focus", "architecture", "audience", "developers",
+                "levelOfDetail", "detailed", "writingStyle", "technical",
+                "outputContext", "internal documentation",
+                "priorities", List.of("Docker first"));
+        when(objectMapper.convertValue(request.getUserGuidance(), Map.class))
+                .thenReturn(guidanceSnapshot);
 
         when(analysisRepository.save(analysis))
                 .thenReturn(analysis);
@@ -153,6 +169,7 @@ public class AnalysisServiceTest {
         assertNull(analysis.getCompletedAt());
         assertEquals("describe-project", analysis.getIntentId());
         assertEquals("v1", analysis.getIntentVersion());
+        assertEquals(guidanceSnapshot, analysis.getUserGuidance());
 
 
         verify(projectRepository)

@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
+import com.hopeful117.devlogai.intent.model.UserGuidance;
+import jakarta.validation.Valid;
 
 import java.util.UUID;
 
@@ -24,4 +26,7 @@ public class CreateAnalysisRequest {
 
     @Size(max = 255)
     private String targetRevision;
+
+    @Valid
+    private UserGuidance userGuidance;
 }

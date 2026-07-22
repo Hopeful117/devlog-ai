@@ -67,6 +67,9 @@ class AiTaskServiceTest {
         Analysis analysis = new Analysis();
         analysis.setIntentId("describe-project");
         analysis.setIntentVersion("v1");
+        Map<String, Object> guidanceSnapshot = Map.of(
+                "focus", "architecture", "priorities", List.of("Docker first"));
+        analysis.setUserGuidance(guidanceSnapshot);
         IntentDefinition intent = new IntentDefinition("describe-project", "v1", "Describe",
                 List.of(InsightType.PROJECT_PRESENTATION), List.of("traceable"),
                 Map.of("type", "object"), "describe-project-prompt-v1");
@@ -95,6 +98,7 @@ class AiTaskServiceTest {
         assertEquals("describe-project", task.getIntentId());
         assertEquals("v1", task.getIntentVersion());
         assertSame(intentSnapshot, task.getIntentSnapshot());
+        assertEquals(guidanceSnapshot, task.getUserGuidanceSnapshot());
         assertEquals(0, task.getAttemptCount());
         assertNull(task.getExternalJobId());
         assertNull(task.getFailureCode());

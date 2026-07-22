@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -9,7 +9,26 @@ from app.models.intent import InsightType
 
 
 class ContractModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(
+        populate_by_name=True, extra="forbid", str_strip_whitespace=True
+    )
+
+
+class UserGuidance(ContractModel):
+    focus: str | None = Field(default=None, min_length=1, max_length=500)
+    audience: str | None = Field(default=None, min_length=1, max_length=200)
+    level_of_detail: str | None = Field(
+        default=None, alias="levelOfDetail", min_length=1, max_length=100
+    )
+    writing_style: str | None = Field(
+        default=None, alias="writingStyle", min_length=1, max_length=100
+    )
+    output_context: str | None = Field(
+        default=None, alias="outputContext", min_length=1, max_length=500
+    )
+    priorities: list[Annotated[str, Field(min_length=1, max_length=300)]] = Field(
+        default_factory=list, max_length=10
+    )
 
 
 class IntentDefinition(ContractModel):
@@ -29,6 +48,7 @@ class AiTaskSubmissionRequest(ContractModel):
     task_type: AiTaskType = Field(alias="taskType")
     analysis_id: UUID = Field(alias="analysisId")
     intent: IntentDefinition
+    user_guidance: UserGuidance | None = Field(default=None, alias="userGuidance")
     context: dict[str, Any]
 
 

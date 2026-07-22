@@ -16,6 +16,7 @@ public interface AiTaskMapper {
     @Mapping(target = "intentId", ignore = true)
     @Mapping(target = "intentVersion", ignore = true)
     @Mapping(target = "intentSnapshot", ignore = true)
+    @Mapping(target = "userGuidanceSnapshot", ignore = true)
     @Mapping(target = "contextSnapshot", ignore = true)
     @Mapping(target = "externalJobId", ignore = true)
     @Mapping(target = "attemptCount", ignore = true)

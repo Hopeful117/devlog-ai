@@ -56,12 +56,21 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         mvc.perform(post("/api/v1/analyses").contentType(MediaType.APPLICATION_JSON)
                         .content(("{\"projectId\":\"%s\",\"type\":\"ARCHITECTURE_REVIEW\"," +
                                 "\"intentId\":\"architecture-overview-v1\"," +
-                                "\"targetRevision\":\"release-1\"}").formatted(projectId)))
+                                "\"targetRevision\":\"release-1\"," +
+                                "\"userGuidance\":{\"focus\":\"distributed architecture\"," +
+                                "\"audience\":\"recruiters\",\"levelOfDetail\":\"concise\"," +
+                                "\"writingStyle\":\"pedagogical\",\"outputContext\":\"portfolio\"," +
+                                "\"priorities\":[\"Docker before Spring Boot\"]}}")
+                                .formatted(projectId)))
                 .andExpect(status().isCreated());
         ArgumentCaptor<CreateAnalysisRequest> request = ArgumentCaptor.forClass(CreateAnalysisRequest.class);
         verify(service).create(request.capture());
         org.junit.jupiter.api.Assertions.assertEquals("release-1", request.getValue().getTargetRevision());
         org.junit.jupiter.api.Assertions.assertEquals("architecture-overview-v1", request.getValue().getIntentId());
+        org.junit.jupiter.api.Assertions.assertEquals("distributed architecture",
+                request.getValue().getUserGuidance().focus());
+        org.junit.jupiter.api.Assertions.assertEquals(List.of("Docker before Spring Boot"),
+                request.getValue().getUserGuidance().priorities());
         mvc.perform(get("/api/v1/analyses/{id}", id)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/analyses/project/{id}", projectId)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/analyses/project/{id}/type/ARCHITECTURE_REVIEW", projectId))

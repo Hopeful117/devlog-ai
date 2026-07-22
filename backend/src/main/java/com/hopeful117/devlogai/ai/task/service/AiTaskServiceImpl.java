@@ -25,6 +25,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -74,6 +76,9 @@ public class AiTaskServiceImpl implements AiTaskService {
         task.setIntentId(intent.id());
         task.setIntentVersion(intent.version());
         task.setIntentSnapshot(intentSnapshot);
+        task.setUserGuidanceSnapshot(analysis.getUserGuidance() == null
+                ? null : Collections.unmodifiableMap(
+                        new LinkedHashMap<>(analysis.getUserGuidance())));
         task.setContextSnapshot(contextSnapshot);
         task.setAttemptCount(0);
         task.setExternalJobId(null);

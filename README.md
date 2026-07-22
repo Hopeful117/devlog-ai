@@ -183,6 +183,27 @@ business importance, not model confidence. Rejecting a proposal never creates an
 Currently registered Intents are `describe-project-v1`, `generate-readme-v1`, and
 `architecture-overview-v1`. Arbitrary free-form prompts are intentionally rejected.
 
+An analysis may include optional, structured User Guidance without changing its Intent:
+
+```json
+{
+  "projectId": "<project-uuid>",
+  "type": "ARCHITECTURE_REVIEW",
+  "intentId": "architecture-overview-v1",
+  "userGuidance": {
+    "focus": "Distributed architecture",
+    "audience": "Recruiters",
+    "levelOfDetail": "Concise",
+    "writingStyle": "Pedagogical",
+    "outputContext": "Portfolio",
+    "priorities": ["Explain Docker before Spring Boot"]
+  }
+}
+```
+
+Guidance only controls emphasis and presentation. It cannot introduce Insight categories, alter
+the output schema, weaken grounding rules, or override the selected Intent.
+
 ## Local development without Docker
 
 ### Requirements

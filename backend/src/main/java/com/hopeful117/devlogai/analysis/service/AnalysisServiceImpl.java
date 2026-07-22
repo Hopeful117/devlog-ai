@@ -16,10 +16,14 @@ import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +34,7 @@ public class AnalysisServiceImpl implements AnalysisService {
 
     private final AnalysisMapper analysisMapper;
     private final IntentCatalog intentCatalog;
+    private final ObjectMapper objectMapper;
 
     @Override
     public AnalysisResponse create(
@@ -51,6 +56,13 @@ public class AnalysisServiceImpl implements AnalysisService {
         analysis.setProject(project);
         analysis.setIntentId(intent.id());
         analysis.setIntentVersion(intent.version());
+        if (request.getUserGuidance() == null || request.getUserGuidance().isEmpty()) {
+            analysis.setUserGuidance(null);
+        } else {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> guidance = objectMapper.convertValue(request.getUserGuidance(), Map.class);
+            analysis.setUserGuidance(Collections.unmodifiableMap(new LinkedHashMap<>(guidance)));
+        }
         analysis.setStatus(AnalysisStatus.PENDING);
         analysis.setStartedAt(null);
         analysis.setCompletedAt(null);

@@ -2,6 +2,7 @@ import pytest
 
 from app.prompts.insight import InsightPromptBuilder, UnsupportedPromptTemplateError
 from tests.intent_fixtures import describe_project_intent
+from app.schemas.ai_task import UserGuidance
 
 
 def test_prompt_is_deterministic_intent_driven_and_versioned() -> None:
@@ -32,3 +33,23 @@ def test_unknown_prompt_template_is_rejected() -> None:
     )
     with pytest.raises(UnsupportedPromptTemplateError):
         InsightPromptBuilder().build(intent, {})
+
+
+def test_user_guidance_is_structured_and_has_lowest_priority() -> None:
+    request = InsightPromptBuilder().build(
+        describe_project_intent(),
+        {"facts": []},
+        UserGuidance(
+            focus="Distributed architecture",
+            audience="Recruiters",
+            levelOfDetail="Concise",
+            writingStyle="Pedagogical",
+            outputContext="Portfolio",
+            priorities=["Docker before Spring Boot"],
+        ),
+    )
+
+    assert "OPTIONAL USER GUIDANCE (LOWEST PRIORITY)" in request.user_prompt
+    assert '"focus":"Distributed architecture"' in request.user_prompt
+    assert '"priorities":["Docker before Spring Boot"]' in request.user_prompt
+    assert "never let it change categories" in request.system_instructions

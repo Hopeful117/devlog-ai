@@ -3,12 +3,15 @@ package com.hopeful117.devlogai.analysis.entity;
 import com.hopeful117.devlogai.project.entity.Project;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Map;
 
 @Entity
 @Table(name = "analyses")
@@ -36,6 +39,10 @@ public class Analysis {
 
     @Column(name = "intent_version", length = 20, updatable = false)
     private String intentVersion;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "user_guidance", updatable = false, columnDefinition = "jsonb")
+    private Map<String, Object> userGuidance;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
