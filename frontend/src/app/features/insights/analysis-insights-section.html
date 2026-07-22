@@ -1,0 +1,75 @@
+<section id="insight-proposals" class="insight-section panel">
+  <h2>Insight Proposals</h2>
+  @if (proposals$ | async; as vm) {
+    @if (vm.state === 'loading') {
+      <p role="status">Loading proposals…</p>
+    } @else if (vm.state === 'error') {
+      <p role="alert" class="error">{{ vm.error.message }}</p>
+    } @else {
+      <p>
+        {{ vm.data.length }} total · {{ vm.data | proposalCount: 'PROPOSED' }} proposed ·
+        {{ vm.data | proposalCount: 'ACCEPTED' }} accepted ·
+        {{ vm.data | proposalCount: 'REJECTED' }} rejected
+      </p>
+      @if (vm.data.length === 0) {
+        @if (executionStatus === 'COMPLETED' && provider?.toLowerCase() === 'mock') {
+          <p data-testid="proposals-empty">
+            The analysis completed using the Mock provider. No AI-generated proposal was configured
+            for this execution.
+          </p>
+        } @else if (executionStatus === 'COMPLETED') {
+          <p data-testid="proposals-empty">
+            The execution completed successfully with zero valid Insight Proposals.
+          </p>
+        } @else if (executionStatus === 'FAILED') {
+          <p data-testid="proposals-empty">
+            No proposals were persisted because the AI execution failed.
+          </p>
+        } @else {
+          <p data-testid="proposals-empty">No Insight Proposals yet.</p>
+        }
+      } @else {
+        <ul>
+          @for (proposal of vm.data; track proposal.id) {
+            <li data-testid="proposal-card">
+              <a [routerLink]="['/proposals', proposal.id]">{{
+                proposal.insight?.title || 'Untitled proposal'
+              }}</a>
+              <app-status-badge [value]="proposal.status" />
+              <span
+                >{{ proposal.insight?.insightType || proposal.type }} · confidence
+                {{ proposal.confidence ?? 'not provided' }} · severity assigned by reviewer</span
+              >
+              <p>{{ proposal.insight?.summary }}</p>
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+</section>
+<section class="insight-section panel">
+  <h2>Validated Insights</h2>
+  @if (insights$ | async; as vm) {
+    @if (vm.state === 'loading') {
+      <p role="status">Loading validated Insights…</p>
+    } @else if (vm.state === 'error') {
+      <p role="alert" class="error">{{ vm.error.message }}</p>
+    } @else if (vm.data.length === 0) {
+      <p>No validated Insights.</p>
+    } @else {
+      <ul>
+        @for (insight of vm.data; track insight.id) {
+          <li data-testid="validated-insight">
+            <a [routerLink]="['/insights', insight.id]">{{ insight.title }}</a> — {{ insight.type }}
+            <app-status-badge [value]="insight.severity" />
+          </li>
+        }
+      </ul>
+      <app-analysis-deliverable-panel
+        [projectId]="vm.data[0].projectId"
+        [analysisId]="analysisId"
+      />
+    }
+  }
+</section>

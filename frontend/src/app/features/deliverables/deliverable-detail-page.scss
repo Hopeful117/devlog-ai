@@ -1,0 +1,24 @@
+.deliverable-detail {
+  max-width: var(--content-max-width);
+}
+.content,
+.metadata {
+  margin-top: var(--space-lg);
+  padding: var(--space-lg);
+}
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  color: var(--text-primary);
+}
+dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-sm) var(--space-md);
+}
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

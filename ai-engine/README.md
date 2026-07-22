@@ -42,6 +42,13 @@ pytest
 
 - `GET /health`
 - `POST /api/v1/ai/tasks`
+- `POST /api/v1/deliverables/generate`
+
+The Deliverable endpoint implements ADR-034. Its closed request schema accepts only validated
+Insight snapshots plus communication parameters. It does not accept repository data, Facts,
+Observations, AnalysisContext, or pending proposals. The versioned
+`deliverable-generation-prompt-v1` template returns a single structured title/content result and
+records provider/model and prompt digest metadata for Core persistence.
 
 ## LLM configuration
 

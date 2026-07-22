@@ -1,0 +1,70 @@
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate aria-labelledby="execution-title">
+  <div class="form-heading">
+    <p class="eyebrow">AI execution</p>
+    <h3 id="execution-title">Run a grounded Analysis</h3>
+    <p>Choose a Core-supported Intent, then optionally refine it with structured guidance.</p>
+  </div>
+  <section class="form-card" aria-labelledby="intent-card-title">
+    <h4 id="intent-card-title">Intent and revision</h4>
+    <label for="analysis-type">Analysis type</label>
+    <select id="analysis-type" formControlName="type">
+      @for (type of types; track type) {
+        <option [value]="type">{{ type }}</option>
+      }
+    </select>
+
+    <label for="intent">Intent</label>
+    <select id="intent" formControlName="intentKey">
+      <option value="">Choose an Intent</option>
+      @for (intent of intents; track intent.id + intent.version) {
+        <option [value]="intent.id + '-' + intent.version">
+          {{ intent.id }} / {{ intent.version }} — {{ intent.objective }}
+        </option>
+      }
+    </select>
+    @if (form.controls.intentKey.touched && form.controls.intentKey.invalid) {
+      <p class="field-error">Intent is required.</p>
+    }
+    @if (selectedIntent; as intent) {
+      <div class="intent-summary">
+        <strong>{{ intent.objective }}</strong>
+        <span>{{ intent.id }}/{{ intent.version }} · {{ intent.promptTemplate }}</span>
+        <span>May propose: {{ intent.supportedInsightTypes.join(', ') }}</span>
+      </div>
+    }
+
+    <label for="target-revision">Target revision <span>(optional branch, tag, or SHA)</span></label>
+    <input id="target-revision" formControlName="targetRevision" maxlength="255" />
+  </section>
+
+  <fieldset class="form-card">
+    <legend>Optional User Guidance</legend>
+    <p>Guidance refines the selected Intent; it does not replace it.</p>
+    <label for="focus">Focus</label
+    ><textarea id="focus" formControlName="focus" maxlength="500"></textarea>
+    <label for="audience">Audience</label
+    ><input id="audience" formControlName="audience" maxlength="200" />
+    <label for="detail">Level of detail</label
+    ><input id="detail" formControlName="levelOfDetail" maxlength="100" />
+    <label for="style">Writing style</label
+    ><input id="style" formControlName="writingStyle" maxlength="100" />
+    <label for="output-context">Output context</label
+    ><textarea id="output-context" formControlName="outputContext" maxlength="500"></textarea>
+    <label for="priorities">Priorities <span>(one per line, up to 10)</span></label
+    ><textarea id="priorities" formControlName="priorities"></textarea>
+    @if (form.controls.priorities.hasError('priorities')) {
+      <p class="field-error">Use at most 10 priorities, each at most 300 characters.</p>
+    }
+  </fieldset>
+  <aside class="what-happens">
+    <h4>What will happen</h4>
+    <p>
+      Core collects deterministic knowledge, selects grounded evidence, sends a versioned request to
+      the AI Engine, validates structured proposals, and preserves them for human review.
+    </p>
+    <p>No proposal becomes an Insight until you explicitly accept it.</p>
+  </aside>
+  <button type="submit" [disabled]="form.invalid || submitting">
+    {{ submitting ? 'Creating and launching…' : 'Create and launch' }}
+  </button>
+</form>

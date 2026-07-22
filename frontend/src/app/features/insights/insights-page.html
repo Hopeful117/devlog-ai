@@ -1,0 +1,49 @@
+<section>
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Trusted project knowledge</p>
+      <h1>Validated Insights</h1>
+      <p>Only human-accepted proposals appear here.</p>
+    </div>
+  </header>
+  <form class="panel" [formGroup]="form" (ngSubmit)="apply()">
+    <label for="project-id">Project UUID</label
+    ><input id="project-id" formControlName="projectId" /><label for="type">Type</label
+    ><select id="type" formControlName="type">
+      <option value="">All</option>
+      @for (type of types; track type) {
+        <option [value]="type">{{ type }}</option>
+      }</select
+    ><label for="severity">Severity</label
+    ><select id="severity" formControlName="severity">
+      <option value="">All</option>
+      @for (severity of severities; track severity) {
+        <option [value]="severity">{{ severity }}</option>
+      }</select
+    ><button type="submit" [disabled]="form.invalid">Load Insights</button>
+  </form>
+  @if (view$ | async; as vm) {
+    @if (vm.state === 'loading') {
+      <p role="status">Loading Insights…</p>
+    } @else if (vm.state === 'error') {
+      <p role="alert">{{ vm.error.message }}</p>
+    } @else if (vm.state === 'loaded') {
+      @if (vm.data.length === 0) {
+        <p>No validated Insights.</p>
+      } @else {
+        <ul>
+          @for (insight of vm.data; track insight.id) {
+            <li data-testid="validated-insight">
+              <a [routerLink]="['/insights', insight.id]">{{ insight.title }}</a
+              ><span>{{ insight.type }} · accepted {{ insight.createdAt | date: 'medium' }}</span
+              ><app-status-badge [value]="insight.severity" /><small
+                >Project {{ insight.projectId }} · Analysis {{ insight.analysisId }} · Proposal
+                {{ insight.proposalId }}</small
+              >
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+</section>

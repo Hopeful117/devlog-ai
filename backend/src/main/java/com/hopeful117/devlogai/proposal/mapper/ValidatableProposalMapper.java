@@ -33,7 +33,22 @@ public interface ValidatableProposalMapper {
             target = "analysisId",
             source = "analysis.id"
     )
+    @Mapping(target = "insight", expression = "java(insightDetails(entity))")
     ValidatableProposalResponse toResponse(
             ValidatableProposal entity
     );
+
+    default com.hopeful117.devlogai.proposal.dto.response.InsightProposalPayloadResponse insightDetails(
+            ValidatableProposal entity) {
+        if (entity.getType() != com.hopeful117.devlogai.proposal.entity.ProposalType.INSIGHT
+                || entity.getPayload() == null) return null;
+        return new com.hopeful117.devlogai.proposal.dto.response.InsightProposalPayloadResponse(
+                text(entity, "insightType"), text(entity, "title"),
+                text(entity, "summary"), text(entity, "rationale"));
+    }
+
+    private String text(ValidatableProposal entity, String key) {
+        Object value = entity.getPayload().get(key);
+        return value instanceof String text ? text : null;
+    }
 }

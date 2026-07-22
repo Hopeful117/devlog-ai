@@ -1,0 +1,29 @@
+<form [formGroup]="form" (ngSubmit)="submit()" class="deliverable-form">
+  <p class="section-note">
+    Only human-validated Insights are used. Repository data and pending or rejected proposals are
+    excluded.
+  </p>
+  <label for="deliverable-type">Deliverable type</label>
+  <select id="deliverable-type" formControlName="type">
+    @for (type of types; track type) {
+      <option [value]="type">{{ type }}</option>
+    }
+  </select>
+  <label for="deliverable-audience">Audience</label
+  ><input id="deliverable-audience" formControlName="audience" maxlength="200" />
+  <label for="deliverable-style">Style</label
+  ><input id="deliverable-style" formControlName="style" maxlength="100" />
+  <label for="deliverable-language">Language</label
+  ><input id="deliverable-language" formControlName="language" maxlength="20" />
+  <label for="deliverable-guidance"
+    >Additional guidance <span>(optional, subordinate to validated knowledge)</span></label
+  >
+  <textarea
+    id="deliverable-guidance"
+    formControlName="additionalGuidance"
+    maxlength="1000"
+  ></textarea>
+  <button type="submit" [disabled]="form.invalid || submitting">
+    {{ submitting ? 'Generating…' : 'Generate from validated Insights' }}
+  </button>
+</form>

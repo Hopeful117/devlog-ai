@@ -1,0 +1,46 @@
+<section class="project-detail" aria-labelledby="project-title">
+  <a routerLink="/projects">← Back to projects</a>
+
+  @if (viewModel$ | async; as viewModel) {
+    @switch (viewModel.state) {
+      @case ('loading') {
+        <p role="status">Loading project…</p>
+      }
+      @case ('not-found') {
+        <div role="alert" class="state state--error">
+          <h1 id="project-title">Project not found</h1>
+          <p>No project matches this address.</p>
+        </div>
+      }
+      @case ('error') {
+        <div role="alert" class="state state--error">
+          <h1 id="project-title">Project could not be loaded</h1>
+          <p>{{ viewModel.error.message }}</p>
+        </div>
+      }
+      @case ('loaded') {
+        <article>
+          <h1 id="project-title">{{ viewModel.project.name }}</h1>
+          @if (viewModel.project.description) {
+            <p>{{ viewModel.project.description }}</p>
+          }
+          <dl>
+            <dt>ID</dt>
+            <dd>{{ viewModel.project.id }}</dd>
+            <dt>Slug</dt>
+            <dd>{{ viewModel.project.slug }}</dd>
+            <dt>Status</dt>
+            <dd>{{ viewModel.project.status }}</dd>
+            <dt>Created</dt>
+            <dd>{{ viewModel.project.createdAt | date: 'medium' }}</dd>
+            <dt>Updated</dt>
+            <dd>{{ viewModel.project.updatedAt | date: 'medium' }}</dd>
+          </dl>
+        </article>
+        <app-project-sources-section [projectId]="viewModel.project.id" />
+        <app-project-analyses-section [projectId]="viewModel.project.id" />
+        <app-project-deliverables-section [projectId]="viewModel.project.id" />
+      }
+    }
+  }
+</section>

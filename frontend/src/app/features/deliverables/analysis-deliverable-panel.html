@@ -1,0 +1,24 @@
+<aside class="deliverable-callout" aria-labelledby="deliverable-action-title">
+  <div>
+    <h3 id="deliverable-action-title">Turn validated knowledge into a Deliverable</h3>
+    <p>Generate one coherent document from the accepted Insights of this Analysis.</p>
+  </div>
+  <button type="button" (click)="showForm = !showForm" [attr.aria-expanded]="showForm">
+    {{ showForm ? 'Close generator' : 'Generate a Deliverable' }}
+  </button>
+  @if (generation$ | async; as generation) {
+    @if (showForm) {
+      <app-deliverable-form
+        [projectId]="projectId"
+        [analysisId]="analysisId"
+        [submitting]="generation.state === 'pending'"
+        (generate)="generate($event)"
+      />
+    }
+    @if (generation.state === 'pending') {
+      <p role="status">Generating from this Analysis’s validated Insights…</p>
+    } @else if (generation.state === 'error') {
+      <p role="alert" class="error">{{ generation.error.message }}</p>
+    }
+  }
+</aside>

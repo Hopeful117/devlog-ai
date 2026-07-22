@@ -1,0 +1,20 @@
+section {
+  max-width: 65rem;
+}
+form,
+li {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+form {
+  grid-template-columns: auto 1fr;
+}
+ul {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}

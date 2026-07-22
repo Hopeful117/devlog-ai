@@ -1,0 +1,73 @@
+.sources {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.source-list {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.source-list article,
+.empty,
+.feedback {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.source--inactive {
+  opacity: 0.72;
+}
+
+.source-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.status {
+  padding: 0.2rem 0.5rem;
+  border-radius: 1rem;
+  color: var(--success);
+  background: rgb(79 198 138 / 0.1);
+}
+
+.status--inactive {
+  color: var(--text-muted);
+  background: rgb(132 145 167 / 0.1);
+}
+
+dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.4rem 1rem;
+}
+
+dt {
+  font-weight: 600;
+}
+
+dd {
+  margin: 0;
+}
+
+.repository-url {
+  overflow-wrap: anywhere;
+}
+
+.feedback--success {
+  border-color: var(--success);
+}
+
+.feedback--error {
+  border-color: var(--danger);
+}
+
+button {
+  padding: 0.4rem 0.7rem;
+}

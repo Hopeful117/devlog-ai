@@ -1,0 +1,219 @@
+<section class="proposal">
+  <a routerLink="/projects">← Back to Projects</a>
+  @if (action$ | async; as action) {
+    <div aria-live="polite">
+      @if (action.state === 'pending') {
+        <p role="status" class="inline-message">Recording human decision…</p>
+      } @else if (action.state === 'error') {
+        <p role="alert" class="inline-message inline-message--error">{{ action.error.message }}</p>
+      }
+    </div>
+    @if (view$ | async; as vm) {
+      @if (vm.state === 'loading') {
+        <p role="status">Loading proposal…</p>
+      } @else if (vm.state === 'not-found') {
+        <div class="panel empty"><h1>Proposal not found</h1></div>
+      } @else if (vm.state === 'error') {
+        <p role="alert" class="inline-message inline-message--error">{{ vm.error.message }}</p>
+      } @else {
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">AI-generated · Human decision required</p>
+            <h1>{{ vm.data.proposal.insight?.title || 'Insight Proposal' }}</h1>
+            <p>{{ vm.data.proposal.insight?.summary }}</p>
+          </div>
+          <div class="header-badges">
+            <app-status-badge
+              data-testid="proposal-status"
+              [value]="vm.data.proposal.status"
+            /><span class="badge badge--info">{{
+              vm.data.proposal.insight?.insightType || vm.data.proposal.type
+            }}</span>
+          </div>
+        </header>
+
+        <div class="review-grid">
+          <main class="review-content">
+            <article class="panel content-card">
+              <h2>Rationale</h2>
+              <p>{{ vm.data.proposal.insight?.rationale || 'Not provided' }}</p>
+            </article>
+            <section class="panel evidence">
+              <h2>Evidence</h2>
+              <p class="section-note">
+                Core-validated references from the source Analysis. Detail routes are not yet
+                exposed for Facts or Observations.
+              </p>
+              <div class="evidence-grid">
+                <article>
+                  <h3>Supporting Facts</h3>
+                  <ul>
+                    @for (id of vm.data.proposal.supportingFactIds; track id) {
+                      <li>
+                        <code>{{ id }}</code>
+                      </li>
+                    } @empty {
+                      <li>None provided</li>
+                    }
+                  </ul>
+                </article>
+                <article>
+                  <h3>Supporting Observations</h3>
+                  <ul>
+                    @for (id of vm.data.proposal.supportingObservationIds; track id) {
+                      <li>
+                        <code>{{ id }}</code>
+                      </li>
+                    } @empty {
+                      <li>None provided</li>
+                    }
+                  </ul>
+                </article>
+              </div>
+              <h3>Evidence references</h3>
+              <ul>
+                @for (reference of vm.data.proposal.evidenceReferences; track reference) {
+                  <li>
+                    <code>{{ reference }}</code>
+                  </li>
+                } @empty {
+                  <li>No evidence references.</li>
+                }
+              </ul>
+              <details>
+                <summary>Structured proposal payload</summary>
+                <pre><code>{{ vm.data.proposal.payload | json }}</code></pre>
+              </details>
+            </section>
+          </main>
+
+          <aside class="panel decision-panel" aria-labelledby="decision-title">
+            <h2 id="decision-title">Human review</h2>
+            <dl class="metadata-list">
+              <dt>Confidence</dt>
+              <dd>{{ vm.data.proposal.confidence ?? 'Not provided' }}</dd>
+              <dt>Created</dt>
+              <dd>{{ vm.data.proposal.createdAt | date: 'medium' }}</dd>
+              <dt>Source Analysis</dt>
+              <dd>
+                <a [routerLink]="['/analyses', vm.data.proposal.analysisId]">Open Analysis</a>
+              </dd>
+              <dt>Severity</dt>
+              <dd>
+                {{
+                  vm.data.proposal.status === 'ACCEPTED'
+                    ? 'See validated Insight'
+                    : 'Assigned on acceptance'
+                }}
+              </dd>
+            </dl>
+            @if (vm.data.proposal.status === 'PROPOSED') {
+              <form [formGroup]="form">
+                <label for="reviewer">Reviewer UUID</label>
+                <p id="reviewer-help" class="section-note">
+                  Required by Core for decision traceability. Authentication is not implemented in
+                  this local MVP.
+                </p>
+                <input
+                  id="reviewer"
+                  formControlName="validatedBy"
+                  autocomplete="off"
+                  aria-describedby="reviewer-help reviewer-error"
+                />
+                @if (form.controls.validatedBy.touched && form.controls.validatedBy.invalid) {
+                  <p id="reviewer-error" class="field-error" role="alert">
+                    Enter a valid UUID or generate a local test reviewer identifier.
+                  </p>
+                }
+                <button
+                  class="secondary-button"
+                  type="button"
+                  (click)="generateLocalReviewerId()"
+                  [disabled]="action.state === 'pending'"
+                >
+                  Generate local test reviewer UUID
+                </button>
+                <label for="comment">Decision note (optional)</label
+                ><textarea id="comment" formControlName="comment" maxlength="2000"></textarea>
+                @if (form.controls.comment.touched && form.controls.comment.invalid) {
+                  <p class="field-error" role="alert">
+                    The decision note must contain at most 2,000 characters.
+                  </p>
+                }
+                ><label for="severity">Severity when accepted</label
+                ><select id="severity" formControlName="severity">
+                  @for (severity of severities; track severity) {
+                    <option [value]="severity">{{ severity }}</option>
+                  }
+                </select>
+                <div class="decision-actions">
+                  <button
+                    data-testid="accept-proposal"
+                    type="button"
+                    (click)="confirmation = 'ACCEPTED'"
+                    [disabled]="action.state === 'pending'"
+                  >
+                    Accept proposal</button
+                  ><button
+                    data-testid="reject-proposal"
+                    class="danger-button"
+                    type="button"
+                    (click)="confirmation = 'REJECTED'"
+                    [disabled]="action.state === 'pending'"
+                  >
+                    Reject proposal
+                  </button>
+                </div>
+                @if (confirmation) {
+                  <div class="confirm" role="group" aria-label="Confirm immutable decision">
+                    <strong
+                      >Confirm
+                      {{ confirmation === 'ACCEPTED' ? 'acceptance' : 'rejection' }}</strong
+                    >
+                    <p>This decision cannot be reversed.</p>
+                    <button
+                      type="button"
+                      (click)="decide(vm.data.proposal.analysisId)"
+                      [disabled]="form.invalid || action.state === 'pending'"
+                      [attr.aria-describedby]="form.invalid ? 'decision-disabled-help' : null"
+                    >
+                      Confirm decision</button
+                    ><button class="secondary-button" type="button" (click)="confirmation = null">
+                      Cancel
+                    </button>
+                    @if (form.invalid) {
+                      <p id="decision-disabled-help" class="field-error">
+                        Complete the required reviewer identifier before confirming.
+                      </p>
+                    }
+                  </div>
+                }
+              </form>
+            } @else {
+              <section class="decided">
+                <h3>Final decision</h3>
+                <app-status-badge [value]="vm.data.proposal.status" />
+                <p>{{ vm.data.decision?.validatedAt | date: 'medium' }}</p>
+                <p>{{ vm.data.decision?.comment || 'No decision note.' }}</p>
+                <small>Immutable · Reviewer {{ vm.data.decision?.validatedBy }}</small>
+              </section>
+            }
+            @if (vm.data.proposal.status === 'ACCEPTED') {
+              <section class="result">
+                <h3>Validated Insight</h3>
+                @for (insight of vm.data.insights; track insight.id) {
+                  @if (insight.proposalId === vm.data.proposal.id) {
+                    <a data-testid="validated-insight" [routerLink]="['/insights', insight.id]">{{
+                      insight.title
+                    }}</a
+                    ><app-status-badge [value]="insight.severity" />
+                  }
+                }
+              </section>
+            }
+          </aside>
+        </div>
+      }
+    }
+  }
+</section>

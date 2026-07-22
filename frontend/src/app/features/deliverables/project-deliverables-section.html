@@ -1,0 +1,34 @@
+<section class="panel deliverables" aria-labelledby="deliverables-title">
+  <h2 id="deliverables-title">Generated Deliverables</h2>
+  @if (generation$ | async; as generation) {
+    <app-deliverable-form
+      [projectId]="projectId"
+      [submitting]="generation.state === 'pending'"
+      (generate)="generate($event)"
+    />
+    @if (generation.state === 'pending') {
+      <p role="status">The AI Engine is organizing validated knowledge…</p>
+    }
+    @if (generation.state === 'error') {
+      <p role="alert" class="error">{{ generation.error.message }}</p>
+    }
+  }
+  @if (deliverables$ | async; as vm) {
+    @if (vm.state === 'loading') {
+      <p role="status">Loading deliverables…</p>
+    } @else if (vm.state === 'error') {
+      <p role="alert" class="error">{{ vm.error.message }}</p>
+    } @else if (vm.data.length === 0) {
+      <p>No deliverable has been generated yet.</p>
+    } @else {
+      <ul>
+        @for (item of vm.data; track item.id) {
+          <li>
+            <a [routerLink]="['/deliverables', item.id]">{{ item.title }}</a> — {{ item.type }} ·
+            {{ item.generatedAt | date: 'medium' }}
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>

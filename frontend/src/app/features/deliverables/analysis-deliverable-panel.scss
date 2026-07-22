@@ -1,0 +1,16 @@
+.deliverable-callout {
+  display: grid;
+  gap: var(--space-md);
+  margin-top: var(--space-lg);
+  padding: var(--space-md);
+  border: 1px solid rgb(77 141 255 / 0.45);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgb(77 141 255 / 0.12), transparent);
+}
+.deliverable-callout h3,
+.deliverable-callout p {
+  margin: 0;
+}
+.deliverable-callout > button {
+  justify-self: start;
+}

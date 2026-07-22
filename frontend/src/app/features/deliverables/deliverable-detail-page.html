@@ -1,0 +1,50 @@
+<section class="deliverable-detail">
+  @if (view$ | async; as vm) {
+    @if (vm.state === 'loading') {
+      <p role="status">Loading deliverable…</p>
+    } @else if (vm.state === 'not-found') {
+      <h1>Deliverable not found</h1>
+    } @else if (vm.state === 'error') {
+      <p role="alert" class="error">{{ vm.error.message }}</p>
+    } @else {
+      <a routerLink="/projects">← Back to Projects</a>
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">{{ vm.data.type }}</p>
+          <h1>{{ vm.data.title }}</h1>
+        </div>
+      </header>
+      <article class="panel content">
+        <pre>{{ vm.data.content }}</pre>
+      </article>
+      <section class="panel metadata">
+        <h2>Generation traceability</h2>
+        <dl>
+          <dt>Generated</dt>
+          <dd>{{ vm.data.generatedAt | date: 'medium' }}</dd>
+          <dt>Audience</dt>
+          <dd>{{ vm.data.audience }}</dd>
+          <dt>Style</dt>
+          <dd>{{ vm.data.style }}</dd>
+          <dt>Language</dt>
+          <dd>{{ vm.data.language }}</dd>
+          <dt>Provider / model</dt>
+          <dd>{{ vm.data.provider }} / {{ vm.data.modelIdentifier }}</dd>
+          <dt>Prompt</dt>
+          <dd>
+            {{ vm.data.promptVersion }} · <code>{{ vm.data.promptDigest }}</code>
+          </dd>
+          <dt>Source Insights</dt>
+          <dd>{{ vm.data.sourceInsightIds.length }}</dd>
+        </dl>
+        <ul>
+          @for (id of vm.data.sourceInsightIds; track id) {
+            <li>
+              <a [routerLink]="['/insights', id]">{{ id }}</a>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  }
+</section>

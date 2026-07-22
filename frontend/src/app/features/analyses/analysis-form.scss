@@ -1,0 +1,61 @@
+form,
+fieldset {
+  display: grid;
+  gap: 0.5rem;
+}
+form {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.form-heading {
+  margin-bottom: var(--space-md);
+}
+.eyebrow {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.form-card,
+.what-happens {
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-elevated);
+}
+.intent-summary {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: var(--space-sm);
+  color: var(--text-secondary);
+}
+.intent-summary strong {
+  color: var(--text-primary);
+}
+.what-happens {
+  border-left: 3px solid var(--accent);
+}
+label {
+  margin-top: 0.4rem;
+  font-weight: 600;
+}
+label span {
+  font-weight: 400;
+}
+input,
+select,
+textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.5rem;
+}
+button {
+  justify-self: start;
+  padding: 0.5rem 0.75rem;
+}
+.field-error {
+  color: var(--danger);
+}

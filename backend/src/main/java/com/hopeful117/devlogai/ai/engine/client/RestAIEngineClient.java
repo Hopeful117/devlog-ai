@@ -4,6 +4,8 @@ import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.ai.engine.exception.AIEngineCommunicationException;
+import com.hopeful117.devlogai.ai.engine.dto.DeliverableGenerationRequest;
+import com.hopeful117.devlogai.ai.engine.dto.DeliverableGenerationResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -60,6 +62,26 @@ public class RestAIEngineClient implements AIEngineClient {
                     "AI Engine task submission failed",
                     exception
             );
+        }
+    }
+
+    @Override
+    public DeliverableGenerationResponse generateDeliverable(DeliverableGenerationRequest request) {
+        try {
+            DeliverableGenerationResponse response = restClient.post()
+                    .uri("/api/v1/deliverables/generate")
+                    .header(HEADER_NAME, request.requestId().toString())
+                    .body(request)
+                    .retrieve()
+                    .body(DeliverableGenerationResponse.class);
+            if (response == null) {
+                throw new AIEngineCommunicationException("AI Engine returned an empty deliverable response");
+            }
+            return response;
+        } catch (AIEngineCommunicationException exception) {
+            throw exception;
+        } catch (RestClientException exception) {
+            throw new AIEngineCommunicationException("AI Engine deliverable generation failed", exception);
         }
     }
 

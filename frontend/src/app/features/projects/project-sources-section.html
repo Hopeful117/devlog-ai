@@ -1,0 +1,80 @@
+<section class="sources" aria-labelledby="sources-title">
+  <h2 id="sources-title">Sources</h2>
+
+  @if (mutationViewModel$ | async; as mutation) {
+    @if (mutation.state === 'pending') {
+      <p role="status">Saving Source change…</p>
+    } @else if (mutation.state === 'success') {
+      <p role="status" class="feedback feedback--success">{{ mutation.message }}</p>
+    } @else if (mutation.state === 'error') {
+      <div role="alert" class="feedback feedback--error">
+        <strong>Source change failed.</strong> {{ mutation.error.message }}
+      </div>
+    }
+
+    @if (sourcesViewModel$ | async; as sourcesViewModel) {
+      @switch (sourcesViewModel.state) {
+        @case ('loading') {
+          <p role="status">Loading Sources…</p>
+        }
+        @case ('error') {
+          <div role="alert" class="feedback feedback--error">
+            <strong>Sources could not be loaded.</strong> {{ sourcesViewModel.error.message }}
+          </div>
+        }
+        @case ('loaded') {
+          @if (sourcesViewModel.sources.length === 0) {
+            <p class="empty" data-testid="sources-empty">No Source configured.</p>
+          } @else {
+            <ul class="source-list">
+              @for (source of sourcesViewModel.sources; track source.id) {
+                <li [class.source--inactive]="!source.active">
+                  <article>
+                    <div class="source-heading">
+                      <h3>{{ source.name }}</h3>
+                      <span class="status" [class.status--inactive]="!source.active">
+                        {{ source.active ? 'Active' : 'Inactive' }}
+                      </span>
+                    </div>
+                    <dl>
+                      <dt>Type</dt>
+                      <dd>{{ source.type }}</dd>
+                      <dt>Repository</dt>
+                      <dd class="repository-url">{{ source.repositoryUrl }}</dd>
+                      <dt>Default branch</dt>
+                      <dd>{{ source.defaultBranch || 'Repository default (origin/HEAD)' }}</dd>
+                      <dt>Provider</dt>
+                      <dd>{{ source.provider || 'Not specified' }}</dd>
+                      <dt>Last synchronized</dt>
+                      <dd>
+                        {{
+                          source.lastSynchronizedAt
+                            ? (source.lastSynchronizedAt | date: 'medium')
+                            : 'Never'
+                        }}
+                      </dd>
+                    </dl>
+                    <button
+                      type="button"
+                      [disabled]="mutation.state === 'pending'"
+                      (click)="setActive(source, !source.active)"
+                    >
+                      {{ source.active ? 'Deactivate' : 'Activate' }}
+                    </button>
+                  </article>
+                </li>
+              }
+            </ul>
+          }
+        }
+      }
+    }
+
+    <app-source-form
+      [projectId]="projectId"
+      [submitting]="mutation.state === 'pending'"
+      [resetToken]="mutation.resetToken"
+      (createSource)="createSource($event)"
+    />
+  }
+</section>

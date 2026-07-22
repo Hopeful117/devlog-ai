@@ -1,0 +1,32 @@
+.analyses {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+ul {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+li {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.error {
+  padding: 1rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+}
+button {
+  padding: 0.4rem 0.7rem;
+}

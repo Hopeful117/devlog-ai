@@ -1,0 +1,54 @@
+<section class="projects" aria-labelledby="projects-title">
+  <h1 id="projects-title">Projects</h1>
+
+  @if (viewModel$ | async; as viewModel) {
+    @switch (viewModel.state) {
+      @case ('loading') {
+        <p role="status">Loading projects…</p>
+      }
+      @case ('error') {
+        <div role="alert" class="state state--error">
+          <h2>Projects could not be loaded</h2>
+          <p>{{ viewModel.error.message }}</p>
+        </div>
+      }
+      @case ('loaded') {
+        @if (viewModel.projects.length === 0) {
+          <div class="state" data-testid="projects-empty">
+            <h2>No projects yet</h2>
+            <p>The Java Core did not return any projects.</p>
+          </div>
+        } @else {
+          <ul class="project-list">
+            @for (project of viewModel.projects; track project.id) {
+              <li>
+                <article>
+                  <h2>
+                    <a [routerLink]="['/projects', project.slug]">{{ project.name }}</a>
+                  </h2>
+                  @if (project.description) {
+                    <p>{{ project.description }}</p>
+                  }
+                  <dl>
+                    <div>
+                      <dt>Status</dt>
+                      <dd>{{ project.status }}</dd>
+                    </div>
+                    <div>
+                      <dt>Slug</dt>
+                      <dd>{{ project.slug }}</dd>
+                    </div>
+                    <div>
+                      <dt>Updated</dt>
+                      <dd>{{ project.updatedAt | date: 'medium' }}</dd>
+                    </div>
+                  </dl>
+                </article>
+              </li>
+            }
+          </ul>
+        }
+      }
+    }
+  }
+</section>

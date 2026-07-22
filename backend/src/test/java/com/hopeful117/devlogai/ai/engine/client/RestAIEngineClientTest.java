@@ -1,12 +1,15 @@
 package com.hopeful117.devlogai.ai.engine.client;
 
-import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionRequest;
+import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.ai.engine.exception.AIEngineCommunicationException;
+import com.hopeful117.devlogai.ai.engine.dto.DeliverableGenerationRequest;
+import com.hopeful117.devlogai.ai.engine.dto.DeliverableGenerationResponse;
+import com.hopeful117.devlogai.deliverable.entity.DeliverableType;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
-import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.InsightType;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -17,6 +20,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,20 +43,42 @@ class RestAIEngineClientTest {
     }
 
     @Test
+    void shouldGenerateDeliverableThroughDedicatedEndpoint() {
+        UUID requestId = UUID.randomUUID();
+        var request = new DeliverableGenerationRequest(
+                requestId, UUID.randomUUID(), null, DeliverableType.PROJECT_DESCRIPTION,
+                "Engineers", "Concise", "en", null,
+                List.of(new DeliverableGenerationRequest.ValidatedInsightSnapshot(
+                        UUID.randomUUID(), UUID.randomUUID(), "ARCHITECTURAL", "INFO", "Core", "Spring Core"))
+        );
+        server.expect(requestTo("http://ai-engine.test/api/v1/deliverables/generate"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.validatedInsights[0].title").value("Core"))
+                .andExpect(jsonPath("$.facts").doesNotExist())
+                .andRespond(withStatus(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body("""
+                        {"title":"Description","content":"Content","promptVersion":"deliverable-generation-prompt-v1",
+                         "promptDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                         "provider":"mock","modelIdentifier":"deterministic-v1"}
+                        """));
+        DeliverableGenerationResponse response = client.generateDeliverable(request);
+        assertEquals("Description", response.title());
+        server.verify();
+    }
+
+    @Test
     void shouldSubmitCompleteContractAndAcceptAcknowledgement() {
         UUID correlationId = UUID.randomUUID();
         UUID analysisId = UUID.randomUUID();
         Instant acceptedAt = Instant.parse("2026-07-21T18:00:00Z");
-        AiTaskSubmissionRequest request = request(correlationId, analysisId);
+        PromptRequest request = request(correlationId, analysisId);
 
         server.expect(once(), requestTo("http://ai-engine.test/api/v1/ai/tasks"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.correlationId").value(correlationId.toString()))
-                .andExpect(jsonPath("$.taskType")
-                        .value("DECISION_PROPOSAL_GENERATION"))
+                .andExpect(jsonPath("$.taskType").value("INSIGHT_GENERATION"))
                 .andExpect(jsonPath("$.analysisId").value(analysisId.toString()))
-                .andExpect(jsonPath("$.context.facts").isArray())
+                .andExpect(jsonPath("$.selectedKnowledge.selectedFacts").isArray())
                 .andRespond(withStatus(HttpStatus.ACCEPTED)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body("""
@@ -75,7 +101,7 @@ class RestAIEngineClientTest {
 
     @Test
     void shouldRejectMismatchedCorrelationIdentifier() {
-        AiTaskSubmissionRequest request = request(
+        PromptRequest request = request(
                 UUID.randomUUID(),
                 UUID.randomUUID()
         );
@@ -102,7 +128,7 @@ class RestAIEngineClientTest {
 
     @Test
     void shouldTranslateHttpFailure() {
-        AiTaskSubmissionRequest request = request(
+        PromptRequest request = request(
                 UUID.randomUUID(),
                 UUID.randomUUID()
         );
@@ -119,29 +145,20 @@ class RestAIEngineClientTest {
         server.verify();
     }
 
-    private AiTaskSubmissionRequest request(
+    private PromptRequest request(
             UUID correlationId,
             UUID analysisId
     ) {
-        AnalysisContext context = new AnalysisContext(
-                null,
-                null,
-                null,
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of()
-        );
-        return new AiTaskSubmissionRequest(
-                correlationId,
-                AiTaskType.DECISION_PROPOSAL_GENERATION,
-                analysisId,
-                new IntentDefinition("describe-project", "v1", "Describe", List.of(InsightType.PROJECT_PRESENTATION), List.of("traceable"), java.util.Map.of("type", "object"), "describe-project-prompt-v1"),
-                context
-        );
+        IntentDefinition intent = new IntentDefinition("describe-project", "v1", "Describe",
+                List.of(InsightType.PROJECT_PRESENTATION), List.of("traceable"),
+                Map.of("type", "object"), "describe-project-prompt-v1");
+        SelectedKnowledge selected = new SelectedKnowledge(
+                null, null, null, List.of(), List.of(),
+                new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0), List.of(),
+                new SelectedKnowledge.SelectionMetadata("selection-v1", List.of(), 0, 0,
+                        new SelectedKnowledge.KnowledgeBudget(40, 25, 10), "COMPLETE"),
+                "a".repeat(64));
+        return new PromptRequest(correlationId, correlationId, analysisId, UUID.randomUUID(),
+                AiTaskType.INSIGHT_GENERATION, intent, null, selected, intent.outputSchema(), Map.of());
     }
 }

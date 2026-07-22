@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.intent.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.NotBlank;
 
@@ -24,6 +25,7 @@ public record UserGuidance(
                 : priorities.stream().map(UserGuidance::normalize).toList();
     }
 
+    @JsonIgnore
     public boolean isEmpty() {
         return blank(focus) && blank(audience) && blank(levelOfDetail)
                 && blank(writingStyle) && blank(outputContext) && priorities.isEmpty();

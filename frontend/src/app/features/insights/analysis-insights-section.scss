@@ -1,0 +1,20 @@
+.insight-section {
+  margin-top: 2rem;
+  padding: var(--space-lg);
+}
+ul {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+li {
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 0.25rem;
+}
+.error {
+  border-color: var(--danger);
+}

@@ -11,6 +11,8 @@ import com.hopeful117.devlogai.validation.mapper.ValidationMapper;
 import com.hopeful117.devlogai.validation.repository.ValidationRepository;
 import com.hopeful117.devlogai.insight.service.InsightPromotionService;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.shared.exception.ConflictException;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -129,8 +131,8 @@ public class ValidationServiceTest {
         assertThatThrownBy(() ->
                 service.validate(request)
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Proposal not found: " + proposalId);
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining(proposalId.toString());
 
         verify(proposalRepository)
                 .findById(proposalId);
@@ -163,7 +165,7 @@ public class ValidationServiceTest {
         assertThatThrownBy(() ->
                 service.validate(request)
         )
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessage("Proposal has already been decided");
 
         verify(proposalRepository)
@@ -200,7 +202,7 @@ public class ValidationServiceTest {
         assertThatThrownBy(() ->
                 service.validate(request)
         )
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessage("Proposal has already been decided");
 
         verify(proposalRepository)
@@ -240,7 +242,7 @@ public class ValidationServiceTest {
         assertThatThrownBy(() ->
                 service.validate(request)
         )
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessage("Proposal has already been validated");
 
         verify(proposalRepository)
@@ -271,8 +273,8 @@ public class ValidationServiceTest {
         assertThatThrownBy(() ->
                 service.getById(validationId)
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Validation not found: " + validationId);
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining(validationId.toString());
 
         verify(validationRepository)
                 .findById(validationId);
@@ -290,10 +292,8 @@ public class ValidationServiceTest {
         assertThatThrownBy(() ->
                 service.getByProposalId(proposalId)
         )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage(
-                        "Validation not found for proposal: " + proposalId
-                );
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining(proposalId.toString());
 
         verify(validationRepository)
                 .findByProposalId(proposalId);

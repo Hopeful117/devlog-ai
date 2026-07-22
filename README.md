@@ -7,8 +7,8 @@ context, and asks an AI engine for structured interpretations. AI output is neve
 it becomes a proposal that must be accepted by a human before it is promoted to an immutable
 Insight.
 
-The project is currently a backend-first reference implementation. It exposes REST APIs and
-OpenAPI documentation; a user interface and document projections are not implemented yet.
+The project now includes a usable Angular MVP for the complete traceable interaction flow, alongside
+the REST APIs and OpenAPI documentation. Document projections remain future work.
 
 ## Current capabilities
 
@@ -25,6 +25,9 @@ OpenAPI documentation; a user interface and document projections are not impleme
 - Build deterministic, versioned Prompts with output contracts, traceability metadata, and content digests.
 - Validate proposals manually and promote accepted Insight Proposals to immutable Insights.
 - Retrieve Insights by project, analysis, type, and severity.
+- Use an Angular engineering dashboard to manage Projects and Sources, launch guided Analyses,
+  monitor deterministic and AI execution, review evidence, decide Proposals, and consult Insights.
+- Generate traceable user-facing Deliverables exclusively from human-validated Insights.
 
 ## Knowledge pipeline
 
@@ -44,12 +47,16 @@ Evidence → Facts → Observations → Project Profile
                               Human validation
                                       ↓
                             Trusted, immutable Insight
+                                      ↓
+                          Deliverable Generation
+                                      ↓
+                         Generated Deliverable
 ```
 
 The Java Core owns repositories, deterministic knowledge, workflow state, validation, and trusted
 Insights. Its Knowledge Selection Engine ranks, deduplicates, and budgets project knowledge for the
-resolved Intent. The Python AI Engine only interprets the immutable `SelectedKnowledge` supplied by the Core. It does
-not read repositories or create trusted knowledge directly.
+resolved Intent. The Python AI Engine only interprets the immutable `SelectedKnowledge` supplied by
+the Core. It does not read repositories or create trusted knowledge directly.
 
 At the AI boundary, the Core sends a provider-independent `PromptRequest`. The AI Engine builds an
 immutable `Prompt`, and the configured provider only adapts it to its API. Prompt versions,
@@ -62,12 +69,13 @@ verification.
 
 ## Architecture
 
-| Component | Technology | Responsibility |
-| --- | --- | --- |
+| Component    | Technology                    | Responsibility                                           |
+| ------------ | ----------------------------- | -------------------------------------------------------- |
 | Core backend | Java 21, Spring Boot 4.1, JPA | Domain model, collection, orchestration, validation, API |
-| AI Engine | Python 3.12, FastAPI | Intent-driven structured interpretation |
-| Database | PostgreSQL 17, Flyway | Durable domain state and migration history |
-| Runtime | Docker Compose | Local orchestration of all services |
+| AI Engine    | Python 3.12, FastAPI          | Intent-driven structured interpretation                  |
+| Frontend     | Angular 22, RxJS, SCSS        | Reactive project workspace and Human-in-the-Loop review  |
+| Database     | PostgreSQL 17, Flyway         | Durable domain state and migration history               |
+| Runtime      | Docker Compose                | Local orchestration of all services                      |
 
 Important documentation:
 
@@ -77,6 +85,8 @@ Important documentation:
 - [Logging policy](docs/logging-policy.md)
 - [Architecture Decision Records](docs/decisions/)
 - [AI Engine documentation](ai-engine/README.md)
+- [Frontend documentation](frontend/README.md)
+- [Manual MVP test guide](frontend/docs/manual-mvp-test.md)
 
 ## Quick start with Docker
 
@@ -102,13 +112,24 @@ database migrations automatically when the backend starts.
 
 Available services:
 
-| Service | URL |
-| --- | --- |
-| Core API | http://localhost:8080 |
-| Swagger UI | http://localhost:8080/swagger-ui.html |
-| OpenAPI JSON | http://localhost:8080/v3/api-docs |
-| AI Engine health | http://localhost:8000/health |
-| PostgreSQL | `localhost:5432` |
+| Service          | URL                                   |
+| ---------------- | ------------------------------------- |
+| Core API         | http://localhost:8080                 |
+| Swagger UI       | http://localhost:8080/swagger-ui.html |
+| OpenAPI JSON     | http://localhost:8080/v3/api-docs     |
+| AI Engine health | http://localhost:8000/health          |
+| PostgreSQL       | `localhost:5432`                      |
+
+Docker Compose starts PostgreSQL, Java Core, and the AI Engine. Start Angular separately:
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+The dashboard is then available at http://localhost:4200. Its development proxy forwards `/api`
+to Java Core on port 8080 without weakening backend CORS.
 
 Useful commands:
 
@@ -144,19 +165,19 @@ docker compose up --build -d
 
 Main settings:
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `LLM_PROVIDER` | `mock` | `mock` or `openai` |
-| `LLM_MODEL` | `gpt-4.1-mini` | Model used by the OpenAI provider |
-| `LLM_API_KEY` | empty | Required when `LLM_PROVIDER=openai` |
-| `LLM_TIMEOUT_SECONDS` | `30` | LLM request timeout |
-| `LLM_MAX_OUTPUT_TOKENS` | `2000` | Maximum structured output size |
-| `CORE_CALLBACK_MAX_ATTEMPTS` | `5` | Maximum callback attempts |
-| `BACKEND_LOG_LEVEL_APP` | `INFO` | Application log level |
-| `AI_ENGINE_LOG_LEVEL` | `INFO` | AI Engine log level |
-| `POSTGRES_DB` | `devlog_ai` | Database name |
-| `POSTGRES_USER` | `devlog` | Database user |
-| `POSTGRES_PASSWORD` | `devlog` | Local database password |
+| Variable                     | Default        | Purpose                             |
+| ---------------------------- | -------------- | ----------------------------------- |
+| `LLM_PROVIDER`               | `mock`         | `mock` or `openai`                  |
+| `LLM_MODEL`                  | `gpt-4.1-mini` | Model used by the OpenAI provider   |
+| `LLM_API_KEY`                | empty          | Required when `LLM_PROVIDER=openai` |
+| `LLM_TIMEOUT_SECONDS`        | `30`           | LLM request timeout                 |
+| `LLM_MAX_OUTPUT_TOKENS`      | `2000`         | Maximum structured output size      |
+| `CORE_CALLBACK_MAX_ATTEMPTS` | `5`            | Maximum callback attempts           |
+| `BACKEND_LOG_LEVEL_APP`      | `INFO`         | Application log level               |
+| `AI_ENGINE_LOG_LEVEL`        | `INFO`         | AI Engine log level                 |
+| `POSTGRES_DB`                | `devlog_ai`    | Database name                       |
+| `POSTGRES_USER`              | `devlog`       | Database user                       |
+| `POSTGRES_PASSWORD`          | `devlog`       | Local database password             |
 
 Collector limits can be adjusted with `COLLECTION_MAX_FILES`, `COLLECTION_MAX_FILE_SIZE`,
 `COLLECTION_MAX_TOTAL_BYTES`, `COLLECTION_MAX_FACTS_PER_TYPE`, and
@@ -166,7 +187,28 @@ For production-like backend behavior, set `SPRING_PROFILES_ACTIVE=prod`. This di
 OpenAPI, disables JPA Open Session in View, and emits ECS-compatible structured JSON logs. Secrets
 and non-default database credentials must be supplied by the deployment environment.
 
-## Running an analysis
+## Running an analysis from the dashboard
+
+The normal MVP path is:
+
+1. Ensure a Project exists in Core, then open http://localhost:4200/projects and select it.
+2. Register and activate a Git repository Source in the Project workspace.
+3. Choose a Core-provided Intent and optional structured User Guidance.
+4. Create and explicitly launch the Analysis.
+5. Monitor deterministic diagnostics and AI Task status on `/analyses/:id`.
+6. Inspect provider/model, Guidance snapshot, selection and prompt versions/digests, and proposals.
+7. Open a Proposal, inspect its rationale and evidence, then explicitly accept or reject it.
+8. Confirm that only a Core-accepted Proposal appears as an immutable validated Insight.
+
+The frontend calls Java Core exclusively. It never contacts the Python service directly, constructs
+prompts, accepts Proposals automatically, or exposes provider credentials. The default Mock provider
+identifies itself as `mock` / `deterministic-v1` and returns zero Proposals unless deterministic test
+output is configured.
+
+For a complete Mock/OpenAI walkthrough and troubleshooting, use the
+[manual MVP test guide](frontend/docs/manual-mvp-test.md).
+
+## Running an analysis through the API
 
 The complete API is documented in Swagger. The minimal workflow is:
 
@@ -218,6 +260,32 @@ An analysis may include optional, structured User Guidance without changing its 
 Guidance only controls emphasis and presentation. It cannot introduce Insight categories, alter
 the output schema, weaken grounding rules, or override the selected Intent.
 
+## Generating Deliverables
+
+ADR-034 adds a second, deliberately separate AI responsibility. Analysis AI proposes knowledge;
+Deliverable AI communicates knowledge that humans have already accepted. From a Project workspace,
+choose one of `PROJECT_DESCRIPTION`, `README`, `ARCHITECTURE_SUMMARY`,
+`PORTFOLIO_DESCRIPTION`, `TECHNICAL_SUMMARY`, or `BLOG_ARTICLE`, then specify audience, style,
+language, and optional bounded guidance.
+
+For the shortest user flow, accept one or more proposals, return to the source Analysis, then use
+**Generate a Deliverable** immediately below its Validated Insights. This sends the Project and
+Analysis scope to Core and opens the persisted result when generation completes.
+
+Core selects only persisted `Insight` records. Facts, Observations, AnalysisContext, source code,
+pending Proposals, and rejected Proposals never enter the Deliverable request. Every generated
+result stores its source Insight IDs, generation time, prompt version/digest, provider, and model.
+
+API endpoints:
+
+- `POST /api/v1/deliverables`
+- `GET /api/v1/deliverables/{id}`
+- `GET /api/v1/deliverables/project/{projectId}`
+- `GET /api/v1/deliverables/analysis/{analysisId}`
+
+The Angular detail route is `/deliverables/:id`. Generated Markdown-compatible content is displayed
+as safe text rather than injected HTML.
+
 ## Local development without Docker
 
 ### Requirements
@@ -225,6 +293,7 @@ the output schema, weaken grounding rules, or override the selected Intent.
 - Java 21
 - PostgreSQL 17 available on `localhost:5432`
 - Python 3.10 or newer
+- Node.js 22 and npm for the Angular frontend
 - Git
 
 Create the PostgreSQL database and credentials expected by
@@ -248,6 +317,14 @@ cd backend
 ./mvnw spring-boot:run
 ```
 
+In another terminal, start Angular:
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
 ### Tests
 
 ```bash
@@ -263,18 +340,25 @@ cd ai-engine
 pytest
 ```
 
+```bash
+cd frontend
+npm test
+npm run build
+```
+
 ## Project status and next steps
 
 Implemented foundations include the domain model, deterministic repository collection, diagnostic
-reporting, immutable project profiles, AnalysisContext construction, deterministic knowledge selection,
-intent-driven AI processing,
-human validation, production-oriented correlation logging, and immutable Insight promotion.
+reporting, immutable project profiles, AnalysisContext construction, deterministic knowledge
+selection, intent-driven AI processing, human validation, production-oriented correlation logging,
+immutable Insight promotion, and a reactive Angular dashboard covering the first complete
+Project-to-Insight workflow.
 
 The main remaining product work is:
 
-- document projections built from validated Insights;
-- a user interface for analysis and validation;
-- authentication and authorization;
+- richer editable/exportable projections built from generated Deliverables;
+- authentication-backed reviewer identity and authorization;
+- richer comparison and document-projection interfaces;
 - durable AI job execution instead of in-process background tasks;
 - credential management for private repositories;
 - production deployment, monitoring, and backup configuration;

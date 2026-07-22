@@ -3,11 +3,13 @@ from functools import lru_cache
 from app.clients.core_callback_client import CoreCallbackClient
 from app.core.config import Settings, get_settings
 from app.prompts.insight import InsightPromptBuilder
+from app.prompts.deliverable import DeliverablePromptBuilder
 from app.providers.base import LlmProvider
 from app.providers.mock import MockLlmProvider
 from app.providers.openai import OpenAiLlmProvider
 from app.services.insight_generation_service import InsightGenerationService
 from app.services.task_processing_service import AiTaskProcessingService
+from app.services.deliverable_generation_service import DeliverableGenerationService
 
 
 def build_llm_provider(settings: Settings) -> LlmProvider:
@@ -41,3 +43,12 @@ def get_task_processing_service() -> AiTaskProcessingService:
         callback_client=callback_client,
     )
     return AiTaskProcessingService(insight_service, callback_client)
+
+
+@lru_cache
+def get_deliverable_generation_service() -> DeliverableGenerationService:
+    settings = get_settings()
+    return DeliverableGenerationService(
+        provider=build_llm_provider(settings),
+        prompt_builder=DeliverablePromptBuilder(),
+    )

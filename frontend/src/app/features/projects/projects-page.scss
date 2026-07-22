@@ -1,0 +1,41 @@
+.projects {
+  max-width: 60rem;
+}
+
+.project-list {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+article,
+.state {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.state--error {
+  border-color: var(--danger);
+}
+
+dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 0;
+}
+
+dl div {
+  display: flex;
+  gap: 0.35rem;
+}
+
+dt {
+  font-weight: 600;
+}
+
+dd {
+  margin: 0;
+}

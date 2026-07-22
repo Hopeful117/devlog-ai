@@ -1,0 +1,260 @@
+<section class="analysis-detail" aria-labelledby="analysis-title">
+  <a routerLink="/projects">← Back to Projects</a>
+  @if (analysis$ | async; as analysis) {
+    @switch (analysis.state) {
+      @case ('loading') {
+        <p role="status">Loading Analysis…</p>
+      }
+      @case ('not-found') {
+        <div role="alert" class="error"><h1 id="analysis-title">Analysis not found</h1></div>
+      }
+      @case ('error') {
+        <div role="alert" class="error">{{ analysis.error.message }}</div>
+      }
+      @case ('loaded') {
+        <h1 id="analysis-title">{{ analysis.data.type }}</h1>
+        <dl>
+          <dt>ID</dt>
+          <dd>{{ analysis.data.id }}</dd>
+          <dt>Status</dt>
+          <dd>{{ analysis.data.status }}</dd>
+          <dt>Intent</dt>
+          <dd>{{ analysis.data.intentId }}/{{ analysis.data.intentVersion }}</dd>
+          <dt>Created</dt>
+          <dd>{{ analysis.data.createdAt | date: 'medium' }}</dd>
+          <dt>Started</dt>
+          <dd>
+            {{
+              analysis.data.startedAt ? (analysis.data.startedAt | date: 'medium') : 'Not started'
+            }}
+          </dd>
+          <dt>Completed</dt>
+          <dd>
+            {{
+              analysis.data.completedAt
+                ? (analysis.data.completedAt | date: 'medium')
+                : 'Not completed'
+            }}
+          </dd>
+        </dl>
+      }
+    }
+  }
+
+  <section class="analysis-card panel" aria-labelledby="diagnostics-title">
+    <div class="heading">
+      <h2 id="diagnostics-title">Diagnostics</h2>
+      <button type="button" (click)="refreshDiagnostics()">Refresh</button>
+    </div>
+    @if (diagnostics$ | async; as diagnostics) {
+      @if (diagnostics.state === 'loading') {
+        <p role="status">Loading diagnostics…</p>
+      } @else if (diagnostics.state === 'error') {
+        <div role="alert" class="error">
+          <p>Diagnostics polling stopped: {{ diagnostics.error.message }}</p>
+          <button type="button" (click)="refreshDiagnostics()">Try again</button>
+        </div>
+      } @else if (diagnostics.state === 'loaded') {
+        @if (diagnostics.data.identity.status === 'FAILED') {
+          <p role="alert" class="error">Analysis failed.</p>
+        }
+        <dl>
+          <dt>Status</dt>
+          <dd>{{ diagnostics.data.identity.status }}</dd>
+          <dt>Requested revision</dt>
+          <dd>{{ diagnostics.data.revision.requestedRevision || 'Source defaults' }}</dd>
+          <dt>Resolved revisions</dt>
+          <dd>
+            <code>{{ diagnostics.data.revision.resolvedRevisions | json }}</code>
+          </dd>
+          <dt>Duration</dt>
+          <dd>{{ diagnostics.data.timeline.duration || 'Not available' }}</dd>
+          <dt>Facts</dt>
+          <dd>{{ diagnostics.data.counts.factCount }}</dd>
+          <dt>Observations</dt>
+          <dd>{{ diagnostics.data.counts.observationCount }}</dd>
+          <dt>Warnings / errors</dt>
+          <dd>
+            {{ diagnostics.data.completeness.warningCount }} /
+            {{ diagnostics.data.completeness.errorCount }}
+          </dd>
+          <dt>Completeness</dt>
+          <dd>
+            {{ diagnostics.data.completeness.collectionComplete ? 'Complete' : 'Partial'
+            }}{{ diagnostics.data.completeness.truncated ? ' (truncated)' : '' }}
+          </dd>
+          <dt>Collectors</dt>
+          <dd>
+            {{ diagnostics.data.collectors.successfulCollectors }} successful,
+            {{ diagnostics.data.collectors.collectorsWithWarnings }} with warnings,
+            {{ diagnostics.data.collectors.failedCollectors }} failed
+          </dd>
+          <dt>AI Task</dt>
+          <dd>
+            {{
+              diagnostics.data.aiTask
+                ? diagnostics.data.aiTask.taskType + ' — ' + diagnostics.data.aiTask.status
+                : 'Not available'
+            }}
+          </dd>
+          <dt>Profile</dt>
+          <dd>
+            {{
+              diagnostics.data.profile.profileAvailable
+                ? diagnostics.data.profile.profileCompleteness +
+                  ' — ' +
+                  diagnostics.data.profile.characteristicCount +
+                  ' characteristics'
+                : 'Not available'
+            }}
+          </dd>
+        </dl>
+        <h3>Pipeline</h3>
+        <ol class="pipeline" data-testid="analysis-pipeline">
+          @for (stage of diagnostics.data.pipeline; track stage.name) {
+            <li>
+              <strong>{{ stage.name }}</strong
+              >: {{ stage.status }} ({{ stage.resourceCount }})
+            </li>
+          }
+        </ol>
+      }
+    }
+  </section>
+
+  <section class="analysis-card panel" aria-labelledby="execution-details-title">
+    <div class="heading">
+      <h2 id="execution-details-title">AI execution</h2>
+      <button type="button" (click)="refreshExecution()">Refresh</button>
+    </div>
+    @if (aiTasks$ | async; as tasks) {
+      @if (tasks.state === 'loading') {
+        <p role="status">Loading AI execution…</p>
+      } @else if (tasks.state === 'error') {
+        <div role="alert" class="error">
+          <p>AI Task monitoring stopped: {{ tasks.error.message }}</p>
+          <button type="button" (click)="refreshExecution()">Try again</button>
+        </div>
+      } @else if (tasks.state === 'loaded') {
+        @if (tasks.data[0]; as task) {
+          <dl data-testid="ai-task-metadata">
+            <dt>Task</dt>
+            <dd>{{ task.taskType }}</dd>
+            <dt>Status</dt>
+            <dd>{{ task.status }}</dd>
+            <dt>Submitted</dt>
+            <dd>{{ task.submittedAt ? (task.submittedAt | date: 'medium') : 'Not submitted' }}</dd>
+            <dt>Processing started</dt>
+            <dd>{{ task.startedAt ? (task.startedAt | date: 'medium') : 'Not started' }}</dd>
+            <dt>Completed</dt>
+            <dd>{{ task.completedAt ? (task.completedAt | date: 'medium') : 'Not completed' }}</dd>
+            <dt>Provider</dt>
+            <dd>{{ task.provider || 'Awaiting execution metadata' }}</dd>
+            <dt>Model</dt>
+            <dd>{{ task.modelIdentifier || 'Awaiting execution metadata' }}</dd>
+          </dl>
+          @if (task.status === 'FAILED') {
+            <p role="alert" class="error">
+              {{ task.failureCode || 'AI_TASK_FAILED' }}:
+              {{ task.failureMessage || 'The AI task failed.' }}
+            </p>
+          }
+          <details>
+            <summary>AI execution details</summary>
+            <dl>
+              <dt>Intent</dt>
+              <dd>{{ task.intentId || 'Unknown' }}/{{ task.intentVersion || 'Unknown' }}</dd>
+              <dt>Selection</dt>
+              <dd>{{ task.selectionVersion || 'Unavailable' }}</dd>
+              <dt>Selection digest</dt>
+              <dd>
+                <code>{{ task.selectionDigest || 'Unavailable' }}</code>
+              </dd>
+              <dt>Prompt version</dt>
+              <dd>{{ task.promptVersion || 'Unavailable' }}</dd>
+              <dt>Prompt digest</dt>
+              <dd>
+                <code>{{ task.promptContentDigest || 'Unavailable' }}</code>
+              </dd>
+              <dt>Context digest</dt>
+              <dd>
+                <code>{{ task.contextDigest || 'Unavailable' }}</code>
+              </dd>
+              <dt>Correlation ID</dt>
+              <dd>
+                <code>{{ task.correlationId }}</code>
+              </dd>
+              <dt>Attempts</dt>
+              <dd>{{ task.attemptCount }}</dd>
+            </dl>
+            <h3>User Guidance snapshot</h3>
+            <pre><code>{{ task.userGuidanceSnapshot || {} | json }}</code></pre>
+            <p>
+              The rendered prompt and provider request are intentionally not exposed by the Core.
+            </p>
+          </details>
+          <app-analysis-insights-section
+            [analysisId]="task.analysisId"
+            [executionStatus]="task.status"
+            [provider]="task.provider"
+            [refreshToken]="task.status + ':' + (task.completedAt || '')"
+          />
+        } @else {
+          <p>No AI Task has been created for this Analysis.</p>
+        }
+      }
+    }
+  </section>
+
+  <section class="analysis-card panel">
+    <h2>Project Profile</h2>
+    @if (profile$ | async; as profile) {
+      @if (profile.state === 'loading') {
+        <p role="status">Loading Profile…</p>
+      } @else if (profile.state === 'error') {
+        <p class="error">{{ profile.error.message }}</p>
+      } @else if (profile.state === 'loaded') {
+        <p>{{ profile.data.deterministicSummary }}</p>
+        <p>
+          {{ profile.data.completeness.status }} ·
+          {{ profile.data.characteristicCount }} characteristics
+        </p>
+      }
+    }
+  </section>
+  <section class="analysis-card panel">
+    <h2>Warnings</h2>
+    @if (warnings$ | async; as warnings) {
+      @if (warnings.state === 'loading') {
+        <p role="status">Loading warnings…</p>
+      } @else if (warnings.state === 'error') {
+        <p class="error">{{ warnings.error.message }}</p>
+      } @else if (warnings.state === 'loaded') {
+        @if (warnings.data.length === 0) {
+          <p>No collection warnings.</p>
+        } @else {
+          <ul>
+            @for (warning of warnings.data; track warning.id) {
+              <li>
+                <strong>{{ warning.severity }} — {{ warning.code }}</strong
+                >: {{ warning.message }}
+              </li>
+            }
+          </ul>
+        }
+      }
+    }
+  </section>
+  <section class="analysis-card panel">
+    <h2>Analysis Context</h2>
+    @if (context$ | async; as context) {
+      @if (context.state === 'loading') {
+        <p role="status">Loading context…</p>
+      } @else if (context.state === 'error') {
+        <p class="error">{{ context.error.message }}</p>
+      } @else if (context.state === 'loaded') {
+        <pre><code>{{ context.data | json }}</code></pre>
+      }
+    }
+  </section>
+</section>

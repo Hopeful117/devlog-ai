@@ -18,6 +18,10 @@ public interface InsightRepository extends JpaRepository<Insight, UUID> {
             UUID analysisId
     );
 
+    List<Insight> findByProjectIdOrderByCreatedAtDescIdDesc(UUID projectId);
+
+    List<Insight> findByAnalysisIdOrderByCreatedAtDescIdDesc(UUID analysisId);
+
     List<Insight> findByProjectIdAndTypeOrderByCreatedAtDesc(
             UUID projectId,
             InsightType type

@@ -15,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
+import com.hopeful117.devlogai.shared.exception.ConflictException;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 
 @Service
 @RequiredArgsConstructor
@@ -35,15 +37,11 @@ public class ValidationServiceImpl implements ValidationService {
 
         ValidatableProposal proposal =
                 proposalRepository.findById(request.proposalId())
-                        .orElseThrow(() ->
-                                new IllegalArgumentException(
-                                        "Proposal not found: "
-                                                + request.proposalId()
-                                )
-                        );
+                        .orElseThrow(() -> new EntityNotFoundException(
+                                "Proposal", request.proposalId()));
 
         if (proposal.getStatus() != ProposalStatus.PROPOSED) {
-            throw new IllegalArgumentException(
+            throw new ConflictException(
                     "Proposal has already been decided"
             );
         }
@@ -51,7 +49,7 @@ public class ValidationServiceImpl implements ValidationService {
         if (validationRepository.existsByProposalId(
                 request.proposalId()
         )) {
-            throw new IllegalArgumentException(
+            throw new ConflictException(
                     "Proposal has already been validated"
             );
         }
@@ -85,11 +83,7 @@ public class ValidationServiceImpl implements ValidationService {
 
         return validationRepository.findById(id)
                 .map(validationMapper::toResponse)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "Validation not found: " + id
-                        )
-                );
+                        .orElseThrow(() -> new EntityNotFoundException("Validation", id));
     }
 
     @Override
@@ -100,11 +94,7 @@ public class ValidationServiceImpl implements ValidationService {
         return validationRepository
                 .findByProposalId(proposalId)
                 .map(validationMapper::toResponse)
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "Validation not found for proposal: "
-                                        + proposalId
-                        )
-                );
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Validation for proposal", proposalId));
     }
 }

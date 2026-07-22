@@ -17,8 +17,25 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.hopeful117.devlogai.shared.exception.ConflictException;
 
 class ValidationControllerWebMvcTest extends ControllerWebMvcTestSupport {
+
+    @Test
+    void shouldReturnConflictWhenProposalWasAlreadyDecided() throws Exception {
+        ValidationService service = mock(ValidationService.class);
+        when(service.validate(any())).thenThrow(new ConflictException(
+                "Proposal has already been decided"));
+        MockMvc mvc = mockMvc(new ValidationController(service));
+
+        mvc.perform(post("/api/v1/validations").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"proposalId\":\"%s\",\"decision\":\"REJECTED\"," +
+                                "\"validatedBy\":\"%s\"}".formatted(
+                                        UUID.randomUUID(), UUID.randomUUID())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value(
+                        "Proposal has already been decided"));
+    }
 
     @Test
     void shouldExposeAllValidationRoutes() throws Exception {

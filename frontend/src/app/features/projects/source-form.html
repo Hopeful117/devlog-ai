@@ -1,0 +1,40 @@
+<form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <h3>Add a Git repository</h3>
+
+  <label for="source-name">Name</label>
+  <input id="source-name" type="text" formControlName="name" maxlength="255" />
+  @if (form.controls.name.touched && form.controls.name.hasError('required')) {
+    <p class="field-error">Name is required.</p>
+  }
+
+  <label for="repository-url">Repository URL</label>
+  <input
+    id="repository-url"
+    type="text"
+    formControlName="repositoryUrl"
+    maxlength="2000"
+    placeholder="https://github.com/example/project.git"
+  />
+  @if (form.controls.repositoryUrl.touched && form.controls.repositoryUrl.hasError('required')) {
+    <p class="field-error">Repository URL is required.</p>
+  } @else if (
+    form.controls.repositoryUrl.touched && form.controls.repositoryUrl.hasError('gitLocation')
+  ) {
+    <p class="field-error">Enter an HTTP(S), SSH, Git, or Git SCP-style repository location.</p>
+  }
+
+  <label for="default-branch">Default branch <span>(optional)</span></label>
+  <input id="default-branch" type="text" formControlName="defaultBranch" maxlength="255" />
+
+  <label for="provider">Provider <span>(optional)</span></label>
+  <select id="provider" formControlName="provider">
+    <option value="">Not specified</option>
+    @for (provider of providers; track provider) {
+      <option [value]="provider">{{ provider }}</option>
+    }
+  </select>
+
+  <button type="submit" [disabled]="form.invalid || submitting">
+    {{ submitting ? 'Adding source…' : 'Add source' }}
+  </button>
+</form>
