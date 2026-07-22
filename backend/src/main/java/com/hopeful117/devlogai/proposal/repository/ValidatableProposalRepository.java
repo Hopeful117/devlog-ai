@@ -31,5 +31,6 @@ public interface ValidatableProposalRepository extends JpaRepository<Validatable
     );
 
     long countByAiTaskId(UUID aiTaskId);
+    long countByAnalysisId(UUID analysisId);
     List<ValidatableProposal> findByProjectId(UUID projectId);
 }

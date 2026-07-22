@@ -2,6 +2,11 @@ package com.hopeful117.devlogai.collection.service;
 
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
+import com.hopeful117.devlogai.analysis.diagnostics.entity.AnalysisExecutionDiagnostic;
+import com.hopeful117.devlogai.analysis.diagnostics.entity.CollectionWarningEntity;
+import com.hopeful117.devlogai.analysis.diagnostics.entity.WarningSeverity;
+import com.hopeful117.devlogai.analysis.diagnostics.repository.AnalysisExecutionDiagnosticRepository;
+import com.hopeful117.devlogai.analysis.diagnostics.repository.CollectionWarningRepository;
 import com.hopeful117.devlogai.collection.collector.CollectedFact;
 import com.hopeful117.devlogai.collection.collector.CollectionContext;
 import com.hopeful117.devlogai.collection.collector.CollectionResult;
@@ -48,6 +53,8 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
     private final ObservationEngine observationEngine;
     private final FactRepository factRepository;
     private final ObservationRepository observationRepository;
+    private final CollectionWarningRepository collectionWarningRepository;
+    private final AnalysisExecutionDiagnosticRepository diagnosticRepository;
 
     @Override
     @Transactional
@@ -64,6 +71,12 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
 
         List<Fact> collectedFacts = new ArrayList<>();
         List<CollectionDiagnostic> warnings = new ArrayList<>();
+        List<CollectionWarningEntity> warningEntities = new ArrayList<>();
+        Map<String, Object> collectorVersions = new LinkedHashMap<>();
+        int collectorCount = 0;
+        int successfulCollectors = 0;
+        int collectorsWithWarnings = 0;
+        int failedCollectors = 0;
         Set<String> fingerprints = new HashSet<>(
                 factRepository.findFingerprintsByAnalysisId(analysisId));
         Map<UUID, String> revisions = new LinkedHashMap<>();
@@ -84,6 +97,8 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
             );
             for (KnowledgeCollector collector : orderedCollectors) {
                 if (!collector.supports(context)) continue;
+                collectorCount++;
+                collectorVersions.put(collector.type().name(), collector.version());
                 try {
                     CollectionResult result = collectorRunner.run(collector, context);
                     validateResult(collector, result);
@@ -91,13 +106,24 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
                             .filter(fact -> fingerprints.add(fact.fingerprint()))
                             .map(fact -> toEntity(analysis, fact))
                             .forEach(collectedFacts::add);
-                    result.warnings().forEach(warning -> warnings.add(new CollectionDiagnostic(
-                            source.getId(), result.collectorType(), result.collectorVersion(),
-                            warning.code(), warning.message())));
+                    if (result.warnings().isEmpty()) successfulCollectors++;
+                    else collectorsWithWarnings++;
+                    result.warnings().forEach(warning -> {
+                        warnings.add(new CollectionDiagnostic(
+                                source.getId(), result.collectorType(), result.collectorVersion(),
+                                warning.code(), warning.message()));
+                        warningEntities.add(toWarningEntity(
+                                analysis, source, result.collectorType(), result.collectorVersion(),
+                                warning.code(), warning.message(), WarningSeverity.WARNING));
+                    });
                 } catch (NonFatalCollectionException failure) {
+                    failedCollectors++;
                     warnings.add(new CollectionDiagnostic(
                             source.getId(), collector.type(), collector.version(),
                             failure.code(), failure.getMessage()));
+                    warningEntities.add(toWarningEntity(
+                            analysis, source, collector.type(), collector.version(),
+                            failure.code(), failure.getMessage(), WarningSeverity.ERROR));
                 }
             }
             source.setLastSynchronizedAt(Instant.now());
@@ -111,6 +137,38 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
                 observationEngine.derive(List.copyOf(savedFacts))
         );
         observationRepository.saveAll(observations);
+        collectionWarningRepository.saveAll(warningEntities);
+
+        int errorCount = (int) warningEntities.stream()
+                .filter(warning -> warning.getSeverity() == WarningSeverity.ERROR)
+                .count();
+        boolean truncated = warningEntities.stream()
+                .map(CollectionWarningEntity::getCode)
+                .anyMatch(code -> code.contains("LIMIT") || code.contains("TRUNCAT"));
+        Map<String, Object> resolvedRevisions = revisions.entrySet().stream()
+                .collect(Collectors.toMap(
+                        entry -> entry.getKey().toString(),
+                        Map.Entry::getValue,
+                        (left, right) -> left,
+                        LinkedHashMap::new
+                ));
+        diagnosticRepository.save(AnalysisExecutionDiagnostic.builder()
+                .analysis(analysis)
+                .sourceCount(sources.size())
+                .factCount(savedFacts.size())
+                .observationCount(observations.size())
+                .warningCount(warningEntities.size())
+                .errorCount(errorCount)
+                .collectorCount(collectorCount)
+                .successfulCollectors(successfulCollectors)
+                .collectorsWithWarnings(collectorsWithWarnings)
+                .failedCollectors(failedCollectors)
+                .collectionComplete(errorCount == 0 && !truncated)
+                .truncated(truncated)
+                .resolvedRevisions(resolvedRevisions)
+                .collectorVersions(collectorVersions)
+                .collectedAt(Instant.now())
+                .build());
 
         return new KnowledgeCollectionResult(
                 sources.size(),
@@ -119,6 +177,28 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
                 revisions,
                 warnings
         );
+    }
+
+    private CollectionWarningEntity toWarningEntity(
+            Analysis analysis,
+            Source source,
+            com.hopeful117.devlogai.collection.collector.CollectorType collectorType,
+            String collectorVersion,
+            String code,
+            String message,
+            WarningSeverity severity
+    ) {
+        return CollectionWarningEntity.builder()
+                .analysis(analysis)
+                .source(source)
+                .collectorType(collectorType)
+                .collectorVersion(collectorVersion)
+                .code(code)
+                .severity(severity)
+                .message(message)
+                .metadata(Map.of())
+                .occurredAt(Instant.now())
+                .build();
     }
 
     private void validateResult(KnowledgeCollector collector, CollectionResult result) {

@@ -55,6 +55,8 @@ class KnowledgeCollectionServiceTest {
     @Mock private ObservationEngine observationEngine;
     @Mock private FactRepository factRepository;
     @Mock private ObservationRepository observationRepository;
+    @Mock private com.hopeful117.devlogai.analysis.diagnostics.repository.CollectionWarningRepository collectionWarningRepository;
+    @Mock private com.hopeful117.devlogai.analysis.diagnostics.repository.AnalysisExecutionDiagnosticRepository diagnosticRepository;
 
     private KnowledgeCollectionServiceImpl service;
 
@@ -68,7 +70,9 @@ class KnowledgeCollectionServiceTest {
                 collectorRunner,
                 observationEngine,
                 factRepository,
-                observationRepository
+                observationRepository,
+                collectionWarningRepository,
+                diagnosticRepository
         );
     }
 
@@ -133,6 +137,14 @@ class KnowledgeCollectionServiceTest {
         verify(factRepository).saveAll(facts.capture());
         assertEquals(analysis, facts.getValue().getFirst().getAnalysis());
         assertEquals(FactType.COMMIT, facts.getValue().getFirst().getType());
+
+        ArgumentCaptor<com.hopeful117.devlogai.analysis.diagnostics.entity.AnalysisExecutionDiagnostic>
+                diagnostic = ArgumentCaptor.forClass(
+                com.hopeful117.devlogai.analysis.diagnostics.entity.AnalysisExecutionDiagnostic.class);
+        verify(diagnosticRepository).save(diagnostic.capture());
+        assertEquals(1, diagnostic.getValue().getCollectorCount());
+        assertEquals(1, diagnostic.getValue().getSuccessfulCollectors());
+        assertEquals(true, diagnostic.getValue().isCollectionComplete());
 
         ArgumentCaptor<List<Observation>> observations = ArgumentCaptor.forClass(List.class);
         verify(observationRepository).saveAll(observations.capture());

@@ -23,4 +23,6 @@ public interface AiTaskRepository extends JpaRepository<AiTask, UUID> {
     );
 
     List<AiTask> findByAnalysisIdOrderByCreatedAtDescIdDesc(UUID analysisId);
+
+    Optional<AiTask> findFirstByAnalysisIdOrderByCreatedAtDescIdDesc(UUID analysisId);
 }

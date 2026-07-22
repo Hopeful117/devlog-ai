@@ -6,6 +6,8 @@ import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
+import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
+import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.fact.entity.Fact;
 import com.hopeful117.devlogai.fact.repository.FactRepository;
 import com.hopeful117.devlogai.observation.entity.Observation;
@@ -31,6 +33,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
     private final ValidatableProposalRepository proposalRepository;
     private final FactRepository factRepository;
     private final ObservationRepository observationRepository;
+    private final AnalysisRepository analysisRepository;
 
     @Override
     @Transactional
@@ -55,6 +58,12 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                         "AI task already ended with a different terminal status."
                 );
             }
+            finishAnalysis(
+                    task,
+                    task.getStatus() == AiTaskStatus.COMPLETED
+                            ? AnalysisStatus.COMPLETED : AnalysisStatus.FAILED,
+                    task.getCompletedAt() == null ? request.completedAt() : task.getCompletedAt()
+            );
             log.info("AI task result acknowledged as duplicate correlationId={} taskStatus={}",
                     correlationId, task.getStatus());
             return acknowledgement(task, true);
@@ -78,6 +87,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         if (request.status() == AiTaskResultStatus.FAILED) {
             failTask(task, request);
             aiTaskRepository.save(task);
+            finishAnalysis(task, AnalysisStatus.FAILED, request.completedAt());
             log.warn("AI task marked failed correlationId={} failureCode={}",
                     correlationId, request.error().code());
             return acknowledgement(task, false);
@@ -87,9 +97,16 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         proposalRepository.saveAll(toProposals(task, request.proposals()));
         completeTask(task, request.completedAt());
         aiTaskRepository.save(task);
+        finishAnalysis(task, AnalysisStatus.COMPLETED, request.completedAt());
         log.info("AI task completed correlationId={} proposalCount={}",
                 correlationId, request.proposals().size());
         return acknowledgement(task, false);
+    }
+
+    private void finishAnalysis(AiTask task, AnalysisStatus status, Instant completedAt) {
+        task.getAnalysis().setStatus(status);
+        task.getAnalysis().setCompletedAt(completedAt);
+        analysisRepository.save(task.getAnalysis());
     }
 
     private void validateContract(

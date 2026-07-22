@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import com.hopeful117.devlogai.analysis.diagnostics.service.AnalysisDiagnosticsService;
 
 class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
 
@@ -32,7 +33,8 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
     void shouldExposeAllAnalysisRoutesAndTaskTypeContract() throws Exception {
         AnalysisService service = mock(AnalysisService.class);
         AnalysisWorkflowService workflow = mock(AnalysisWorkflowService.class);
-        MockMvc mvc = mockMvc(new AnalysisController(service, workflow));
+        AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
+        MockMvc mvc = mockMvc(new AnalysisController(service, workflow, diagnostics));
         UUID id = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
@@ -48,6 +50,8 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         when(workflow.start(id))
                 .thenReturn(new AnalysisWorkflowResult(id, AnalysisStatus.IN_PROGRESS, 2, 1,
                         taskId, AiTaskStatus.SUBMITTED, correlationId));
+        when(diagnostics.getWarnings(id)).thenReturn(List.of());
+        when(diagnostics.getContext(id)).thenReturn(java.util.Map.of("analysisId", id.toString()));
 
         mvc.perform(post("/api/v1/analyses").contentType(MediaType.APPLICATION_JSON)
                         .content(("{\"projectId\":\"%s\",\"type\":\"ARCHITECTURE_REVIEW\"," +
@@ -64,5 +68,9 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("PENDING"));
         mvc.perform(post("/api/v1/analyses/{id}/workflow", id))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.aiTaskStatus").value("SUBMITTED"));
+        mvc.perform(get("/api/v1/analyses/{id}/diagnostics", id)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/analyses/{id}/warnings", id)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/analyses/{id}/context", id))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.analysisId").value(id.toString()));
     }
 }

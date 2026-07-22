@@ -7,6 +7,7 @@ import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
+import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.fact.entity.Fact;
 import com.hopeful117.devlogai.fact.repository.FactRepository;
 import com.hopeful117.devlogai.observation.entity.Observation;
@@ -46,6 +47,9 @@ class AiTaskResultServiceTest {
 
     @Mock
     private ObservationRepository observationRepository;
+
+    @Mock
+    private AnalysisRepository analysisRepository;
 
     @InjectMocks
     private AiTaskResultServiceImpl service;

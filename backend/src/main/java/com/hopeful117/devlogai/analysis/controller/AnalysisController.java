@@ -7,6 +7,9 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.service.AnalysisService;
 import com.hopeful117.devlogai.analysis.workflow.AnalysisWorkflowService;
 import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
+import com.hopeful117.devlogai.analysis.diagnostics.dto.AnalysisDiagnosticsResponse;
+import com.hopeful117.devlogai.analysis.diagnostics.dto.CollectionWarningResponse;
+import com.hopeful117.devlogai.analysis.diagnostics.service.AnalysisDiagnosticsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/analyses")
@@ -22,6 +26,22 @@ import java.util.UUID;
 public class AnalysisController {
     private final AnalysisService analysisService;
     private final AnalysisWorkflowService analysisWorkflowService;
+    private final AnalysisDiagnosticsService analysisDiagnosticsService;
+
+    @GetMapping("/{id}/diagnostics")
+    public ResponseEntity<AnalysisDiagnosticsResponse> getDiagnostics(@PathVariable UUID id) {
+        return ResponseEntity.ok(analysisDiagnosticsService.getDiagnostics(id));
+    }
+
+    @GetMapping("/{id}/warnings")
+    public ResponseEntity<List<CollectionWarningResponse>> getWarnings(@PathVariable UUID id) {
+        return ResponseEntity.ok(analysisDiagnosticsService.getWarnings(id));
+    }
+
+    @GetMapping("/{id}/context")
+    public ResponseEntity<Map<String, Object>> getContext(@PathVariable UUID id) {
+        return ResponseEntity.ok(analysisDiagnosticsService.getContext(id));
+    }
 
     @PostMapping
     public ResponseEntity<AnalysisResponse> create(
