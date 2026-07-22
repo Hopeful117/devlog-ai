@@ -27,6 +27,14 @@ class AiTaskResultError(ResultContractModel):
     message: str = Field(min_length=1, max_length=5000)
 
 
+class PromptExecutionMetadata(ResultContractModel):
+    prompt_version: str = Field(alias="promptVersion", min_length=1, max_length=100)
+    provider: str = Field(min_length=1, max_length=100)
+    model_identifier: str = Field(alias="modelIdentifier", min_length=1, max_length=255)
+    prompt_content_digest: str = Field(alias="promptContentDigest", pattern=r"^[0-9a-f]{64}$")
+    context_digest: str = Field(alias="contextDigest", pattern=r"^[0-9a-f]{64}$")
+
+
 class AiTaskResultRequest(ResultContractModel):
     correlation_id: UUID = Field(alias="correlationId")
     external_job_id: str | None = Field(alias="externalJobId")
@@ -34,6 +42,9 @@ class AiTaskResultRequest(ResultContractModel):
     completed_at: datetime = Field(alias="completedAt")
     proposals: list[AiProposalResult]
     error: AiTaskResultError | None = None
+    prompt_execution: PromptExecutionMetadata | None = Field(
+        default=None, alias="promptExecution"
+    )
 
 
 class AiTaskResultAcknowledgement(ResultContractModel):

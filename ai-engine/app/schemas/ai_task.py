@@ -43,13 +43,20 @@ class IntentDefinition(ContractModel):
     prompt_template: str = Field(alias="promptTemplate", min_length=1, max_length=100)
 
 
-class AiTaskSubmissionRequest(ContractModel):
+class PromptRequest(ContractModel):
+    request_id: UUID = Field(alias="requestId")
     correlation_id: UUID = Field(alias="correlationId")
-    task_type: AiTaskType = Field(alias="taskType")
     analysis_id: UUID = Field(alias="analysisId")
+    ai_task_id: UUID = Field(alias="aiTaskId")
+    task_type: AiTaskType = Field(alias="taskType")
     intent: IntentDefinition
     user_guidance: UserGuidance | None = Field(default=None, alias="userGuidance")
     context: dict[str, Any]
+    expected_output_contract: dict[str, Any] = Field(alias="expectedOutputContract")
+    metadata: dict[str, Any]
+
+
+AiTaskSubmissionRequest = PromptRequest
 
 
 class AiTaskSubmissionResponse(ContractModel):

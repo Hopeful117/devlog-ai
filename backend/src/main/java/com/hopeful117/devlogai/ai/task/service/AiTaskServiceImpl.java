@@ -79,6 +79,7 @@ public class AiTaskServiceImpl implements AiTaskService {
         task.setUserGuidanceSnapshot(analysis.getUserGuidance() == null
                 ? null : Collections.unmodifiableMap(
                         new LinkedHashMap<>(analysis.getUserGuidance())));
+        task.setPromptRequestId(task.getCorrelationId());
         task.setContextSnapshot(contextSnapshot);
         task.setAttemptCount(0);
         task.setExternalJobId(null);

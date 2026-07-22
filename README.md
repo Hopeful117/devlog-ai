@@ -21,6 +21,7 @@ OpenAPI documentation; a user interface and document projections are not impleme
 - Diagnose partial collection and expose analysis warnings.
 - Run an asynchronous Core-to-AI workflow with correlation IDs, retries, and structured logs.
 - Generate structured Insight Proposals from versioned Intents.
+- Build deterministic, versioned Prompts with output contracts, traceability metadata, and content digests.
 - Validate proposals manually and promote accepted Insight Proposals to immutable Insights.
 - Retrieve Insights by project, analysis, type, and severity.
 
@@ -45,6 +46,11 @@ Evidence → Facts → Observations → Project Profile
 The Java Core owns repositories, deterministic knowledge, workflow state, validation, and trusted
 Insights. The Python AI Engine only interprets the immutable context supplied by the Core. It does
 not read repositories or create trusted knowledge directly.
+
+At the AI boundary, the Core sends a provider-independent `PromptRequest`. The AI Engine builds an
+immutable `Prompt`, and the configured provider only adapts it to its API. Prompt versions,
+SHA-256 content digests, provider/model identifiers, and context digests are persisted with AI Tasks
+without logging complete prompt content.
 
 ## Architecture
 

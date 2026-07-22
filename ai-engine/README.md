@@ -1,7 +1,7 @@
 # DevLog AI Engine
 
 Insight generation is intent-driven. Every accepted submission contains a
-versioned catalog Intent and an immutable `AnalysisContext`; arbitrary user
+provider-independent `PromptRequest` with a versioned catalog Intent and an immutable `AnalysisContext`; arbitrary user
 prompts are not accepted. The prompt builder only supports registered template
 versions and validates generated Insight categories against the Intent before
 returning proposals for human validation.
@@ -10,6 +10,14 @@ Submissions may include structured User Guidance (`focus`, `audience`,
 `levelOfDetail`, `writingStyle`, `outputContext`, and ordered `priorities`). It is
 validated as a closed schema and inserted into the prompt at the lowest priority:
 Intent and AnalysisContext constraints always win.
+
+The Prompt Builder converts this contract into an immutable, provider-agnostic
+`Prompt` containing separate system and user messages, the expected output
+schema, a generation policy, traceability metadata, and a deterministic SHA-256
+content digest. Providers only adapt that Prompt to their external API. Prompt
+versions, digests, provider names, and model identifiers are returned to the
+Core for persistence; complete rendered prompts are never written to standard
+logs.
 
 FastAPI service responsible for the AI-processing boundary of DevLog AI.
 

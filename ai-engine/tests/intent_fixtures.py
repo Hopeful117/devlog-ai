@@ -1,5 +1,8 @@
 from app.models.intent import InsightType
 from app.schemas.ai_task import IntentDefinition
+from app.schemas.ai_task import PromptRequest, UserGuidance
+from app.models.ai_task import AiTaskType
+from uuid import uuid4
 
 
 def describe_project_intent() -> IntentDefinition:
@@ -20,3 +23,21 @@ def describe_project_intent() -> IntentDefinition:
 
 def describe_project_intent_json() -> dict[str, object]:
     return describe_project_intent().model_dump(by_alias=True, mode="json")
+
+
+def prompt_request(
+    *, context: dict[str, object] | None = None,
+    guidance: UserGuidance | None = None,
+) -> PromptRequest:
+    analysis_id = uuid4()
+    return PromptRequest(
+        request_id=uuid4(), correlation_id=uuid4(), analysis_id=analysis_id,
+        ai_task_id=uuid4(), task_type=AiTaskType.INSIGHT_GENERATION,
+        intent=describe_project_intent(), user_guidance=guidance,
+        context=context or {
+            "project": {"id": str(uuid4()), "name": "Core"},
+            "analysis": {"id": str(analysis_id)}, "facts": [], "observations": [],
+        },
+        expected_output_contract={"type": "object", "root": "proposals"},
+        metadata={"source": "test"},
+    )

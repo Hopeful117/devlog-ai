@@ -47,7 +47,20 @@ public class IntentCatalog {
                 List.of("Utiliser uniquement AnalysisContext.",
                         "Ne produire que des propositions traçables et soumises à validation humaine.",
                         "Ne jamais présenter une proposition comme une connaissance validée."),
-                Map.of("type", "object", "root", "proposals", "structured", true), template);
+                outputContract(types), template);
+    }
+
+    private static Map<String, Object> outputContract(List<InsightType> types) {
+        return Map.of(
+                "type", "object",
+                "root", "proposals",
+                "structured", true,
+                "minimumProposalCount", 0,
+                "maximumProposalCount", 10,
+                "allowedInsightTypes", types.stream().map(Enum::name).toList(),
+                "requiredProposalFields", List.of(
+                        "insightType", "title", "summary", "rationale", "confidence",
+                        "supportingFactIds", "supportingObservationIds", "evidenceReferences"));
     }
 
     private static void register(Map<String, IntentDefinition> target, IntentDefinition intent) {

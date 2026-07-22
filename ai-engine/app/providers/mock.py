@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from app.providers.base import LlmRequest, StructuredOutput
+from app.providers.base import Prompt, StructuredOutput
 
 
 class MockLlmProvider:
@@ -12,11 +12,19 @@ class MockLlmProvider:
 
     def __init__(self, outputs: Iterable[Any] | None = None) -> None:
         self._outputs = deque(outputs or [])
-        self.requests: list[LlmRequest] = []
+        self.requests: list[Prompt] = []
+
+    @property
+    def provider_name(self) -> str:
+        return "mock"
+
+    @property
+    def model_identifier(self) -> str:
+        return "deterministic-v1"
 
     async def generate_structured(
         self,
-        request: LlmRequest,
+        request: Prompt,
         response_model: type[StructuredOutput],
     ) -> StructuredOutput:
         self.requests.append(request)

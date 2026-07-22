@@ -64,9 +64,16 @@ class AiTaskResultControllerTest {
                                     "supportingObservationIds": [],
                                     "evidenceReferences": ["src/app.py:10"]
                                   }],
-                                  "error": null
+                                  "error": null,
+                                  "promptExecution": {
+                                    "promptVersion": "describe-project-prompt-v1",
+                                    "provider": "mock",
+                                    "modelIdentifier": "deterministic-v1",
+                                    "promptContentDigest": "%s",
+                                    "contextDigest": "%s"
+                                  }
                                 }
-                                """.formatted(correlationId)))
+                                """.formatted(correlationId, "a".repeat(64), "b".repeat(64))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.correlationId")
                         .value(correlationId.toString()))

@@ -56,6 +56,24 @@ public class AiTask {
     @Column(name = "user_guidance_snapshot", updatable = false, columnDefinition = "jsonb")
     private Map<String, Object> userGuidanceSnapshot;
 
+    @Column(name = "prompt_request_id", updatable = false)
+    private UUID promptRequestId;
+
+    @Column(name = "prompt_version", length = 100)
+    private String promptVersion;
+
+    @Column(name = "provider", length = 100)
+    private String provider;
+
+    @Column(name = "model_identifier", length = 255)
+    private String modelIdentifier;
+
+    @Column(name = "prompt_content_digest", length = 64)
+    private String promptContentDigest;
+
+    @Column(name = "context_digest", length = 64)
+    private String contextDigest;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

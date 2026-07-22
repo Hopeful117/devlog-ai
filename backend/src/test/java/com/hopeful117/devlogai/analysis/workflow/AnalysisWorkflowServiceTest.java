@@ -249,7 +249,8 @@ class AnalysisWorkflowServiceTest {
                 new CreateAiTaskRequest(analysisId, taskType),
                 context
         )).thenReturn(task);
-        when(aiEngineClient.submit(any())).thenThrow(failure);
+        when(aiEngineClient.submit(any(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class)))
+                .thenThrow(failure);
 
         RuntimeException result = assertThrows(
                 RuntimeException.class,

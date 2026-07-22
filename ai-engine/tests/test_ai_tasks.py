@@ -27,9 +27,11 @@ async def test_submit_ai_task_returns_accepted_acknowledgement() -> None:
     correlation_id = uuid4()
     analysis_id = uuid4()
     payload = {
+        "requestId": str(uuid4()),
         "correlationId": str(correlation_id),
         "taskType": "INSIGHT_GENERATION",
         "analysisId": str(analysis_id),
+        "aiTaskId": str(uuid4()),
         "intent": describe_project_intent_json(),
         "userGuidance": {
             "focus": "Distributed architecture",
@@ -43,6 +45,8 @@ async def test_submit_ai_task_returns_accepted_acknowledgement() -> None:
             "facts": [],
             "observations": [],
         },
+        "expectedOutputContract": {"type": "object", "root": "proposals"},
+        "metadata": {"source": "test"},
     }
 
     processing_service = RecordingProcessingService()
@@ -111,11 +115,15 @@ async def test_submit_ai_task_rejects_unsupported_type_without_background_task()
             response = await client.post(
                 "/api/v1/ai/tasks",
                 json={
+                    "requestId": str(uuid4()),
                     "correlationId": str(uuid4()),
                     "taskType": "DECISION_PROPOSAL_GENERATION",
                     "analysisId": str(analysis_id),
+                    "aiTaskId": str(uuid4()),
                     "intent": describe_project_intent_json(),
                     "context": {},
+                    "expectedOutputContract": {"type": "object"},
+                    "metadata": {},
                 },
             )
     finally:
@@ -139,6 +147,7 @@ async def test_submit_ai_task_rejects_invalid_payload() -> None:
         response = await client.post(
             "/api/v1/ai/tasks",
             json={
+                "requestId": str(uuid4()),
                 "correlationId": "not-a-uuid",
                 "taskType": "UNKNOWN_TASK",
                 "analysisId": str(uuid4()),

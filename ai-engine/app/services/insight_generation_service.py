@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from uuid import UUID
 
 from pydantic import ValidationError
@@ -7,18 +8,22 @@ from app.clients.core_callback_client import CoreCallbackClient
 from app.models.proposal import AiTaskResultStatus, ProposalType
 from app.models.intent import InsightType
 from app.prompts.insight import InsightPromptBuilder
-from app.providers.base import LlmProvider, LlmRequest
+from app.providers.base import LlmProvider, Prompt
 from app.schemas.ai_task import AiTaskSubmissionRequest
 from app.schemas.ai_task_result import (
     AiProposalResult,
     AiTaskResultError,
     AiTaskResultRequest,
+    PromptExecutionMetadata,
 )
 from app.schemas.insight import InsightGenerationOutput
 
 
 class InsightOutputValidationError(ValueError):
     pass
+
+
+logger = logging.getLogger(__name__)
 
 
 class InsightGenerationService:
@@ -38,12 +43,12 @@ class InsightGenerationService:
         external_job_id: UUID,
     ) -> None:
         try:
-            prompt = self._prompt_builder.build(
-                submission.intent, submission.context, submission.user_guidance
-            )
+            prompt = self._prompt_builder.build(submission)
         except ValueError as intent_error:
             await self._send_failure(
-                submission, external_job_id, "INVALID_INTENT", intent_error
+                submission, external_job_id,
+                getattr(intent_error, "code", "PROMPT_CONSTRUCTION_FAILED"),
+                intent_error,
             )
             return
         try:
@@ -58,12 +63,14 @@ class InsightGenerationService:
                     submission.context,
                     set(submission.intent.supported_insight_types),
                 )
+                prompt = corrective_prompt
             except (ValidationError, InsightOutputValidationError, ValueError) as retry_error:
                 await self._send_failure(
                     submission,
                     external_job_id,
                     "INVALID_LLM_OUTPUT",
                     retry_error,
+                    corrective_prompt,
                 )
                 return
             except Exception as provider_error:
@@ -72,6 +79,7 @@ class InsightGenerationService:
                     external_job_id,
                     "LLM_PROVIDER_ERROR",
                     provider_error,
+                    corrective_prompt,
                 )
                 return
         except Exception as provider_error:
@@ -80,6 +88,7 @@ class InsightGenerationService:
                 external_job_id,
                 "LLM_PROVIDER_ERROR",
                 provider_error,
+                prompt,
             )
             return
 
@@ -99,6 +108,11 @@ class InsightGenerationService:
             )
             for proposal in output.proposals
         ]
+        logger.info(
+            "Prompt execution completed promptVersion=%s promptDigest=%s provider=%s model=%s userMessageSize=%d",
+            prompt.prompt_version, prompt.content_digest, self._provider.provider_name,
+            self._provider.model_identifier, len(prompt.user_message),
+        )
         await self._callback_client.send_result(
             submission.correlation_id,
             AiTaskResultRequest(
@@ -108,12 +122,19 @@ class InsightGenerationService:
                 completed_at=datetime.now(timezone.utc),
                 proposals=proposals,
                 error=None,
+                prompt_execution=PromptExecutionMetadata(
+                    prompt_version=prompt.prompt_version,
+                    provider=self._provider.provider_name,
+                    model_identifier=self._provider.model_identifier,
+                    prompt_content_digest=prompt.content_digest,
+                    context_digest=prompt.traceability.context_digest,
+                ),
             ),
         )
 
     async def _generate_and_validate(
         self,
-        prompt: LlmRequest,
+        prompt: Prompt,
         context: dict[str, object],
         supported_insight_types: set[InsightType],
     ) -> InsightGenerationOutput:
@@ -201,6 +222,7 @@ class InsightGenerationService:
         external_job_id: UUID,
         error_code: str,
         error: Exception,
+        prompt: Prompt | None = None,
     ) -> None:
         await self._callback_client.send_result(
             submission.correlation_id,
@@ -214,5 +236,15 @@ class InsightGenerationService:
                     code=error_code,
                     message=str(error)[:5000] or "LLM output validation failed",
                 ),
+                prompt_execution=self._execution_metadata(prompt) if prompt else None,
             ),
+        )
+
+    def _execution_metadata(self, prompt: Prompt) -> PromptExecutionMetadata:
+        return PromptExecutionMetadata(
+            prompt_version=prompt.prompt_version,
+            provider=self._provider.provider_name,
+            model_identifier=self._provider.model_identifier,
+            prompt_content_digest=prompt.content_digest,
+            context_digest=prompt.traceability.context_digest,
         )

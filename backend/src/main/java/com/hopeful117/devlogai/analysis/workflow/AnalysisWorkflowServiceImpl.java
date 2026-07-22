@@ -7,7 +7,7 @@ import com.hopeful117.devlogai.ai.task.dto.response.AiTaskResponse;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.ai.engine.client.AIEngineClient;
-import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionRequest;
+import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.context.AnalysisContextService;
@@ -61,13 +61,21 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
                     context
             );
             AiTaskSubmissionResponse submission = aiEngineClient.submit(
-                    new AiTaskSubmissionRequest(
+                    new PromptRequest(
                             createdTask.correlationId(),
-                            createdTask.taskType(),
+                            createdTask.correlationId(),
                             analysisId,
+                            createdTask.id(),
+                            createdTask.taskType(),
                             intent,
                             UserGuidance.from(analysis.userGuidance()),
-                            context
+                            context,
+                            intent.outputSchema(),
+                            java.util.Map.of(
+                                    "source", "devlog-ai-core",
+                                    "analysisContextId", analysisId.toString(),
+                                    "profileId", context.projectProfile().id().toString(),
+                                    "profileVersion", context.projectProfile().profileVersion())
                     )
             );
             AiTaskResponse submittedTask = aiTaskService.submit(

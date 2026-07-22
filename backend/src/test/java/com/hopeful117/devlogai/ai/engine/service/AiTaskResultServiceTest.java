@@ -99,6 +99,11 @@ class AiTaskResultServiceTest {
         assertEquals(AiTaskStatus.COMPLETED, task.getStatus());
         assertEquals(completedAt, task.getStartedAt());
         assertEquals(completedAt, task.getCompletedAt());
+        assertEquals("describe-project-prompt-v1", task.getPromptVersion());
+        assertEquals("mock", task.getProvider());
+        assertEquals("deterministic-v1", task.getModelIdentifier());
+        assertEquals("a".repeat(64), task.getPromptContentDigest());
+        assertEquals("b".repeat(64), task.getContextDigest());
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<ValidatableProposal>> captor =
@@ -270,7 +275,14 @@ class AiTaskResultServiceTest {
                 AiTaskResultStatus.COMPLETED,
                 completedAt,
                 proposals,
-                null
+                null,
+                promptMetadata()
         );
+    }
+
+    private PromptExecutionMetadata promptMetadata() {
+        return new PromptExecutionMetadata(
+                "describe-project-prompt-v1", "mock", "deterministic-v1",
+                "a".repeat(64), "b".repeat(64));
     }
 }

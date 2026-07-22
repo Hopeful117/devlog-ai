@@ -25,9 +25,11 @@ def submission() -> tuple[AiTaskSubmissionRequest, str, str, str]:
     observation_id = str(uuid4())
     evidence = "src/app.py:10"
     request = AiTaskSubmissionRequest(
+        request_id=uuid4(),
         correlation_id=uuid4(),
         task_type=AiTaskType.INSIGHT_GENERATION,
         analysis_id=uuid4(),
+        ai_task_id=uuid4(),
         intent=describe_project_intent(),
         context={
             "project": {"id": str(uuid4()), "name": "DevLog AI"},
@@ -43,6 +45,8 @@ def submission() -> tuple[AiTaskSubmissionRequest, str, str, str]:
                 {"id": observation_id, "content": "Architecture is modular"}
             ],
         },
+        expected_output_contract={"type": "object", "root": "proposals"},
+        metadata={"source": "test"},
     )
     return request, fact_id, observation_id, evidence
 
@@ -95,7 +99,7 @@ async def test_unsupported_insight_type_gets_corrective_retry() -> None:
     await service.process(request, uuid4())
 
     assert len(provider.requests) == 2
-    assert "not supported by Intent" in provider.requests[1].corrective_feedback  # type: ignore[operator]
+    assert "not supported by Intent" in provider.requests[1].user_message
 
 
 @pytest.mark.asyncio
@@ -113,7 +117,7 @@ async def test_invalid_output_gets_one_corrective_retry() -> None:
     await service.process(request, uuid4())
 
     assert len(provider.requests) == 2
-    assert provider.requests[1].corrective_feedback is not None
+    assert "CORRECTIVE RETRY" in provider.requests[1].user_message
     assert callback.results[0].status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
 
 
@@ -130,7 +134,7 @@ async def test_reference_outside_context_gets_corrective_retry() -> None:
     await service.process(request, uuid4())
 
     assert len(provider.requests) == 2
-    assert "supportingFactIds" in provider.requests[1].corrective_feedback  # type: ignore[operator]
+    assert "supportingFactIds" in provider.requests[1].user_message
     assert callback.results[0].status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
 
 
@@ -156,6 +160,9 @@ async def test_failed_corrective_retry_sends_failed_callback() -> None:
 
 
 class FailingProvider:
+    provider_name = "failing-test-provider"
+    model_identifier = "failing-test-model"
+
     async def generate_structured(self, request: object, model: object) -> object:
         raise RuntimeError("provider unavailable")
 

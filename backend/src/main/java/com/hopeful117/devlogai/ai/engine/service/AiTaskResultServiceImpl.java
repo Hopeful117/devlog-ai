@@ -85,6 +85,9 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         }
 
         if (request.status() == AiTaskResultStatus.FAILED) {
+            if (request.promptExecution() != null) {
+                applyPromptExecution(task, request.promptExecution());
+            }
             failTask(task, request);
             aiTaskRepository.save(task);
             finishAnalysis(task, AnalysisStatus.FAILED, request.completedAt());
@@ -94,6 +97,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         }
 
         validateReferences(task, request.proposals());
+        applyPromptExecution(task, request.promptExecution());
         proposalRepository.saveAll(toProposals(task, request.proposals()));
         completeTask(task, request.completedAt());
         aiTaskRepository.save(task);
@@ -124,6 +128,12 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                     "A completed result must not contain an error"
             );
         }
+        if (request.status() == AiTaskResultStatus.COMPLETED
+                && request.promptExecution() == null) {
+            throw new InvalidAiTaskResultException(
+                    "A completed result must contain Prompt execution metadata"
+            );
+        }
         if (request.status() == AiTaskResultStatus.FAILED) {
             if (request.error() == null) {
                 throw new InvalidAiTaskResultException(
@@ -149,6 +159,17 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
 
     private boolean isTerminal(AiTaskStatus status) {
         return status == AiTaskStatus.COMPLETED || status == AiTaskStatus.FAILED;
+    }
+
+    private void applyPromptExecution(AiTask task, PromptExecutionMetadata metadata) {
+        task.setPromptVersion(metadata.promptVersion());
+        task.setProvider(metadata.provider());
+        task.setModelIdentifier(metadata.modelIdentifier());
+        task.setPromptContentDigest(metadata.promptContentDigest());
+        task.setContextDigest(metadata.contextDigest());
+        log.info("Persisting Prompt metadata taskId={} promptVersion={} promptDigest={} provider={} model={}",
+                task.getId(), metadata.promptVersion(), metadata.promptContentDigest(),
+                metadata.provider(), metadata.modelIdentifier());
     }
 
     private void validateReferences(

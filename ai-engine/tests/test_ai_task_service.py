@@ -11,10 +11,14 @@ def test_acceptance_service_only_acknowledges_submission() -> None:
     correlation_id = uuid4()
     request = AiTaskSubmissionRequest(
         correlation_id=correlation_id,
+        request_id=uuid4(),
         task_type=AiTaskType.INSIGHT_GENERATION,
         analysis_id=uuid4(),
+        ai_task_id=uuid4(),
         intent=describe_project_intent(),
         context={"facts": [], "observations": []},
+        expected_output_contract={"type": "object"},
+        metadata={},
     )
 
     response = AiTaskAcceptanceService().accept(request)

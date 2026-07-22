@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.ai.engine.client;
 
+import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.ai.engine.exception.AIEngineCommunicationException;
@@ -25,7 +26,7 @@ public class RestAIEngineClient implements AIEngineClient {
     private final RestClient restClient;
 
     @Override
-    public AiTaskSubmissionResponse submit(AiTaskSubmissionRequest request) {
+    public AiTaskSubmissionResponse submit(PromptRequest request) {
         long startedAt = System.nanoTime();
         log.info("Submitting AI task correlationId={} analysisId={} taskType={}",
                 request.correlationId(), request.analysisId(), request.taskType());
@@ -62,7 +63,17 @@ public class RestAIEngineClient implements AIEngineClient {
         }
     }
 
-    private String outboundCorrelationId(AiTaskSubmissionRequest request) {
+    @Override
+    @Deprecated
+    public AiTaskSubmissionResponse submit(AiTaskSubmissionRequest request) {
+        return submit(new PromptRequest(
+                request.correlationId(), request.correlationId(), request.analysisId(),
+                request.correlationId(), request.taskType(), request.intent(),
+                request.userGuidance(), request.context(), request.intent().outputSchema(),
+                java.util.Map.of("compatibility", true)));
+    }
+
+    private String outboundCorrelationId(PromptRequest request) {
         String requestCorrelationId = MDC.get(MDC_KEY);
         return requestCorrelationId == null ? request.correlationId().toString() : requestCorrelationId;
     }
@@ -72,7 +83,7 @@ public class RestAIEngineClient implements AIEngineClient {
     }
 
     private void validateResponse(
-            AiTaskSubmissionRequest request,
+            PromptRequest request,
             AiTaskSubmissionResponse response
     ) {
         if (response == null) {

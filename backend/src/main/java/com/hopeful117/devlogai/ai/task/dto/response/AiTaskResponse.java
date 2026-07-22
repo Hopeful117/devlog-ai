@@ -15,6 +15,12 @@ public record AiTaskResponse(
         String intentVersion,
         Map<String, Object> intentSnapshot,
         Map<String, Object> userGuidanceSnapshot,
+        UUID promptRequestId,
+        String promptVersion,
+        String provider,
+        String modelIdentifier,
+        String promptContentDigest,
+        String contextDigest,
         AiTaskStatus status,
         Map<String, Object> contextSnapshot,
         String externalJobId,
@@ -31,7 +37,8 @@ public record AiTaskResponse(
                           String externalJobId, int attemptCount, String failureCode,
                           String failureMessage, Instant createdAt, Instant submittedAt,
                           Instant startedAt, Instant completedAt) {
-        this(id, analysisId, correlationId, taskType, null, null, null, null, status,
+        this(id, analysisId, correlationId, taskType, null, null, null, null,
+                null, null, null, null, null, null, status,
                 contextSnapshot, externalJobId, attemptCount, failureCode, failureMessage,
                 createdAt, submittedAt, startedAt, completedAt);
     }
