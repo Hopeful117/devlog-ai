@@ -64,6 +64,7 @@ class AiTaskResultServiceTest {
         Fact fact = Fact.builder().id(factId).analysis(task.getAnalysis()).build();
         Observation observation = Observation.builder()
                 .id(observationId)
+                .ruleId("TEST_RULE").ruleVersion("1")
                 .analysis(task.getAnalysis())
                 .build();
         AiProposalResult proposal = new AiProposalResult(

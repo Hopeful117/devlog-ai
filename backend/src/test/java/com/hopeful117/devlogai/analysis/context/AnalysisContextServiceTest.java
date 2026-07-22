@@ -79,6 +79,7 @@ class AnalysisContextServiceTest {
                 .id(UUID.randomUUID()).analysis(analysis)
                 .type(ObservationType.ARCHITECTURE_MODULARIZATION)
                 .content("Architecture is becoming more modular.")
+                .ruleId("ARCHITECTURE_MODULARIZATION").ruleVersion("1")
                 .supportingFacts(new LinkedHashSet<>(Set.of(oldestFact, newestFact)))
                 .createdAt(Instant.parse("2026-07-21T12:00:00Z")).build();
         KnowledgeEvent newestEvent = KnowledgeEvent.builder().id(UUID.randomUUID())
@@ -119,6 +120,8 @@ class AnalysisContextServiceTest {
         assertEquals(List.of(newestFact.getId(), oldestFact.getId()),
                 context.facts().stream().map(AnalysisContext.FactSnapshot::id).toList());
         assertEquals(List.of("a", "b"), context.facts().getFirst().evidenceReferences());
+        assertEquals("ARCHITECTURE_MODULARIZATION", context.observations().getFirst().ruleId());
+        assertEquals("1", context.observations().getFirst().ruleVersion());
         assertEquals(List.of(newestEvent.getId(), oldestEvent.getId()),
                 context.recentKnowledgeEvents().stream()
                         .map(AnalysisContext.KnowledgeEventSnapshot::id).toList());

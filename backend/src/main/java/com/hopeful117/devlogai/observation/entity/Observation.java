@@ -37,6 +37,12 @@ public class Observation {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "rule_id", nullable = false, length = 100)
+    private String ruleId;
+
+    @Column(name = "rule_version", nullable = false, length = 50)
+    private String ruleVersion;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "observation_facts",

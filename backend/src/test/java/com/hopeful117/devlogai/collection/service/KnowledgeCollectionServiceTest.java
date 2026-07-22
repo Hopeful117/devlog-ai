@@ -119,6 +119,7 @@ class KnowledgeCollectionServiceTest {
         });
         when(observationEngine.derive(anyList())).thenReturn(List.of(
                 new DerivedObservation(
+                        "TEST_RULE", "1",
                         ObservationType.OTHER,
                         "Derived deterministically",
                         Set.of(factId)
@@ -149,6 +150,8 @@ class KnowledgeCollectionServiceTest {
         ArgumentCaptor<List<Observation>> observations = ArgumentCaptor.forClass(List.class);
         verify(observationRepository).saveAll(observations.capture());
         assertEquals(analysis, observations.getValue().getFirst().getAnalysis());
+        assertEquals("TEST_RULE", observations.getValue().getFirst().getRuleId());
+        assertEquals("1", observations.getValue().getFirst().getRuleVersion());
         assertEquals(factId, observations.getValue().getFirst()
                 .getSupportingFacts().iterator().next().getId());
     }
@@ -189,7 +192,8 @@ class KnowledgeCollectionServiceTest {
                 .thenReturn(List.of());
         when(factRepository.saveAll(List.of())).thenReturn(List.of());
         when(observationEngine.derive(List.of())).thenReturn(List.of(
-                new DerivedObservation(ObservationType.OTHER, "invalid", Set.of(UUID.randomUUID()))
+                new DerivedObservation("TEST_RULE", "1", ObservationType.OTHER,
+                        "invalid", Set.of(UUID.randomUUID()))
         ));
 
         assertThrows(IllegalArgumentException.class, () -> service.collect(analysisId));

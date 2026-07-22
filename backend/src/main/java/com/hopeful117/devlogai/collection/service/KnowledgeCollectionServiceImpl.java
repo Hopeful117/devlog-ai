@@ -243,6 +243,8 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
                 .collect(Collectors.toMap(Fact::getId, Function.identity()));
         return derived.stream().map(observation -> Observation.builder()
                         .analysis(analysis)
+                        .ruleId(observation.ruleId())
+                        .ruleVersion(observation.ruleVersion())
                         .type(observation.type())
                         .content(observation.content())
                         .supportingFacts(observation.supportingFactIds().stream()

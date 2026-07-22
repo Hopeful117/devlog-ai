@@ -172,6 +172,7 @@ public class AnalysisContextServiceImpl implements AnalysisContextService {
     private AnalysisContext.ObservationSnapshot toObservationSnapshot(Observation observation) {
         return new AnalysisContext.ObservationSnapshot(
                 observation.getId(), observation.getType(), observation.getContent(),
+                observation.getRuleId(), observation.getRuleVersion(),
                 observation.getSupportingFacts().stream()
                         .map(Fact::getId)
                         .sorted(Comparator.comparing(UUID::toString))

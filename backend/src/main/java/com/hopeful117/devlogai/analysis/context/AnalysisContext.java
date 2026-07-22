@@ -74,6 +74,8 @@ public record AnalysisContext(
             UUID id,
             ObservationType type,
             String content,
+            String ruleId,
+            String ruleVersion,
             List<UUID> supportingFactIds,
             Instant createdAt
     ) {

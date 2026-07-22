@@ -47,8 +47,11 @@ resolved Git revision. The unique Analysis/fingerprint identity makes retries
 idempotent while preserving Facts across separate Analyses. Structured
 non-fatal warnings are returned by the collection result.
 
-No speculative Observation rule is defined, so the Observation Engine still
-intentionally emits no Observations.
+ADR-026 adds explicit, versioned Observation rules. Each rule evaluates Facts
+only, emits an objective characteristic when all of its conditions are met and
+persists its rule identity, version and complete supporting Fact set. Manual
+Observation creation is intentionally unavailable: Observations are produced
+exclusively by this deterministic engine.
 
 The package does not build `AnalysisContext`, call the AI Engine, validate
 knowledge or access AI providers.

@@ -11,6 +11,8 @@ public record ObservationResponse(
         UUID analysisId,
         ObservationType type,
         String content,
+        String ruleId,
+        String ruleVersion,
         Set<UUID> supportingFactIds,
         Instant createdAt
 ) {
