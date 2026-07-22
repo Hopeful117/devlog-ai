@@ -107,7 +107,7 @@ Return only grounded, structured Insight proposals that require human validation
         )
         prompt_version = request.intent.prompt_template
         digest = self._content_digest(
-            prompt_version, self.SYSTEM_MESSAGE, user_message, schema_json
+            self.SYSTEM_MESSAGE, user_message, schema_json
         )
         traceability = PromptTraceability(
             request_id=str(request.request_id),
@@ -143,7 +143,7 @@ Return only grounded, structured Insight proposals that require human validation
         )
         schema_json = self._canonical(original.expected_output_schema)
         digest = self._content_digest(
-            original.prompt_version, original.system_message, user_message, schema_json
+            original.system_message, user_message, schema_json
         )
         return replace(
             original,
@@ -152,8 +152,17 @@ Return only grounded, structured Insight proposals that require human validation
             content_digest=digest,
         )
 
-    def _content_digest(self, version: str, system: str, user: str, schema: str) -> str:
-        return self._sha256("\n".join((version, system, user, schema)))
+    def _content_digest(self, system: str, user: str, schema: str) -> str:
+        normalized = "\n".join(
+            self._normalize_message(value) for value in (system, user, schema)
+        )
+        return self._sha256(normalized)
+
+    def _normalize_message(self, value: str) -> str:
+        normalized_lines = (
+            value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        )
+        return "\n".join(line.rstrip() for line in normalized_lines).strip()
 
     def _canonical(self, value: object) -> str:
         return json.dumps(

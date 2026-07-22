@@ -52,6 +52,10 @@ immutable `Prompt`, and the configured provider only adapts it to its API. Promp
 SHA-256 content digests, provider/model identifiers, and context digests are persisted with AI Tasks
 without logging complete prompt content.
 
+Prompt Version expresses the governed semantics of a template, while Prompt Digest identifies its
+exact normalized rendered content. Both are retained on historical AI Tasks for audit and replay
+verification.
+
 ## Architecture
 
 | Component | Technology | Responsibility |

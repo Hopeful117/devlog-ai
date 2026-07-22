@@ -1,4 +1,5 @@
 import pytest
+import hashlib
 
 from app.prompts.insight import InsightPromptBuilder, UnsupportedPromptTemplateError
 from app.schemas.ai_task import UserGuidance
@@ -71,3 +72,27 @@ def test_output_contract_cannot_override_intent() -> None:
     )
     with pytest.raises(ValueError, match="does not match"):
         InsightPromptBuilder().build(request)
+
+
+def test_digest_represents_normalized_rendered_content_not_prompt_version() -> None:
+    builder = InsightPromptBuilder()
+    prompt = builder.build(prompt_request())
+    normalized = "\n".join((
+        prompt.system_message.strip(),
+        prompt.user_message.strip(),
+        builder._canonical(prompt.expected_output_schema).strip(),
+    ))
+    assert prompt.content_digest == hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    same_content_new_version = prompt.__class__(
+        **{**prompt.__dict__, "prompt_version": "describe-project-prompt-v2"}
+    )
+    assert same_content_new_version.content_digest == prompt.content_digest
+
+
+def test_any_semantic_rendered_content_change_changes_digest() -> None:
+    builder = InsightPromptBuilder()
+    original = builder.build(prompt_request())
+    changed = builder.corrective_retry(original, ValueError("grounding reference missing"))
+    assert changed.prompt_version == original.prompt_version
+    assert changed.content_digest != original.content_digest

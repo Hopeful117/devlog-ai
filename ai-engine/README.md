@@ -19,6 +19,11 @@ versions, digests, provider names, and model identifiers are returned to the
 Core for persistence; complete rendered prompts are never written to standard
 logs.
 
+Prompt Version and Prompt Digest have distinct roles. The human-readable,
+semantic version governs the template contract; the SHA-256 digest identifies
+the normalized system message, user message, and expected schema actually sent
+to the provider. Historical AI Tasks persist both values.
+
 FastAPI service responsible for the AI-processing boundary of DevLog AI.
 
 The service implements health reporting, ADR-019 task acceptance, the ADR-020
