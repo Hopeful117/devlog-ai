@@ -16,6 +16,7 @@ import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -44,7 +45,7 @@ public class AiTaskServiceImpl implements AiTaskService {
     public AiTaskResponse create(CreateAiTaskRequest request) {
         Analysis analysis = findAnalysis(request.analysisId());
         AnalysisContext context = analysisContextService.build(request.analysisId());
-        return create(request, context, analysis);
+        return create(request, context, null, analysis);
     }
 
     @Override
@@ -52,12 +53,34 @@ public class AiTaskServiceImpl implements AiTaskService {
             CreateAiTaskRequest request,
             AnalysisContext context
     ) {
-        return create(request, context, findAnalysis(request.analysisId()));
+        return create(request, context, null, findAnalysis(request.analysisId()));
+    }
+
+    @Override
+    public AiTaskResponse create(CreateAiTaskRequest request, AnalysisContext context,
+                                 SelectedKnowledge selectedKnowledge) {
+        return create(request, context, selectedKnowledge, findAnalysis(request.analysisId()));
+    }
+
+    @Override
+    public AiTaskResponse attachSelectedKnowledge(UUID id, SelectedKnowledge selectedKnowledge) {
+        AiTask task = findTask(id);
+        requireStatus(task, AiTaskStatus.CREATED, AiTaskStatus.CREATED);
+        if (task.getSelectedKnowledgeSnapshot() != null) {
+            throw new ConflictException("Selected knowledge is already attached to AI task " + id);
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> snapshot = objectMapper.convertValue(selectedKnowledge, Map.class);
+        task.setSelectedKnowledgeSnapshot(snapshot);
+        task.setSelectionVersion(selectedKnowledge.selectionMetadata().selectionVersion());
+        task.setSelectionDigest(selectedKnowledge.selectionDigest());
+        return saveAndMap(task);
     }
 
     private AiTaskResponse create(
             CreateAiTaskRequest request,
             AnalysisContext context,
+            SelectedKnowledge selectedKnowledge,
             Analysis analysis
     ) {
         @SuppressWarnings("unchecked")
@@ -65,6 +88,9 @@ public class AiTaskServiceImpl implements AiTaskService {
                 context,
                 Map.class
         );
+        @SuppressWarnings("unchecked")
+        Map<String, Object> selectedKnowledgeSnapshot = selectedKnowledge == null ? null
+                : objectMapper.convertValue(selectedKnowledge, Map.class);
 
         AiTask task = aiTaskMapper.toEntity(request);
         IntentDefinition intent = intentCatalog.resolve(analysis.getIntentId(), analysis.getIntentVersion());
@@ -81,6 +107,11 @@ public class AiTaskServiceImpl implements AiTaskService {
                         new LinkedHashMap<>(analysis.getUserGuidance())));
         task.setPromptRequestId(task.getCorrelationId());
         task.setContextSnapshot(contextSnapshot);
+        task.setSelectedKnowledgeSnapshot(selectedKnowledgeSnapshot);
+        task.setSelectionVersion(selectedKnowledge == null ? null
+                : selectedKnowledge.selectionMetadata().selectionVersion());
+        task.setSelectionDigest(selectedKnowledge == null ? null
+                : selectedKnowledge.selectionDigest());
         task.setAttemptCount(0);
         task.setExternalJobId(null);
         task.setFailureCode(null);

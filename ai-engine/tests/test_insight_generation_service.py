@@ -8,7 +8,7 @@ from app.prompts.insight import InsightPromptBuilder
 from app.providers.mock import MockLlmProvider
 from app.schemas.ai_task import AiTaskSubmissionRequest
 from app.services.insight_generation_service import InsightGenerationService
-from tests.intent_fixtures import describe_project_intent
+from tests.intent_fixtures import describe_project_intent, selected_knowledge
 
 
 class RecordingCallbackClient:
@@ -31,20 +31,18 @@ def submission() -> tuple[AiTaskSubmissionRequest, str, str, str]:
         analysis_id=uuid4(),
         ai_task_id=uuid4(),
         intent=describe_project_intent(),
-        context={
-            "project": {"id": str(uuid4()), "name": "DevLog AI"},
-            "analysis": {"id": str(uuid4())},
-            "facts": [
+        selected_knowledge=selected_knowledge(
+            facts=[
                 {
                     "id": fact_id,
                     "content": "Modules were separated",
                     "evidenceReferences": [evidence],
                 }
             ],
-            "observations": [
+            observations=[
                 {"id": observation_id, "content": "Architecture is modular"}
             ],
-        },
+        ),
         expected_output_contract={"type": "object", "root": "proposals"},
         metadata={"source": "test"},
     )

@@ -20,6 +20,8 @@ import com.hopeful117.devlogai.collection.service.KnowledgeCollectionService;
 import com.hopeful117.devlogai.profile.service.ProjectProfileService;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
+import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,10 +43,12 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
     private final AiTaskService aiTaskService;
     private final AIEngineClient aiEngineClient;
     private final IntentCatalog intentCatalog;
+    private final KnowledgeSelectionService knowledgeSelectionService;
 
     @Override
     public AnalysisWorkflowResult start(UUID analysisId) {
         boolean started = false;
+        boolean selectionCompleted = false;
         AiTaskResponse createdTask = null;
         try {
             AnalysisResponse analysis = analysisService.start(analysisId);
@@ -56,10 +60,13 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
                     deterministicAnalysisService.analyze(analysisId);
             projectProfileService.build(analysisId);
             AnalysisContext context = analysisContextService.build(analysisId);
+            UserGuidance guidance = UserGuidance.from(analysis.userGuidance());
             createdTask = aiTaskService.create(
-                    new CreateAiTaskRequest(analysisId, taskType),
-                    context
-            );
+                    new CreateAiTaskRequest(analysisId, taskType), context);
+            SelectedKnowledge selectedKnowledge = knowledgeSelectionService.select(
+                    context, intent, guidance);
+            createdTask = aiTaskService.attachSelectedKnowledge(createdTask.id(), selectedKnowledge);
+            selectionCompleted = true;
             AiTaskSubmissionResponse submission = aiEngineClient.submit(
                     new PromptRequest(
                             createdTask.correlationId(),
@@ -68,14 +75,12 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
                             createdTask.id(),
                             createdTask.taskType(),
                             intent,
-                            UserGuidance.from(analysis.userGuidance()),
-                            context,
+                            guidance,
+                            selectedKnowledge,
                             intent.outputSchema(),
                             java.util.Map.of(
                                     "source", "devlog-ai-core",
-                                    "analysisContextId", analysisId.toString(),
-                                    "profileId", context.projectProfile().id().toString(),
-                                    "profileVersion", context.projectProfile().profileVersion())
+                                    "analysisContextId", analysisId.toString())
                     )
             );
             AiTaskResponse submittedTask = aiTaskService.submit(
@@ -100,7 +105,8 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
                         failure
                 );
                 if (createdTask != null) {
-                    markTaskSubmissionFailed(createdTask.id(), failure);
+                    markTaskFailed(createdTask.id(), failure, selectionCompleted
+                            ? "AI_ENGINE_SUBMISSION_FAILED" : "KNOWLEDGE_SELECTION_FAILED");
                 }
                 markAnalysisFailed(analysisId, failure);
             }
@@ -108,15 +114,16 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
         }
     }
 
-    private void markTaskSubmissionFailed(
+    private void markTaskFailed(
             UUID taskId,
-            RuntimeException failure
+            RuntimeException failure,
+            String failureCode
     ) {
         try {
             aiTaskService.failSubmission(
                     taskId,
                     new FailAiTaskRequest(
-                            "AI_ENGINE_SUBMISSION_FAILED",
+                            failureCode,
                             failureMessage(failure)
                     )
             );

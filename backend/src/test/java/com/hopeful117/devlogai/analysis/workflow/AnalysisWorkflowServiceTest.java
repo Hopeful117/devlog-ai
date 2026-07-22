@@ -24,9 +24,12 @@ import com.hopeful117.devlogai.profile.service.ProjectProfileService;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
+import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTypeException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
@@ -71,8 +74,20 @@ class AnalysisWorkflowServiceTest {
     @Mock
     private AIEngineClient aiEngineClient;
 
+    @Mock
+    private KnowledgeSelectionService knowledgeSelectionService;
+
+    @Mock
+    private SelectedKnowledge selectedKnowledge;
+
     @InjectMocks
     private AnalysisWorkflowServiceImpl workflowService;
+
+    @BeforeEach
+    void selectKnowledgeByDefault() {
+        lenient().when(knowledgeSelectionService.select(any(), any(), any()))
+                .thenReturn(selectedKnowledge);
+    }
 
     @Test
     void shouldPrepareAiTaskInWorkflowOrder() {
@@ -110,14 +125,9 @@ class AnalysisWorkflowServiceTest {
                 new CreateAiTaskRequest(analysisId, taskType),
                 context
         )).thenReturn(task);
-        when(aiEngineClient.submit(new AiTaskSubmissionRequest(
-                correlationId,
-                taskType,
-                analysisId,
-                intent(),
-                com.hopeful117.devlogai.intent.model.UserGuidance.from(guidance()),
-                context
-        ))).thenReturn(submission);
+        when(aiTaskService.attachSelectedKnowledge(taskId, selectedKnowledge)).thenReturn(task);
+        when(aiEngineClient.submit(any(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class)))
+                .thenReturn(submission);
         when(aiTaskService.submit(
                 taskId,
                 new SubmitAiTaskRequest("engine-job-42")
@@ -151,14 +161,8 @@ class AnalysisWorkflowServiceTest {
                 new CreateAiTaskRequest(analysisId, taskType),
                 context
         );
-        order.verify(aiEngineClient).submit(new AiTaskSubmissionRequest(
-                correlationId,
-                taskType,
-                analysisId,
-                intent(),
-                com.hopeful117.devlogai.intent.model.UserGuidance.from(guidance()),
-                context
-        ));
+        order.verify(aiTaskService).attachSelectedKnowledge(taskId, selectedKnowledge);
+        order.verify(aiEngineClient).submit(any(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class));
         order.verify(aiTaskService).submit(
                 taskId,
                 new SubmitAiTaskRequest("engine-job-42")
@@ -201,6 +205,30 @@ class AnalysisWorkflowServiceTest {
 
         verify(analysisService).fail(analysisId);
         verifyNoInteractions(aiTaskService);
+    }
+
+    @Test
+    void shouldFailAnalysisWithoutCallingAiEngineWhenKnowledgeSelectionFails() {
+        UUID analysisId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        AnalysisContext context = mock(AnalysisContext.class);
+        RuntimeException failure = new IllegalStateException("mandatory knowledge unavailable");
+        when(analysisService.start(analysisId))
+                .thenReturn(analysisResponse(analysisId, AnalysisStatus.IN_PROGRESS));
+        when(intentCatalog.resolve("describe-project", "v1")).thenReturn(intent());
+        when(deterministicAnalysisService.analyze(analysisId))
+                .thenReturn(new DeterministicAnalysisResult(1, 1));
+        when(analysisContextService.build(analysisId)).thenReturn(context);
+        when(aiTaskService.create(any(), eq(context))).thenReturn(aiTaskResponse(
+                taskId, analysisId, UUID.randomUUID(), AiTaskStatus.CREATED));
+        when(knowledgeSelectionService.select(any(), any(), any())).thenThrow(failure);
+
+        assertSame(failure, assertThrows(RuntimeException.class,
+                () -> workflowService.start(analysisId)));
+
+        verify(analysisService).fail(analysisId);
+        verify(aiTaskService).failSubmission(eq(taskId), any(FailAiTaskRequest.class));
+        verifyNoInteractions(aiEngineClient);
     }
 
     @Test
@@ -249,6 +277,7 @@ class AnalysisWorkflowServiceTest {
                 new CreateAiTaskRequest(analysisId, taskType),
                 context
         )).thenReturn(task);
+        when(aiTaskService.attachSelectedKnowledge(taskId, selectedKnowledge)).thenReturn(task);
         when(aiEngineClient.submit(any(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class)))
                 .thenThrow(failure);
 

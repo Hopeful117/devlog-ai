@@ -66,11 +66,9 @@ public class RestAIEngineClient implements AIEngineClient {
     @Override
     @Deprecated
     public AiTaskSubmissionResponse submit(AiTaskSubmissionRequest request) {
-        return submit(new PromptRequest(
-                request.correlationId(), request.correlationId(), request.analysisId(),
-                request.correlationId(), request.taskType(), request.intent(),
-                request.userGuidance(), request.context(), request.intent().outputSchema(),
-                java.util.Map.of("compatibility", true)));
+        throw new AIEngineCommunicationException(
+                "Legacy AnalysisContext submission is disabled; submit a PromptRequest with SelectedKnowledge"
+        );
     }
 
     private String outboundCorrelationId(PromptRequest request) {

@@ -18,6 +18,7 @@ OpenAPI documentation; a user interface and document projections are not impleme
   test structure.
 - Derive deterministic, traceable Observations from Facts.
 - Produce immutable Project Profile and AnalysisContext snapshots.
+- Select intent-relevant knowledge deterministically with explicit budgets, metadata, and SHA-256 digests.
 - Diagnose partial collection and expose analysis warnings.
 - Run an asynchronous Core-to-AI workflow with correlation IDs, retries, and structured logs.
 - Generate structured Insight Proposals from versioned Intents.
@@ -34,6 +35,8 @@ Evidence → Facts → Observations → Project Profile
                                       ↓
                               AnalysisContext + Intent
                                       ↓
+                           SelectedKnowledge snapshot
+                                      ↓
                                   AI Engine
                                       ↓
                               Insight Proposal
@@ -44,12 +47,13 @@ Evidence → Facts → Observations → Project Profile
 ```
 
 The Java Core owns repositories, deterministic knowledge, workflow state, validation, and trusted
-Insights. The Python AI Engine only interprets the immutable context supplied by the Core. It does
+Insights. Its Knowledge Selection Engine ranks, deduplicates, and budgets project knowledge for the
+resolved Intent. The Python AI Engine only interprets the immutable `SelectedKnowledge` supplied by the Core. It does
 not read repositories or create trusted knowledge directly.
 
 At the AI boundary, the Core sends a provider-independent `PromptRequest`. The AI Engine builds an
 immutable `Prompt`, and the configured provider only adapts it to its API. Prompt versions,
-SHA-256 content digests, provider/model identifiers, and context digests are persisted with AI Tasks
+SHA-256 content digests, provider/model identifiers, and selection digests are persisted with AI Tasks
 without logging complete prompt content.
 
 Prompt Version expresses the governed semantics of a template, while Prompt Digest identifies its
@@ -262,7 +266,8 @@ pytest
 ## Project status and next steps
 
 Implemented foundations include the domain model, deterministic repository collection, diagnostic
-reporting, immutable project profiles, AnalysisContext construction, intent-driven AI processing,
+reporting, immutable project profiles, AnalysisContext construction, deterministic knowledge selection,
+intent-driven AI processing,
 human validation, production-oriented correlation logging, and immutable Insight promotion.
 
 The main remaining product work is:

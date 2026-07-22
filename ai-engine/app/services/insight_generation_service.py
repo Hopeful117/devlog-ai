@@ -53,14 +53,14 @@ class InsightGenerationService:
             return
         try:
             output = await self._generate_and_validate(
-                prompt, submission.context, set(submission.intent.supported_insight_types)
+                prompt, submission.selected_knowledge, set(submission.intent.supported_insight_types)
             )
         except (ValidationError, InsightOutputValidationError, ValueError) as error:
             corrective_prompt = self._prompt_builder.corrective_retry(prompt, error)
             try:
                 output = await self._generate_and_validate(
                     corrective_prompt,
-                    submission.context,
+                    submission.selected_knowledge,
                     set(submission.intent.supported_insight_types),
                 )
                 prompt = corrective_prompt
@@ -152,11 +152,11 @@ class InsightGenerationService:
         context: dict[str, object],
         supported_insight_types: set[InsightType],
     ) -> None:
-        facts = context.get("facts", [])
-        observations = context.get("observations", [])
+        facts = context.get("selectedFacts", [])
+        observations = context.get("selectedObservations", [])
         if not isinstance(facts, list) or not isinstance(observations, list):
             raise InsightOutputValidationError(
-                "AnalysisContext facts and observations must be arrays"
+                "SelectedKnowledge facts and observations must be arrays"
             )
 
         fact_ids = self._collect_ids(facts)

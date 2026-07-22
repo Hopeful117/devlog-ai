@@ -74,6 +74,16 @@ public class AiTask {
     @Column(name = "context_digest", length = 64)
     private String contextDigest;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "selected_knowledge_snapshot", columnDefinition = "jsonb")
+    private Map<String, Object> selectedKnowledgeSnapshot;
+
+    @Column(name = "selection_version", length = 100)
+    private String selectionVersion;
+
+    @Column(name = "selection_digest", length = 64)
+    private String selectionDigest;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

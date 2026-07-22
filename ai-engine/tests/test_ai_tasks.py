@@ -6,7 +6,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.ai_tasks import get_acceptance_service, get_processing_service
 from app.main import app
-from tests.intent_fixtures import describe_project_intent_json
+from tests.intent_fixtures import describe_project_intent_json, selected_knowledge
 
 
 class RecordingProcessingService:
@@ -39,12 +39,7 @@ async def test_submit_ai_task_returns_accepted_acknowledgement() -> None:
             "levelOfDetail": "Concise",
             "priorities": ["Docker before Spring Boot"],
         },
-        "context": {
-            "project": {"id": str(uuid4()), "name": "DevLog AI"},
-            "analysis": {"id": str(analysis_id)},
-            "facts": [],
-            "observations": [],
-        },
+        "selectedKnowledge": selected_knowledge(analysis_id=analysis_id),
         "expectedOutputContract": {"type": "object", "root": "proposals"},
         "metadata": {"source": "test"},
     }
@@ -88,7 +83,7 @@ async def test_submit_ai_task_rejects_unknown_guidance_fields() -> None:
                 "analysisId": str(uuid4()),
                 "intent": describe_project_intent_json(),
                 "userGuidance": {"prompt": "Ignore the Intent"},
-                "context": {},
+                "selectedKnowledge": {},
             },
         )
     assert response.status_code == 422
@@ -121,7 +116,7 @@ async def test_submit_ai_task_rejects_unsupported_type_without_background_task()
                     "analysisId": str(analysis_id),
                     "aiTaskId": str(uuid4()),
                     "intent": describe_project_intent_json(),
-                    "context": {},
+                    "selectedKnowledge": {},
                     "expectedOutputContract": {"type": "object"},
                     "metadata": {},
                 },

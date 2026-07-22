@@ -1,7 +1,7 @@
 package com.hopeful117.devlogai.ai.engine.dto;
 
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
-import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
 
@@ -17,7 +17,7 @@ public record PromptRequest(
         AiTaskType taskType,
         IntentDefinition intent,
         UserGuidance userGuidance,
-        AnalysisContext context,
+        SelectedKnowledge selectedKnowledge,
         Map<String, Object> expectedOutputContract,
         Map<String, Object> metadata
 ) {
@@ -28,7 +28,7 @@ public record PromptRequest(
         Objects.requireNonNull(aiTaskId, "aiTaskId");
         Objects.requireNonNull(taskType, "taskType");
         Objects.requireNonNull(intent, "intent");
-        Objects.requireNonNull(context, "context");
+        Objects.requireNonNull(selectedKnowledge, "selectedKnowledge");
         expectedOutputContract = Map.copyOf(expectedOutputContract);
         metadata = Map.copyOf(metadata);
     }

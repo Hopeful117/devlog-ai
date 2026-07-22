@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.ai.task.dto.request.FailAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.response.AiTaskResponse;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 
 import java.util.List;
 import java.util.UUID;
@@ -14,6 +15,11 @@ public interface AiTaskService {
     AiTaskResponse create(CreateAiTaskRequest request);
 
     AiTaskResponse create(CreateAiTaskRequest request, AnalysisContext context);
+
+    AiTaskResponse create(CreateAiTaskRequest request, AnalysisContext context,
+                          SelectedKnowledge selectedKnowledge);
+
+    AiTaskResponse attachSelectedKnowledge(UUID id, SelectedKnowledge selectedKnowledge);
 
     AiTaskResponse getById(UUID id);
 

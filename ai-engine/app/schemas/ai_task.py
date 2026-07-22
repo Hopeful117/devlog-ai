@@ -51,7 +51,7 @@ class PromptRequest(ContractModel):
     task_type: AiTaskType = Field(alias="taskType")
     intent: IntentDefinition
     user_guidance: UserGuidance | None = Field(default=None, alias="userGuidance")
-    context: dict[str, Any]
+    selected_knowledge: dict[str, Any] = Field(alias="selectedKnowledge")
     expected_output_contract: dict[str, Any] = Field(alias="expectedOutputContract")
     metadata: dict[str, Any]
 
