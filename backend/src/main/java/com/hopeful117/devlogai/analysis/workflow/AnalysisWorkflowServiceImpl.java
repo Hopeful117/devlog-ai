@@ -29,6 +29,7 @@ import java.util.UUID;
 public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
 
     private final AnalysisService analysisService;
+    private final AnalysisAiTaskTypeResolver taskTypeResolver;
     private final KnowledgeCollectionService knowledgeCollectionService;
     private final DeterministicAnalysisService deterministicAnalysisService;
     private final AnalysisContextService analysisContextService;
@@ -36,12 +37,13 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
     private final AIEngineClient aiEngineClient;
 
     @Override
-    public AnalysisWorkflowResult start(UUID analysisId, AiTaskType taskType) {
+    public AnalysisWorkflowResult start(UUID analysisId) {
         boolean started = false;
         AiTaskResponse createdTask = null;
         try {
             AnalysisResponse analysis = analysisService.start(analysisId);
             started = true;
+            AiTaskType taskType = taskTypeResolver.resolve(analysis.type());
             knowledgeCollectionService.collect(analysisId);
             DeterministicAnalysisResult deterministicResult =
                     deterministicAnalysisService.analyze(analysisId);

@@ -32,11 +32,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
-import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -191,7 +191,7 @@ class AnalysisContextServiceTest {
                 project(projectId),
                 AnalysisType.TECHNICAL_DEBT
         );
-        JsonNode payload = mock(JsonNode.class);
+        Map<String, Object> payload = Map.of("summary", "accepted");
         ValidatableProposal acceptedProposal = ValidatableProposal.builder()
                 .id(UUID.randomUUID())
                 .project(analysis.getProject())
@@ -202,7 +202,6 @@ class AnalysisContextServiceTest {
                 .build();
 
         commonContextData(analysis, false);
-        when(payload.toString()).thenReturn("{\"summary\":\"accepted\"}");
         when(proposalRepository.findByProjectIdAndStatusOrderByCreatedAtDescIdDesc(
                 eq(projectId), eq(ProposalStatus.ACCEPTED), any(Pageable.class)))
                 .thenReturn(List.of(acceptedProposal));
@@ -211,7 +210,7 @@ class AnalysisContextServiceTest {
 
         assertEquals(1, context.validatedProposals().size());
         assertEquals(acceptedProposal.getId(), context.validatedProposals().getFirst().id());
-        assertEquals("{\"summary\":\"accepted\"}",
+        assertEquals(Map.of("summary", "accepted"),
                 context.validatedProposals().getFirst().payload());
         assertThrows(
                 UnsupportedOperationException.class,

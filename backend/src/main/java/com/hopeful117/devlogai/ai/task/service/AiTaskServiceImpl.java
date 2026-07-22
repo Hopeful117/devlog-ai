@@ -17,11 +17,11 @@ import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -55,7 +55,11 @@ public class AiTaskServiceImpl implements AiTaskService {
             AnalysisContext context,
             Analysis analysis
     ) {
-        JsonNode contextSnapshot = objectMapper.valueToTree(context);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> contextSnapshot = objectMapper.convertValue(
+                context,
+                Map.class
+        );
 
         AiTask task = aiTaskMapper.toEntity(request);
         task.setAnalysis(analysis);

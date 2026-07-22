@@ -2,9 +2,8 @@ package com.hopeful117.devlogai.proposal.dto.response;
 
 import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
 import com.hopeful117.devlogai.proposal.entity.ProposalType;
-import tools.jackson.databind.JsonNode;
-
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 public record ValidatableProposalResponse(
@@ -19,7 +18,7 @@ public record ValidatableProposalResponse(
 
         ProposalStatus status,
 
-        JsonNode payload,
+        Map<String, Object> payload,
 
         Instant createdAt,
 

@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.ai.engine.service;
 
 import com.hopeful117.devlogai.ai.engine.dto.*;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
+import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
@@ -12,9 +13,9 @@ import com.hopeful117.devlogai.observation.repository.ObservationRepository;
 import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
-import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +24,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AiTaskResultServiceImpl implements AiTaskResultService {
 
     private final AiTaskRepository aiTaskRepository;
@@ -36,6 +38,8 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             UUID correlationId,
             AiTaskResultRequest request
     ) {
+        log.info("Receiving AI task result correlationId={} status={} proposalCount={}",
+                correlationId, request.status(), request.proposals().size());
         validateContract(correlationId, request);
         AiTask task = aiTaskRepository.findByCorrelationIdForUpdate(correlationId)
                 .orElseThrow(() -> new EntityNotFoundException(
@@ -45,22 +49,37 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
 
         if (isTerminal(task.getStatus())) {
             if (!task.getStatus().name().equals(request.status().name())) {
-                throw new ConflictException(
-                        "AI task already ended with status " + task.getStatus()
+                throw new AiTaskResultConflictException(
+                        "AI_TASK_TERMINAL_CONFLICT",
+                        task.getStatus(),
+                        "AI task already ended with a different terminal status."
                 );
             }
+            log.info("AI task result acknowledged as duplicate correlationId={} taskStatus={}",
+                    correlationId, task.getStatus());
             return acknowledgement(task, true);
+        }
+        if (task.getStatus() == AiTaskStatus.CREATED) {
+            throw new AiTaskResultConflictException(
+                    "AI_TASK_NOT_READY",
+                    task.getStatus(),
+                    "AI task cannot receive a result yet."
+            );
         }
         if (task.getStatus() != AiTaskStatus.SUBMITTED
                 && task.getStatus() != AiTaskStatus.PROCESSING) {
-            throw new ConflictException(
-                    "AI task cannot receive a result from status " + task.getStatus()
+            throw new AiTaskResultConflictException(
+                    "AI_TASK_INVALID_STATE",
+                    task.getStatus(),
+                    "AI task cannot receive a result from its current status."
             );
         }
 
         if (request.status() == AiTaskResultStatus.FAILED) {
             failTask(task, request);
             aiTaskRepository.save(task);
+            log.warn("AI task marked failed correlationId={} failureCode={}",
+                    correlationId, request.error().code());
             return acknowledgement(task, false);
         }
 
@@ -68,6 +87,8 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         proposalRepository.saveAll(toProposals(task, request.proposals()));
         completeTask(task, request.completedAt());
         aiTaskRepository.save(task);
+        log.info("AI task completed correlationId={} proposalCount={}",
+                correlationId, request.proposals().size());
         return acknowledgement(task, false);
     }
 

@@ -12,6 +12,7 @@ import com.hopeful117.devlogai.proposal.entity.ProposalType;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public record AnalysisContext(
@@ -124,9 +125,12 @@ public record AnalysisContext(
     public record ValidatedProposalSnapshot(
             UUID id,
             ProposalType type,
-            String payload,
+            Map<String, Object> payload,
             Instant createdAt,
             Instant decidedAt
     ) {
+        public ValidatedProposalSnapshot {
+            payload = Map.copyOf(payload);
+        }
     }
 }

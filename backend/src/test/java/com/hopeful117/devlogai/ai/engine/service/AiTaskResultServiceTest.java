@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.ai.engine.service;
 
 import com.hopeful117.devlogai.ai.engine.dto.*;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
+import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
@@ -21,7 +22,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.databind.JsonNode;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -64,7 +64,7 @@ class AiTaskResultServiceTest {
                 .build();
         AiProposalResult proposal = new AiProposalResult(
                 ProposalType.INSIGHT,
-                mock(JsonNode.class),
+                java.util.Map.of("title", "Test insight"),
                 new BigDecimal("0.8500"),
                 List.of(factId),
                 List.of(observationId),
@@ -164,6 +164,45 @@ class AiTaskResultServiceTest {
     }
 
     @Test
+    void shouldReportCreatedTaskAsTransientNotReadyConflict() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.CREATED);
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+
+        AiTaskResultConflictException result = assertThrows(
+                AiTaskResultConflictException.class,
+                () -> service.handle(
+                        correlationId,
+                        completedRequest(correlationId, Instant.now(), List.of())
+                )
+        );
+
+        assertEquals("AI_TASK_NOT_READY", result.getCode());
+        assertEquals(AiTaskStatus.CREATED, result.getCurrentStatus());
+        verifyNoInteractions(proposalRepository, factRepository, observationRepository);
+    }
+
+    @Test
+    void shouldReportDifferentTerminalResultAsNonTransientConflict() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.FAILED);
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+
+        AiTaskResultConflictException result = assertThrows(
+                AiTaskResultConflictException.class,
+                () -> service.handle(
+                        correlationId,
+                        completedRequest(correlationId, Instant.now(), List.of())
+                )
+        );
+
+        assertEquals("AI_TASK_TERMINAL_CONFLICT", result.getCode());
+        assertEquals(AiTaskStatus.FAILED, result.getCurrentStatus());
+    }
+
+    @Test
     void shouldRejectReferencesFromAnotherAnalysis() {
         UUID correlationId = UUID.randomUUID();
         UUID factId = UUID.randomUUID();
@@ -174,7 +213,7 @@ class AiTaskResultServiceTest {
                 .build();
         AiProposalResult proposal = new AiProposalResult(
                 ProposalType.CHALLENGE,
-                mock(JsonNode.class),
+                java.util.Map.of("title", "Test challenge"),
                 BigDecimal.ONE,
                 List.of(factId),
                 List.of(),

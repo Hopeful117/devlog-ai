@@ -20,10 +20,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -60,13 +60,13 @@ class AiTaskServiceTest {
         );
         Analysis analysis = new Analysis();
         AnalysisContext context = mock(AnalysisContext.class);
-        JsonNode snapshot = mock(JsonNode.class);
+        Map<String, Object> snapshot = Map.of("analysis", Map.of("id", analysisId));
         AiTask task = new AiTask();
         AiTaskResponse response = mock(AiTaskResponse.class);
 
         when(analysisRepository.findById(analysisId)).thenReturn(Optional.of(analysis));
         when(analysisContextService.build(analysisId)).thenReturn(context);
-        when(objectMapper.valueToTree(context)).thenReturn(snapshot);
+        when(objectMapper.convertValue(context, Map.class)).thenReturn(snapshot);
         when(aiTaskMapper.toEntity(request)).thenReturn(task);
         when(aiTaskRepository.save(task)).thenReturn(task);
         when(aiTaskMapper.toResponse(task)).thenReturn(response);

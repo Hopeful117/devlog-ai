@@ -4,6 +4,8 @@ import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.ai.engine.exception.AIEngineCommunicationException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,8 +13,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import static com.hopeful117.devlogai.shared.logging.CorrelationIdFilter.HEADER_NAME;
+import static com.hopeful117.devlogai.shared.logging.CorrelationIdFilter.MDC_KEY;
+
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class RestAIEngineClient implements AIEngineClient {
 
     @Qualifier("aiEngineRestClient")
@@ -20,9 +26,13 @@ public class RestAIEngineClient implements AIEngineClient {
 
     @Override
     public AiTaskSubmissionResponse submit(AiTaskSubmissionRequest request) {
+        long startedAt = System.nanoTime();
+        log.info("Submitting AI task correlationId={} analysisId={} taskType={}",
+                request.correlationId(), request.analysisId(), request.taskType());
         try {
             ResponseEntity<AiTaskSubmissionResponse> response = restClient.post()
                     .uri("/api/v1/ai/tasks")
+                    .header(HEADER_NAME, outboundCorrelationId(request))
                     .body(request)
                     .retrieve()
                     .toEntity(AiTaskSubmissionResponse.class);
@@ -36,15 +46,29 @@ public class RestAIEngineClient implements AIEngineClient {
 
             AiTaskSubmissionResponse body = response.getBody();
             validateResponse(request, body);
+            log.info("AI task accepted correlationId={} durationMs={}",
+                    request.correlationId(), elapsedMs(startedAt));
             return body;
         } catch (AIEngineCommunicationException exception) {
             throw exception;
         } catch (RestClientException exception) {
+            log.warn("AI task submission failed correlationId={} durationMs={} exceptionType={}",
+                    request.correlationId(), elapsedMs(startedAt),
+                    exception.getClass().getSimpleName());
             throw new AIEngineCommunicationException(
                     "AI Engine task submission failed",
                     exception
             );
         }
+    }
+
+    private String outboundCorrelationId(AiTaskSubmissionRequest request) {
+        String requestCorrelationId = MDC.get(MDC_KEY);
+        return requestCorrelationId == null ? request.correlationId().toString() : requestCorrelationId;
+    }
+
+    private long elapsedMs(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
     }
 
     private void validateResponse(

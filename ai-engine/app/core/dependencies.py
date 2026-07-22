@@ -31,6 +31,9 @@ def get_task_processing_service() -> AiTaskProcessingService:
     callback_client = CoreCallbackClient(
         settings.core_base_url,
         timeout=settings.core_callback_timeout_seconds,
+        max_attempts=settings.core_callback_max_attempts,
+        initial_delay_ms=settings.core_callback_initial_delay_ms,
+        max_delay_ms=settings.core_callback_max_delay_ms,
     )
     insight_service = InsightGenerationService(
         provider=build_llm_provider(settings),

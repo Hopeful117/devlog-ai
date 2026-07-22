@@ -1,23 +1,61 @@
 package com.hopeful117.devlogai.shared.exception.handler;
 
-import com.hopeful117.devlogai.shared.exception.ConflictException;
+import com.hopeful117.devlogai.ai.engine.dto.AiTaskConflictResponse;
+import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
+import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTypeException;
+import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.response.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
+    @ExceptionHandler(AiTaskResultConflictException.class)
+    public ResponseEntity<AiTaskConflictResponse> handleAiTaskResultConflict(
+            AiTaskResultConflictException ex,
+            HttpServletRequest request
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                new AiTaskConflictResponse(
+                        Instant.now(),
+                        HttpStatus.CONFLICT.value(),
+                        HttpStatus.CONFLICT.getReasonPhrase(),
+                        ex.getCode(),
+                        ex.getCurrentStatus(),
+                        ex.getMessage(),
+                        request.getRequestURI()
+                )
+        );
+    }
+
+    @ExceptionHandler(UnsupportedAnalysisTypeException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnsupportedAnalysisType(
+            UnsupportedAnalysisTypeException ex,
+            HttpServletRequest request
+    ) {
+        ApiErrorResponse response = new ApiErrorResponse(
+                Instant.now(),
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI()
+        );
+        return ResponseEntity.unprocessableEntity().body(response);
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiErrorResponse> handleTypeMismatch(
             MethodArgumentTypeMismatchException ex,
@@ -100,6 +138,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleUnexpected(
             Exception ex,
             HttpServletRequest request) {
+
+        log.error(
+                "Unhandled exception method={} path={} exceptionType={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                ex.getClass().getName(),
+                ex
+        );
 
         ApiErrorResponse response = new ApiErrorResponse(
                 Instant.now(),

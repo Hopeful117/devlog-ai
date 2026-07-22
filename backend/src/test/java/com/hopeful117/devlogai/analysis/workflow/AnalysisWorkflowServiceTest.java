@@ -21,11 +21,13 @@ import com.hopeful117.devlogai.analysis.service.AnalysisService;
 import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
 import com.hopeful117.devlogai.collection.service.KnowledgeCollectionService;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
+import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTypeException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.UUID;
@@ -39,6 +41,10 @@ class AnalysisWorkflowServiceTest {
 
     @Mock
     private AnalysisService analysisService;
+
+    @Spy
+    private AnalysisAiTaskTypeResolver taskTypeResolver =
+            new AnalysisAiTaskTypeResolver();
 
     @Mock
     private KnowledgeCollectionService knowledgeCollectionService;
@@ -63,7 +69,7 @@ class AnalysisWorkflowServiceTest {
         UUID analysisId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
         UUID correlationId = UUID.randomUUID();
-        AiTaskType taskType = AiTaskType.DECISION_PROPOSAL_GENERATION;
+        AiTaskType taskType = AiTaskType.INSIGHT_GENERATION;
         AnalysisResponse analysis = analysisResponse(analysisId, AnalysisStatus.IN_PROGRESS);
         AnalysisContext context = mock(AnalysisContext.class);
         AiTaskResponse task = aiTaskResponse(
@@ -104,7 +110,7 @@ class AnalysisWorkflowServiceTest {
                 new SubmitAiTaskRequest("engine-job-42")
         )).thenReturn(submittedTask);
 
-        AnalysisWorkflowResult result = workflowService.start(analysisId, taskType);
+        AnalysisWorkflowResult result = workflowService.start(analysisId);
 
         assertEquals(analysisId, result.analysisId());
         assertEquals(AnalysisStatus.IN_PROGRESS, result.analysisStatus());
@@ -153,10 +159,7 @@ class AnalysisWorkflowServiceTest {
 
         RuntimeException result = assertThrows(
                 RuntimeException.class,
-                () -> workflowService.start(
-                        analysisId,
-                        AiTaskType.INSIGHT_GENERATION
-                )
+                () -> workflowService.start(analysisId)
         );
 
         assertSame(failure, result);
@@ -176,10 +179,7 @@ class AnalysisWorkflowServiceTest {
 
         assertThrows(
                 RuntimeException.class,
-                () -> workflowService.start(
-                        analysisId,
-                        AiTaskType.DOCUMENTATION_GENERATION
-                )
+                () -> workflowService.start(analysisId)
         );
 
         verify(analysisService).fail(analysisId);
@@ -189,7 +189,7 @@ class AnalysisWorkflowServiceTest {
     @Test
     void shouldMarkAnalysisFailedWhenAiTaskCreationFails() {
         UUID analysisId = UUID.randomUUID();
-        AiTaskType taskType = AiTaskType.EVENT_PROPOSAL_GENERATION;
+        AiTaskType taskType = AiTaskType.INSIGHT_GENERATION;
         AnalysisContext context = mock(AnalysisContext.class);
         when(analysisService.start(analysisId))
                 .thenReturn(analysisResponse(analysisId, AnalysisStatus.IN_PROGRESS));
@@ -203,7 +203,7 @@ class AnalysisWorkflowServiceTest {
 
         assertThrows(
                 RuntimeException.class,
-                () -> workflowService.start(analysisId, taskType)
+                () -> workflowService.start(analysisId)
         );
 
         verify(analysisService).fail(analysisId);
@@ -214,7 +214,7 @@ class AnalysisWorkflowServiceTest {
         UUID analysisId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
         UUID correlationId = UUID.randomUUID();
-        AiTaskType taskType = AiTaskType.DECISION_PROPOSAL_GENERATION;
+        AiTaskType taskType = AiTaskType.INSIGHT_GENERATION;
         AnalysisContext context = mock(AnalysisContext.class);
         AiTaskResponse task = aiTaskResponse(
                 taskId,
@@ -236,7 +236,7 @@ class AnalysisWorkflowServiceTest {
 
         RuntimeException result = assertThrows(
                 RuntimeException.class,
-                () -> workflowService.start(analysisId, taskType)
+                () -> workflowService.start(analysisId)
         );
 
         assertSame(failure, result);
@@ -259,10 +259,7 @@ class AnalysisWorkflowServiceTest {
 
         ConflictException result = assertThrows(
                 ConflictException.class,
-                () -> workflowService.start(
-                        analysisId,
-                        AiTaskType.INSIGHT_GENERATION
-                )
+                () -> workflowService.start(analysisId)
         );
 
         assertSame(conflict, result);
@@ -286,12 +283,39 @@ class AnalysisWorkflowServiceTest {
 
         RuntimeException result = assertThrows(
                 RuntimeException.class,
-                () -> workflowService.start(analysisId, AiTaskType.INSIGHT_GENERATION)
+                () -> workflowService.start(analysisId)
         );
 
         assertSame(failure, result);
         verify(analysisService).fail(analysisId);
         verifyNoInteractions(deterministicAnalysisService, analysisContextService, aiTaskService);
+    }
+
+    @Test
+    void shouldFailUnsupportedAnalysisBeforeCollectionOrSubmission() {
+        UUID analysisId = UUID.randomUUID();
+        AnalysisResponse unsupported = new AnalysisResponse(
+                analysisId,
+                UUID.randomUUID(),
+                AnalysisType.TECHNICAL_DEBT,
+                AnalysisStatus.IN_PROGRESS,
+                null, null, null, null
+        );
+        when(analysisService.start(analysisId)).thenReturn(unsupported);
+
+        assertThrows(
+                UnsupportedAnalysisTypeException.class,
+                () -> workflowService.start(analysisId)
+        );
+
+        verify(analysisService).fail(analysisId);
+        verifyNoInteractions(
+                knowledgeCollectionService,
+                deterministicAnalysisService,
+                analysisContextService,
+                aiTaskService,
+                aiEngineClient
+        );
     }
 
     @Test
@@ -308,10 +332,7 @@ class AnalysisWorkflowServiceTest {
 
         RuntimeException result = assertThrows(
                 RuntimeException.class,
-                () -> workflowService.start(
-                        analysisId,
-                        AiTaskType.INSIGHT_GENERATION
-                )
+                () -> workflowService.start(analysisId)
         );
 
         assertSame(original, result);
@@ -341,7 +362,7 @@ class AnalysisWorkflowServiceTest {
                 id,
                 analysisId,
                 correlationId,
-                AiTaskType.DECISION_PROPOSAL_GENERATION,
+                AiTaskType.INSIGHT_GENERATION,
                 status,
                 null,
                 null,

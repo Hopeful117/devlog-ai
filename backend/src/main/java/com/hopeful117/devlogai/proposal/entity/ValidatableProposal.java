@@ -10,12 +10,11 @@ import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import tools.jackson.databind.JsonNode;
-
 import java.time.Instant;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -58,7 +57,7 @@ public class ValidatableProposal {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, columnDefinition = "jsonb")
-    private JsonNode payload;
+    private Map<String, Object> payload;
 
     @Column(precision = 5, scale = 4)
     private BigDecimal confidence;

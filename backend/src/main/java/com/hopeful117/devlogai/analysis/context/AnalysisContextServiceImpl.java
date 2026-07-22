@@ -213,7 +213,7 @@ public class AnalysisContextServiceImpl implements AnalysisContextService {
             ValidatableProposal proposal
     ) {
         return new AnalysisContext.ValidatedProposalSnapshot(
-                proposal.getId(), proposal.getType(), proposal.getPayload().toString(),
+                proposal.getId(), proposal.getType(), proposal.getPayload(),
                 proposal.getCreatedAt(), proposal.getDecidedAt()
         );
     }

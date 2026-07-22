@@ -2,8 +2,7 @@ package com.hopeful117.devlogai.proposal.dto.request;
 
 import com.hopeful117.devlogai.proposal.entity.ProposalType;
 import jakarta.validation.constraints.NotNull;
-import tools.jackson.databind.JsonNode;
-
+import java.util.Map;
 import java.util.UUID;
 
 public record CreateValidatableProposalRequest(
@@ -18,6 +17,6 @@ public record CreateValidatableProposalRequest(
         ProposalType type,
 
         @NotNull
-        JsonNode payload
+        Map<String, Object> payload
 ) {
 }

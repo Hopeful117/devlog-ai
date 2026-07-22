@@ -2,9 +2,8 @@ package com.hopeful117.devlogai.ai.task.dto.response;
 
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
-import tools.jackson.databind.JsonNode;
-
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 public record AiTaskResponse(
@@ -13,7 +12,7 @@ public record AiTaskResponse(
         UUID correlationId,
         AiTaskType taskType,
         AiTaskStatus status,
-        JsonNode contextSnapshot,
+        Map<String, Object> contextSnapshot,
         String externalJobId,
         int attemptCount,
         String failureCode,

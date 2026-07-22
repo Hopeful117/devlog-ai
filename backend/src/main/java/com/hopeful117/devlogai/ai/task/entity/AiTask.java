@@ -7,9 +7,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import tools.jackson.databind.JsonNode;
-
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -50,7 +49,7 @@ public class AiTask {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, updatable = false, columnDefinition = "jsonb")
-    private JsonNode contextSnapshot;
+    private Map<String, Object> contextSnapshot;
 
     @Column(length = 255)
     private String externalJobId;

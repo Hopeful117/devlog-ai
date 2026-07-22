@@ -23,3 +23,9 @@ class AiTaskSubmissionResponse(ContractModel):
     accepted: bool
     external_job_id: UUID = Field(alias="externalJobId")
     accepted_at: datetime = Field(alias="acceptedAt")
+
+
+class UnsupportedTaskTypeResponse(ContractModel):
+    code: str
+    task_type: str = Field(alias="taskType")
+    supported_task_types: list[str] = Field(alias="supportedTaskTypes")

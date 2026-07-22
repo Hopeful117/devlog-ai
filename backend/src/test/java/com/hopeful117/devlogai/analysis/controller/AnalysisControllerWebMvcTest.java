@@ -45,7 +45,7 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         when(service.getByProjectAndType(projectId, AnalysisType.ARCHITECTURE_REVIEW))
                 .thenReturn(List.of(response));
         when(service.getByProjectAndStatus(projectId, AnalysisStatus.PENDING)).thenReturn(List.of(response));
-        when(workflow.start(id, com.hopeful117.devlogai.ai.task.entity.AiTaskType.INSIGHT_GENERATION))
+        when(workflow.start(id))
                 .thenReturn(new AnalysisWorkflowResult(id, AnalysisStatus.IN_PROGRESS, 2, 1,
                         taskId, AiTaskStatus.SUBMITTED, correlationId));
 
@@ -62,8 +62,7 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].type").value("ARCHITECTURE_REVIEW"));
         mvc.perform(get("/api/v1/analyses/project/{id}/status/PENDING", projectId))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("PENDING"));
-        mvc.perform(post("/api/v1/analyses/{id}/workflow", id).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"taskType\":\"INSIGHT_GENERATION\"}"))
+        mvc.perform(post("/api/v1/analyses/{id}/workflow", id))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.aiTaskStatus").value("SUBMITTED"));
     }
 }

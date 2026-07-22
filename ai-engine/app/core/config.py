@@ -12,6 +12,9 @@ class Settings:
     llm_max_output_tokens: int = 2_000
     core_base_url: str = "http://localhost:8080"
     core_callback_timeout_seconds: float = 5.0
+    core_callback_max_attempts: int = 5
+    core_callback_initial_delay_ms: int = 100
+    core_callback_max_delay_ms: int = 1_000
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -26,6 +29,15 @@ class Settings:
             core_base_url=os.getenv("CORE_BASE_URL", "http://localhost:8080"),
             core_callback_timeout_seconds=float(
                 os.getenv("CORE_CALLBACK_TIMEOUT_SECONDS", "5")
+            ),
+            core_callback_max_attempts=int(
+                os.getenv("CORE_CALLBACK_MAX_ATTEMPTS", "5")
+            ),
+            core_callback_initial_delay_ms=int(
+                os.getenv("CORE_CALLBACK_INITIAL_DELAY_MS", "100")
+            ),
+            core_callback_max_delay_ms=int(
+                os.getenv("CORE_CALLBACK_MAX_DELAY_MS", "1000")
             ),
         )
         settings.validate()
@@ -42,6 +54,15 @@ class Settings:
             raise ValueError("LLM_MAX_OUTPUT_TOKENS must be positive")
         if self.core_callback_timeout_seconds <= 0:
             raise ValueError("CORE_CALLBACK_TIMEOUT_SECONDS must be positive")
+        if self.core_callback_max_attempts <= 0:
+            raise ValueError("CORE_CALLBACK_MAX_ATTEMPTS must be positive")
+        if self.core_callback_initial_delay_ms < 0:
+            raise ValueError("CORE_CALLBACK_INITIAL_DELAY_MS must not be negative")
+        if self.core_callback_max_delay_ms < self.core_callback_initial_delay_ms:
+            raise ValueError(
+                "CORE_CALLBACK_MAX_DELAY_MS must be greater than or equal to "
+                "CORE_CALLBACK_INITIAL_DELAY_MS"
+            )
 
 
 @lru_cache

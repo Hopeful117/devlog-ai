@@ -15,9 +15,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.databind.JsonNode;
 
 import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
@@ -61,7 +61,7 @@ public class ValidatableProposalServiceTest {
                         projectId,
                         analysisId,
                         ProposalType.INSIGHT,
-                        mock(JsonNode.class)
+                        Map.of("summary", "proposal")
                 );
 
         ValidatableProposal proposal =
