@@ -9,6 +9,7 @@ import com.hopeful117.devlogai.milestone.entity.MilestoneStatus;
 import com.hopeful117.devlogai.observation.entity.ObservationType;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.proposal.entity.ProposalType;
+import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.UUID;
 public record AnalysisContext(
         ProjectSnapshot project,
         AnalysisSnapshot analysis,
+        ProjectProfileResponse projectProfile,
         List<FactSnapshot> facts,
         List<ObservationSnapshot> observations,
         List<KnowledgeEventSnapshot> recentKnowledgeEvents,
@@ -50,6 +52,8 @@ public record AnalysisContext(
     public record AnalysisSnapshot(
             UUID id,
             AnalysisType type,
+            String intentId,
+            String intentVersion,
             AnalysisStatus status,
             Instant startedAt,
             Instant completedAt,

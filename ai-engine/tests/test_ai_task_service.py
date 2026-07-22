@@ -4,6 +4,7 @@ from uuid import uuid4
 from app.models.ai_task import AiTaskType
 from app.schemas.ai_task import AiTaskSubmissionRequest
 from app.services.ai_task_service import AiTaskAcceptanceService
+from tests.intent_fixtures import describe_project_intent
 
 
 def test_acceptance_service_only_acknowledges_submission() -> None:
@@ -12,6 +13,7 @@ def test_acceptance_service_only_acknowledges_submission() -> None:
         correlation_id=correlation_id,
         task_type=AiTaskType.INSIGHT_GENERATION,
         analysis_id=uuid4(),
+        intent=describe_project_intent(),
         context={"facts": [], "observations": []},
     )
 

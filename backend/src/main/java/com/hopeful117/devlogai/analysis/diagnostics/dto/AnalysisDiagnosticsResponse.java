@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.hopeful117.devlogai.profile.model.ProfileCompletenessStatus;
 
 public record AnalysisDiagnosticsResponse(
         Identity identity,
@@ -20,15 +21,21 @@ public record AnalysisDiagnosticsResponse(
         AiTaskSummary aiTask,
         List<PipelineStage> pipeline,
         TechnicalMetadata technicalMetadata,
+        ProfileSummary profile,
         Map<String, String> links
 ) {
-    public record Identity(UUID analysisId, UUID projectId, AnalysisType analysisType, AnalysisStatus status) { }
+    public record Identity(UUID analysisId, UUID projectId, AnalysisType analysisType,
+                           String intentId, String intentVersion, AnalysisStatus status) { }
     public record Revision(String requestedRevision, Map<String, Object> resolvedRevisions) { }
     public record Timeline(Instant createdAt, Instant startedAt, Instant completedAt, Duration duration) { }
     public record Counts(int sourceCount, int factCount, int observationCount, int warningCount, long proposalCount) { }
     public record Completeness(boolean collectionComplete, boolean truncated, int warningCount, int errorCount) { }
     public record CollectorSummary(int collectorCount, int successfulCollectors, int collectorsWithWarnings, int failedCollectors) { }
-    public record AiTaskSummary(AiTaskType taskType, AiTaskStatus status, String provider, Instant startedAt, Instant completedAt) { }
+    public record AiTaskSummary(AiTaskType taskType, AiTaskStatus status, String intentId,
+                                String intentVersion, String provider,
+                                Instant startedAt, Instant completedAt) { }
     public record PipelineStage(String name, String status, long resourceCount) { }
     public record TechnicalMetadata(String contextBuilderVersion, Map<String, Object> collectorVersions, int serializedContextSize) { }
+    public record ProfileSummary(boolean profileAvailable, UUID profileId, String profileVersion,
+                                 ProfileCompletenessStatus profileCompleteness, int characteristicCount) { }
 }

@@ -19,6 +19,8 @@ public interface AnalysisMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "project", ignore = true)
     @Mapping(target = "status", ignore = true)
+    @Mapping(target = "intentId", ignore = true)
+    @Mapping(target = "intentVersion", ignore = true)
     @Mapping(target = "startedAt", ignore = true)
     @Mapping(target = "completedAt", ignore = true)
     @Mapping(target = "createdAt", ignore = true)

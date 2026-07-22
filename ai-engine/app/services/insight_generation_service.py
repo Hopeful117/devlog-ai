@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from app.clients.core_callback_client import CoreCallbackClient
 from app.models.proposal import AiTaskResultStatus, ProposalType
+from app.models.intent import InsightType
 from app.prompts.insight import InsightPromptBuilder
 from app.providers.base import LlmProvider, LlmRequest
 from app.schemas.ai_task import AiTaskSubmissionRequest
@@ -36,15 +37,24 @@ class InsightGenerationService:
         submission: AiTaskSubmissionRequest,
         external_job_id: UUID,
     ) -> None:
-        prompt = self._prompt_builder.build(submission.context)
         try:
-            output = await self._generate_and_validate(prompt, submission.context)
+            prompt = self._prompt_builder.build(submission.intent, submission.context)
+        except ValueError as intent_error:
+            await self._send_failure(
+                submission, external_job_id, "INVALID_INTENT", intent_error
+            )
+            return
+        try:
+            output = await self._generate_and_validate(
+                prompt, submission.context, set(submission.intent.supported_insight_types)
+            )
         except (ValidationError, InsightOutputValidationError, ValueError) as error:
             corrective_prompt = self._prompt_builder.corrective_retry(prompt, error)
             try:
                 output = await self._generate_and_validate(
                     corrective_prompt,
                     submission.context,
+                    set(submission.intent.supported_insight_types),
                 )
             except (ValidationError, InsightOutputValidationError, ValueError) as retry_error:
                 await self._send_failure(
@@ -75,6 +85,7 @@ class InsightGenerationService:
             AiProposalResult(
                 type=ProposalType.INSIGHT,
                 payload={
+                    "insightType": proposal.insight_type.value,
                     "title": proposal.title,
                     "summary": proposal.summary,
                     "rationale": proposal.rationale,
@@ -102,19 +113,21 @@ class InsightGenerationService:
         self,
         prompt: LlmRequest,
         context: dict[str, object],
+        supported_insight_types: set[InsightType],
     ) -> InsightGenerationOutput:
         output = await self._provider.generate_structured(
             prompt,
             InsightGenerationOutput,
         )
         validated = InsightGenerationOutput.model_validate(output)
-        self._validate_context_references(validated, context)
+        self._validate_output(validated, context, supported_insight_types)
         return validated
 
-    def _validate_context_references(
+    def _validate_output(
         self,
         output: InsightGenerationOutput,
         context: dict[str, object],
+        supported_insight_types: set[InsightType],
     ) -> None:
         facts = context.get("facts", [])
         observations = context.get("observations", [])
@@ -134,6 +147,10 @@ class InsightGenerationService:
         }
 
         for proposal in output.proposals:
+            if proposal.insight_type not in supported_insight_types:
+                raise InsightOutputValidationError(
+                    f"insightType {proposal.insight_type.value} is not supported by Intent"
+                )
             self._require_subset(
                 set(proposal.supporting_fact_ids),
                 fact_ids,

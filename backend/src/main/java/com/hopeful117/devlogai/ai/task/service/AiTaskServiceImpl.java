@@ -14,6 +14,8 @@ import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,6 +36,7 @@ public class AiTaskServiceImpl implements AiTaskService {
     private final AnalysisContextService analysisContextService;
     private final AiTaskMapper aiTaskMapper;
     private final ObjectMapper objectMapper;
+    private final IntentCatalog intentCatalog;
 
     @Override
     public AiTaskResponse create(CreateAiTaskRequest request) {
@@ -62,9 +65,15 @@ public class AiTaskServiceImpl implements AiTaskService {
         );
 
         AiTask task = aiTaskMapper.toEntity(request);
+        IntentDefinition intent = intentCatalog.resolve(analysis.getIntentId(), analysis.getIntentVersion());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> intentSnapshot = objectMapper.convertValue(intent, Map.class);
         task.setAnalysis(analysis);
         task.setCorrelationId(UUID.randomUUID());
         task.setStatus(AiTaskStatus.CREATED);
+        task.setIntentId(intent.id());
+        task.setIntentVersion(intent.version());
+        task.setIntentSnapshot(intentSnapshot);
         task.setContextSnapshot(contextSnapshot);
         task.setAttemptCount(0);
         task.setExternalJobId(null);

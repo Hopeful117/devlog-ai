@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from app.core.config import Settings
 from app.core.dependencies import build_llm_provider
 from app.prompts.insight import InsightPromptBuilder
+from tests.intent_fixtures import describe_project_intent
 from app.providers.mock import MockLlmProvider
 from app.providers.openai import OpenAiLlmProvider
 from app.schemas.insight import InsightGenerationOutput
@@ -14,7 +15,7 @@ from app.schemas.insight import InsightGenerationOutput
 @pytest.mark.asyncio
 async def test_mock_provider_is_deterministic_without_configuration() -> None:
     provider = MockLlmProvider()
-    request = InsightPromptBuilder().build({"facts": [], "observations": []})
+    request = InsightPromptBuilder().build(describe_project_intent(), {"facts": [], "observations": []})
 
     output = await provider.generate_structured(
         request,
@@ -31,7 +32,7 @@ async def test_mock_provider_validates_configured_output() -> None:
 
     with pytest.raises(ValidationError):
         await provider.generate_structured(
-            InsightPromptBuilder().build({}),
+            InsightPromptBuilder().build(describe_project_intent(), {}),
             InsightGenerationOutput,
         )
 
@@ -74,7 +75,7 @@ async def test_openai_provider_uses_structured_response_model() -> None:
         max_output_tokens=500,
         client=client,  # type: ignore[arg-type]
     )
-    request = InsightPromptBuilder().build({"facts": [], "observations": []})
+    request = InsightPromptBuilder().build(describe_project_intent(), {"facts": [], "observations": []})
 
     output = await provider.generate_structured(request, InsightGenerationOutput)
 

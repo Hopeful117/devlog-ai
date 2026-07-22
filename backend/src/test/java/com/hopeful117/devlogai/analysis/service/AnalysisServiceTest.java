@@ -11,6 +11,9 @@ import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
+import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.model.InsightType;
+import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,6 +39,9 @@ public class AnalysisServiceTest {
 
     @Mock
     ProjectRepository projectRepository;
+
+    @Mock
+    IntentCatalog intentCatalog;
 
     @InjectMocks
     AnalysisServiceImpl analysisService;
@@ -97,6 +103,7 @@ public class AnalysisServiceTest {
 
         request.setProjectId(projectId);
         request.setType(AnalysisType.ARCHITECTURE_REVIEW);
+        request.setIntentId("describe-project-v1");
 
         Project project = new Project();
 
@@ -111,6 +118,10 @@ public class AnalysisServiceTest {
 
         when(projectRepository.findById(projectId))
                 .thenReturn(Optional.of(project));
+        when(intentCatalog.resolve("describe-project-v1"))
+                .thenReturn(new IntentDefinition("describe-project", "v1", "Describe",
+                        List.of(InsightType.PROJECT_PRESENTATION), List.of("traceable"),
+                        java.util.Map.of("type", "object"), "describe-project-prompt-v1"));
 
         when(analysisMapper.toEntity(request))
                 .thenReturn(analysis);
@@ -140,6 +151,8 @@ public class AnalysisServiceTest {
 
         assertNull(analysis.getStartedAt());
         assertNull(analysis.getCompletedAt());
+        assertEquals("describe-project", analysis.getIntentId());
+        assertEquals("v1", analysis.getIntentVersion());
 
 
         verify(projectRepository)

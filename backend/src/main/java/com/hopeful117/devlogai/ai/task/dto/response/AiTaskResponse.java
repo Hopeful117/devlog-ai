@@ -11,6 +11,9 @@ public record AiTaskResponse(
         UUID analysisId,
         UUID correlationId,
         AiTaskType taskType,
+        String intentId,
+        String intentVersion,
+        Map<String, Object> intentSnapshot,
         AiTaskStatus status,
         Map<String, Object> contextSnapshot,
         String externalJobId,
@@ -22,4 +25,13 @@ public record AiTaskResponse(
         Instant startedAt,
         Instant completedAt
 ) {
+    public AiTaskResponse(UUID id, UUID analysisId, UUID correlationId, AiTaskType taskType,
+                          AiTaskStatus status, Map<String, Object> contextSnapshot,
+                          String externalJobId, int attemptCount, String failureCode,
+                          String failureMessage, Instant createdAt, Instant submittedAt,
+                          Instant startedAt, Instant completedAt) {
+        this(id, analysisId, correlationId, taskType, null, null, null, status,
+                contextSnapshot, externalJobId, attemptCount, failureCode, failureMessage,
+                createdAt, submittedAt, startedAt, completedAt);
+    }
 }

@@ -21,6 +21,7 @@ import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.profile.service.ProjectProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,7 @@ public class AnalysisContextServiceImpl implements AnalysisContextService {
     private final AnalysisRepository analysisRepository;
     private final FactRepository factRepository;
     private final ObservationRepository observationRepository;
+    private final ProjectProfileService projectProfileService;
     private final KnowledgeEventRepository knowledgeEventRepository;
     private final ValidatableProposalRepository proposalRepository;
     private final ArtifactRepository artifactRepository;
@@ -83,6 +85,7 @@ public class AnalysisContextServiceImpl implements AnalysisContextService {
         return new AnalysisContext(
                 toProjectSnapshot(project),
                 toAnalysisSnapshot(analysis),
+                projectProfileService.getByAnalysis(analysisId),
                 factRepository.findByAnalysisIdOrderByDetectedAtDescIdDesc(
                                 analysisId, PageRequest.of(0, MAX_FACTS)
                         ).stream()
@@ -157,7 +160,8 @@ public class AnalysisContextServiceImpl implements AnalysisContextService {
 
     private AnalysisContext.AnalysisSnapshot toAnalysisSnapshot(Analysis analysis) {
         return new AnalysisContext.AnalysisSnapshot(
-                analysis.getId(), analysis.getType(), analysis.getStatus(),
+                analysis.getId(), analysis.getType(),
+                analysis.getIntentId(), analysis.getIntentVersion(), analysis.getStatus(),
                 analysis.getStartedAt(), analysis.getCompletedAt(), analysis.getCreatedAt()
         );
     }

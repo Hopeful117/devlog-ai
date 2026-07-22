@@ -12,7 +12,9 @@ Workspace synchronization -> Collectors -> Facts -> Observation Engine
 ```
 
 `AnalysisWorkflowService` runs this pipeline before deterministic analysis,
-`AnalysisContext` construction and AI task submission.
+immutable `ProjectProfileSnapshot` construction, `AnalysisContext` construction
+and AI task submission. The profile is derived from persisted Observations and
+collection diagnostics only; it never reopens the workspace or reruns a Collector.
 
 ## Workspace
 

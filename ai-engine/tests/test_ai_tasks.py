@@ -6,6 +6,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.api.ai_tasks import get_acceptance_service, get_processing_service
 from app.main import app
+from tests.intent_fixtures import describe_project_intent_json
 
 
 class RecordingProcessingService:
@@ -29,6 +30,7 @@ async def test_submit_ai_task_returns_accepted_acknowledgement() -> None:
         "correlationId": str(correlation_id),
         "taskType": "INSIGHT_GENERATION",
         "analysisId": str(analysis_id),
+        "intent": describe_project_intent_json(),
         "context": {
             "project": {"id": str(uuid4()), "name": "DevLog AI"},
             "analysis": {"id": str(analysis_id)},
@@ -87,6 +89,7 @@ async def test_submit_ai_task_rejects_unsupported_type_without_background_task()
                     "correlationId": str(uuid4()),
                     "taskType": "DECISION_PROPOSAL_GENERATION",
                     "analysisId": str(analysis_id),
+                    "intent": describe_project_intent_json(),
                     "context": {},
                 },
             )

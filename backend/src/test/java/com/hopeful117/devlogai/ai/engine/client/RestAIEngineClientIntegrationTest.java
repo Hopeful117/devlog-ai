@@ -4,6 +4,8 @@ import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.model.InsightType;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
@@ -107,6 +109,7 @@ class RestAIEngineClientIntegrationTest {
         AnalysisContext context = new AnalysisContext(
                 null,
                 null,
+                null,
                 List.of(),
                 List.of(),
                 List.of(),
@@ -120,6 +123,7 @@ class RestAIEngineClientIntegrationTest {
                 correlationId,
                 AiTaskType.DECISION_PROPOSAL_GENERATION,
                 analysisId,
+                new IntentDefinition("describe-project", "v1", "Describe", List.of(InsightType.PROJECT_PRESENTATION), List.of("traceable"), java.util.Map.of("type", "object"), "describe-project-prompt-v1"),
                 context
         );
     }

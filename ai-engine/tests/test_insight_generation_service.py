@@ -8,6 +8,7 @@ from app.prompts.insight import InsightPromptBuilder
 from app.providers.mock import MockLlmProvider
 from app.schemas.ai_task import AiTaskSubmissionRequest
 from app.services.insight_generation_service import InsightGenerationService
+from tests.intent_fixtures import describe_project_intent
 
 
 class RecordingCallbackClient:
@@ -27,6 +28,7 @@ def submission() -> tuple[AiTaskSubmissionRequest, str, str, str]:
         correlation_id=uuid4(),
         task_type=AiTaskType.INSIGHT_GENERATION,
         analysis_id=uuid4(),
+        intent=describe_project_intent(),
         context={
             "project": {"id": str(uuid4()), "name": "DevLog AI"},
             "analysis": {"id": str(uuid4())},
@@ -49,6 +51,7 @@ def valid_output(fact_id: str, observation_id: str, evidence: str) -> dict:
     return {
         "proposals": [
             {
+                "insightType": "ARCHITECTURE_DESCRIPTION",
                 "title": "Modular architecture",
                 "summary": "The application was split into modules.",
                 "rationale": "The supplied fact and observation support it.",
@@ -75,6 +78,24 @@ async def test_successful_generation_sends_only_insight_proposals() -> None:
     assert result.status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
     assert result.proposals[0].type == ProposalType.INSIGHT  # type: ignore[attr-defined]
     assert result.proposals[0].payload["title"] == "Modular architecture"  # type: ignore[attr-defined]
+    assert result.proposals[0].payload["insightType"] == "ARCHITECTURE_DESCRIPTION"  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_unsupported_insight_type_gets_corrective_retry() -> None:
+    request, fact_id, observation_id, evidence = submission()
+    invalid = valid_output(fact_id, observation_id, evidence)
+    invalid["proposals"][0]["insightType"] = "INSTALLATION"
+    provider = MockLlmProvider(
+        [invalid, valid_output(fact_id, observation_id, evidence)]
+    )
+    callback = RecordingCallbackClient()
+    service = InsightGenerationService(provider, InsightPromptBuilder(), callback)  # type: ignore[arg-type]
+
+    await service.process(request, uuid4())
+
+    assert len(provider.requests) == 2
+    assert "not supported by Intent" in provider.requests[1].corrective_feedback  # type: ignore[operator]
 
 
 @pytest.mark.asyncio

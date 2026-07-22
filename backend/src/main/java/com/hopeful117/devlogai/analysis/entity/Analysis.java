@@ -31,6 +31,12 @@ public class Analysis {
     @Column(nullable = false)
     private AnalysisType type;
 
+    @Column(name = "intent_id", length = 80, updatable = false)
+    private String intentId;
+
+    @Column(name = "intent_version", length = 20, updatable = false)
+    private String intentVersion;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AnalysisStatus status;

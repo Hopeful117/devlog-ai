@@ -1,0 +1,12 @@
+package com.hopeful117.devlogai.intent.model;
+
+public enum InsightType {
+    PROJECT_PRESENTATION,
+    ARCHITECTURE_DESCRIPTION,
+    TECHNOLOGY_DESCRIPTION,
+    INSTALLATION,
+    USAGE,
+    REQUIREMENTS,
+    INFRASTRUCTURE_DESCRIPTION,
+    API_DESCRIPTION
+}

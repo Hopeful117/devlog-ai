@@ -24,6 +24,8 @@ import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
 import com.hopeful117.devlogai.proposal.entity.ProposalType;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
+import com.hopeful117.devlogai.profile.service.ProjectProfileService;
+import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,6 +53,7 @@ class AnalysisContextServiceTest {
     @Mock AnalysisRepository analysisRepository;
     @Mock FactRepository factRepository;
     @Mock ObservationRepository observationRepository;
+    @Mock ProjectProfileService projectProfileService;
     @Mock KnowledgeEventRepository knowledgeEventRepository;
     @Mock ValidatableProposalRepository proposalRepository;
     @Mock ArtifactRepository artifactRepository;
@@ -97,6 +100,7 @@ class AnalysisContextServiceTest {
                 .rationale("Relational model").build();
 
         when(analysisRepository.findById(analysisId)).thenReturn(Optional.of(analysis));
+        when(projectProfileService.getByAnalysis(analysisId)).thenReturn(mock(ProjectProfileResponse.class));
         when(factRepository.findByAnalysisIdOrderByDetectedAtDescIdDesc(eq(analysisId), any(Pageable.class)))
                 .thenReturn(List.of(newestFact, oldestFact));
         when(observationRepository.findByAnalysisIdOrderByCreatedAtDescIdDesc(eq(analysisId), any(Pageable.class)))
@@ -240,7 +244,8 @@ class AnalysisContextServiceTest {
 
         verifyNoInteractions(
                 factRepository, observationRepository, knowledgeEventRepository,
-                proposalRepository, artifactRepository, decisionRepository, milestoneRepository
+                proposalRepository, artifactRepository, decisionRepository, milestoneRepository,
+                projectProfileService
         );
     }
 
@@ -251,6 +256,7 @@ class AnalysisContextServiceTest {
     private void commonContextData(Analysis analysis, boolean stubProposals) {
         UUID projectId = analysis.getProject().getId();
         when(analysisRepository.findById(analysis.getId())).thenReturn(Optional.of(analysis));
+        when(projectProfileService.getByAnalysis(analysis.getId())).thenReturn(mock(ProjectProfileResponse.class));
         when(factRepository.findByAnalysisIdOrderByDetectedAtDescIdDesc(eq(analysis.getId()), any(Pageable.class)))
                 .thenReturn(List.of());
         when(observationRepository.findByAnalysisIdOrderByCreatedAtDescIdDesc(eq(analysis.getId()), any(Pageable.class)))

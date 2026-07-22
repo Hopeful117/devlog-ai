@@ -1,0 +1,6 @@
+package com.hopeful117.devlogai.profile.model;
+
+public enum ProfileCategory {
+    IDENTITY, TECHNOLOGIES, ARCHITECTURE, BUILD, API, PERSISTENCE,
+    SECURITY, TESTING, DOCUMENTATION, INFRASTRUCTURE, CI_CD, QUALITY
+}

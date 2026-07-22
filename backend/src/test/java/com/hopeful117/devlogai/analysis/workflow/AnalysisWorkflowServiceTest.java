@@ -20,6 +20,10 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.service.AnalysisService;
 import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
 import com.hopeful117.devlogai.collection.service.KnowledgeCollectionService;
+import com.hopeful117.devlogai.profile.service.ProjectProfileService;
+import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.model.InsightType;
+import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTypeException;
 import org.junit.jupiter.api.Test;
@@ -51,6 +55,12 @@ class AnalysisWorkflowServiceTest {
 
     @Mock
     private DeterministicAnalysisService deterministicAnalysisService;
+
+    @Mock
+    private ProjectProfileService projectProfileService;
+
+    @Mock
+    private IntentCatalog intentCatalog;
 
     @Mock
     private AnalysisContextService analysisContextService;
@@ -92,6 +102,7 @@ class AnalysisWorkflowServiceTest {
         );
 
         when(analysisService.start(analysisId)).thenReturn(analysis);
+        when(intentCatalog.resolve("describe-project", "v1")).thenReturn(intent());
         when(deterministicAnalysisService.analyze(analysisId))
                 .thenReturn(new DeterministicAnalysisResult(4, 2));
         when(analysisContextService.build(analysisId)).thenReturn(context);
@@ -103,6 +114,7 @@ class AnalysisWorkflowServiceTest {
                 correlationId,
                 taskType,
                 analysisId,
+                intent(),
                 context
         ))).thenReturn(submission);
         when(aiTaskService.submit(
@@ -124,6 +136,7 @@ class AnalysisWorkflowServiceTest {
                 analysisService,
                 knowledgeCollectionService,
                 deterministicAnalysisService,
+                projectProfileService,
                 analysisContextService,
                 aiTaskService,
                 aiEngineClient
@@ -131,6 +144,7 @@ class AnalysisWorkflowServiceTest {
         order.verify(analysisService).start(analysisId);
         order.verify(knowledgeCollectionService).collect(analysisId);
         order.verify(deterministicAnalysisService).analyze(analysisId);
+        order.verify(projectProfileService).build(analysisId);
         order.verify(analysisContextService).build(analysisId);
         order.verify(aiTaskService).create(
                 new CreateAiTaskRequest(analysisId, taskType),
@@ -140,6 +154,7 @@ class AnalysisWorkflowServiceTest {
                 correlationId,
                 taskType,
                 analysisId,
+                intent(),
                 context
         ));
         order.verify(aiTaskService).submit(
@@ -344,12 +359,21 @@ class AnalysisWorkflowServiceTest {
                 id,
                 UUID.randomUUID(),
                 AnalysisType.ARCHITECTURE_REVIEW,
+                "describe-project",
+                "v1",
                 status,
                 null,
                 null,
                 null,
                 null
         );
+    }
+
+    private IntentDefinition intent() {
+        return new IntentDefinition("describe-project", "v1", "Describe",
+                java.util.List.of(InsightType.PROJECT_PRESENTATION),
+                java.util.List.of("traceable"), java.util.Map.of("type", "object"),
+                "describe-project-prompt-v1");
     }
 
     private AiTaskResponse aiTaskResponse(

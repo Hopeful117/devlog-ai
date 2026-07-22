@@ -13,6 +13,10 @@ public record AnalysisResponse(
 
         AnalysisType type,
 
+        String intentId,
+
+        String intentVersion,
+
         AnalysisStatus status,
 
         Instant startedAt,
@@ -25,4 +29,8 @@ public record AnalysisResponse(
 
 
 ) {
+    public AnalysisResponse(UUID id, UUID projectId, AnalysisType type, AnalysisStatus status,
+                            Instant startedAt, Instant completedAt, Instant createdAt, Instant updatedAt) {
+        this(id, projectId, type, null, null, status, startedAt, completedAt, createdAt, updatedAt);
+    }
 }

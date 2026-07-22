@@ -17,6 +17,9 @@ import com.hopeful117.devlogai.analysis.dto.response.AnalysisResponse;
 import com.hopeful117.devlogai.analysis.service.AnalysisService;
 import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
 import com.hopeful117.devlogai.collection.service.KnowledgeCollectionService;
+import com.hopeful117.devlogai.profile.service.ProjectProfileService;
+import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -32,9 +35,11 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
     private final AnalysisAiTaskTypeResolver taskTypeResolver;
     private final KnowledgeCollectionService knowledgeCollectionService;
     private final DeterministicAnalysisService deterministicAnalysisService;
+    private final ProjectProfileService projectProfileService;
     private final AnalysisContextService analysisContextService;
     private final AiTaskService aiTaskService;
     private final AIEngineClient aiEngineClient;
+    private final IntentCatalog intentCatalog;
 
     @Override
     public AnalysisWorkflowResult start(UUID analysisId) {
@@ -44,9 +49,11 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
             AnalysisResponse analysis = analysisService.start(analysisId);
             started = true;
             AiTaskType taskType = taskTypeResolver.resolve(analysis.type());
+            IntentDefinition intent = intentCatalog.resolve(analysis.intentId(), analysis.intentVersion());
             knowledgeCollectionService.collect(analysisId);
             DeterministicAnalysisResult deterministicResult =
                     deterministicAnalysisService.analyze(analysisId);
+            projectProfileService.build(analysisId);
             AnalysisContext context = analysisContextService.build(analysisId);
             createdTask = aiTaskService.create(
                     new CreateAiTaskRequest(analysisId, taskType),
@@ -57,6 +64,7 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
                             createdTask.correlationId(),
                             createdTask.taskType(),
                             analysisId,
+                            intent,
                             context
                     )
             );

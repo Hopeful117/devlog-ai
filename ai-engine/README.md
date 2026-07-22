@@ -1,5 +1,11 @@
 # DevLog AI Engine
 
+Insight generation is intent-driven. Every accepted submission contains a
+versioned catalog Intent and an immutable `AnalysisContext`; arbitrary user
+prompts are not accepted. The prompt builder only supports registered template
+versions and validates generated Insight categories against the Intent before
+returning proposals for human validation.
+
 FastAPI service responsible for the AI-processing boundary of DevLog AI.
 
 The service implements health reporting, ADR-019 task acceptance, the ADR-020

@@ -42,6 +42,16 @@ public class AiTask {
     @Column(nullable = false, updatable = false)
     private AiTaskType taskType;
 
+    @Column(name = "intent_id", length = 80, updatable = false)
+    private String intentId;
+
+    @Column(name = "intent_version", length = 20, updatable = false)
+    private String intentVersion;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "intent_snapshot", updatable = false, columnDefinition = "jsonb")
+    private Map<String, Object> intentSnapshot;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

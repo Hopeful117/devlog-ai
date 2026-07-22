@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from app.models.intent import InsightType
 
 
 class InsightOutputModel(BaseModel):
@@ -12,6 +13,7 @@ class InsightOutputModel(BaseModel):
 
 
 class InsightProposalOutput(InsightOutputModel):
+    insight_type: InsightType = Field(alias="insightType")
     title: str = Field(min_length=1, max_length=255)
     summary: str = Field(min_length=1, max_length=5000)
     rationale: str = Field(min_length=1, max_length=5000)

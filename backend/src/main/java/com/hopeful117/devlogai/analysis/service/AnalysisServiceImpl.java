@@ -11,6 +11,8 @@ import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
+import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ public class AnalysisServiceImpl implements AnalysisService {
     private final ProjectRepository projectRepository;
 
     private final AnalysisMapper analysisMapper;
+    private final IntentCatalog intentCatalog;
 
     @Override
     public AnalysisResponse create(
@@ -43,8 +46,11 @@ public class AnalysisServiceImpl implements AnalysisService {
 
         Analysis analysis =
                 analysisMapper.toEntity(request);
+        IntentDefinition intent = intentCatalog.resolve(request.getIntentId());
 
         analysis.setProject(project);
+        analysis.setIntentId(intent.id());
+        analysis.setIntentVersion(intent.version());
         analysis.setStatus(AnalysisStatus.PENDING);
         analysis.setStartedAt(null);
         analysis.setCompletedAt(null);

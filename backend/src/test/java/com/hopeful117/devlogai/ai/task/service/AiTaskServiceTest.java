@@ -15,6 +15,9 @@ import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.model.InsightType;
+import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -48,6 +51,9 @@ class AiTaskServiceTest {
     @Mock
     private ObjectMapper objectMapper;
 
+    @Mock
+    private IntentCatalog intentCatalog;
+
     @InjectMocks
     private AiTaskServiceImpl aiTaskService;
 
@@ -59,6 +65,12 @@ class AiTaskServiceTest {
                 AiTaskType.DECISION_PROPOSAL_GENERATION
         );
         Analysis analysis = new Analysis();
+        analysis.setIntentId("describe-project");
+        analysis.setIntentVersion("v1");
+        IntentDefinition intent = new IntentDefinition("describe-project", "v1", "Describe",
+                List.of(InsightType.PROJECT_PRESENTATION), List.of("traceable"),
+                Map.of("type", "object"), "describe-project-prompt-v1");
+        Map<String, Object> intentSnapshot = Map.of("id", "describe-project", "version", "v1");
         AnalysisContext context = mock(AnalysisContext.class);
         Map<String, Object> snapshot = Map.of("analysis", Map.of("id", analysisId));
         AiTask task = new AiTask();
@@ -67,6 +79,8 @@ class AiTaskServiceTest {
         when(analysisRepository.findById(analysisId)).thenReturn(Optional.of(analysis));
         when(analysisContextService.build(analysisId)).thenReturn(context);
         when(objectMapper.convertValue(context, Map.class)).thenReturn(snapshot);
+        when(intentCatalog.resolve("describe-project", "v1")).thenReturn(intent);
+        when(objectMapper.convertValue(intent, Map.class)).thenReturn(intentSnapshot);
         when(aiTaskMapper.toEntity(request)).thenReturn(task);
         when(aiTaskRepository.save(task)).thenReturn(task);
         when(aiTaskMapper.toResponse(task)).thenReturn(response);
@@ -78,6 +92,9 @@ class AiTaskServiceTest {
         assertNotNull(task.getCorrelationId());
         assertEquals(AiTaskStatus.CREATED, task.getStatus());
         assertSame(snapshot, task.getContextSnapshot());
+        assertEquals("describe-project", task.getIntentId());
+        assertEquals("v1", task.getIntentVersion());
+        assertSame(intentSnapshot, task.getIntentSnapshot());
         assertEquals(0, task.getAttemptCount());
         assertNull(task.getExternalJobId());
         assertNull(task.getFailureCode());
