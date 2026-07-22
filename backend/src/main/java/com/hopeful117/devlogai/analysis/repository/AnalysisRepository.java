@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,6 +17,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface AnalysisRepository extends JpaRepository<Analysis, UUID> {
+
+    @EntityGraph(attributePaths = "project")
+    Optional<Analysis> findWithProjectById(UUID id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select analysis from Analysis analysis where analysis.id = :id")

@@ -20,6 +20,9 @@ An analysis belongs to exactly one project.
 
 An analysis may later produce multiple Insights.
 
+An analysis can target an optional immutable Git revision (branch, tag or SHA).
+When absent, collection uses each active Source's default branch at HEAD.
+
 ```text
 Project
    |
@@ -83,6 +86,7 @@ Retrieving analyses by project.
 Filtering analyses by type.
 Filtering analyses by status.
 Maintaining analysis execution timestamps.
+Defining the requested source revision for deterministic collection.
 
 The Analysis domain is not responsible for:
 

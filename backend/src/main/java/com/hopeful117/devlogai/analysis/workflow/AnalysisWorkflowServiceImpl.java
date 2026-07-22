@@ -16,6 +16,7 @@ import com.hopeful117.devlogai.analysis.deterministic.DeterministicAnalysisServi
 import com.hopeful117.devlogai.analysis.dto.response.AnalysisResponse;
 import com.hopeful117.devlogai.analysis.service.AnalysisService;
 import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
+import com.hopeful117.devlogai.collection.service.KnowledgeCollectionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ import java.util.UUID;
 public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
 
     private final AnalysisService analysisService;
+    private final KnowledgeCollectionService knowledgeCollectionService;
     private final DeterministicAnalysisService deterministicAnalysisService;
     private final AnalysisContextService analysisContextService;
     private final AiTaskService aiTaskService;
@@ -40,6 +42,7 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
         try {
             AnalysisResponse analysis = analysisService.start(analysisId);
             started = true;
+            knowledgeCollectionService.collect(analysisId);
             DeterministicAnalysisResult deterministicResult =
                     deterministicAnalysisService.analyze(analysisId);
             AnalysisContext context = analysisContextService.build(analysisId);

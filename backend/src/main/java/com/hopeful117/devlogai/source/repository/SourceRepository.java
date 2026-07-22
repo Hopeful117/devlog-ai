@@ -11,4 +11,6 @@ public interface SourceRepository extends JpaRepository<Source, UUID> {
     List<Source> findByProjectIdOrderByCreatedAtDescIdDesc(UUID projectId);
 
     List<Source> findByProjectIdAndActiveTrueOrderByCreatedAtDescIdDesc(UUID projectId);
+
+    List<Source> findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(UUID projectId);
 }

@@ -19,6 +19,7 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.service.AnalysisService;
 import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
+import com.hopeful117.devlogai.collection.service.KnowledgeCollectionService;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +39,9 @@ class AnalysisWorkflowServiceTest {
 
     @Mock
     private AnalysisService analysisService;
+
+    @Mock
+    private KnowledgeCollectionService knowledgeCollectionService;
 
     @Mock
     private DeterministicAnalysisService deterministicAnalysisService;
@@ -112,12 +116,14 @@ class AnalysisWorkflowServiceTest {
 
         InOrder order = inOrder(
                 analysisService,
+                knowledgeCollectionService,
                 deterministicAnalysisService,
                 analysisContextService,
                 aiTaskService,
                 aiEngineClient
         );
         order.verify(analysisService).start(analysisId);
+        order.verify(knowledgeCollectionService).collect(analysisId);
         order.verify(deterministicAnalysisService).analyze(analysisId);
         order.verify(analysisContextService).build(analysisId);
         order.verify(aiTaskService).create(
@@ -262,11 +268,30 @@ class AnalysisWorkflowServiceTest {
         assertSame(conflict, result);
         verify(analysisService, never()).fail(any());
         verifyNoInteractions(
+                knowledgeCollectionService,
                 deterministicAnalysisService,
                 analysisContextService,
                 aiTaskService,
                 aiEngineClient
         );
+    }
+
+    @Test
+    void shouldMarkAnalysisFailedWhenCollectionFails() {
+        UUID analysisId = UUID.randomUUID();
+        RuntimeException failure = new RuntimeException("collection failure");
+        when(analysisService.start(analysisId))
+                .thenReturn(analysisResponse(analysisId, AnalysisStatus.IN_PROGRESS));
+        when(knowledgeCollectionService.collect(analysisId)).thenThrow(failure);
+
+        RuntimeException result = assertThrows(
+                RuntimeException.class,
+                () -> workflowService.start(analysisId, AiTaskType.INSIGHT_GENERATION)
+        );
+
+        assertSame(failure, result);
+        verify(analysisService).fail(analysisId);
+        verifyNoInteractions(deterministicAnalysisService, analysisContextService, aiTaskService);
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.analysis.controller;
 
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.analysis.dto.response.AnalysisResponse;
+import com.hopeful117.devlogai.analysis.dto.request.CreateAnalysisRequest;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.service.AnalysisService;
@@ -9,6 +10,7 @@ import com.hopeful117.devlogai.analysis.workflow.AnalysisWorkflowService;
 import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
 import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -18,6 +20,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -47,8 +50,12 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
                         taskId, AiTaskStatus.SUBMITTED, correlationId));
 
         mvc.perform(post("/api/v1/analyses").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"projectId\":\"%s\",\"type\":\"ARCHITECTURE_REVIEW\"}".formatted(projectId)))
+                        .content(("{\"projectId\":\"%s\",\"type\":\"ARCHITECTURE_REVIEW\"," +
+                                "\"targetRevision\":\"release-1\"}").formatted(projectId)))
                 .andExpect(status().isCreated());
+        ArgumentCaptor<CreateAnalysisRequest> request = ArgumentCaptor.forClass(CreateAnalysisRequest.class);
+        verify(service).create(request.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("release-1", request.getValue().getTargetRevision());
         mvc.perform(get("/api/v1/analyses/{id}", id)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/analyses/project/{id}", projectId)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/analyses/project/{id}/type/ARCHITECTURE_REVIEW", projectId))

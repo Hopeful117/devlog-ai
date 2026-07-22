@@ -18,8 +18,11 @@ services:
       AI_ENGINE_BASE_URL: http://ai-engine:8000
       AI_ENGINE_CONNECT_TIMEOUT: ${AI_ENGINE_CONNECT_TIMEOUT:-2s}
       AI_ENGINE_READ_TIMEOUT: ${AI_ENGINE_READ_TIMEOUT:-5s}
+      COLLECTION_WORKSPACE_ROOT: /var/lib/devlog-ai/workspaces
     ports:
       - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - devlog-workspaces:/var/lib/devlog-ai/workspaces
 
   ai-engine:
     build:
@@ -73,3 +76,4 @@ services:
 
 volumes:
   devlog-postgres-data:
+  devlog-workspaces:

@@ -16,6 +16,13 @@ public interface AnalysisMapper {
             Analysis analysis
     );
 
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "project", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "startedAt", ignore = true)
+    @Mapping(target = "completedAt", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "updatedAt", ignore = true)
     Analysis toEntity(
             CreateAnalysisRequest request
     );

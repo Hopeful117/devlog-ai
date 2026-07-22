@@ -35,7 +35,11 @@ must not be used by future collection or synchronization operations.
 
 Project retrieval is ordered deterministically by `createdAt DESC, id DESC`.
 
+Active Git Sources are consumed by the deterministic collection pipeline before
+an Analysis context is built. Their persistent workspaces remain an
+infrastructure concern and are not exposed by this domain.
+
 ## Out of Scope
 
-This increment does not clone repositories, authenticate with Git providers,
-ingest documents, synchronize automatically, or scope an Analysis by Source.
+V1 does not authenticate with Git providers, ingest non-Git documents, or scope
+an Analysis to only a subset of a Project's active Sources.
