@@ -1,19 +1,14 @@
 package com.hopeful117.devlogai.collection.collector;
 
-import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
-import com.hopeful117.devlogai.source.entity.Source;
-import com.hopeful117.devlogai.source.entity.SourceType;
-
-import java.util.List;
-
 public interface KnowledgeCollector {
 
-    String name();
+    CollectorType type();
 
-    boolean supports(SourceType sourceType);
+    String version();
 
-    List<CollectedFact> collect(
-            Source source,
-            SynchronizedWorkspace workspace
-    );
+    default boolean supports(CollectionContext context) {
+        return context.sourceType() == com.hopeful117.devlogai.source.entity.SourceType.GIT_REPOSITORY;
+    }
+
+    CollectionResult collect(CollectionContext context);
 }

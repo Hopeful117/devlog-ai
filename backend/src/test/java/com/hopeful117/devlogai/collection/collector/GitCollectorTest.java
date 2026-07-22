@@ -1,20 +1,24 @@
 package com.hopeful117.devlogai.collection.collector;
 
 import com.hopeful117.devlogai.collection.workspace.GitCommandExecutor;
-import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
 import com.hopeful117.devlogai.fact.entity.FactType;
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.entity.SourceType;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GitCollectorTest {
+
+    @TempDir
+    Path workspace;
 
     @Test
     void shouldProduceTheSameCommitFactForTheSameWorkspaceState() {
@@ -28,25 +32,19 @@ class GitCollectorTest {
             default -> throw new AssertionError("Unexpected command: " + arguments);
         };
         GitCollector collector = new GitCollector(git);
-        Source source = Source.builder()
-                .id(sourceId)
-                .type(SourceType.GIT_REPOSITORY)
-                .active(true)
-                .build();
-        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
-                sourceId,
-                Path.of("workspace"),
-                revision
-        );
+        CollectionContext context = new CollectionContext(
+                UUID.randomUUID(), sourceId, UUID.randomUUID(), workspace,
+                revision, SourceType.GIT_REPOSITORY, Instant.now());
 
-        List<CollectedFact> first = collector.collect(source, workspace);
-        List<CollectedFact> second = collector.collect(source, workspace);
+        List<CollectedFact> first = collector.collect(context).facts();
+        List<CollectedFact> second = collector.collect(context).facts();
 
         assertEquals(first, second);
         assertEquals(FactType.COMMIT, first.getFirst().type());
-        assertEquals("git-collector-v1:" + sourceId, first.getFirst().source());
-        assertEquals(List.of("git:" + revision), first.getFirst().evidenceReferences());
+        assertEquals("git-collector-v1", first.getFirst().source());
+        assertEquals(List.of("git:" + revision, "source:" + sourceId),
+                first.getFirst().evidenceReferences());
         assertTrue(first.getFirst().content().contains("revision=" + revision));
-        assertTrue(collector.supports(SourceType.GIT_REPOSITORY));
+        assertTrue(collector.supports(context));
     }
 }

@@ -34,9 +34,21 @@ in the generated Fact evidence.
 - `KnowledgeCollectionService` orchestrates these boundaries for active Sources
   belonging to the Analysis Project.
 
-V1 includes `GitCollector`, which emits one deterministic `COMMIT` Fact for the
-resolved revision. No speculative Observation rule is defined yet, so the V1
-Observation Engine intentionally emits no Observations.
+ADR-024 adds versioned repository metadata, build, Spring, Docker,
+documentation and test-structure Collectors. They inspect files through a
+shared deterministic scanner with file, byte, Fact, directory and timeout
+limits. Paths are normalized relative to the workspace, symbolic links are not
+followed, generated/dependency directories are excluded, and repository tools
+or scripts are never executed.
+
+Each collected Fact carries the Collector version as its source and a SHA-256
+fingerprint derived from its normalized content, evidence, type, version and
+resolved Git revision. The unique Analysis/fingerprint identity makes retries
+idempotent while preserving Facts across separate Analyses. Structured
+non-fatal warnings are returned by the collection result.
+
+No speculative Observation rule is defined, so the Observation Engine still
+intentionally emits no Observations.
 
 The package does not build `AnalysisContext`, call the AI Engine, validate
 knowledge or access AI providers.

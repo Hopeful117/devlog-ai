@@ -39,6 +39,9 @@ public class Fact {
     @Column(nullable = false)
     private String source;
 
+    @Column(length = 64)
+    private String fingerprint;
+
     @ElementCollection
     @CollectionTable(
             name = "fact_evidence_references",

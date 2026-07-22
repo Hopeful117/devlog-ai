@@ -3,7 +3,11 @@ package com.hopeful117.devlogai.collection.service;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.collection.collector.CollectedFact;
+import com.hopeful117.devlogai.collection.collector.CollectionContext;
+import com.hopeful117.devlogai.collection.collector.CollectionResult;
 import com.hopeful117.devlogai.collection.collector.KnowledgeCollector;
+import com.hopeful117.devlogai.collection.collector.NonFatalCollectionException;
+import com.hopeful117.devlogai.collection.collector.CollectorRunner;
 import com.hopeful117.devlogai.collection.observation.DerivedObservation;
 import com.hopeful117.devlogai.collection.observation.ObservationEngine;
 import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
@@ -29,6 +33,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.Set;
+import java.util.HashSet;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +44,7 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
     private final SourceRepository sourceRepository;
     private final WorkspaceManager workspaceManager;
     private final List<KnowledgeCollector> collectors;
+    private final CollectorRunner collectorRunner;
     private final ObservationEngine observationEngine;
     private final FactRepository factRepository;
     private final ObservationRepository observationRepository;
@@ -52,10 +59,13 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
                         analysis.getProject().getId()
                 );
         List<KnowledgeCollector> orderedCollectors = collectors.stream()
-                .sorted(Comparator.comparing(KnowledgeCollector::name))
+                .sorted(Comparator.comparing(KnowledgeCollector::type))
                 .toList();
 
         List<Fact> collectedFacts = new ArrayList<>();
+        List<CollectionDiagnostic> warnings = new ArrayList<>();
+        Set<String> fingerprints = new HashSet<>(
+                factRepository.findFingerprintsByAnalysisId(analysisId));
         Map<UUID, String> revisions = new LinkedHashMap<>();
         for (Source source : sources) {
             SynchronizedWorkspace workspace = workspaceManager.synchronize(
@@ -63,11 +73,31 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
                     analysis.getTargetRevision()
             );
             revisions.put(source.getId(), workspace.resolvedRevision());
+            CollectionContext context = new CollectionContext(
+                    analysisId,
+                    source.getId(),
+                    analysis.getProject().getId(),
+                    workspace.path(),
+                    workspace.resolvedRevision(),
+                    source.getType(),
+                    Instant.now()
+            );
             for (KnowledgeCollector collector : orderedCollectors) {
-                if (collector.supports(source.getType())) {
-                    collector.collect(source, workspace).stream()
+                if (!collector.supports(context)) continue;
+                try {
+                    CollectionResult result = collectorRunner.run(collector, context);
+                    validateResult(collector, result);
+                    result.facts().stream()
+                            .filter(fact -> fingerprints.add(fact.fingerprint()))
                             .map(fact -> toEntity(analysis, fact))
                             .forEach(collectedFacts::add);
+                    result.warnings().forEach(warning -> warnings.add(new CollectionDiagnostic(
+                            source.getId(), result.collectorType(), result.collectorVersion(),
+                            warning.code(), warning.message())));
+                } catch (NonFatalCollectionException failure) {
+                    warnings.add(new CollectionDiagnostic(
+                            source.getId(), collector.type(), collector.version(),
+                            failure.code(), failure.getMessage()));
                 }
             }
             source.setLastSynchronizedAt(Instant.now());
@@ -86,8 +116,31 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
                 sources.size(),
                 savedFacts.size(),
                 observations.size(),
-                revisions
+                revisions,
+                warnings
         );
+    }
+
+    private void validateResult(KnowledgeCollector collector, CollectionResult result) {
+        if (result.collectorType() != collector.type()
+                || !result.collectorVersion().equals(collector.version())) {
+            throw new IllegalStateException("Collector returned inconsistent metadata: " + collector.type());
+        }
+        result.facts().forEach(fact -> {
+            if (!fact.source().equals(result.collectorVersion())) {
+                throw new IllegalStateException("Fact source does not identify its Collector version");
+            }
+            fact.evidenceReferences().forEach(this::validateEvidenceReference);
+        });
+    }
+
+    private void validateEvidenceReference(String reference) {
+        String normalized = reference.replace('\\', '/');
+        if (normalized.startsWith("/") || normalized.matches("^[A-Za-z]:/.*")
+                || normalized.equals("..") || normalized.startsWith("../")
+                || normalized.contains("/../")) {
+            throw new IllegalArgumentException("Fact evidence must be relative to the workspace");
+        }
     }
 
     private Fact toEntity(Analysis analysis, CollectedFact collected) {
@@ -96,6 +149,7 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
                 .type(collected.type())
                 .content(collected.content())
                 .source(collected.source())
+                .fingerprint(collected.fingerprint())
                 .evidenceReferences(new LinkedHashSet<>(collected.evidenceReferences()))
                 .build();
     }

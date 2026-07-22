@@ -1,59 +1,41 @@
 package com.hopeful117.devlogai.collection.collector;
 
 import com.hopeful117.devlogai.collection.workspace.GitCommandExecutor;
-import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
 import com.hopeful117.devlogai.fact.entity.FactType;
-import com.hopeful117.devlogai.source.entity.Source;
-import com.hopeful117.devlogai.source.entity.SourceType;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
 public class GitCollector implements KnowledgeCollector {
 
+    private static final String VERSION = "git-collector-v1";
     private final GitCommandExecutor git;
 
-    @Override
-    public String name() {
-        return "git-collector-v1";
+    public GitCollector(GitCommandExecutor git) {
+        this.git = git;
     }
 
-    @Override
-    public boolean supports(SourceType sourceType) {
-        return sourceType == SourceType.GIT_REPOSITORY;
-    }
+    @Override public CollectorType type() { return CollectorType.GIT; }
+    @Override public String version() { return VERSION; }
 
     @Override
-    public List<CollectedFact> collect(
-            Source source,
-            SynchronizedWorkspace workspace
-    ) {
-        String revision = git.execute(
-                workspace.path(),
-                List.of("rev-parse", "HEAD")
-        );
-        String authoredAt = git.execute(
-                workspace.path(),
-                List.of("show", "-s", "--format=%aI", "HEAD")
-        );
-        String subject = git.execute(
-                workspace.path(),
-                List.of("show", "-s", "--format=%s", "HEAD")
-        );
-
-        String content = "revision=%s%nauthoredAt=%s%nsubject=%s".formatted(
-                revision,
-                authoredAt,
-                subject
-        );
-        return List.of(new CollectedFact(
+    public CollectionResult collect(CollectionContext context) {
+        String revision = git.execute(context.workspacePath(), List.of("rev-parse", "HEAD"));
+        if (!revision.equals(context.resolvedRevision())) {
+            throw new IllegalStateException("Workspace HEAD differs from resolved revision");
+        }
+        String authoredAt = git.execute(context.workspacePath(),
+                List.of("show", "-s", "--format=%aI", "HEAD"));
+        String subject = git.execute(context.workspacePath(),
+                List.of("show", "-s", "--format=%s", "HEAD"));
+        CollectedFact fact = CollectedFact.create(
+                VERSION,
                 FactType.COMMIT,
-                content,
-                name() + ":" + source.getId(),
-                List.of("git:" + revision)
-        ));
+                "revision=%s%nauthoredAt=%s%nsubject=%s".formatted(revision, authoredAt, subject),
+                List.of("git:" + revision, "source:" + context.sourceId()),
+                revision
+        );
+        return CollectionResult.of(type(), version(), List.of(fact), List.of());
     }
 }

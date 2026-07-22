@@ -12,6 +12,7 @@ public interface FactMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "analysis", ignore = true)
     @Mapping(target = "detectedAt", ignore = true)
+    @Mapping(target = "fingerprint", ignore = true)
     Fact toEntity(CreateFactRequest request);
 
     @Mapping(target = "analysisId", source = "analysis.id")
