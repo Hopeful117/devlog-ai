@@ -9,6 +9,8 @@ import com.hopeful117.devlogai.validation.entity.Validation;
 import com.hopeful117.devlogai.validation.entity.ValidationDecision;
 import com.hopeful117.devlogai.validation.mapper.ValidationMapper;
 import com.hopeful117.devlogai.validation.repository.ValidationRepository;
+import com.hopeful117.devlogai.insight.service.InsightPromotionService;
+import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -33,6 +35,9 @@ public class ValidationServiceTest {
     @Mock
     ValidatableProposalRepository proposalRepository;
 
+    @Mock
+    InsightPromotionService insightPromotionService;
+
     @InjectMocks
     ValidationServiceImpl service;
 
@@ -52,7 +57,8 @@ public class ValidationServiceTest {
                         proposalId,
                         ValidationDecision.ACCEPTED,
                         "Approved",
-                        UUID.randomUUID()
+                        UUID.randomUUID(),
+                        InsightSeverity.WARNING
                 );
 
         Validation validation =
@@ -101,6 +107,8 @@ public class ValidationServiceTest {
 
         verify(validationRepository)
                 .save(validation);
+
+        verify(insightPromotionService).promote(proposal, savedValidation, InsightSeverity.WARNING);
     }
     @Test
     void shouldRejectWhenProposalDoesNotExist() {

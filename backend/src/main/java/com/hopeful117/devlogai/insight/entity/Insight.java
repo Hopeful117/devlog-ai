@@ -2,6 +2,8 @@ package com.hopeful117.devlogai.insight.entity;
 
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.project.entity.Project;
+import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
+import com.hopeful117.devlogai.validation.entity.Validation;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -14,7 +16,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "insights")
 @Getter
-@Setter
 @EntityListeners(AuditingEntityListener.class)
 @Builder
 @AllArgsConstructor
@@ -31,6 +32,14 @@ public class Insight {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "analysis_id", nullable = false)
     private Analysis analysis;
+
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "proposal_id", nullable = false, updatable = false, unique = true)
+    private ValidatableProposal proposal;
+
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "validation_id", nullable = false, updatable = false, unique = true)
+    private Validation validation;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -53,4 +62,5 @@ public class Insight {
     @Column(nullable = false)
     @LastModifiedDate
     private Instant updatedAt;
+
 }

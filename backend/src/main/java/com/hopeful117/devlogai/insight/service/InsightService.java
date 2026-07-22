@@ -1,6 +1,5 @@
 package com.hopeful117.devlogai.insight.service;
 
-import com.hopeful117.devlogai.insight.dto.request.CreateInsightRequest;
 import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
@@ -9,8 +8,6 @@ import java.util.List;
 import java.util.UUID;
 
 public interface InsightService {
-    InsightResponse create(CreateInsightRequest request);
-
     InsightResponse getById(UUID id);
 
     List<InsightResponse> getByProject(UUID projectId);

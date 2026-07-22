@@ -1,6 +1,5 @@
 package com.hopeful117.devlogai.insight.mapper;
 
-import com.hopeful117.devlogai.insight.dto.request.CreateInsightRequest;
 import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import org.mapstruct.Mapper;
@@ -17,12 +16,9 @@ public interface InsightMapper {
             target = "analysisId",
             source = "analysis.id"
     )
+    @Mapping(target = "proposalId", source = "proposal.id")
+    @Mapping(target = "validationId", source = "validation.id")
     InsightResponse toResponse(
             Insight insight
     );
-
-    Insight toEntity(
-            CreateInsightRequest request
-    );
 }
-

@@ -14,6 +14,10 @@ public record InsightResponse(
 
         UUID analysisId,
 
+        UUID proposalId,
+
+        UUID validationId,
+
         InsightType type,
 
         InsightSeverity severity,

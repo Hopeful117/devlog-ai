@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.validation.dto.request;
 
+import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.validation.entity.ValidationDecision;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -17,6 +18,12 @@ public record CreateValidationRequest(
         String comment,
 
         @NotNull
-        UUID validatedBy
+        UUID validatedBy,
+
+        InsightSeverity insightSeverity
 ) {
+    public CreateValidationRequest(UUID proposalId, ValidationDecision decision,
+                                   String comment, UUID validatedBy) {
+        this(proposalId, decision, comment, validatedBy, null);
+    }
 }

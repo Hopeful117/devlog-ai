@@ -1,83 +1,39 @@
 # Insight Domain
 
-## Overview
+An Insight is immutable, human-validated project knowledge as defined by ADR-029. It is never
+created directly by the AI Engine or through an Insight creation endpoint.
 
-The Insight domain represents a significant observation, finding, or recommendation produced by an analysis of a project.
-
-Insights are the concrete results generated from the project's accumulated knowledge and analysis history.
-
-The Insight domain is therefore one of the main outputs of the future AI Engine.
-
----
-
-## Business Concept
-
-An Insight answers:
-
-> "What did the analysis identify about the project?"
-
-An Insight belongs to:
-
-- One Project.
-- One Analysis.
-
-An Analysis may generate multiple Insights.
+The lifecycle is:
 
 ```text
-Project
-   |
-   +── Analysis
-          |
-          +── Insight
-          +── Insight
-          └── Insight
-
+AnalysisContext -> Intent -> InsightProposal -> Human validation -> Insight
 ```
 
-## Domain Model
+Accepting an `INSIGHT` proposal atomically creates one Insight. Rejecting it creates none. The
+human validator supplies the severity because severity expresses business importance, not model
+confidence.
 
-An Insight maintains direct references to both its Project and its source Analysis.
+Every newly promoted Insight belongs to exactly one Project and one Analysis and keeps unique,
+direct references to its source proposal and validation. The proposal links to the AI task, whose
+immutable context snapshot and Intent preserve the rest of the provenance chain.
 
-This allows the application to retrieve insights directly at project or analysis level.
+## Types
 
-## Insight Types
+| Type | Meaning |
+| --- | --- |
+| `ARCHITECTURAL` | Architecture or infrastructure knowledge |
+| `DOCUMENTATION` | Presentation, installation, usage, requirements, or API knowledge |
+| `TECHNOLOGY` | Technology knowledge |
+| `EVOLUTION` | Project evolution knowledge |
+| `TECHNICAL_DEBT` | Technical debt |
+| `SECURITY` | Security knowledge |
+| `RISK` | Project risk |
+| `RECOMMENDATION` | Recommended action |
 
-| Type           | Description                                      |
-| -------------- | ------------------------------------------------ |
-| ARCHITECTURAL  | Identifies architectural observations or issues  |
-| EVOLUTION      | Identifies relevant project evolution patterns   |
-| TECHNICAL_DEBT | Identifies potential or confirmed technical debt |
-| SECURITY       | Identifies potential security concerns           |
-| RISK           | Identifies project risks                         |
-| RECOMMENDATION | Provides a recommended action or improvement     |
+## Severity
 
-## Insight Severity
-| Severity | Description                                  |
-| -------- | -------------------------------------------- |
-| INFO     | Informational observation                    |
-| WARNING  | Observation requiring attention              |
-| CRITICAL | Important issue requiring priority attention |
+`INFO`, `WARNING`, and `CRITICAL` express business importance. They are independent from the
+proposal confidence score.
 
-## Responsabilities
-
-The Insight domain is responsible for:
-
-Storing analysis findings.
-Associating findings with projects.
-Associating findings with their source analyses.
-Categorizing insights by type.
-Assigning insight severity.
-Retrieving insights by project.
-Retrieving insights by analysis.
-Filtering insights by type.
-Filtering insights by severity.
-
-The Insight domain is not responsible for:
-
-Performing AI analysis.
-Communicating with LLM providers.
-Building prompts.
-Selecting AI models.
-Generating analysis context.
-
-These responsibilities belong to the future AI Engine.
+Insights expose read-only retrieval by identifier, Project, Analysis, type, and severity. Document
+generation and other presentation concerns consume Insights but do not own or modify them.
