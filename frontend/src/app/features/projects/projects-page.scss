@@ -2,6 +2,51 @@
   max-width: 60rem;
 }
 
+.page-header button,
+.project-form button,
+.state button {
+  padding: 0.65rem 1rem;
+}
+
+.project-form {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: var(--space-lg);
+  padding: var(--space-lg);
+}
+
+.project-form h2,
+.project-form p {
+  margin-bottom: 0.3rem;
+}
+
+.project-form input,
+.project-form textarea {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+}
+
+.project-form label {
+  margin-top: 0.45rem;
+  font-weight: 700;
+}
+
+.project-form label span {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--danger);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
 .project-list {
   display: grid;
   gap: 1rem;
@@ -18,6 +63,10 @@ article,
 
 .state--error {
   border-color: var(--danger);
+}
+
+.state {
+  padding: var(--space-lg);
 }
 
 dl {

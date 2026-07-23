@@ -7,7 +7,7 @@
   </div>
   @if (launchState$ | async; as launchState) {
     @if (launchState.state === 'pending') {
-      <p role="status">Creating and launching Analysis…</p>
+      <app-loading-indicator message="Creating the Analysis and launching the AI task…" />
     }
     @if (launchState.state === 'error') {
       <div role="alert" class="error">

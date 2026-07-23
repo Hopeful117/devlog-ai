@@ -13,13 +13,14 @@ import {
   tap,
 } from 'rxjs';
 import { toRequestError } from '../../core/http/request-error';
+import { LoadingIndicator } from '../../shared/components/loading-indicator';
 import { CreateDeliverableRequest } from './deliverable.models';
 import { DeliverableForm } from './deliverable-form';
 import { DeliverableService } from './deliverable.service';
 
 @Component({
   selector: 'app-project-deliverables-section',
-  imports: [AsyncPipe, DatePipe, RouterLink, DeliverableForm],
+  imports: [AsyncPipe, DatePipe, RouterLink, DeliverableForm, LoadingIndicator],
   templateUrl: './project-deliverables-section.html',
   styleUrl: './project-deliverables-section.scss',
 })

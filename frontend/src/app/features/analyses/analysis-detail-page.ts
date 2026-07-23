@@ -26,6 +26,7 @@ import {
 } from './analysis.models';
 import { AnalysisService } from './analysis.service';
 import { AnalysisInsightsSection } from '../insights/analysis-insights-section';
+import { LoadingIndicator } from '../../shared/components/loading-indicator';
 
 type LoadState<T> =
   | { readonly state: 'loading' }
@@ -35,7 +36,7 @@ type LoadState<T> =
 
 @Component({
   selector: 'app-analysis-detail-page',
-  imports: [AsyncPipe, DatePipe, JsonPipe, RouterLink, AnalysisInsightsSection],
+  imports: [AsyncPipe, DatePipe, JsonPipe, RouterLink, AnalysisInsightsSection, LoadingIndicator],
   templateUrl: './analysis-detail-page.html',
   styleUrl: './analysis-detail-page.scss',
 })

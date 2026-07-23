@@ -137,6 +137,17 @@
         </div>
       } @else if (tasks.state === 'loaded') {
         @if (tasks.data[0]; as task) {
+          @if (
+            task.status === 'CREATED' || task.status === 'SUBMITTED' || task.status === 'PROCESSING'
+          ) {
+            <app-loading-indicator
+              [message]="
+                task.status === 'PROCESSING'
+                  ? 'The AI is analyzing the project knowledge…'
+                  : 'The AI task is waiting to be processed…'
+              "
+            />
+          }
           <dl data-testid="ai-task-metadata">
             <dt>Task</dt>
             <dd>{{ task.taskType }}</dd>

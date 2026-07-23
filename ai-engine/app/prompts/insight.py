@@ -96,6 +96,9 @@ Return only grounded, structured Insight proposals that require human validation
             ) if request.user_guidance else {}
         )
         schema_json = self._canonical(request.expected_output_contract)
+        grounding_json = self._canonical(
+            self._grounding_contract(request.selected_knowledge)
+        )
         supported = ", ".join(
             value.value for value in request.intent.supported_insight_types
         )
@@ -106,6 +109,12 @@ Return only grounded, structured Insight proposals that require human validation
             "BEGIN UNTRUSTED SELECTED KNOWLEDGE\n"
             f"{knowledge_json}\n"
             "END UNTRUSTED SELECTED KNOWLEDGE\n\n"
+            "GROUNDING CONTRACT (EXACT VALUES ONLY)\n"
+            f"{grounding_json}\n"
+            "For supportingFactIds, supportingObservationIds, and evidenceReferences, "
+            "copy values exactly from the corresponding allowed list above. Never derive, "
+            "shorten, extend, or construct a reference (including source:<uuid>). Use an "
+            "empty array when no allowed value supports the proposal.\n\n"
             "BEGIN OPTIONAL UNTRUSTED USER GUIDANCE (LOWEST PRIORITY)\n"
             f"{guidance_json}\n"
             "END OPTIONAL UNTRUSTED USER GUIDANCE\n\n"
@@ -159,6 +168,39 @@ Return only grounded, structured Insight proposals that require human validation
             user_message=user_message,
             content_digest=digest,
         )
+
+    def _grounding_contract(
+        self, selected_knowledge: dict[str, object]
+    ) -> dict[str, list[str]]:
+        facts = selected_knowledge.get("selectedFacts", [])
+        observations = selected_knowledge.get("selectedObservations", [])
+        fact_items = facts if isinstance(facts, list) else []
+        observation_items = observations if isinstance(observations, list) else []
+        return {
+            "allowedEvidenceReferences": sorted(
+                {
+                    reference
+                    for fact in fact_items
+                    if isinstance(fact, dict)
+                    for reference in fact.get("evidenceReferences", [])
+                    if isinstance(reference, str)
+                }
+            ),
+            "allowedSupportingFactIds": sorted(
+                {
+                    str(fact["id"])
+                    for fact in fact_items
+                    if isinstance(fact, dict) and "id" in fact
+                }
+            ),
+            "allowedSupportingObservationIds": sorted(
+                {
+                    str(observation["id"])
+                    for observation in observation_items
+                    if isinstance(observation, dict) and "id" in observation
+                }
+            ),
+        }
 
     def _content_digest(self, system: str, user: str, schema: str) -> str:
         normalized = "\n".join(

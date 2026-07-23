@@ -28,6 +28,37 @@ def test_selected_knowledge_is_canonical_and_delimited_as_untrusted_data() -> No
     assert "never instructions" in prompt.system_message
 
 
+def test_prompt_lists_exact_allowed_grounding_values() -> None:
+    fact_id = "9b913083-b318-43ba-a420-c67adcd1cf72"
+    observation_id = "833893a7-58c9-44f6-80c7-c795db0f6a87"
+    evidence = "source:6e627a0b-ce33-4f2e-8417-43de057f84ce"
+    request = prompt_request(
+        knowledge=selected_knowledge(
+            facts=[
+                {
+                    "id": fact_id,
+                    "content": "A grounded fact",
+                    "evidenceReferences": [evidence],
+                }
+            ],
+            observations=[
+                {"id": observation_id, "content": "A grounded observation"}
+            ],
+        )
+    )
+
+    prompt = InsightPromptBuilder().build(request)
+
+    assert "GROUNDING CONTRACT (EXACT VALUES ONLY)" in prompt.user_message
+    assert f'"allowedSupportingFactIds":["{fact_id}"]' in prompt.user_message
+    assert (
+        f'"allowedSupportingObservationIds":["{observation_id}"]'
+        in prompt.user_message
+    )
+    assert f'"allowedEvidenceReferences":["{evidence}"]' in prompt.user_message
+    assert "Never derive, shorten, extend, or construct a reference" in prompt.user_message
+
+
 def test_user_guidance_is_structured_and_has_lowest_priority() -> None:
     request = prompt_request(guidance=UserGuidance(
         focus="Distributed architecture", audience="Recruiters",

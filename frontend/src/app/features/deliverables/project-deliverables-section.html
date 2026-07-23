@@ -7,7 +7,7 @@
       (generate)="generate($event)"
     />
     @if (generation.state === 'pending') {
-      <p role="status">The AI Engine is organizing validated knowledge…</p>
+      <app-loading-indicator message="The AI Engine is organizing the validated knowledge…" />
     }
     @if (generation.state === 'error') {
       <p role="alert" class="error">{{ generation.error.message }}</p>

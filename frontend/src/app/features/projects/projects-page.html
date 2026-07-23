@@ -1,52 +1,106 @@
 <section class="projects" aria-labelledby="projects-title">
-  <h1 id="projects-title">Projects</h1>
+  <div class="page-header">
+    <div>
+      <p class="eyebrow">Workspace</p>
+      <h1 id="projects-title">Projects</h1>
+      <p>Connect your work to start building grounded analyses and deliverables.</p>
+    </div>
+    <button type="button" (click)="showForm = !showForm" [attr.aria-expanded]="showForm">
+      {{ showForm ? 'Cancel' : 'New project' }}
+    </button>
+  </div>
 
-  @if (viewModel$ | async; as viewModel) {
-    @switch (viewModel.state) {
-      @case ('loading') {
-        <p role="status">Loading projects…</p>
-      }
-      @case ('error') {
-        <div role="alert" class="state state--error">
-          <h2>Projects could not be loaded</h2>
-          <p>{{ viewModel.error.message }}</p>
+  @if (creationState$ | async; as creationState) {
+    @if (showForm) {
+      <form class="project-form panel" [formGroup]="form" (ngSubmit)="createProject()" novalidate>
+        <div>
+          <h2>Create a project</h2>
+          <p>The slug will be generated automatically from the project name.</p>
         </div>
-      }
-      @case ('loaded') {
-        @if (viewModel.projects.length === 0) {
-          <div class="state" data-testid="projects-empty">
-            <h2>No projects yet</h2>
-            <p>The Java Core did not return any projects.</p>
+
+        <label for="project-name">Name</label>
+        <input
+          id="project-name"
+          formControlName="name"
+          maxlength="100"
+          autocomplete="off"
+          placeholder="My project"
+        />
+        @if (form.controls.name.touched && form.controls.name.hasError('required')) {
+          <p class="field-error">A project name is required.</p>
+        }
+
+        <label for="project-description">Description <span>(optional)</span></label>
+        <textarea
+          id="project-description"
+          formControlName="description"
+          maxlength="5000"
+          rows="4"
+          placeholder="What is this project about?"
+        ></textarea>
+
+        @if (creationState.state === 'error') {
+          <p role="alert" class="inline-message inline-message--error">
+            {{ creationState.error.message }}
+          </p>
+        }
+
+        <div class="form-actions">
+          <button type="submit" [disabled]="form.invalid || creationState.state === 'pending'">
+            {{ creationState.state === 'pending' ? 'Creating…' : 'Create project' }}
+          </button>
+        </div>
+      </form>
+    }
+
+    @if (viewModel$ | async; as viewModel) {
+      @switch (viewModel.state) {
+        @case ('loading') {
+          <p role="status">Loading projects…</p>
+        }
+        @case ('error') {
+          <div role="alert" class="state state--error">
+            <h2>Projects could not be loaded</h2>
+            <p>{{ viewModel.error.message }}</p>
           </div>
-        } @else {
-          <ul class="project-list">
-            @for (project of viewModel.projects; track project.id) {
-              <li>
-                <article>
-                  <h2>
-                    <a [routerLink]="['/projects', project.slug]">{{ project.name }}</a>
-                  </h2>
-                  @if (project.description) {
-                    <p>{{ project.description }}</p>
-                  }
-                  <dl>
-                    <div>
-                      <dt>Status</dt>
-                      <dd>{{ project.status }}</dd>
-                    </div>
-                    <div>
-                      <dt>Slug</dt>
-                      <dd>{{ project.slug }}</dd>
-                    </div>
-                    <div>
-                      <dt>Updated</dt>
-                      <dd>{{ project.updatedAt | date: 'medium' }}</dd>
-                    </div>
-                  </dl>
-                </article>
-              </li>
-            }
-          </ul>
+        }
+        @case ('loaded') {
+          @if (viewModel.projects.length === 0) {
+            <div class="state" data-testid="projects-empty">
+              <h2>No projects yet</h2>
+              <p>Create your first project to begin collecting knowledge.</p>
+              <button type="button" (click)="showForm = true">Create the first project</button>
+            </div>
+          } @else {
+            <ul class="project-list">
+              @for (project of viewModel.projects; track project.id) {
+                <li>
+                  <article>
+                    <h2>
+                      <a [routerLink]="['/projects', project.slug]">{{ project.name }}</a>
+                    </h2>
+                    @if (project.description) {
+                      <p>{{ project.description }}</p>
+                    }
+                    <dl>
+                      <div>
+                        <dt>Status</dt>
+                        <dd>{{ project.status }}</dd>
+                      </div>
+                      <div>
+                        <dt>Slug</dt>
+                        <dd>{{ project.slug }}</dd>
+                      </div>
+                      <div>
+                        <dt>Updated</dt>
+                        <dd>{{ project.updatedAt | date: 'medium' }}</dd>
+                      </div>
+                    </dl>
+                  </article>
+                </li>
+              }
+            </ul>
+          }
         }
       }
     }

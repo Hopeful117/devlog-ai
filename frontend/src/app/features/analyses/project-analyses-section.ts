@@ -15,6 +15,7 @@ import {
   tap,
 } from 'rxjs';
 import { RequestError, toRequestError } from '../../core/http/request-error';
+import { LoadingIndicator } from '../../shared/components/loading-indicator';
 import { AnalysisForm } from './analysis-form';
 import { AnalysisSummary, CreateAnalysisRequest, IntentDefinition } from './analysis.models';
 import { AnalysisService } from './analysis.service';
@@ -31,7 +32,7 @@ type LaunchState =
 
 @Component({
   selector: 'app-project-analyses-section',
-  imports: [AsyncPipe, DatePipe, RouterLink, AnalysisForm],
+  imports: [AsyncPipe, DatePipe, RouterLink, AnalysisForm, LoadingIndicator],
   templateUrl: './project-analyses-section.html',
   styleUrl: './project-analyses-section.scss',
 })

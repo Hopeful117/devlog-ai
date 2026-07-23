@@ -16,7 +16,9 @@
       />
     }
     @if (generation.state === 'pending') {
-      <p role="status">Generating from this Analysis’s validated Insights…</p>
+      <app-loading-indicator
+        message="The AI is generating a Deliverable from the validated Insights…"
+      />
     } @else if (generation.state === 'error') {
       <p role="alert" class="error">{{ generation.error.message }}</p>
     }

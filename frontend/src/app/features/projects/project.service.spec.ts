@@ -55,4 +55,21 @@ describe('ProjectService', () => {
 
     expect(result).toEqual(summary);
   });
+
+  it('creates a project', () => {
+    let result: ProjectDetail | undefined;
+    service
+      .createProject({ name: 'DevLog AI', description: 'Architecture knowledge platform' })
+      .subscribe((project) => (result = project));
+
+    const request = http.expectOne('http://core.test/api/v1/projects');
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({
+      name: 'DevLog AI',
+      description: 'Architecture knowledge platform',
+    });
+    request.flush(summary);
+
+    expect(result).toEqual(summary);
+  });
 });

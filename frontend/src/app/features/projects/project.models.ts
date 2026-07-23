@@ -16,3 +16,8 @@ interface ProjectFields {
 export interface ProjectSummary extends ProjectFields {}
 
 export interface ProjectDetail extends ProjectFields {}
+
+export interface CreateProjectRequest {
+  readonly name: string;
+  readonly description?: string;
+}

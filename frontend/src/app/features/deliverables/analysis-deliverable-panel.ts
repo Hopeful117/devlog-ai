@@ -3,13 +3,14 @@ import { Component, inject, Input } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, exhaustMap, map, of, shareReplay, startWith, Subject, tap } from 'rxjs';
 import { toRequestError } from '../../core/http/request-error';
+import { LoadingIndicator } from '../../shared/components/loading-indicator';
 import { CreateDeliverableRequest } from './deliverable.models';
 import { DeliverableForm } from './deliverable-form';
 import { DeliverableService } from './deliverable.service';
 
 @Component({
   selector: 'app-analysis-deliverable-panel',
-  imports: [AsyncPipe, DeliverableForm],
+  imports: [AsyncPipe, DeliverableForm, LoadingIndicator],
   templateUrl: './analysis-deliverable-panel.html',
   styleUrl: './analysis-deliverable-panel.scss',
 })
