@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.repositorycontext;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 
 public record RepositoryEvidence(
         RepositoryContextLayer layer,
@@ -10,7 +11,7 @@ public record RepositoryEvidence(
         String reference,
         String summary,
         Instant occurredAt,
-        int relevanceScore,
+        EvidenceScore score,
         List<String> relatedReferences,
         EvidenceProvenance provenance,
         Map<String, String> extractionMetadata,
@@ -23,7 +24,11 @@ public record RepositoryEvidence(
         rankingReasons = List.copyOf(rankingReasons);
     }
 
-    public RepositoryEvidence withRanking(int score, List<String> reasons) {
+    public int relevanceScore() {
+        return score.finalScore();
+    }
+
+    public RepositoryEvidence withRanking(EvidenceScore score, List<String> reasons) {
         return new RepositoryEvidence(layer, kind, reference, summary, occurredAt,
                 score, relatedReferences, provenance, extractionMetadata,
                 estimatedTokens, reasons);

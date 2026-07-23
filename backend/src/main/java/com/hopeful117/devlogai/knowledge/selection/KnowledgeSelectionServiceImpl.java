@@ -21,7 +21,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService {
-    static final String VERSION = "knowledge-selection-v1";
+    static final String VERSION = "knowledge-selection-v2";
     static final SelectedKnowledge.KnowledgeBudget BUDGET =
             new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 60);
 

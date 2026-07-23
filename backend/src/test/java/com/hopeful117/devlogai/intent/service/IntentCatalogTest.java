@@ -21,8 +21,12 @@ class IntentCatalogTest {
         assertEquals("generate-readme", intent.id());
         assertEquals("v1", intent.version());
         assertTrue(intent.supportedInsightTypes().contains(InsightType.INSTALLATION));
+        assertEquals(java.util.List.of("documentation-v1", "project-state-v1"),
+                intent.contextProfiles());
         assertThrows(UnsupportedOperationException.class,
                 () -> intent.supportedInsightTypes().add(InsightType.API_DESCRIPTION));
+        assertThrows(UnsupportedOperationException.class,
+                () -> intent.contextProfiles().add("user-defined-profile"));
     }
 
     @Test

@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 
 @Component
 public class EvidenceFactory {
@@ -18,7 +19,6 @@ public class EvidenceFactory {
             String reference,
             String summary,
             Instant occurredAt,
-            int baseRelevance,
             List<String> relatedReferences,
             String repositoryLocation,
             String originatingFile,
@@ -29,12 +29,12 @@ public class EvidenceFactory {
         int estimatedTokens = Math.max(1,
                 (bounded.length() + reference.length() + 3) / 4);
         return new RepositoryEvidence(layer, kind, reference, bounded, occurredAt,
-                baseRelevance, relatedReferences,
+                EvidenceScore.unscored(), relatedReferences,
                 new RepositoryEvidence.EvidenceProvenance(
                         metadata.sourceType(), repositoryLocation, originatingFile, identifier),
                 Map.of("collectorId", metadata.collectorId(),
                         "collectorVersion", metadata.collectorVersion()),
-                estimatedTokens, List.of("COLLECTOR_BASE_SCORE"));
+                estimatedTokens, List.of("COLLECTED_NOT_RANKED"));
     }
 
     private String bound(String value, int maximum) {

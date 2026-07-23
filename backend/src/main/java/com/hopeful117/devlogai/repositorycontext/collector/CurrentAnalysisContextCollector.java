@@ -26,7 +26,7 @@ public class CurrentAnalysisContextCollector implements RepositoryContextCollect
         return List.of(evidenceFactory.create(metadata(),
                 RepositoryContextLayer.CURRENT_ANALYSIS, "ANALYSIS",
                 "analysis:" + analysis.id(), request.intent().objective(),
-                analysis.createdAt(), 1_000, List.of(), null, null,
+                analysis.createdAt(), List.of(), null, null,
                 analysis.id().toString(), request.budget().maximumSummaryCharacters()));
     }
 

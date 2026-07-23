@@ -1,5 +1,5 @@
 <section class="panel deliverables" aria-labelledby="deliverables-title">
-  <h2 id="deliverables-title">Generated Deliverables</h2>
+  <h2 id="deliverables-title">Project documentation</h2>
   @if (generation$ | async; as generation) {
     <app-deliverable-form
       [projectId]="projectId"
@@ -19,7 +19,7 @@
     } @else if (vm.state === 'error') {
       <p role="alert" class="error">{{ vm.error.message }}</p>
     } @else if (vm.data.length === 0) {
-      <p>No deliverable has been generated yet.</p>
+      <p>No project document has been generated yet.</p>
     } @else {
       <ul>
         @for (item of vm.data; track item.id) {

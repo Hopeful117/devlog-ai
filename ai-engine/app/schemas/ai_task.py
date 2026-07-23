@@ -41,6 +41,9 @@ class IntentDefinition(ContractModel):
     constraints: list[str] = Field(min_length=1)
     output_schema: dict[str, Any] = Field(alias="outputSchema")
     prompt_template: str = Field(alias="promptTemplate", min_length=1, max_length=100)
+    context_profiles: list[str] = Field(
+        default_factory=list, alias="contextProfiles"
+    )
 
 
 class PromptRequest(ContractModel):

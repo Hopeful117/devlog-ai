@@ -68,6 +68,8 @@ class KnowledgeSelectionServiceTest {
                 Map.of("type", "object"), "architecture-overview-prompt-v1");
         RepositoryContext repositoryContext = new RepositoryContext(
                 "repository-context-engine-v1", ContextProfile.ARCHITECTURE_REVIEW,
+                List.of("architecture-v1", "history-v1"),
+                "context-intelligence-v1", List.of("test"),
                 List.of(), Map.of(),
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                 0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
@@ -86,7 +88,7 @@ class KnowledgeSelectionServiceTest {
                 .filter(value -> value.content().equals("duplicate")).count());
         assertEquals(ObservationType.ARCHITECTURE_MODULARIZATION,
                 first.selectedObservations().getFirst().type());
-        assertEquals("knowledge-selection-v1", first.selectionMetadata().selectionVersion());
+        assertEquals("knowledge-selection-v2", first.selectionMetadata().selectionVersion());
         assertTrue(first.selectionMetadata().discardedKnowledgeCount() > 0);
         assertTrue(first.selectionDigest().matches("[0-9a-f]{64}"));
         assertEquals(repositoryContext, first.repositoryContext());

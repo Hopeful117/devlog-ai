@@ -24,15 +24,22 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
         Set<String> selectedReferences = new HashSet<>();
         int usedTokens = 0;
 
-        // First pass preserves layer diversity before filling remaining budget by rank.
+        // Context Intelligence determines which layers must receive diversity priority.
         Set<RepositoryContextLayer> represented = new HashSet<>();
-        for (RepositoryEvidence candidate : deduplicated) {
-            if (represented.contains(candidate.layer())) continue;
-            if (fits(candidate, selected.size(), usedTokens, request)) {
-                selected.add(candidate);
-                selectedReferences.add(candidate.reference());
-                represented.add(candidate.layer());
-                usedTokens += candidate.estimatedTokens();
+        for (RepositoryContextLayer preferred
+                : request.contextPlan().preferredLayers()) {
+            if (represented.size() >= request.contextPlan().minimumDiverseLayers())
+                break;
+            for (RepositoryEvidence candidate : deduplicated) {
+                if (candidate.layer() != preferred
+                        || selectedReferences.contains(candidate.reference())) continue;
+                if (fits(candidate, selected.size(), usedTokens, request)) {
+                    selected.add(candidate);
+                    selectedReferences.add(candidate.reference());
+                    represented.add(candidate.layer());
+                    usedTokens += candidate.estimatedTokens();
+                    break;
+                }
             }
         }
         for (RepositoryEvidence candidate : deduplicated) {

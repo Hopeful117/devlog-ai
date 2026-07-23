@@ -36,6 +36,8 @@ Scope:
   (ADR-037 implemented),
 - execute context construction through modular collectors, context profiles, deterministic
   ranking, diversity-aware selection and a token budget (ADR-038 implemented),
+- compose versioned Context Profiles and calculate explainable multi-criteria Evidence scores
+  through deterministic Context Intelligence (ADR-039 implemented),
 - implement repository bootstrap analysis.
 
 Current boundary:

@@ -7,7 +7,7 @@
   </div>
   @if (launchState$ | async; as launchState) {
     @if (launchState.state === 'pending') {
-      <app-loading-indicator message="Creating the Analysis and launching the AI task…" />
+      <app-loading-indicator message="Preparing the project context and launching the analysis…" />
     }
     @if (launchState.state === 'error') {
       <div role="alert" class="error">
@@ -33,7 +33,7 @@
                   ><span
                     >{{ analysis.status }} · {{ analysis.intentId }}/{{ analysis.intentVersion }} ·
                     {{ analysis.createdAt | date: 'medium' }}</span
-                  ><small>Requested revision is available in diagnostics.</small>
+                    ><small>Open the analysis to review its results.</small>
                 </li>
               }
             </ul>

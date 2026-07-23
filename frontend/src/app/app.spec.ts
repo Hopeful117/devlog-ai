@@ -20,7 +20,7 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('header')?.textContent).toContain('DevLog AI');
+    expect(compiled.querySelector('header')?.textContent).toContain('Developer OS');
     expect(compiled.querySelector('main')).toBeTruthy();
     expect(compiled.querySelector('footer')).toBeTruthy();
   });

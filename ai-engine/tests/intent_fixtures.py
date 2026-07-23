@@ -18,6 +18,7 @@ def describe_project_intent() -> IntentDefinition:
         constraints=["Use only AnalysisContext."],
         output_schema={"type": "object", "root": "proposals"},
         prompt_template="describe-project-prompt-v1",
+        context_profiles=["project-state-v1", "history-v1"],
     )
 
 
@@ -45,7 +46,7 @@ def selected_knowledge(
             "usedTokens": 0,
             "contextDigest": "b" * 64,
         },
-        "selectionMetadata": {"selectionVersion": "knowledge-selection-v1"},
+        "selectionMetadata": {"selectionVersion": "knowledge-selection-v2"},
         "selectionDigest": "a" * 64,
     }
 

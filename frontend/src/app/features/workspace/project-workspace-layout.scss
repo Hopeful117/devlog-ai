@@ -1,0 +1,131 @@
+:host {
+  display: block;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 13.5rem minmax(0, 1fr);
+  gap: clamp(1.25rem, 3vw, 2.5rem);
+}
+.workspace-sidebar {
+  position: sticky;
+  top: 6rem;
+  display: flex;
+  align-self: start;
+  min-height: calc(100vh - 9rem);
+  flex-direction: column;
+}
+.back-link {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  text-decoration: none;
+}
+.project-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 1.15rem 0 1.4rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.project-identity__mark {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgb(77 141 255 / 0.55);
+  border-radius: 0.65rem;
+  background: rgb(77 141 255 / 0.12);
+  color: #9bc0ff;
+  font-weight: 900;
+}
+.project-identity div {
+  display: grid;
+  min-width: 0;
+}
+.project-identity small,
+.workspace-sidebar__module small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.project-identity strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+nav {
+  display: grid;
+  gap: 0.35rem;
+}
+nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.62rem 0.72rem;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+nav a span {
+  width: 1rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+nav a:hover,
+nav a.active {
+  background: rgb(77 141 255 / 0.11);
+  color: var(--text-primary);
+}
+nav a.active span {
+  color: var(--accent-hover);
+}
+.workspace-sidebar__module {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: auto;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgb(17 26 43 / 0.7);
+  font-size: 0.72rem;
+}
+.workspace-sidebar__module i {
+  display: inline-block;
+  width: 0.42rem;
+  height: 0.42rem;
+  margin-right: 0.25rem;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+.workspace-content {
+  min-width: 0;
+}
+@media (max-width: 52rem) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  .workspace-sidebar {
+    position: static;
+    min-height: auto;
+  }
+  .project-identity {
+    margin-bottom: 0.7rem;
+    padding-bottom: 0.8rem;
+  }
+  .workspace-sidebar nav {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 0.4rem;
+  }
+  .workspace-sidebar nav a {
+    white-space: nowrap;
+  }
+  .workspace-sidebar__module {
+    display: none;
+  }
+}

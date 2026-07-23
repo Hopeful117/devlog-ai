@@ -17,7 +17,7 @@ import com.hopeful117.devlogai.repositorycontext.collector.EvidenceFactory;
 import com.hopeful117.devlogai.repositorycontext.collector.GitHistoryContextCollector;
 import com.hopeful117.devlogai.repositorycontext.collector.ProjectKnowledgeContextCollector;
 import com.hopeful117.devlogai.repositorycontext.collector.RepositoryContextCollector;
-import com.hopeful117.devlogai.repositorycontext.profile.ContextProfileResolver;
+import com.hopeful117.devlogai.repositorycontext.intelligence.DeterministicContextIntelligence;
 import com.hopeful117.devlogai.repositorycontext.ranking.DeterministicEvidenceRanker;
 import com.hopeful117.devlogai.repositorycontext.selection.BudgetedDiverseEvidenceSelector;
 import org.junit.jupiter.api.Test;
@@ -66,6 +66,9 @@ class RepositoryContextServiceTest {
         assertEquals(first, second);
         assertFalse(first.truncated());
         assertEquals(ContextProfile.ARCHITECTURE_REVIEW, first.profile());
+        assertEquals(List.of("architecture-v1", "history-v1"),
+                first.activeProfileKeys());
+        assertEquals("context-intelligence-v1", first.contextPlanVersion());
         assertTrue(first.selectedByLayer().containsKey(RepositoryContextLayer.CURRENT_ANALYSIS));
         assertTrue(first.selectedByLayer().containsKey(RepositoryContextLayer.GIT_HISTORY));
         assertTrue(first.selectedByLayer().containsKey(RepositoryContextLayer.ADR));
@@ -79,7 +82,17 @@ class RepositoryContextServiceTest {
         assertFalse(history.summary().contains("source of truth"));
         assertEquals("GIT", history.provenance().sourceType());
         assertEquals("git-history", history.extractionMetadata().get("collectorId"));
-        assertTrue(history.rankingReasons().contains("CONTEXT_PROFILE_PRIORITY"));
+        assertEquals("multi-criteria-v1", history.score().policyVersion());
+        assertTrue(history.score().criteria().size() >= 6);
+        int weightedScore = history.score().criteria().entrySet().stream()
+                .mapToInt(entry -> entry.getValue()
+                        * history.score().weights().get(entry.getKey())).sum();
+        int totalWeight = history.score().weights().values().stream()
+                .mapToInt(Integer::intValue).sum();
+        int expectedScore = (int) Math.round((double) weightedScore / totalWeight);
+        assertEquals(expectedScore, history.score().finalScore());
+        assertTrue(history.rankingReasons().stream()
+                .anyMatch(value -> value.startsWith("HISTORICAL_RELEVANCE=")));
         assertTrue(first.usedTokens() <= first.budget().maximumTokens());
         assertEquals(first.candidateCount(), first.selectionDecisions().size());
         assertTrue(first.contextDigest().matches("[0-9a-f]{64}"));
@@ -127,7 +140,7 @@ class RepositoryContextServiceTest {
                                 collectorId(), collectorVersion(), "EXTENSION"),
                         RepositoryContextLayer.COMMIT_DIFF, "EXTENSION_EVIDENCE",
                         "extension:1", "bounded extension evidence", Instant.EPOCH,
-                        900, List.of(), "repository", "extension.txt", "1",
+                        List.of(), "repository", "extension.txt", "1",
                         request.budget().maximumSummaryCharacters()));
             }
         };
@@ -172,7 +185,8 @@ class RepositoryContextServiceTest {
     private IntentDefinition intent() {
         return new IntentDefinition("architecture-overview", "v1", "Describe architecture",
                 List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
-                Map.of("type", "object"), "architecture-overview-prompt-v1");
+                Map.of("type", "object"), "architecture-overview-prompt-v1",
+                List.of("architecture-v1", "history-v1"));
     }
 
     private RepositoryContextEngine engine(
@@ -203,7 +217,7 @@ class RepositoryContextServiceTest {
         if (extension != null) collectors.add(extension);
         return new RepositoryContextEngine(
                 collectors,
-                new ContextProfileResolver(),
+                new DeterministicContextIntelligence(),
                 new DeterministicEvidenceRanker(),
                 new BudgetedDiverseEvidenceSelector(),
                 new ObjectMapper(), maximumItems, maximumSummary,

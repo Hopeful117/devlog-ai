@@ -1,6 +1,4 @@
-<section class="project-detail" aria-labelledby="project-title">
-  <a routerLink="/projects">← Back to projects</a>
-
+<section class="cockpit" aria-labelledby="project-title">
   @if (viewModel$ | async; as viewModel) {
     @switch (viewModel.state) {
       @case ('loading') {
@@ -19,27 +17,196 @@
         </div>
       }
       @case ('loaded') {
-        <article>
-          <h1 id="project-title">{{ viewModel.project.name }}</h1>
-          @if (viewModel.project.description) {
-            <p>{{ viewModel.project.description }}</p>
-          }
-          <dl>
-            <dt>ID</dt>
-            <dd>{{ viewModel.project.id }}</dd>
-            <dt>Slug</dt>
-            <dd>{{ viewModel.project.slug }}</dd>
-            <dt>Status</dt>
-            <dd>{{ viewModel.project.status }}</dd>
-            <dt>Created</dt>
-            <dd>{{ viewModel.project.createdAt | date: 'medium' }}</dd>
-            <dt>Updated</dt>
-            <dd>{{ viewModel.project.updatedAt | date: 'medium' }}</dd>
-          </dl>
-        </article>
-        <app-project-sources-section [projectId]="viewModel.project.id" />
-        <app-project-analyses-section [projectId]="viewModel.project.id" />
-        <app-project-deliverables-section [projectId]="viewModel.project.id" />
+        <header class="cockpit-header">
+          <div>
+            <p class="eyebrow">Project cockpit</p>
+            <h1 id="project-title">{{ viewModel.project.name }}</h1>
+            <p>{{ viewModel.project.description || 'Your project intelligence at a glance.' }}</p>
+          </div>
+          <div class="repository-state">
+            <span class="status-dot"></span>
+            <div>
+              <small>Repository status</small><strong>{{ viewModel.project.status }}</strong>
+            </div>
+          </div>
+        </header>
+
+        <div class="project-strip">
+          <span><small>Branch</small><strong>default</strong></span>
+          <span
+            ><small>Last synchronized</small
+            ><strong>{{ viewModel.project.updatedAt | date: 'medium' }}</strong></span
+          >
+          <span
+            ><small>Last analysis</small
+            ><strong>{{
+              latestAnalysis(viewModel.analyses)?.createdAt
+                ? (latestAnalysis(viewModel.analyses)?.createdAt | date: 'medium')
+                : 'Not analysed yet'
+            }}</strong></span
+          >
+        </div>
+
+        <section aria-labelledby="health-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">System overview</p>
+              <h2 id="health-title">Project health</h2>
+            </div>
+            <small>Updated from current workspace data</small>
+          </div>
+          <div class="metric-grid">
+            <app-dashboard-card title="Repository health" eyebrow="Sources" [accent]="true">
+              <strong class="metric"
+                >{{ activeSources(viewModel.sources) }}/{{
+                  viewModel.sources.length || '—'
+                }}</strong
+              >
+              <p>Configured repositories active</p>
+            </app-dashboard-card>
+            <app-dashboard-card title="Knowledge coverage" eyebrow="Trusted context">
+              <strong class="metric">{{ viewModel.knowledge.length }}</strong>
+              <p>Knowledge items available</p>
+            </app-dashboard-card>
+            <app-dashboard-card title="Documentation" eyebrow="Project assets">
+              <strong class="metric">{{ viewModel.deliverables.length }}</strong>
+              <p>Documents generated</p>
+            </app-dashboard-card>
+            <app-dashboard-card title="Analysis coverage" eyebrow="Project understanding">
+              <strong class="metric">{{ completedAnalyses(viewModel.analyses) }}</strong>
+              <p>Analyses completed</p>
+            </app-dashboard-card>
+          </div>
+        </section>
+
+        <div class="cockpit-grid">
+          <app-dashboard-card title="Recent activity" eyebrow="Project history">
+            @if (viewModel.analyses.length) {
+              <ul class="timeline">
+                @for (analysis of viewModel.analyses.slice(0, 4); track analysis.id) {
+                  <li>
+                    <i></i>
+                    <div>
+                      <a [routerLink]="['/analyses', analysis.id]">{{
+                        analysis.type.replaceAll('_', ' ')
+                      }}</a
+                      ><small>{{ analysis.createdAt | date: 'medium' }}</small>
+                    </div>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="empty-copy">Activity will appear after the first repository analysis.</p>
+            }
+            <a card-footer routerLink="activity">View full activity →</a>
+          </app-dashboard-card>
+
+          <app-dashboard-card title="Pending work" eyebrow="Recommended next steps">
+            <ul class="work-list">
+              @if (!viewModel.sources.length) {
+                <li>
+                  <span>1</span>
+                  <div>
+                    <strong>Connect a repository</strong
+                    ><small>Enable grounded project intelligence</small>
+                  </div>
+                </li>
+              }
+              @if (!viewModel.analyses.length) {
+                <li>
+                  <span>2</span>
+                  <div>
+                    <strong>Run the first analysis</strong
+                    ><small>Build an initial project state</small>
+                  </div>
+                </li>
+              }
+              @if (!viewModel.deliverables.length) {
+                <li>
+                  <span>3</span>
+                  <div>
+                    <strong>Create project documentation</strong
+                    ><small>Turn validated knowledge into an asset</small>
+                  </div>
+                </li>
+              }
+              @if (
+                viewModel.sources.length &&
+                viewModel.analyses.length &&
+                viewModel.deliverables.length
+              ) {
+                <li>
+                  <span>✓</span>
+                  <div>
+                    <strong>Workspace is up to date</strong
+                    ><small>Review recent results when convenient</small>
+                  </div>
+                </li>
+              }
+            </ul>
+          </app-dashboard-card>
+
+          <app-dashboard-card title="Agent status" eyebrow="Workspace modules">
+            <ul class="agent-list">
+              <li>
+                <i class="online"></i
+                ><span
+                  ><strong>Repository Agent</strong
+                  ><small>{{
+                    viewModel.sources.length
+                      ? 'Idle · monitoring configured sources'
+                      : 'Waiting for a source'
+                  }}</small></span
+                >
+              </li>
+              <li>
+                <i class="online"></i
+                ><span><strong>History Agent</strong><small>Idle · ready for analysis</small></span>
+              </li>
+              <li>
+                <i></i
+                ><span
+                  ><strong>Documentation Agent</strong
+                  ><small>{{
+                    viewModel.deliverables.length ? 'Completed' : 'Waiting for knowledge'
+                  }}</small></span
+                >
+              </li>
+              <li class="muted">
+                <i></i
+                ><span
+                  ><strong>Codeglyphe</strong
+                  ><small>Module available in a future iteration</small></span
+                >
+              </li>
+            </ul>
+          </app-dashboard-card>
+
+          <app-dashboard-card title="Documentation" eyebrow="Latest assets">
+            @if (viewModel.deliverables.length) {
+              <ul class="document-list">
+                @for (document of viewModel.deliverables.slice(0, 4); track document.id) {
+                  <li>
+                    <span>▤</span>
+                    <div>
+                      <a [routerLink]="['/deliverables', document.id]">{{ document.title }}</a
+                      ><small>{{ document.type.replaceAll('_', ' ') }}</small>
+                    </div>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="empty-copy">
+                Generated documentation will become a durable project asset here.
+              </p>
+            }
+            <a card-footer routerLink="documentation">Open documentation →</a>
+          </app-dashboard-card>
+        </div>
+
+        <section class="analysis-launcher">
+          <app-project-analyses-section [projectId]="viewModel.project.id" />
+        </section>
       }
     }
   }

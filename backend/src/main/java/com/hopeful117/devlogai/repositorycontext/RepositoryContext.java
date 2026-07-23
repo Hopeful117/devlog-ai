@@ -6,6 +6,9 @@ import java.util.Map;
 public record RepositoryContext(
         String contextVersion,
         ContextProfile profile,
+        List<String> activeProfileKeys,
+        String contextPlanVersion,
+        List<String> contextIntelligenceExplanations,
         List<RepositoryEvidence> evidence,
         Map<RepositoryContextLayer, Integer> selectedByLayer,
         ContextBudget budget,
@@ -19,6 +22,9 @@ public record RepositoryContext(
 ) {
     public RepositoryContext {
         evidence = List.copyOf(evidence);
+        activeProfileKeys = List.copyOf(activeProfileKeys);
+        contextIntelligenceExplanations =
+                List.copyOf(contextIntelligenceExplanations);
         selectedByLayer = Map.copyOf(selectedByLayer);
         selectionDecisions = List.copyOf(selectionDecisions);
         warnings = List.copyOf(warnings);

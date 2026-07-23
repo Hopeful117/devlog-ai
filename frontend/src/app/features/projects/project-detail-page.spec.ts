@@ -10,6 +10,7 @@ import { SourceService } from './source.service';
 import { AnalysisService } from '../analyses/analysis.service';
 import { IntentCatalogService } from '../analyses/intent-catalog.service';
 import { DeliverableService } from '../deliverables/deliverable.service';
+import { InsightService } from '../insights/insight.service';
 
 const project: ProjectDetail = {
   id: 'a1ee6d55-e034-491a-a6e6-cdad70573b24',
@@ -56,6 +57,7 @@ describe('ProjectDetailPage', () => {
           provide: DeliverableService,
           useValue: { getByProject: () => of([]), generate: vi.fn() },
         },
+        { provide: InsightService, useValue: { getInsightsByProject: () => of([]) } },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(ProjectDetailPage);
@@ -71,8 +73,8 @@ describe('ProjectDetailPage', () => {
 
     expect(getProject).toHaveBeenCalledWith('devlog-ai');
     expect(element.querySelector('h1')?.textContent).toContain('DevLog AI');
-    expect(element.textContent).toContain(project.id);
-    expect(element.textContent).toContain('Sources');
+    expect(element.textContent).toContain('Project health');
+    expect(element.textContent).toContain('Repository health');
   });
 
   it('renders the not-found state for a 404', async () => {

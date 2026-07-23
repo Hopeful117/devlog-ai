@@ -330,6 +330,28 @@ the selected profile, token allocation, ranking reasons, selected/discarded deci
 provenance. Context construction remains entirely inside Java Core; the AI Engine only interprets
 the bounded result.
 
+### Context Intelligence and Evidence scoring
+
+[ADR-039](docs/decisions/ADR-039.md) adds a deterministic decision layer before the Context Engine.
+Each versioned Intent references one or more predefined Context Profiles. The initial compositions
+are:
+
+- `describe-project-v1` → `project-state-v1` + `history-v1`;
+- `architecture-overview-v1` → `architecture-v1` + `history-v1`;
+- `generate-readme-v1` → `documentation-v1` + `project-state-v1`.
+
+Context Intelligence composes the profile weighting and diversity policies into a versioned
+`ContextPlan`. Evidence is then scored independently on semantic relevance, architectural
+relevance, historical relevance, recency, deterministic source confidence, and User Guidance
+alignment. The final 0–100 score is the weighted result of those visible criteria; collectors no
+longer assign an arbitrary final relevance score.
+
+For V1, semantic relevance is a deterministic lexical and metadata comparison. It does not use
+embeddings or a vector store. Evidence confidence describes the reliability of its deterministic
+source (for example Git or validated knowledge); it is not model confidence, business severity, or
+a truth probability. Every snapshot records the profile composition, policy versions, criterion
+values, weights, final score and explanations.
+
 ## Generating Deliverables
 
 ADR-034 adds a second, deliberately separate AI responsibility. Analysis AI proposes knowledge;

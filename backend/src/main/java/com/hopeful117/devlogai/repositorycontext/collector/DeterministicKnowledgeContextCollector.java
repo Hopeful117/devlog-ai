@@ -31,7 +31,7 @@ public class DeterministicKnowledgeContextCollector
             String location = fact.evidenceReferences().stream().findFirst().orElse(fact.source());
             evidence.add(evidenceFactory.create(metadata(), layer(location), "FACT",
                     location == null ? "fact:" + fact.id() : location,
-                    fact.content(), fact.detectedAt(), 720,
+                    fact.content(), fact.detectedAt(),
                     List.of("fact:" + fact.id()), location, location,
                     fact.id().toString(), request.budget().maximumSummaryCharacters()));
         }
@@ -40,7 +40,7 @@ public class DeterministicKnowledgeContextCollector
             evidence.add(evidenceFactory.create(metadata(),
                     RepositoryContextLayer.RELATED_SOURCE_CODE, "OBSERVATION",
                     "observation:" + observation.id(), observation.content(),
-                    observation.createdAt(), 650,
+                    observation.createdAt(),
                     observation.supportingFactIds().stream()
                             .map(id -> "fact:" + id).toList(),
                     null, null, observation.id().toString(),

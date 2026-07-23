@@ -1,0 +1,28 @@
+<div class="workspace">
+  <aside class="workspace-sidebar">
+    <a class="back-link" routerLink="/projects">← All projects</a>
+    @if (project$ | async; as view) {
+      <div class="project-identity">
+        <span class="project-identity__mark">P</span>
+        <div>
+          <small>Project</small>
+          <strong>{{ view.state === 'loaded' ? view.project.name : 'Workspace' }}</strong>
+        </div>
+      </div>
+    }
+    <nav aria-label="Project navigation">
+      <a routerLink="." [routerLinkActiveOptions]="{ exact: true }" routerLinkActive="active"
+        ><span>⌂</span>Cockpit</a
+      >
+      <a routerLink="activity" routerLinkActive="active"><span>↗</span>Activity</a>
+      <a routerLink="knowledge" routerLinkActive="active"><span>◇</span>Knowledge</a>
+      <a routerLink="documentation" routerLinkActive="active"><span>▤</span>Documentation</a>
+      <a routerLink="settings" routerLinkActive="active"><span>⚙</span>Settings</a>
+    </nav>
+    <div class="workspace-sidebar__module">
+      <small>Workspace module</small>
+      <strong><i></i> DevLog intelligence</strong>
+    </div>
+  </aside>
+  <main class="workspace-content"><router-outlet /></main>
+</div>

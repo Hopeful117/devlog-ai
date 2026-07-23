@@ -1,30 +1,205 @@
-.project-detail {
-  max-width: 50rem;
+.cockpit {
+  animation: enter 280ms ease both;
 }
-
-article,
-.state {
-  margin-top: 1rem;
-  padding: 1rem;
+.cockpit-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+.cockpit-header h1 {
+  margin-bottom: 0.35rem;
+}
+.cockpit-header p:last-child {
+  margin: 0;
+}
+.repository-state {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 10rem;
+  padding: 0.65rem 0.8rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  background: rgb(17 26 43 / 0.7);
 }
-
-.state--error {
-  border-color: var(--danger);
-}
-
-dl {
+.repository-state div {
   display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 0.5rem 1rem;
 }
-
-dt {
-  font-weight: 600;
+.repository-state small,
+.project-strip small {
+  color: var(--text-muted);
+  font-size: 0.68rem;
 }
-
-dd {
+.status-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 10px rgb(79 198 138 / 0.65);
+}
+.project-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  margin: 1.4rem 0 2rem;
+  padding: 0.75rem 1rem;
+  border-block: 1px solid var(--border);
+}
+.project-strip span {
+  display: grid;
+}
+.project-strip strong {
+  font-size: 0.78rem;
+}
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+.section-heading h2,
+.section-heading .eyebrow {
+  margin-bottom: 0;
+}
+.section-heading > small {
+  color: var(--text-muted);
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+.metric {
+  display: block;
+  color: #f6f9ff;
+  font-size: 1.9rem;
+  line-height: 1;
+}
+app-dashboard-card p {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+}
+.cockpit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 1.8rem;
+}
+.timeline,
+.work-list,
+.agent-list,
+.document-list {
+  display: grid;
+  gap: 0.75rem;
   margin: 0;
-  overflow-wrap: anywhere;
+  padding: 0;
+  list-style: none;
+}
+.timeline li,
+.work-list li,
+.agent-list li,
+.document-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+.timeline i {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.timeline div,
+.document-list div,
+.work-list div,
+.agent-list span {
+  display: grid;
+  min-width: 0;
+}
+.timeline a,
+.document-list a {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.timeline small,
+.document-list small,
+.work-list small,
+.agent-list small {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+.work-list > li > span {
+  display: grid;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.45rem;
+  background: rgb(77 141 255 / 0.12);
+  color: var(--accent-hover);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+.work-list strong,
+.agent-list strong {
+  font-size: 0.8rem;
+}
+.agent-list i {
+  width: 0.45rem;
+  height: 0.45rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.agent-list i.online {
+  background: var(--success);
+}
+.agent-list .muted {
+  opacity: 0.55;
+}
+.document-list > li > span {
+  color: var(--info);
+}
+.empty-copy {
+  margin: 0;
+}
+.analysis-launcher {
+  margin-top: 1.8rem;
+}
+.state {
+  padding: 1rem;
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (max-width: 68rem) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 42rem) {
+  .cockpit-header,
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .repository-state {
+    width: 100%;
+  }
+  .metric-grid,
+  .cockpit-grid {
+    grid-template-columns: 1fr;
+  }
 }

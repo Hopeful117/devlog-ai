@@ -28,26 +28,26 @@ public class ProjectKnowledgeContextCollector implements RepositoryContextCollec
         request.analysisContext().relatedDecisions().forEach(value -> result.add(create(
                 request, RepositoryContextLayer.ADR, "DECISION", "decision:" + value.id(),
                 value.title() + " — " + Objects.toString(value.choice(), ""),
-                value.createdAt(), 800, value.id().toString(), List.of())));
+                value.createdAt(), value.id().toString(), List.of())));
         request.analysisContext().recentMilestones().forEach(value -> result.add(create(
                 request, RepositoryContextLayer.ROADMAP, "MILESTONE",
                 "milestone:" + value.id(), value.name() + " — " + value.status(),
-                value.startedAt(), 760, value.id().toString(), List.of())));
+                value.startedAt(), value.id().toString(), List.of())));
         request.validatedInsights().forEach(value -> result.add(create(
                 request, RepositoryContextLayer.VALIDATED_INSIGHT, "INSIGHT",
                 "insight:" + value.getId(), value.getTitle() + " — " + value.getContent(),
-                value.getCreatedAt(), 850, value.getId().toString(),
+                value.getCreatedAt(), value.getId().toString(),
                 List.of("analysis:" + value.getAnalysis().getId()))));
         request.analysisContext().relatedAnalyses().forEach(value -> result.add(create(
                 request, RepositoryContextLayer.PREVIOUS_ANALYSIS, "ANALYSIS",
                 "analysis:" + value.id(), value.type() + " " + value.status(),
-                value.createdAt(), 450, value.id().toString(), List.of())));
+                value.createdAt(), value.id().toString(), List.of())));
         request.analysisContext().architectureArtifacts().forEach(value -> result.add(
                 evidenceFactory.create(metadata(),
                         RepositoryContextLayer.PROJECT_DOCUMENTATION, "ARTIFACT",
                         "artifact:" + value.id(),
                         value.name() + " — " + Objects.toString(value.description(), ""),
-                        value.createdAt(), 600,
+                        value.createdAt(),
                         value.path() == null ? List.of()
                                 : List.of("repository:" + value.path()),
                         null, value.path(), value.id().toString(),
@@ -62,12 +62,11 @@ public class ProjectKnowledgeContextCollector implements RepositoryContextCollec
             String reference,
             String summary,
             java.time.Instant timestamp,
-            int relevance,
             String identifier,
             List<String> related
     ) {
         return evidenceFactory.create(metadata(), layer, kind, reference, summary,
-                timestamp, relevance, related, null, null, identifier,
+                timestamp, related, null, null, identifier,
                 request.budget().maximumSummaryCharacters());
     }
 

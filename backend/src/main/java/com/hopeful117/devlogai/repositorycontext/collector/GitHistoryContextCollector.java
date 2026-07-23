@@ -45,7 +45,7 @@ public class GitHistoryContextCollector implements RepositoryContextCollector {
                     commit.getSubject() + " — " + commit.getFilesChanged()
                             + " files, +" + commit.getInsertions()
                             + "/-" + commit.getDeletions(),
-                    commit.getCommittedAt(), 700,
+                    commit.getCommittedAt(),
                     commit.getParents().stream().map(parent ->
                             "git:" + repositoryId + ":" + parent.getParentHash()).toList(),
                     repositoryId, null, commit.getCommitHash(),

@@ -1,9 +1,8 @@
 <form [formGroup]="form" (ngSubmit)="submit()" class="deliverable-form">
   <p class="section-note">
-    Only human-validated Insights are used. Repository data and pending or rejected proposals are
-    excluded.
+    Only human-validated project knowledge is used. Unreviewed results are excluded.
   </p>
-  <label for="deliverable-type">Deliverable type</label>
+  <label for="deliverable-type">Document type</label>
   <select id="deliverable-type" formControlName="type">
     @for (type of types; track type) {
       <option [value]="type">{{ type }}</option>
@@ -24,6 +23,6 @@
     maxlength="1000"
   ></textarea>
   <button type="submit" [disabled]="form.invalid || submitting">
-    {{ submitting ? 'Generating…' : 'Generate from validated Insights' }}
+    {{ submitting ? 'Generating…' : 'Generate from validated knowledge' }}
   </button>
 </form>

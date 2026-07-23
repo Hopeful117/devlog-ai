@@ -1,0 +1,107 @@
+@if (project$ | async; as view) {
+  @if (view.state === 'loading') {
+    <p role="status">Loading workspace…</p>
+  } @else if (view.state === 'error') {
+    <div class="state state--error" role="alert">
+      <h1>Workspace unavailable</h1>
+      <p>The project could not be loaded.</p>
+    </div>
+  } @else {
+    <section class="workspace-page">
+      @switch (section) {
+        @case ('activity') {
+          <header class="page-header">
+            <div>
+              <p class="eyebrow">Living project history</p>
+              <h1>Activity</h1>
+              <p>Analyses, repository changes and project milestones in one timeline.</p>
+            </div>
+          </header>
+          <div class="future-filter" aria-label="Activity filters">
+            <button class="active" type="button">All activity</button
+            ><button type="button" disabled>Commits</button
+            ><button type="button" disabled>Documentation</button
+            ><button type="button" disabled>Roadmap</button>
+          </div>
+          <app-project-analyses-section [projectId]="view.project.id" />
+        }
+        @case ('knowledge') {
+          <header class="page-header">
+            <div>
+              <p class="eyebrow">Trusted project understanding</p>
+              <h1>Knowledge</h1>
+              <p>Validated architecture, business, infrastructure and engineering knowledge.</p>
+            </div>
+          </header>
+          @if (knowledge$ | async; as knowledge) {
+            @if (knowledge.state === 'loading') {
+              <p role="status">Loading knowledge…</p>
+            } @else if (knowledge.state === 'error') {
+              <p role="alert" class="inline-message inline-message--error">
+                Knowledge could not be loaded.
+              </p>
+            } @else if (!knowledge.items.length) {
+              <div class="empty-state panel">
+                <span>◇</span>
+                <h2>No trusted knowledge yet</h2>
+                <p>
+                  Run an analysis, review its results and validate the useful findings. Validated
+                  knowledge will be organized here.
+                </p>
+                <a routerLink="../activity">Launch an analysis →</a>
+              </div>
+            } @else {
+              <ul class="knowledge-grid">
+                @for (item of knowledge.items; track item.id) {
+                  <li>
+                    <article>
+                      <p class="eyebrow">{{ item.type.replaceAll('_', ' ') }}</p>
+                      <h2>
+                        <a [routerLink]="['/insights', item.id]">{{ item.title }}</a>
+                      </h2>
+                      <p>{{ item.content }}</p>
+                      <small>{{ item.severity }} · {{ item.createdAt | date: 'medium' }}</small>
+                    </article>
+                  </li>
+                }
+              </ul>
+            }
+          }
+        }
+        @case ('documentation') {
+          <header class="page-header">
+            <div>
+              <p class="eyebrow">Project assets</p>
+              <h1>Documentation</h1>
+              <p>Create and maintain durable documentation from validated project knowledge.</p>
+            </div>
+          </header>
+          <app-project-deliverables-section [projectId]="view.project.id" />
+        }
+        @case ('settings') {
+          <header class="page-header">
+            <div>
+              <p class="eyebrow">Project configuration</p>
+              <h1>Settings</h1>
+              <p>Manage the repositories that power this workspace.</p>
+            </div>
+          </header>
+          <section class="project-metadata panel">
+            <h2>Project identity</h2>
+            <dl>
+              <dt>Name</dt>
+              <dd>{{ view.project.name }}</dd>
+              <dt>Slug</dt>
+              <dd>{{ view.project.slug }}</dd>
+              <dt>Status</dt>
+              <dd>{{ view.project.status }}</dd>
+              <dt>Created</dt>
+              <dd>{{ view.project.createdAt | date: 'medium' }}</dd>
+            </dl>
+          </section>
+          <app-project-sources-section [projectId]="view.project.id" />
+        }
+      }
+    </section>
+  }
+}

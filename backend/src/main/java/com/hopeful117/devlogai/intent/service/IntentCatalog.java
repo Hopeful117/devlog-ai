@@ -47,7 +47,17 @@ public class IntentCatalog {
                 List.of("Utiliser uniquement AnalysisContext.",
                         "Ne produire que des propositions traçables et soumises à validation humaine.",
                         "Ne jamais présenter une proposition comme une connaissance validée."),
-                outputContract(types), template);
+                outputContract(types), template, contextProfiles(id));
+    }
+
+    private static List<String> contextProfiles(String intentId) {
+        return switch (intentId) {
+            case "describe-project" -> List.of("project-state-v1", "history-v1");
+            case "architecture-overview" -> List.of("architecture-v1", "history-v1");
+            case "generate-readme" -> List.of("documentation-v1", "project-state-v1");
+            default -> throw new IllegalArgumentException(
+                    "No Context Profiles registered for Intent " + intentId);
+        };
     }
 
     private static Map<String, Object> outputContract(List<InsightType> types) {

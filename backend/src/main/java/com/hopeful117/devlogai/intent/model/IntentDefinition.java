@@ -10,12 +10,23 @@ public record IntentDefinition(
         List<InsightType> supportedInsightTypes,
         List<String> constraints,
         Map<String, Object> outputSchema,
-        String promptTemplate
+        String promptTemplate,
+        List<String> contextProfiles
 ) {
     public IntentDefinition {
         supportedInsightTypes = List.copyOf(supportedInsightTypes);
         constraints = List.copyOf(constraints);
         outputSchema = Map.copyOf(outputSchema);
+        contextProfiles = List.copyOf(contextProfiles);
+    }
+
+    public IntentDefinition(
+            String id, String version, String objective,
+            List<InsightType> supportedInsightTypes, List<String> constraints,
+            Map<String, Object> outputSchema, String promptTemplate
+    ) {
+        this(id, version, objective, supportedInsightTypes, constraints,
+                outputSchema, promptTemplate, List.of());
     }
 
     public String key() { return id + "-" + version; }

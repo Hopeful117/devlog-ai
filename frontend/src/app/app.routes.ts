@@ -4,8 +4,7 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    loadComponent: () =>
-      import('./features/dashboard/dashboard-page').then((module) => module.DashboardPage),
+    redirectTo: 'projects',
   },
   {
     path: 'projects',
@@ -13,11 +12,52 @@ export const routes: Routes = [
       import('./features/projects/projects-page').then((module) => module.ProjectsPage),
   },
   {
-    // The backend identifies projects by slug. The public route keeps the
-    // requested :id shape, and the value passed in this segment is the slug.
     path: 'projects/:id',
     loadComponent: () =>
-      import('./features/projects/project-detail-page').then((module) => module.ProjectDetailPage),
+      import('./features/workspace/project-workspace-layout').then(
+        (module) => module.ProjectWorkspaceLayout,
+      ),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/projects/project-detail-page').then(
+            (module) => module.ProjectDetailPage,
+          ),
+      },
+      {
+        path: 'activity',
+        data: { workspaceSection: 'activity' },
+        loadComponent: () =>
+          import('./features/workspace/project-workspace-section-page').then(
+            (module) => module.ProjectWorkspaceSectionPage,
+          ),
+      },
+      {
+        path: 'knowledge',
+        data: { workspaceSection: 'knowledge' },
+        loadComponent: () =>
+          import('./features/workspace/project-workspace-section-page').then(
+            (module) => module.ProjectWorkspaceSectionPage,
+          ),
+      },
+      {
+        path: 'documentation',
+        data: { workspaceSection: 'documentation' },
+        loadComponent: () =>
+          import('./features/workspace/project-workspace-section-page').then(
+            (module) => module.ProjectWorkspaceSectionPage,
+          ),
+      },
+      {
+        path: 'settings',
+        data: { workspaceSection: 'settings' },
+        loadComponent: () =>
+          import('./features/workspace/project-workspace-section-page').then(
+            (module) => module.ProjectWorkspaceSectionPage,
+          ),
+      },
+    ],
   },
   {
     path: 'analyses/:id',
