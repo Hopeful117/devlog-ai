@@ -29,9 +29,16 @@ Allow DevLog AI to understand and preserve repository evolution.
 Scope:
 
 - connect Git repositories,
-- collect repository activity,
-- store Raw Activity,
+- collect repository activity (first commit-history import slice implemented),
+- store Raw Activity (commit metadata, parents, changed files and diff statistics implemented),
+- build bounded deterministic commit-diff contexts (implemented),
 - implement repository bootstrap analysis.
+
+Current boundary:
+
+- AI commit interpretation, validated historical events, multi-parent comparison and
+  language-specific symbol extraction remain deferred to later vertical slices of ADR-035 and
+  ADR-036.
 
 Output:
 

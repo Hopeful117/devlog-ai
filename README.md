@@ -260,6 +260,29 @@ An analysis may include optional, structured User Guidance without changing its 
 Guidance only controls emphasis and presentation. It cannot introduce Insight categories, alter
 the output schema, weaken grounding rules, or override the selected Intent.
 
+## Importing deterministic project history
+
+The first vertical slice of [ADR-035](docs/decisions/ADR-035.md) and
+[ADR-036](docs/decisions/ADR-036.md) imports the Git history of a configured repository into Java
+Core. It persists immutable factual commit metadata, ordered parents, first-parent file changes,
+line statistics and binary-file flags. Repository identity plus the full commit hash is unique, so
+re-importing the same history is idempotent.
+
+Core also constructs a bounded `CommitDiffAnalysisContext` containing deterministic file
+categories, language hints, directly modified ADR/roadmap references, evidence references and
+truncation warnings. It stores no unrestricted raw patch and creates no trusted interpretation.
+Future AI interpretation must enter through a versioned Intent and the existing immutable Proposal
+validation lifecycle.
+
+API endpoints:
+
+- `POST /api/v1/project-history/repositories/{repositoryId}/imports`
+- `GET /api/v1/project-history/projects/{projectId}/commits`
+- `GET /api/v1/project-history/repositories/{repositoryId}/commits/{commitHash}/context`
+
+The optional `revision` query parameter selects an explicit import target. Context limits are
+configured with `HISTORY_CONTEXT_MAX_FILES` and `HISTORY_CONTEXT_MAX_CHANGED_LINES`.
+
 ## Generating Deliverables
 
 ADR-034 adds a second, deliberately separate AI responsibility. Analysis AI proposes knowledge;
