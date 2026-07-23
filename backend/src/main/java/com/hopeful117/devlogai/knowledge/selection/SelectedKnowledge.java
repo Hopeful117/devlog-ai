@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +17,7 @@ public record SelectedKnowledge(
         List<AnalysisContext.FactSnapshot> selectedFacts,
         DiagnosticSnapshot diagnostics,
         List<InsightSnapshot> selectedInsights,
+        RepositoryContext repositoryContext,
         SelectionMetadata selectionMetadata,
         String selectionDigest
 ) {
@@ -38,5 +40,5 @@ public record SelectedKnowledge(
     }
 
     public record KnowledgeBudget(int maximumFacts, int maximumObservations,
-                                  int maximumInsights) { }
+                                  int maximumInsights, int maximumRepositoryEvidence) { }
 }

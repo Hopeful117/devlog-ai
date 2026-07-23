@@ -10,6 +10,8 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -155,8 +157,12 @@ class RestAIEngineClientTest {
         SelectedKnowledge selected = new SelectedKnowledge(
                 null, null, null, List.of(), List.of(),
                 new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0), List.of(),
+                new RepositoryContext("repository-context-engine-v1",
+                        ContextProfile.PROJECT_STATE, List.of(), Map.of(),
+                        new RepositoryContext.ContextBudget(60, 500, 20, 6000),
+                        0, 0, 0, false, List.of(), List.of(), "b".repeat(64)),
                 new SelectedKnowledge.SelectionMetadata("selection-v1", List.of(), 0, 0,
-                        new SelectedKnowledge.KnowledgeBudget(40, 25, 10), "COMPLETE"),
+                        new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 60), "COMPLETE"),
                 "a".repeat(64));
         return new PromptRequest(correlationId, correlationId, analysisId, UUID.randomUUID(),
                 AiTaskType.INSIGHT_GENERATION, intent, null, selected, intent.outputSchema(), Map.of());

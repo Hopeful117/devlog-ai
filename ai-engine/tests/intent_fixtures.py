@@ -28,6 +28,7 @@ def describe_project_intent_json() -> dict[str, object]:
 def selected_knowledge(
     *, facts: list[object] | None = None, observations: list[object] | None = None,
     analysis_id: object | None = None,
+    repository_evidence: list[object] | None = None,
 ) -> dict[str, object]:
     return {
         "project": {"id": str(uuid4()), "name": "Core"},
@@ -37,6 +38,13 @@ def selected_knowledge(
         "diagnostics": {"collectionComplete": True, "truncated": False,
                         "warningCount": 0, "errorCount": 0},
         "selectedInsights": [],
+        "repositoryContext": {
+            "contextVersion": "repository-context-engine-v1",
+            "profile": "PROJECT_STATE",
+            "evidence": repository_evidence or [],
+            "usedTokens": 0,
+            "contextDigest": "b" * 64,
+        },
         "selectionMetadata": {"selectionVersion": "knowledge-selection-v1"},
         "selectionDigest": "a" * 64,
     }

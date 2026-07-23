@@ -174,8 +174,16 @@ Return only grounded, structured Insight proposals that require human validation
     ) -> dict[str, list[str]]:
         facts = selected_knowledge.get("selectedFacts", [])
         observations = selected_knowledge.get("selectedObservations", [])
+        repository_context = selected_knowledge.get("repositoryContext", {})
         fact_items = facts if isinstance(facts, list) else []
         observation_items = observations if isinstance(observations, list) else []
+        repository_evidence = (
+            repository_context.get("evidence", [])
+            if isinstance(repository_context, dict) else []
+        )
+        repository_items = (
+            repository_evidence if isinstance(repository_evidence, list) else []
+        )
         return {
             "allowedEvidenceReferences": sorted(
                 {
@@ -183,6 +191,20 @@ Return only grounded, structured Insight proposals that require human validation
                     for fact in fact_items
                     if isinstance(fact, dict)
                     for reference in fact.get("evidenceReferences", [])
+                    if isinstance(reference, str)
+                }
+                | {
+                    reference
+                    for item in repository_items
+                    if isinstance(item, dict)
+                    for reference in (
+                        [item.get("reference")]
+                        + (
+                            item.get("relatedReferences", [])
+                            if isinstance(item.get("relatedReferences", []), list)
+                            else []
+                        )
+                    )
                     if isinstance(reference, str)
                 }
             ),

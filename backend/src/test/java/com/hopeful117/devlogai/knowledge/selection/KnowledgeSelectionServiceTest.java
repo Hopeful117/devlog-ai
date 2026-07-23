@@ -12,6 +12,9 @@ import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.observation.entity.ObservationType;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
+import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -33,6 +36,7 @@ class KnowledgeSelectionServiceTest {
         var diagnostics = mock(AnalysisExecutionDiagnosticRepository.class);
         var insights = mock(InsightRepository.class);
         var mapper = mock(ObjectMapper.class);
+        var repositoryContexts = mock(RepositoryContextService.class);
         UUID projectId = UUID.randomUUID();
         UUID analysisId = UUID.randomUUID();
         AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
@@ -62,7 +66,15 @@ class KnowledgeSelectionServiceTest {
         IntentDefinition intent = new IntentDefinition("architecture-overview", "v1", "Architecture",
                 List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
                 Map.of("type", "object"), "architecture-overview-prompt-v1");
-        var service = new KnowledgeSelectionServiceImpl(diagnostics, insights, mapper);
+        RepositoryContext repositoryContext = new RepositoryContext(
+                "repository-context-engine-v1", ContextProfile.ARCHITECTURE_REVIEW,
+                List.of(), Map.of(),
+                new RepositoryContext.ContextBudget(60, 500, 20, 6000),
+                0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList()))
+                .thenReturn(repositoryContext);
+        var service = new KnowledgeSelectionServiceImpl(
+                diagnostics, insights, mapper, repositoryContexts);
 
         SelectedKnowledge first = service.select(context, intent, null);
         SelectedKnowledge second = service.select(context, intent, null);
@@ -77,6 +89,9 @@ class KnowledgeSelectionServiceTest {
         assertEquals("knowledge-selection-v1", first.selectionMetadata().selectionVersion());
         assertTrue(first.selectionMetadata().discardedKnowledgeCount() > 0);
         assertTrue(first.selectionDigest().matches("[0-9a-f]{64}"));
+        assertEquals(repositoryContext, first.repositoryContext());
+        assertTrue(first.selectionMetadata().appliedRules()
+                .contains("REPOSITORY_FIRST_LAYERING"));
     }
 
     private AnalysisContext.FactSnapshot fact(FactType type, String content) {

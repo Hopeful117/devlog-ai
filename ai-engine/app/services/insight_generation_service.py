@@ -154,6 +154,7 @@ class InsightGenerationService:
     ) -> None:
         facts = context.get("selectedFacts", [])
         observations = context.get("selectedObservations", [])
+        repository_context = context.get("repositoryContext", {})
         if not isinstance(facts, list) or not isinstance(observations, list):
             raise InsightOutputValidationError(
                 "SelectedKnowledge facts and observations must be arrays"
@@ -168,6 +169,20 @@ class InsightGenerationService:
             for reference in fact.get("evidenceReferences", [])
             if isinstance(reference, str)
         }
+        if isinstance(repository_context, dict):
+            repository_evidence = repository_context.get("evidence", [])
+            if isinstance(repository_evidence, list):
+                for item in repository_evidence:
+                    if not isinstance(item, dict):
+                        continue
+                    reference = item.get("reference")
+                    if isinstance(reference, str):
+                        evidence_references.add(reference)
+                    related = item.get("relatedReferences", [])
+                    if isinstance(related, list):
+                        evidence_references.update(
+                            value for value in related if isinstance(value, str)
+                        )
 
         for proposal in output.proposals:
             if proposal.insight_type not in supported_insight_types:

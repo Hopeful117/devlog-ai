@@ -59,6 +59,26 @@ def test_prompt_lists_exact_allowed_grounding_values() -> None:
     assert "Never derive, shorten, extend, or construct a reference" in prompt.user_message
 
 
+def test_repository_context_references_are_grounded_without_raw_diff() -> None:
+    commit_reference = "git:repository-id:commit-hash"
+    parent_reference = "git:repository-id:parent-hash"
+    request = prompt_request(knowledge=selected_knowledge(
+        repository_evidence=[{
+            "layer": "GIT_HISTORY",
+            "kind": "COMMIT",
+            "reference": commit_reference,
+            "summary": "4 files, +50/-3",
+            "relatedReferences": [parent_reference],
+        }],
+    ))
+
+    prompt = InsightPromptBuilder().build(request)
+
+    assert commit_reference in prompt.user_message
+    assert parent_reference in prompt.user_message
+    assert "diff --git" not in prompt.user_message
+
+
 def test_user_guidance_is_structured_and_has_lowest_priority() -> None:
     request = prompt_request(guidance=UserGuidance(
         focus="Distributed architecture", audience="Recruiters",

@@ -283,6 +283,53 @@ API endpoints:
 The optional `revision` query parameter selects an explicit import target. Context limits are
 configured with `HISTORY_CONTEXT_MAX_FILES` and `HISTORY_CONTEXT_MAX_CHANGED_LINES`.
 
+## Repository-first analysis context
+
+[ADR-037](docs/decisions/ADR-037.md) is implemented by a deterministic
+`RepositoryContext` assembled during knowledge selection. It layers the current Analysis,
+repository Facts and Observations, recent Git history, directly identified ADR and roadmap
+knowledge, validated Insights, previous analyses and project documentation. Repository evidence is
+ranked using the versioned Intent and optional User Guidance, but guidance cannot create evidence or
+override repository facts.
+
+The context is stored inside the immutable selected-knowledge snapshot of each AI task. Every item
+contains an evidence reference, its repository layer, a bounded factual summary and related
+references. The AI Engine accepts only those exact references in generated Proposals. No full
+repository, unrestricted source file or raw Git diff is added to the prompt.
+
+Repository-context limits are configurable with:
+
+- `REPOSITORY_CONTEXT_MAX_EVIDENCE_ITEMS` (default `60`);
+- `REPOSITORY_CONTEXT_MAX_SUMMARY_CHARACTERS` (default `500`);
+- `REPOSITORY_CONTEXT_MAX_HISTORY_ITEMS` (default `20`);
+- `REPOSITORY_CONTEXT_MAX_TOKENS` (default `6000`).
+
+### Repository Context Engine
+
+[ADR-038](docs/decisions/ADR-038.md) turns repository-first selection into an explicit Core
+pipeline:
+
+```text
+Context Profile
+→ independent Context Collectors
+→ deterministic Evidence Ranking
+→ diverse Evidence Selection
+→ token budget
+→ RepositoryContext
+```
+
+The initial collectors cover the current Analysis, deterministic Facts and Observations, Git
+history, and existing Core knowledge such as ADR decisions, roadmap milestones, validated Insights,
+previous analyses and documentation artifacts. Collectors implement a common interface and carry
+their identifier and version in extraction metadata, so adding a collector does not require changes
+to the engine.
+
+Profiles currently distinguish project state, architecture review, documentation, README
+generation, release summary, knowledge extraction and history analysis. The context snapshot records
+the selected profile, token allocation, ranking reasons, selected/discarded decisions and evidence
+provenance. Context construction remains entirely inside Java Core; the AI Engine only interprets
+the bounded result.
+
 ## Generating Deliverables
 
 ADR-034 adds a second, deliberately separate AI responsibility. Analysis AI proposes knowledge;

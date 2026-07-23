@@ -32,6 +32,10 @@ Scope:
 - collect repository activity (first commit-history import slice implemented),
 - store Raw Activity (commit metadata, parents, changed files and diff statistics implemented),
 - build bounded deterministic commit-diff contexts (implemented),
+- assemble layered, traceable and budgeted Repository Context during knowledge selection
+  (ADR-037 implemented),
+- execute context construction through modular collectors, context profiles, deterministic
+  ranking, diversity-aware selection and a token budget (ADR-038 implemented),
 - implement repository bootstrap analysis.
 
 Current boundary:

@@ -7,6 +7,8 @@ import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
@@ -21,11 +23,12 @@ import java.util.*;
 public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService {
     static final String VERSION = "knowledge-selection-v1";
     static final SelectedKnowledge.KnowledgeBudget BUDGET =
-            new SelectedKnowledge.KnowledgeBudget(40, 25, 10);
+            new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 60);
 
     private final AnalysisExecutionDiagnosticRepository diagnosticRepository;
     private final InsightRepository insightRepository;
     private final ObjectMapper objectMapper;
+    private final RepositoryContextService repositoryContextService;
 
     @Override
     public SelectedKnowledge select(AnalysisContext context, IntentDefinition intent,
@@ -56,6 +59,8 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 .toList();
         List<SelectedKnowledge.InsightSnapshot> insights = insightCandidates.stream()
                 .limit(BUDGET.maximumInsights()).map(this::toInsight).toList();
+        RepositoryContext repositoryContext = repositoryContextService.build(
+                context, intent, guidance, insightCandidates);
         AnalysisExecutionDiagnostic diagnostic = diagnosticRepository.findById(context.analysis().id())
                 .orElseThrow(() -> new IllegalStateException(
                         "Mandatory analysis diagnostics are unavailable"));
@@ -63,17 +68,20 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 diagnostic.isCollectionComplete(), diagnostic.isTruncated(),
                 diagnostic.getWarningCount(), diagnostic.getErrorCount());
         int candidates = context.observations().size() + context.facts().size()
-                + insightCandidates.size();
-        int selected = 1 + observations.size() + facts.size() + insights.size() + 1;
+                + insightCandidates.size() + repositoryContext.candidateCount();
+        int selected = 1 + observations.size() + facts.size() + insights.size()
+                + repositoryContext.evidence().size() + 1;
         var metadata = new SelectedKnowledge.SelectionMetadata(
                 VERSION,
-                List.of("INTENT_SPECIFIC_RANKING", "USER_GUIDANCE_KEYWORD_BOOST", "STABLE_TYPE_AND_ID_ORDER",
+                List.of("REPOSITORY_FIRST_LAYERING", "INTENT_SPECIFIC_RANKING",
+                        "USER_GUIDANCE_KEYWORD_BOOST", "STABLE_TYPE_AND_ID_ORDER",
                         "DUPLICATE_FACT_CONTENT_ELIMINATION", "KNOWLEDGE_BUDGET"),
                 selected, Math.max(0, candidates + 2 - selected), BUDGET,
                 diagnostic.isCollectionComplete() ? "COMPLETE" : "PARTIAL");
-        String digest = digest(context, observations, facts, diagnostics, insights, metadata);
+        String digest = digest(context, observations, facts, diagnostics, insights,
+                repositoryContext, metadata);
         return new SelectedKnowledge(context.project(), context.analysis(), context.projectProfile(),
-                observations, facts, diagnostics, insights, metadata, digest);
+                observations, facts, diagnostics, insights, repositoryContext, metadata, digest);
     }
 
     private void requireMandatoryKnowledge(AnalysisContext context, IntentDefinition intent) {
@@ -138,13 +146,15 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                           List<AnalysisContext.FactSnapshot> facts,
                           SelectedKnowledge.DiagnosticSnapshot diagnostics,
                           List<SelectedKnowledge.InsightSnapshot> insights,
+                          RepositoryContext repositoryContext,
                           SelectedKnowledge.SelectionMetadata metadata) {
         record DigestInput(Object project, Object analysis, Object profile, Object selectedObservations,
                            Object selectedFacts, Object diagnostic, Object selectedInsights,
-                           Object selectionMetadata) { }
+                           Object repositoryContext, Object selectionMetadata) { }
         byte[] serialized = objectMapper.writeValueAsString(new DigestInput(
                 context.project(), context.analysis(), context.projectProfile(), observations,
-                facts, diagnostics, insights, metadata)).getBytes(StandardCharsets.UTF_8);
+                facts, diagnostics, insights, repositoryContext, metadata))
+                .getBytes(StandardCharsets.UTF_8);
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(serialized));
         } catch (NoSuchAlgorithmException impossible) {

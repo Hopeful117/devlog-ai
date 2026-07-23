@@ -84,6 +84,34 @@ async def test_successful_generation_sends_only_insight_proposals() -> None:
 
 
 @pytest.mark.asyncio
+async def test_repository_context_evidence_reference_is_accepted() -> None:
+    request, fact_id, observation_id, _ = submission()
+    repository_reference = "git:repository-id:commit-hash"
+    request = request.model_copy(update={
+        "selected_knowledge": {
+            **request.selected_knowledge,
+            "repositoryContext": {
+                "evidence": [{
+                    "reference": repository_reference,
+                    "relatedReferences": [],
+                }]
+            },
+        }
+    })
+    provider = MockLlmProvider([
+        valid_output(fact_id, observation_id, repository_reference)
+    ])
+    callback = RecordingCallbackClient()
+    service = InsightGenerationService(
+        provider, InsightPromptBuilder(), callback  # type: ignore[arg-type]
+    )
+
+    await service.process(request, uuid4())
+
+    assert callback.results[0].status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
 async def test_unsupported_insight_type_gets_corrective_retry() -> None:
     request, fact_id, observation_id, evidence = submission()
     invalid = valid_output(fact_id, observation_id, evidence)
