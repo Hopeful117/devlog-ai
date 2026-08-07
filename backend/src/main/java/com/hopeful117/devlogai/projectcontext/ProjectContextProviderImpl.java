@@ -1,0 +1,170 @@
+package com.hopeful117.devlogai.projectcontext;
+
+import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.analysis.entity.Analysis;
+import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
+import com.hopeful117.devlogai.artifact.entity.Artifact;
+import com.hopeful117.devlogai.artifact.entity.ArtifactType;
+import com.hopeful117.devlogai.artifact.repository.ArtifactRepository;
+import com.hopeful117.devlogai.decision.entity.Decision;
+import com.hopeful117.devlogai.decision.repository.DecisionRepository;
+import com.hopeful117.devlogai.knowledge.entity.KnowledgeEvent;
+import com.hopeful117.devlogai.knowledge.repository.KnowledgeEventRepository;
+import com.hopeful117.devlogai.milestone.entity.Milestone;
+import com.hopeful117.devlogai.milestone.repository.MilestoneRepository;
+import com.hopeful117.devlogai.project.entity.Project;
+import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
+import com.hopeful117.devlogai.profile.service.ProjectProfileService;
+import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
+import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
+import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
+import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class ProjectContextProviderImpl implements ProjectContextProvider {
+
+    static final int MAX_RECENT_EVENTS = 20;
+    static final int MAX_VALIDATED_PROPOSALS = 20;
+    static final int MAX_ARCHITECTURE_ARTIFACTS = 20;
+    static final int MAX_ARCHITECTURE_DECISIONS = 20;
+    static final int MAX_RECENT_MILESTONES = 10;
+    static final int MAX_RELATED_ANALYSES = 10;
+
+    private static final List<ArtifactType> ARCHITECTURE_ARTIFACT_TYPES = List.of(
+            ArtifactType.API,
+            ArtifactType.CONFIGURATION,
+            ArtifactType.DATABASE,
+            ArtifactType.INFRASTRUCTURE
+    );
+
+    private final ProjectRepository projectRepository;
+    private final ProjectProfileService projectProfileService;
+    private final KnowledgeEventRepository knowledgeEventRepository;
+    private final ValidatableProposalRepository proposalRepository;
+    private final ArtifactRepository artifactRepository;
+    private final DecisionRepository decisionRepository;
+    private final MilestoneRepository milestoneRepository;
+    private final AnalysisRepository analysisRepository;
+
+    @Override
+    public ProjectContextSnapshot build(UUID projectId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new com.hopeful117.devlogai.shared.exception.EntityNotFoundException("Project", projectId));
+
+        ProjectProfileResponse latestProfile = projectProfileService.getLatestByProject(projectId);
+
+        List<AnalysisContext.KnowledgeEventSnapshot> recentKnowledgeEvents =
+                knowledgeEventRepository.findByProjectIdOrderByCreatedAtDescIdDesc(
+                                projectId, PageRequest.of(0, MAX_RECENT_EVENTS))
+                        .stream()
+                        .map(this::toKnowledgeEventSnapshot)
+                        .toList();
+
+        List<AnalysisContext.ValidatedProposalSnapshot> validatedProposals =
+                proposalRepository.findByProjectIdAndStatusOrderByCreatedAtDescIdDesc(
+                                projectId, ProposalStatus.ACCEPTED,
+                                PageRequest.of(0, MAX_VALIDATED_PROPOSALS))
+                        .stream()
+                        .map(this::toValidatedProposalSnapshot)
+                        .toList();
+
+        List<AnalysisContext.ArtifactSnapshot> architectureArtifacts =
+                artifactRepository.findByProjectIdAndTypeInOrderByCreatedAtDescIdDesc(
+                                projectId, ARCHITECTURE_ARTIFACT_TYPES,
+                                PageRequest.of(0, MAX_ARCHITECTURE_ARTIFACTS))
+                        .stream()
+                        .map(this::toArtifactSnapshot)
+                        .toList();
+
+        List<AnalysisContext.DecisionSnapshot> relatedDecisions =
+                decisionRepository.findByProjectIdOrderByCreatedAtDescIdDesc(
+                                projectId, PageRequest.of(0, MAX_ARCHITECTURE_DECISIONS))
+                        .stream()
+                        .map(this::toDecisionSnapshot)
+                        .toList();
+
+        List<AnalysisContext.MilestoneSnapshot> recentMilestones =
+                milestoneRepository.findByProjectIdOrderByStartedAtDescIdDesc(
+                                projectId, PageRequest.of(0, MAX_RECENT_MILESTONES))
+                        .stream()
+                        .map(this::toMilestoneSnapshot)
+                        .toList();
+
+        List<AnalysisContext.AnalysisSnapshot> recentAnalyses =
+                analysisRepository.findByProjectIdOrderByCreatedAtDesc(projectId)
+                        .stream()
+                        .map(this::toAnalysisSnapshot)
+                        .toList();
+
+        return new ProjectContextSnapshot(
+                toProjectSnapshot(project),
+                latestProfile,
+                recentKnowledgeEvents,
+                validatedProposals,
+                architectureArtifacts,
+                relatedDecisions,
+                recentMilestones,
+                recentAnalyses
+        );
+    }
+
+    private AnalysisContext.ProjectSnapshot toProjectSnapshot(Project project) {
+        return new AnalysisContext.ProjectSnapshot(
+                project.getId(), project.getName(), project.getSlug(),
+                project.getDescription(), project.getStatus()
+        );
+    }
+
+    private AnalysisContext.AnalysisSnapshot toAnalysisSnapshot(Analysis analysis) {
+        return new AnalysisContext.AnalysisSnapshot(
+                analysis.getId(), analysis.getType(),
+                analysis.getIntentId(), analysis.getIntentVersion(), analysis.getStatus(),
+                analysis.getStartedAt(), analysis.getCompletedAt(), analysis.getCreatedAt()
+        );
+    }
+
+    private AnalysisContext.KnowledgeEventSnapshot toKnowledgeEventSnapshot(KnowledgeEvent event) {
+        return new AnalysisContext.KnowledgeEventSnapshot(
+                event.getId(), event.getType(), event.getTitle(), event.getDescription(),
+                event.getCreatedAt()
+        );
+    }
+
+    private AnalysisContext.ArtifactSnapshot toArtifactSnapshot(com.hopeful117.devlogai.artifact.entity.Artifact artifact) {
+        return new AnalysisContext.ArtifactSnapshot(
+                artifact.getId(), artifact.getType(), artifact.getName(), artifact.getPath(),
+                artifact.getDescription(), artifact.getCreatedAt()
+        );
+    }
+
+    private AnalysisContext.DecisionSnapshot toDecisionSnapshot(Decision decision) {
+        return new AnalysisContext.DecisionSnapshot(
+                decision.getId(), decision.getTitle(), decision.getContext(),
+                decision.getChoice(), decision.getRationale(), decision.getConsequences(),
+                decision.getCreatedAt()
+        );
+    }
+
+    private AnalysisContext.MilestoneSnapshot toMilestoneSnapshot(Milestone milestone) {
+        return new AnalysisContext.MilestoneSnapshot(
+                milestone.getId(), milestone.getName(), milestone.getDescription(),
+                milestone.getStatus(), milestone.getStartedAt(), milestone.getCompletedAt()
+        );
+    }
+
+    private AnalysisContext.ValidatedProposalSnapshot toValidatedProposalSnapshot(
+            ValidatableProposal proposal
+    ) {
+        return new AnalysisContext.ValidatedProposalSnapshot(
+                proposal.getId(), proposal.getType(), proposal.getPayload(),
+                proposal.getCreatedAt(), proposal.getDecidedAt()
+        );
+    }
+}
