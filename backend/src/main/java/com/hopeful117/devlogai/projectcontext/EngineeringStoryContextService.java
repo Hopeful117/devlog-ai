@@ -5,4 +5,7 @@ import java.util.UUID;
 public interface EngineeringStoryContextService {
 
     EngineeringStoryContext build(UUID projectId);
+
+    EngineeringStoryContext buildWithRepositoryContext(
+            UUID projectId, String storyDescription);
 }

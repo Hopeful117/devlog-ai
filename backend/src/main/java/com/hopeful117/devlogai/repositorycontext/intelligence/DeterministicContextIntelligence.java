@@ -101,6 +101,14 @@ public class DeterministicContextIntelligence implements ContextIntelligence {
                 List.of(RepositoryContextLayer.RELATED_SOURCE_CODE,
                         RepositoryContextLayer.CURRENT_ANALYSIS,
                         RepositoryContextLayer.PROJECT_DOCUMENTATION), 2, 100));
+        register(result, profile("engineering-story-v1",
+                ContextProfile.ENGINEERING_STORY,
+                weights(15, 15, 25, 20, 20, 5),
+                List.of(RepositoryContextLayer.GIT_HISTORY,
+                        RepositoryContextLayer.COMMIT_DIFF,
+                        RepositoryContextLayer.ADR,
+                        RepositoryContextLayer.PROJECT_DOCUMENTATION,
+                        RepositoryContextLayer.ROADMAP), 3, 100));
         return Map.copyOf(result);
     }
 

@@ -7,6 +7,7 @@ import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.repositorycontext.ContextProfile;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -16,6 +17,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 class DeterministicContextIntelligenceTest {
@@ -54,6 +56,38 @@ class DeterministicContextIntelligenceTest {
         return new IntentDefinition("architecture-overview", "v1", "Architecture",
                 List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
                 Map.of("type", "object"), "template-v1", profiles);
+    }
+
+    @Test
+    void resolvesEngineeringStoryProfile() {
+        ContextPlan plan = intelligence.plan(context(), intent(
+                List.of("engineering-story-v1")));
+
+        assertEquals(List.of("engineering-story-v1"), plan.profileKeys());
+        assertEquals(ContextProfile.ENGINEERING_STORY, plan.primaryProfile());
+        assertEquals(15, plan.composedWeights().get(
+                EvidenceCriterion.SEMANTIC_RELEVANCE));
+        assertEquals(15, plan.composedWeights().get(
+                EvidenceCriterion.ARCHITECTURAL_RELEVANCE));
+        assertEquals(25, plan.composedWeights().get(
+                EvidenceCriterion.HISTORICAL_RELEVANCE));
+        assertEquals(20, plan.composedWeights().get(
+                EvidenceCriterion.RECENCY));
+        assertEquals(20, plan.composedWeights().get(
+                EvidenceCriterion.CONFIDENCE));
+        assertEquals(5, plan.composedWeights().get(
+                EvidenceCriterion.USER_GUIDANCE_BOOST));
+        assertEquals(3, plan.minimumDiverseLayers());
+        assertTrue(plan.preferredLayers().contains(
+                RepositoryContextLayer.GIT_HISTORY));
+        assertTrue(plan.preferredLayers().contains(
+                RepositoryContextLayer.COMMIT_DIFF));
+        assertTrue(plan.preferredLayers().contains(
+                RepositoryContextLayer.ADR));
+        assertTrue(plan.preferredLayers().contains(
+                RepositoryContextLayer.PROJECT_DOCUMENTATION));
+        assertTrue(plan.preferredLayers().contains(
+                RepositoryContextLayer.ROADMAP));
     }
 
     private AnalysisContext context() {

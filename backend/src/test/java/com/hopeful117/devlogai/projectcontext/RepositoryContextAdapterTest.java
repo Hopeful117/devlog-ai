@@ -1,0 +1,152 @@
+package com.hopeful117.devlogai.projectcontext;
+
+import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.insight.entity.Insight;
+import com.hopeful117.devlogai.insight.repository.InsightRepository;
+import com.hopeful117.devlogai.project.entity.ProjectStatus;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class RepositoryContextAdapterTest {
+
+    @Mock
+    ProjectContextProvider projectContextProvider;
+
+    @Mock
+    RepositoryContextService repositoryContextService;
+
+    @Mock
+    InsightRepository insightRepository;
+
+    @InjectMocks
+    RepositoryContextAdapter adapter;
+
+    private ProjectContextSnapshot snapshot(UUID projectId) {
+        AnalysisContext.ProjectSnapshot project =
+                new AnalysisContext.ProjectSnapshot(
+                        projectId, "Test Project", "test-project",
+                        null, ProjectStatus.ACTIVE);
+        return new ProjectContextSnapshot(
+                project, null, List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of());
+    }
+
+    @Test
+    void shouldBuildRepositoryContextWithStoryDescription() {
+        UUID projectId = UUID.randomUUID();
+        String description = "Add authentication module";
+        RepositoryContext expected = mock(RepositoryContext.class);
+
+        when(projectContextProvider.build(projectId))
+                .thenReturn(snapshot(projectId));
+        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(repositoryContextService.build(
+                any(), any(), any(), any())).thenReturn(expected);
+
+        RepositoryContext result =
+                adapter.buildRepositoryContext(projectId, description);
+
+        assertNotNull(result);
+        assertEquals(expected, result);
+
+        ArgumentCaptor<AnalysisContext> contextCaptor =
+                ArgumentCaptor.forClass(AnalysisContext.class);
+        verify(repositoryContextService).build(
+                contextCaptor.capture(), any(), any(), any());
+
+        AnalysisContext ctx = contextCaptor.getValue();
+        assertEquals(projectId, ctx.project().id());
+        assertEquals("engineering-story-preparation",
+                ctx.analysis().intentId());
+        assertEquals("v1", ctx.analysis().intentVersion());
+    }
+
+    @Test
+    void shouldBuildRepositoryContextWithNullDescription() {
+        UUID projectId = UUID.randomUUID();
+        RepositoryContext expected = mock(RepositoryContext.class);
+
+        when(projectContextProvider.build(projectId))
+                .thenReturn(snapshot(projectId));
+        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(repositoryContextService.build(
+                any(), any(), isNull(), any())).thenReturn(expected);
+
+        RepositoryContext result =
+                adapter.buildRepositoryContext(projectId, null);
+
+        assertNotNull(result);
+        assertEquals(expected, result);
+    }
+
+    @Test
+    void shouldLoadInsightsByProjectId() {
+        UUID projectId = UUID.randomUUID();
+        Insight insight1 = mock(Insight.class);
+        Insight insight2 = mock(Insight.class);
+        RepositoryContext expected = mock(RepositoryContext.class);
+
+        when(projectContextProvider.build(projectId))
+                .thenReturn(snapshot(projectId));
+        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of(insight1, insight2));
+        when(repositoryContextService.build(
+                any(), any(), any(), any())).thenReturn(expected);
+
+        adapter.buildRepositoryContext(projectId, "Test description");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Insight>> insightsCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(repositoryContextService).build(
+                any(), any(), any(), insightsCaptor.capture());
+        assertEquals(2, insightsCaptor.getValue().size());
+    }
+
+    @Test
+    void shouldPassIntentDefinitionWithEngineeringStoryProfile() {
+        UUID projectId = UUID.randomUUID();
+        RepositoryContext expected = mock(RepositoryContext.class);
+
+        when(projectContextProvider.build(projectId))
+                .thenReturn(snapshot(projectId));
+        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(repositoryContextService.build(
+                any(), any(), any(), any())).thenReturn(expected);
+
+        adapter.buildRepositoryContext(projectId, "Test");
+
+        ArgumentCaptor<com.hopeful117.devlogai.intent.model.IntentDefinition>
+                intentCaptor = ArgumentCaptor.forClass(
+                com.hopeful117.devlogai.intent.model.IntentDefinition.class);
+        verify(repositoryContextService).build(
+                any(), intentCaptor.capture(), any(), any());
+
+        com.hopeful117.devlogai.intent.model.IntentDefinition intent =
+                intentCaptor.getValue();
+        assertEquals("engineering-story-preparation", intent.id());
+        assertEquals("v1", intent.version());
+        assertEquals(List.of("engineering-story-v1"), intent.contextProfiles());
+    }
+}
