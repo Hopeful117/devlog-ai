@@ -4,8 +4,11 @@ import com.hopeful117.devlogai.ai.engine.dto.AiTaskConflictResponse;
 import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTypeException;
+import com.hopeful117.devlogai.project.exception.ProjectSlugAlreadyExistsException;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.shared.logging.CorrelationIdFilter;
+import com.hopeful117.devlogai.shared.response.ApiErrorCode;
 import com.hopeful117.devlogai.shared.response.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -13,10 +16,13 @@ import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 
@@ -36,7 +42,8 @@ public class GlobalExceptionHandler {
                         ex.getCode(),
                         ex.getCurrentStatus(),
                         ex.getMessage(),
-                        request.getRequestURI()
+                        request.getRequestURI(),
+                        correlationId(request)
                 )
         );
     }
@@ -46,14 +53,31 @@ public class GlobalExceptionHandler {
             UnsupportedAnalysisTypeException ex,
             HttpServletRequest request
     ) {
-        ApiErrorResponse response = new ApiErrorResponse(
-                Instant.now(),
-                HttpStatus.UNPROCESSABLE_ENTITY.value(),
-                HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase(),
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-        return ResponseEntity.unprocessableEntity().body(response);
+        return response(HttpStatus.UNPROCESSABLE_ENTITY,
+                ApiErrorCode.UNSUPPORTED_ANALYSIS_TYPE, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
+    public ResponseEntity<ApiErrorResponse> handleRouteNotFound(
+            Exception ex,
+            HttpServletRequest request
+    ) {
+        return response(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND,
+                "No API route matches this request.", request);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiErrorResponse> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException ex,
+            HttpServletRequest request
+    ) {
+        ApiErrorResponse body = body(HttpStatus.METHOD_NOT_ALLOWED,
+                ApiErrorCode.METHOD_NOT_ALLOWED,
+                "HTTP method '%s' is not supported for this route."
+                        .formatted(ex.getMethod()), request);
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                .headers(ex.getHeaders())
+                .body(body);
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -62,7 +86,8 @@ public class GlobalExceptionHandler {
             HttpServletRequest request
     ) {
         String message = "Invalid value for parameter '" + ex.getName() + "'.";
-        return badRequest(message, request);
+        return response(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAMETER,
+                message, request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -70,7 +95,8 @@ public class GlobalExceptionHandler {
             HttpMessageNotReadableException ex,
             HttpServletRequest request
     ) {
-        return badRequest("Malformed or invalid JSON request.", request);
+        return response(HttpStatus.BAD_REQUEST, ApiErrorCode.MALFORMED_REQUEST,
+                "Malformed or invalid JSON request.", request);
     }
 
     @ExceptionHandler(InvalidAiTaskResultException.class)
@@ -78,14 +104,8 @@ public class GlobalExceptionHandler {
             InvalidAiTaskResultException ex,
             HttpServletRequest request
     ) {
-        ApiErrorResponse response = new ApiErrorResponse(
-                Instant.now(),
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.getReasonPhrase(),
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-        return ResponseEntity.badRequest().body(response);
+        return response(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_AI_TASK_RESULT,
+                ex.getMessage(), request);
     }
 
     @ExceptionHandler(EntityNotFoundException.class)
@@ -93,32 +113,26 @@ public class GlobalExceptionHandler {
             EntityNotFoundException ex,
             HttpServletRequest request) {
 
-        ApiErrorResponse response = new ApiErrorResponse(
-                Instant.now(),
-                HttpStatus.NOT_FOUND.value(),
-                HttpStatus.NOT_FOUND.getReasonPhrase(),
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(response);
+        return response(HttpStatus.NOT_FOUND, ApiErrorCode.ENTITY_NOT_FOUND,
+                ex.getMessage(), request);
     }
+
+    @ExceptionHandler(ProjectSlugAlreadyExistsException.class)
+    public ResponseEntity<ApiErrorResponse> handleProjectSlugAlreadyExists(
+            ProjectSlugAlreadyExistsException ex,
+            HttpServletRequest request
+    ) {
+        return response(HttpStatus.CONFLICT,
+                ApiErrorCode.PROJECT_SLUG_ALREADY_EXISTS, ex.getMessage(), request);
+    }
+
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ApiErrorResponse> handleConflict(
             ConflictException ex,
             HttpServletRequest request) {
 
-        ApiErrorResponse response = new ApiErrorResponse(
-                Instant.now(),
-                HttpStatus.CONFLICT.value(),
-                HttpStatus.CONFLICT.getReasonPhrase(),
-                ex.getMessage(),
-                request.getRequestURI()
-        );
-
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(response);
+        return response(HttpStatus.CONFLICT, ApiErrorCode.RESOURCE_CONFLICT,
+                ex.getMessage(), request);
     }
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(
@@ -132,7 +146,8 @@ public class GlobalExceptionHandler {
                 .map(DefaultMessageSourceResolvable::getDefaultMessage)
                 .orElse("Validation failed");
 
-        return badRequest(message, request);
+        return response(HttpStatus.BAD_REQUEST, ApiErrorCode.VALIDATION_FAILED,
+                message, request);
     }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(
@@ -147,29 +162,38 @@ public class GlobalExceptionHandler {
                 ex
         );
 
-        ApiErrorResponse response = new ApiErrorResponse(
-                Instant.now(),
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                HttpStatus.INTERNAL_SERVER_ERROR.getReasonPhrase(),
-                "An unexpected error occurred.",
-                request.getRequestURI()
-        );
-
-        return ResponseEntity.internalServerError()
-                .body(response);
+        return response(HttpStatus.INTERNAL_SERVER_ERROR, ApiErrorCode.INTERNAL_ERROR,
+                "An unexpected error occurred.", request);
     }
 
-    private ResponseEntity<ApiErrorResponse> badRequest(
+    private ResponseEntity<ApiErrorResponse> response(
+            HttpStatus status,
+            ApiErrorCode code,
             String message,
             HttpServletRequest request
     ) {
-        ApiErrorResponse response = new ApiErrorResponse(
+        return ResponseEntity.status(status).body(body(status, code, message, request));
+    }
+
+    private ApiErrorResponse body(
+            HttpStatus status,
+            ApiErrorCode code,
+            String message,
+            HttpServletRequest request
+    ) {
+        return new ApiErrorResponse(
                 Instant.now(),
-                HttpStatus.BAD_REQUEST.value(),
-                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                status.value(),
+                status.getReasonPhrase(),
+                code,
                 message,
-                request.getRequestURI()
+                request.getRequestURI(),
+                correlationId(request)
         );
-        return ResponseEntity.badRequest().body(response);
+    }
+
+    private String correlationId(HttpServletRequest request) {
+        Object value = request.getAttribute(CorrelationIdFilter.REQUEST_ATTRIBUTE);
+        return value instanceof String correlationId ? correlationId : null;
     }
 }

@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.project.controller;
 
 import com.hopeful117.devlogai.project.dto.response.ProjectResponse;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
+import com.hopeful117.devlogai.project.exception.ProjectSlugAlreadyExistsException;
 import com.hopeful117.devlogai.project.service.ProjectService;
 import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,11 +17,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -69,5 +70,20 @@ class ProjectControllerWebMvcTest extends ControllerWebMvcTestSupport {
                         .content("{\"description\":\"Missing name\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void shouldReturnExplicitConflictForDuplicateSlug() throws Exception {
+        when(service.create(any())).thenThrow(
+                new ProjectSlugAlreadyExistsException("devlog-ai"));
+
+        mvc.perform(post("/api/v1/projects")
+                        .header("X-Correlation-ID", "project-conflict-42")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"DevLog AI\",\"description\":\"Core\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(header().string("X-Correlation-ID", "project-conflict-42"))
+                .andExpect(jsonPath("$.code").value("PROJECT_SLUG_ALREADY_EXISTS"))
+                .andExpect(jsonPath("$.correlationId").value("project-conflict-42"));
     }
 }

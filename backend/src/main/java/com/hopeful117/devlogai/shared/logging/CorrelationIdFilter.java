@@ -21,6 +21,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
 
     public static final String HEADER_NAME = "X-Correlation-ID";
     public static final String MDC_KEY = "correlationId";
+    public static final String REQUEST_ATTRIBUTE =
+            CorrelationIdFilter.class.getName() + ".correlationId";
     private static final int MAX_CORRELATION_ID_LENGTH = 128;
     private static final Logger log = LoggerFactory.getLogger(CorrelationIdFilter.class);
 
@@ -32,6 +34,7 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String correlationId = resolveCorrelationId(request.getHeader(HEADER_NAME));
         long startedAt = System.nanoTime();
+        request.setAttribute(REQUEST_ATTRIBUTE, correlationId);
         MDC.put(MDC_KEY, correlationId);
         try {
             response.setHeader(HEADER_NAME, correlationId);

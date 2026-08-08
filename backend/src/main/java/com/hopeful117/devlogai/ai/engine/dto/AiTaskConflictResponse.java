@@ -11,6 +11,7 @@ public record AiTaskConflictResponse(
         String code,
         AiTaskStatus currentStatus,
         String message,
-        String path
+        String path,
+        String correlationId
 ) {
 }

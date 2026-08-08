@@ -20,7 +20,11 @@ class CorrelationIdFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, (ignoredRequest, ignoredResponse) ->
-                assertEquals("request-42", MDC.get(CorrelationIdFilter.MDC_KEY)));
+        {
+            assertEquals("request-42", MDC.get(CorrelationIdFilter.MDC_KEY));
+            assertEquals("request-42", request.getAttribute(
+                    CorrelationIdFilter.REQUEST_ATTRIBUTE));
+        });
 
         assertEquals("request-42", response.getHeader(CorrelationIdFilter.HEADER_NAME));
         assertNull(MDC.get(CorrelationIdFilter.MDC_KEY));
@@ -34,7 +38,9 @@ class CorrelationIdFilterTest {
 
         filter.doFilter(request, response, (ignoredRequest, ignoredResponse) -> { });
 
-        assertDoesNotThrow(() -> UUID.fromString(
-                response.getHeader(CorrelationIdFilter.HEADER_NAME)));
+        String correlationId = response.getHeader(CorrelationIdFilter.HEADER_NAME);
+        assertDoesNotThrow(() -> UUID.fromString(correlationId));
+        assertEquals(correlationId, request.getAttribute(
+                CorrelationIdFilter.REQUEST_ATTRIBUTE));
     }
 }
