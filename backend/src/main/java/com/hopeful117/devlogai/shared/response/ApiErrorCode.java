@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.shared.response;
 public enum ApiErrorCode {
     ROUTE_NOT_FOUND,
     METHOD_NOT_ALLOWED,
+    UNSUPPORTED_MEDIA_TYPE,
     INVALID_PARAMETER,
     MALFORMED_REQUEST,
     VALIDATION_FAILED,

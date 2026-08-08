@@ -1,0 +1,164 @@
+package com.hopeful117.devlogai.projectcontext;
+
+import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Instant;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class EngineeringStoryContextControllerWebMvcTest
+        extends ControllerWebMvcTestSupport {
+
+    private static final String PATH =
+            "/api/projects/{projectId}/engineering-story-context";
+
+    private MockMvc mvc;
+    private EngineeringStoryContextService service;
+
+    @BeforeEach
+    void setUp() {
+        service = mock(EngineeringStoryContextService.class);
+        mvc = mockMvc(new EngineeringStoryContextController(service));
+    }
+
+    @Test
+    void shouldBuildContextFromPostBody() throws Exception {
+        UUID projectId = UUID.randomUUID();
+        String description = "Add a body-based context request";
+        when(service.buildWithRepositoryContext(projectId, description))
+                .thenReturn(context(projectId));
+
+        mvc.perform(post(PATH, projectId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"" + description + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectId").value(projectId.toString()))
+                .andExpect(jsonPath("$.generatedAt").value("2026-08-08T12:00:00Z"));
+
+        verify(service).buildWithRepositoryContext(projectId, description);
+    }
+
+    @Test
+    void shouldTransmitLargeStoryWithoutTruncation() throws Exception {
+        UUID projectId = UUID.randomUUID();
+        String description = "Engineering Story acceptance criterion. ".repeat(320);
+        when(service.buildWithRepositoryContext(projectId, description))
+                .thenReturn(context(projectId));
+
+        mvc.perform(post(PATH, projectId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"" + description + "\"}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<String> captured = ArgumentCaptor.forClass(String.class);
+        verify(service).buildWithRepositoryContext(
+                org.mockito.ArgumentMatchers.eq(projectId), captured.capture());
+        assertEquals(description, captured.getValue());
+        assertEquals(description.length(), captured.getValue().length());
+    }
+
+    @Test
+    void shouldPreserveGetCompatibility() throws Exception {
+        UUID projectId = UUID.randomUUID();
+        String description = "Short description";
+        when(service.buildWithRepositoryContext(projectId, description))
+                .thenReturn(context(projectId));
+
+        mvc.perform(get(PATH, projectId).param("description", description))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectId").value(projectId.toString()));
+
+        verify(service).buildWithRepositoryContext(projectId, description);
+    }
+
+    @Test
+    void shouldPreserveMissingNullAndBlankDescriptionSemantics() throws Exception {
+        UUID missingProject = UUID.randomUUID();
+        UUID nullProject = UUID.randomUUID();
+        UUID blankProject = UUID.randomUUID();
+        when(service.buildWithRepositoryContext(missingProject, null))
+                .thenReturn(context(missingProject));
+        when(service.buildWithRepositoryContext(nullProject, null))
+                .thenReturn(context(nullProject));
+        when(service.buildWithRepositoryContext(blankProject, "   "))
+                .thenReturn(context(blankProject));
+
+        mvc.perform(post(PATH, missingProject)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+        mvc.perform(post(PATH, nullProject)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":null}"))
+                .andExpect(status().isOk());
+        mvc.perform(post(PATH, blankProject)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"   \"}"))
+                .andExpect(status().isOk());
+
+        verify(service).buildWithRepositoryContext(missingProject, null);
+        verify(service).buildWithRepositoryContext(nullProject, null);
+        verify(service).buildWithRepositoryContext(blankProject, "   ");
+    }
+
+    @Test
+    void shouldReturnCommonErrorsForInvalidBodiesAndMediaType() throws Exception {
+        UUID projectId = UUID.randomUUID();
+
+        mvc.perform(post(PATH, projectId)
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+        mvc.perform(post(PATH, projectId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+        mvc.perform(post(PATH, projectId)
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("story")
+                        .header("X-Correlation-ID", "story-media-415"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(header().string("X-Correlation-ID", "story-media-415"))
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"))
+                .andExpect(jsonPath("$.correlationId").value("story-media-415"));
+    }
+
+    @Test
+    void shouldUseSharedErrorsForInvalidAndUnknownProject() throws Exception {
+        UUID projectId = UUID.randomUUID();
+        when(service.buildWithRepositoryContext(projectId, "story"))
+                .thenThrow(new EntityNotFoundException("Project", projectId));
+
+        mvc.perform(post(PATH, "not-a-uuid")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"story\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+        mvc.perform(post(PATH, projectId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"story\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ENTITY_NOT_FOUND"));
+    }
+
+    private EngineeringStoryContext context(UUID projectId) {
+        return new EngineeringStoryContext(
+                null, Instant.parse("2026-08-08T12:00:00Z"), projectId, null);
+    }
+}

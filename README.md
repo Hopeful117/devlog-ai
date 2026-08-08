@@ -218,8 +218,29 @@ The complete API is documented in Swagger. The minimal workflow is:
 4. Create an analysis with `POST /api/v1/analyses`.
 5. Start it with `POST /api/v1/analyses/{analysisId}/workflow`.
 6. Inspect proposals with `GET /api/v1/proposals/analysis/{analysisId}`.
+
 7. Accept or reject a proposal with `POST /api/v1/validations`.
 8. Retrieve trusted knowledge with `GET /api/v1/insights/analysis/{analysisId}`.
+
+### Engineering Story Context
+
+Complete Engineering Stories should be submitted in a JSON request body so their size is not
+limited by the HTTP request target:
+
+```bash
+curl -X POST \
+  "http://localhost:8080/api/projects/<project-id>/engineering-story-context" \
+  -H "Content-Type: application/json" \
+  --data-binary '{"description":"<complete Engineering Story>"}'
+```
+
+The response is the existing `EngineeringStoryContext`, including its selected Repository Context.
+For compatibility with existing consumers and short descriptions, the GET operation remains
+available:
+
+```text
+GET /api/projects/{projectId}/engineering-story-context?description={description}
+```
 
 Example validation of an Insight Proposal:
 

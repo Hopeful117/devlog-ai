@@ -60,6 +60,19 @@ class ApiErrorHandlingWebMvcTest extends ControllerWebMvcTestSupport {
     }
 
     @Test
+    void shouldReturnTraceableUnsupportedMediaType() throws Exception {
+        mvc.perform(post("/api/v1/projects")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("not-json")
+                        .header("X-Correlation-ID", "media-415"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(header().string("X-Correlation-ID", "media-415"))
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"))
+                .andExpect(jsonPath("$.path").value("/api/v1/projects"))
+                .andExpect(jsonPath("$.correlationId").value("media-415"));
+    }
+
+    @Test
     void shouldReturnExplicitErrorsForInvalidAndUnknownProjectIds() throws Exception {
         mvc.perform(get("/api/test/entity/not-a-uuid"))
                 .andExpect(status().isBadRequest())
