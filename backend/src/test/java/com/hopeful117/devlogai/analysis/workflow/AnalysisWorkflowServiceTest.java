@@ -84,9 +84,10 @@ class AnalysisWorkflowServiceTest {
     private AnalysisWorkflowServiceImpl workflowService;
 
     @BeforeEach
-    void selectKnowledgeByDefault() {
+    void setUpDefaults() {
         lenient().when(knowledgeSelectionService.select(any(), any(), any()))
                 .thenReturn(selectedKnowledge);
+        lenient().when(intentCatalog.resolve(any(), any())).thenReturn(intent());
     }
 
     @Test

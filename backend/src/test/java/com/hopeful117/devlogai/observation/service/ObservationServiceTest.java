@@ -40,4 +40,25 @@ class ObservationServiceTest {
 
         assertEquals(List.of(response), observationService.getByAnalysis(analysisId));
     }
+
+    @Test
+    void shouldReturnObservationById() {
+        UUID id = UUID.randomUUID();
+        Observation observation = new Observation();
+        ObservationResponse response = mock(ObservationResponse.class);
+
+        when(observationRepository.findById(id)).thenReturn(java.util.Optional.of(observation));
+        when(observationMapper.toResponse(observation)).thenReturn(response);
+
+        assertEquals(response, observationService.getById(id));
+    }
+
+    @Test
+    void shouldThrowWhenObservationNotFound() {
+        UUID id = UUID.randomUUID();
+        when(observationRepository.findById(id)).thenReturn(java.util.Optional.empty());
+
+        assertThrows(com.hopeful117.devlogai.shared.exception.EntityNotFoundException.class,
+                () -> observationService.getById(id));
+    }
 }

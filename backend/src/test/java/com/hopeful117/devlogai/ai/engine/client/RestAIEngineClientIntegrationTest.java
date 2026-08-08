@@ -1,11 +1,12 @@
 package com.hopeful117.devlogai.ai.engine.client;
 
-import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
+import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
-import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.InsightType;
+import com.hopeful117.devlogai.intent.model.UserGuidance;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -27,6 +29,7 @@ class RestAIEngineClientIntegrationTest {
     void shouldExchangeSubmissionContractOverHttp() throws IOException {
         UUID correlationId = UUID.randomUUID();
         UUID analysisId = UUID.randomUUID();
+        UUID aiTaskId = UUID.randomUUID();
         UUID externalJobId = UUID.randomUUID();
         AtomicReference<String> receivedBody = new AtomicReference<>();
         HttpServer server = HttpServer.create(
@@ -48,9 +51,36 @@ class RestAIEngineClientIntegrationTest {
                             .build()
             );
 
-            AiTaskSubmissionResponse response = client.submit(
-                    request(correlationId, analysisId)
+            IntentDefinition intent = new IntentDefinition(
+                    "describe-project", "v1", "Describe",
+                    List.of(InsightType.PROJECT_PRESENTATION),
+                    List.of("traceable"),
+                    Map.of("type", "object"),
+                    "describe-project-prompt-v1"
             );
+            UserGuidance guidance = UserGuidance.from(Map.of(
+                    "focus", "architecture",
+                    "priorities", List.of("Docker first")
+            ));
+            SelectedKnowledge knowledge = new SelectedKnowledge(
+                    null, null, null, List.of(), List.of(),
+                    new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0),
+                    List.of(), null, null, null);
+
+            PromptRequest request = new PromptRequest(
+                    UUID.randomUUID(),
+                    correlationId,
+                    analysisId,
+                    aiTaskId,
+                    AiTaskType.DECISION_PROPOSAL_GENERATION,
+                    intent,
+                    guidance,
+                    knowledge,
+                    Map.of("type", "object"),
+                    Map.of("source", "test")
+            );
+
+            AiTaskSubmissionResponse response = client.submit(request);
 
             assertEquals(correlationId, response.correlationId());
             assertTrue(response.accepted());
@@ -66,7 +96,6 @@ class RestAIEngineClientIntegrationTest {
             assertTrue(receivedBody.get().contains(
                     "\"analysisId\":\"" + analysisId + "\""
             ));
-            assertTrue(receivedBody.get().contains("\"context\":"));
         } finally {
             server.stop(0);
         }
@@ -100,31 +129,5 @@ class RestAIEngineClientIntegrationTest {
         exchange.sendResponseHeaders(202, response.length);
         exchange.getResponseBody().write(response);
         exchange.close();
-    }
-
-    private AiTaskSubmissionRequest request(
-            UUID correlationId,
-            UUID analysisId
-    ) {
-        AnalysisContext context = new AnalysisContext(
-                null,
-                null,
-                null,
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of(),
-                List.of()
-        );
-        return new AiTaskSubmissionRequest(
-                correlationId,
-                AiTaskType.DECISION_PROPOSAL_GENERATION,
-                analysisId,
-                new IntentDefinition("describe-project", "v1", "Describe", List.of(InsightType.PROJECT_PRESENTATION), List.of("traceable"), java.util.Map.of("type", "object"), "describe-project-prompt-v1"),
-                context
-        );
     }
 }

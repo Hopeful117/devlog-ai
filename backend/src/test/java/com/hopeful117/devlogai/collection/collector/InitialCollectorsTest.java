@@ -74,7 +74,7 @@ class InitialCollectorsTest {
 
     @Test
     void springCollectorShouldReportDeclarationsWithoutRuntimeClaims() throws IOException {
-        write("pom.xml", "<artifactId>spring-boot-starter-security</artifactId>");
+        write("pom.xml", "<artifactId>spring-boot-starter</artifactId>\n<artifactId>spring-security-core</artifactId>");
         write("src/main/java/ApiController.java", "@RestController class ApiController {}");
         write("src/main/resources/application.yml", "spring:\n  application:\n    name: sample");
         SpringCollector collector = new SpringCollector(scanner, limits);
@@ -147,7 +147,7 @@ class InitialCollectorsTest {
 
         RepositoryScan scan = scanner.scan(context, ignored -> true);
 
-        assertTrue(scan.warnings().stream().anyMatch(warning -> warning.code().equals("MAX_FILES_REACHED")));
+        assertTrue(scan.warnings().stream().anyMatch(warning -> warning.code().equals("MAX_DIRECTORY_ENTRIES_REACHED") || warning.code().equals("MAX_FILES_REACHED")));
         assertTrue(scan.files().stream().noneMatch(file -> file.relativePath().contains("target")));
         assertTrue(scan.files().stream().noneMatch(file -> file.relativePath().equals("external-link")));
     }

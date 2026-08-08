@@ -28,10 +28,11 @@ class ValidationControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 "Proposal has already been decided"));
         MockMvc mvc = mockMvc(new ValidationController(service));
 
+        String json = ("{\"proposalId\":\"%s\",\"decision\":\"REJECTED\","
+                + "\"validatedBy\":\"%s\"}").formatted(
+                        UUID.randomUUID(), UUID.randomUUID());
         mvc.perform(post("/api/v1/validations").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"proposalId\":\"%s\",\"decision\":\"REJECTED\"," +
-                                "\"validatedBy\":\"%s\"}".formatted(
-                                        UUID.randomUUID(), UUID.randomUUID())))
+                        .content(json))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(
                         "Proposal has already been decided"));

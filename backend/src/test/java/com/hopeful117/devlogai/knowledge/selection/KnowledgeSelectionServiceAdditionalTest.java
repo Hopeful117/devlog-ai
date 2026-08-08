@@ -1,0 +1,194 @@
+package com.hopeful117.devlogai.knowledge.selection;
+
+import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.analysis.diagnostics.entity.AnalysisExecutionDiagnostic;
+import com.hopeful117.devlogai.analysis.diagnostics.repository.AnalysisExecutionDiagnosticRepository;
+import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
+import com.hopeful117.devlogai.analysis.entity.AnalysisType;
+import com.hopeful117.devlogai.fact.entity.FactType;
+import com.hopeful117.devlogai.insight.repository.InsightRepository;
+import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.model.UserGuidance;
+import com.hopeful117.devlogai.observation.entity.ObservationType;
+import com.hopeful117.devlogai.project.entity.ProjectStatus;
+import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
+import com.hopeful117.devlogai.profile.model.ProfileCompletenessStatus;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.ObjectMapper;
+
+import java.time.Instant;
+import java.util.*;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class KnowledgeSelectionServiceAdditionalTest {
+
+    @Mock private AnalysisExecutionDiagnosticRepository diagnosticRepository;
+    @Mock private InsightRepository insightRepository;
+    @Mock private ObjectMapper objectMapper;
+    @Mock private RepositoryContextService repositoryContextService;
+
+    private KnowledgeSelectionServiceImpl createService() {
+        return new KnowledgeSelectionServiceImpl(diagnosticRepository, insightRepository,
+                objectMapper, repositoryContextService);
+    }
+
+    private IntentDefinition architectureIntent() {
+        return new IntentDefinition("architecture-overview", "v1", "Overview",
+                List.of(), List.of(), Map.of(), null);
+    }
+
+    private AnalysisContext.AnalysisSnapshot testAnalysis() {
+        return new AnalysisContext.AnalysisSnapshot(
+                UUID.randomUUID(), AnalysisType.ARCHITECTURE_REVIEW, "architecture-overview", "v1",
+                AnalysisStatus.IN_PROGRESS, null, null, Instant.now());
+    }
+
+    private ProjectProfileResponse testProfile() {
+        return new ProjectProfileResponse(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                "v1", "r1", Instant.now(), null, Map.of(),
+                new ProjectProfileResponse.Completeness(ProfileCompletenessStatus.COMPLETE, true, false, 0, 0, 1, 0, 0),
+                List.of(), "summary", List.of(), 0);
+    }
+
+    private AnalysisContext createMinimalContext(AnalysisContext.AnalysisSnapshot analysis) {
+        return new AnalysisContext(
+                new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "Test", "test", "desc", ProjectStatus.ACTIVE),
+                analysis, testProfile(),
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+    }
+
+    private void mockRepositories(AnalysisContext context) throws Exception {
+        AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
+                .analysisId(context.analysis().id())
+                .collectionComplete(true).truncated(false)
+                .warningCount(0).errorCount(0)
+                .build();
+        when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.of(diagnostic));
+        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(context.project().id())).thenReturn(List.of());
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        RepositoryContext repoContext = new RepositoryContext(
+                "v1", null, List.of(), "v1", List.of(), List.of(),
+                Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
+                0, 0, 0, false, List.of(), List.of(), "digest");
+        when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+    }
+
+    @Test
+    void shouldSelectKnowledgeWithMinimalContext() throws Exception {
+        var service = createService();
+        var analysis = testAnalysis();
+        var context = createMinimalContext(analysis);
+
+        mockRepositories(context);
+
+        SelectedKnowledge result = service.select(context, architectureIntent(), null);
+
+        assertNotNull(result);
+        assertNotNull(result.selectionDigest());
+        assertEquals(KnowledgeSelectionServiceImpl.VERSION, result.selectionMetadata().selectionVersion());
+    }
+
+    @Test
+    void shouldFilterObservationsByBudget() throws Exception {
+        var service = createService();
+        var analysis = testAnalysis();
+        List<AnalysisContext.ObservationSnapshot> observations = new ArrayList<>();
+        for (int i = 0; i < 30; i++) {
+            observations.add(new AnalysisContext.ObservationSnapshot(
+                    UUID.randomUUID(), ObservationType.SPRING_BOOT_REST_APPLICATION,
+                    "obs" + i, "RULE", "1", List.of(), Instant.now()));
+        }
+        var context = new AnalysisContext(
+                new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "Test", "test", "desc", ProjectStatus.ACTIVE),
+                analysis, testProfile(),
+                List.of(), observations, List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+        mockRepositories(context);
+
+        SelectedKnowledge result = service.select(context, architectureIntent(), null);
+
+        assertTrue(result.selectedObservations().size() <= KnowledgeSelectionServiceImpl.BUDGET.maximumObservations());
+    }
+
+    @Test
+    void shouldFilterFactsByContentDeduplication() throws Exception {
+        var service = createService();
+        var analysis = testAnalysis();
+        List<AnalysisContext.FactSnapshot> facts = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            facts.add(new AnalysisContext.FactSnapshot(
+                    UUID.randomUUID(), FactType.SPRING_BOOT_DETECTED,
+                    "duplicate content", "source", List.of("pom.xml"), Instant.now()));
+        }
+        var context = new AnalysisContext(
+                new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "Test", "test", "desc", ProjectStatus.ACTIVE),
+                analysis, testProfile(),
+                facts, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+        mockRepositories(context);
+
+        SelectedKnowledge result = service.select(context, architectureIntent(), null);
+
+        assertEquals(1, result.selectedFacts().size());
+    }
+
+    @Test
+    void shouldIncludeUserGuidanceBoostInScoring() throws Exception {
+        var service = createService();
+        var context = createMinimalContext(testAnalysis());
+        UserGuidance guidance = new UserGuidance("architecture", null, null, null, null,
+                List.of("architecture", "docker"));
+
+        mockRepositories(context);
+
+        SelectedKnowledge result = service.select(context, architectureIntent(), guidance);
+
+        assertNotNull(result);
+        assertEquals(KnowledgeSelectionServiceImpl.VERSION, result.selectionMetadata().selectionVersion());
+    }
+
+    @Test
+    void shouldThrowWhenMandatoryKnowledgeUnavailable() {
+        var service = createService();
+        assertThrows(IllegalStateException.class,
+                () -> service.select(null, architectureIntent(), null));
+    }
+
+    @Test
+    void shouldThrowWhenIntentDoesNotMatchAnalysis() {
+        var service = createService();
+        var analysis = new AnalysisContext.AnalysisSnapshot(
+                UUID.randomUUID(), AnalysisType.ARCHITECTURE_REVIEW, "different-intent", "v1",
+                AnalysisStatus.IN_PROGRESS, null, null, Instant.now());
+        var context = createMinimalContext(analysis);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.select(context, architectureIntent(), null));
+    }
+
+    @Test
+    void shouldThrowWhenDiagnosticsUnavailable() throws Exception {
+        var service = createService();
+        var context = createMinimalContext(testAnalysis());
+
+        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(context.project().id())).thenReturn(List.of());
+        RepositoryContext repoContext = new RepositoryContext(
+                "v1", null, List.of(), "v1", List.of(), List.of(),
+                Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
+                0, 0, 0, false, List.of(), List.of(), "digest");
+        when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+        when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.empty());
+
+        assertThrows(IllegalStateException.class,
+                () -> service.select(context, architectureIntent(), null));
+    }
+}

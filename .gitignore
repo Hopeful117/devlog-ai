@@ -3,3 +3,9 @@
 .env.*
 !.env.example
 
+# Maven build output
+backend/target/
+
+# JaCoCo reports
+**/jacoco.exec
+
