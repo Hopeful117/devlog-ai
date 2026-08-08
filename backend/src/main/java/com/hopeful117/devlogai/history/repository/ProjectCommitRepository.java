@@ -19,4 +19,7 @@ public interface ProjectCommitRepository extends JpaRepository<ProjectCommit, UU
     @EntityGraph(attributePaths = {"parents", "source"})
     List<ProjectCommit> findByProjectIdOrderByCommittedAtDescCommitHashDesc(
             UUID projectId, Pageable pageable);
+
+    List<ProjectCommit> findByProjectIdAndCommittedAtAfterOrderByCommittedAtDescCommitHashDesc(
+            UUID projectId, java.time.Instant after);
 }
