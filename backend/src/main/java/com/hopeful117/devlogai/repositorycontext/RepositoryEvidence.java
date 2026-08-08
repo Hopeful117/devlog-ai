@@ -55,9 +55,18 @@ public record RepositoryEvidence(
 
     public RepositoryEvidence withContent(RepositoryEvidenceContent value) {
         int tokens = estimatedTokens;
-        if (value != null && value.text() != null) {
-            tokens = Math.max(1, (summary.length() + reference.length()
-                    + value.text().length() + 3) / 4);
+        if (value != null) {
+            int contentCharacters = java.util.stream.Stream.of(
+                            value.text(), value.reason(), value.policyId(),
+                            value.policyVersion(), value.revision(),
+                            value.allocationPolicyId(), value.allocationPolicyVersion())
+                    .filter(java.util.Objects::nonNull)
+                    .mapToInt(String::length).sum();
+            contentCharacters += value.allocationReasons().stream()
+                    .mapToInt(String::length).sum();
+            tokens = Math.max(estimatedTokens, Math.max(1,
+                    (summary.length() + reference.length()
+                            + contentCharacters + 3) / 4));
         }
         return new RepositoryEvidence(layer, kind, reference, summary, occurredAt,
                 score, relatedReferences, provenance, extractionMetadata, tokens,

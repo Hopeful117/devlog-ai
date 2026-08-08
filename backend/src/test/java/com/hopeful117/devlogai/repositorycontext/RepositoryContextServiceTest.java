@@ -241,6 +241,36 @@ class RepositoryContextServiceTest {
         assertEquals("abc123", first.evidence().getFirst().content().revision());
     }
 
+    @Test
+    void includesContentAllocationDecisionInContextDigest() {
+        ProjectCommitRepository commits = mock(ProjectCommitRepository.class);
+        UUID projectId = UUID.randomUUID();
+        when(commits.findByProjectIdOrderByCommittedAtDescCommitHashDesc(
+                eq(projectId), any(Pageable.class))).thenReturn(List.of());
+        EvidenceFactory factory = new EvidenceFactory();
+        RepositoryContextCollector structure = new RepositoryContextCollector() {
+            @Override public String collectorId() { return "repository-structure"; }
+            @Override public String collectorVersion() { return "v2"; }
+            @Override
+            public List<RepositoryEvidence> collect(ContextRequest request) {
+                return List.of(fileEvidence(factory, request, "SOURCE_FILE",
+                        "backend/src/main/java/example/App.java"));
+            }
+        };
+        AnalysisContext context = context(projectId, List.of());
+
+        RepositoryContext first = engine(commits, 20, 200, 0, 1000,
+                structure, contentEnricher("class App {}", 1))
+                .build(context, engineeringStoryIntent(), null, List.of());
+        RepositoryContext second = engine(commits, 20, 200, 0, 1000,
+                structure, contentEnricher("class App {}", 2))
+                .build(context, engineeringStoryIntent(), null, List.of());
+
+        assertNotEquals(first.contextDigest(), second.contextDigest());
+        assertEquals(1, first.evidence().getFirst().content().allocationRank());
+        assertEquals(2, second.evidence().getFirst().content().allocationRank());
+    }
+
     private RepositoryEvidence fileEvidence(
             EvidenceFactory factory,
             ContextRequest request,
@@ -351,6 +381,10 @@ class RepositoryContextServiceTest {
     }
 
     private SelectedFileContentEnricher contentEnricher(String text) {
+        return contentEnricher(text, 1);
+    }
+
+    private SelectedFileContentEnricher contentEnricher(String text, int allocationRank) {
         SelectedFileContentEnricher enricher = mock(SelectedFileContentEnricher.class);
         when(enricher.enrich(any(), any())).thenAnswer(invocation -> {
             com.hopeful117.devlogai.repositorycontext.selection.EvidenceSelector.SelectionResult
@@ -358,7 +392,10 @@ class RepositoryContextServiceTest {
             List<RepositoryEvidence> enriched = selection.selected().stream()
                     .map(value -> value.withContent(new RepositoryEvidenceContent(
                             RepositoryEvidenceContent.Status.COMPLETE, text, null,
-                            "selected-file-content", "v1", "abc123")))
+                            "selected-file-content", "v1", "abc123",
+                            "selected-content-allocation", "v1", allocationRank,
+                            List.of("FINAL_SCORE=49", "SEMANTIC_MATCH_STRENGTH=7",
+                                    "GUIDANCE_MATCH_STRENGTH=3"))))
                     .toList();
             int usedTokens = enriched.stream()
                     .mapToInt(RepositoryEvidence::estimatedTokens).sum();

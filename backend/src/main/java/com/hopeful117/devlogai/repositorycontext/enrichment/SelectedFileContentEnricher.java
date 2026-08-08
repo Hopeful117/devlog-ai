@@ -12,7 +12,6 @@ import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
 import org.springframework.stereotype.Component;
 
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,17 +30,20 @@ public class SelectedFileContentEnricher {
             "CONTENT_BUDGET_EXHAUSTED";
 
     private final RepositoryContentPolicy policy;
+    private final SelectedContentAllocationPolicy allocationPolicy;
     private final SecureRepositoryContentReader reader;
     private final SourceRepository sourceRepository;
     private final WorkspaceManager workspaceManager;
 
     public SelectedFileContentEnricher(
             RepositoryContentPolicy policy,
+            SelectedContentAllocationPolicy allocationPolicy,
             SecureRepositoryContentReader reader,
             SourceRepository sourceRepository,
             WorkspaceManager workspaceManager
     ) {
         this.policy = policy;
+        this.allocationPolicy = allocationPolicy;
         this.reader = reader;
         this.sourceRepository = sourceRepository;
         this.workspaceManager = workspaceManager;
@@ -54,22 +56,31 @@ public class SelectedFileContentEnricher {
         Map<String, RepositoryEvidence> enriched = new HashMap<>();
         Map<String, Optional<SynchronizedWorkspace>> workspaces = new HashMap<>();
         LinkedHashSet<String> warnings = new LinkedHashSet<>();
-        BudgetState state = new BudgetState(selection.usedTokens());
 
         List<RepositoryEvidence> eligible = selection.selected().stream()
                 .filter(value -> ELIGIBLE_KINDS.contains(value.kind()))
-                .sorted(Comparator.comparingInt(RepositoryEvidence::relevanceScore)
-                        .reversed().thenComparing(RepositoryEvidence::reference))
                 .toList();
+        List<SelectedContentAllocationPolicy.Allocation> allocations =
+                allocationPolicy.allocate(eligible);
+        int reservedMetadataTokens = allocations.stream()
+                .mapToInt(this::metadataTokenDelta).sum();
+        BudgetState state = new BudgetState(
+                selection.usedTokens(), reservedMetadataTokens);
 
-        for (RepositoryEvidence evidence : eligible) {
+        for (SelectedContentAllocationPolicy.Allocation allocation : allocations) {
+            RepositoryEvidence evidence = allocation.evidence();
+            state.releaseMetadata(metadataTokenDelta(allocation));
             RepositoryEvidence updated = enrichEvidence(
-                    evidence, request, state, workspaces);
-            enriched.put(evidence.reference(), updated);
-            if (updated.content().text() != null) {
-                state.accountFor(evidence, updated);
+                    allocation, request, state, workspaces);
+            if (!state.fits(evidence, updated, request.budget().maximumTokens())) {
+                updated = evidence;
+                warnings.add("CONTENT_ALLOCATION_METADATA_BUDGET_EXHAUSTED");
             }
-            addWarning(updated.content(), warnings);
+            enriched.put(evidence.reference(), updated);
+            state.accountFor(evidence, updated);
+            if (updated.content() != null) {
+                addWarning(updated.content(), warnings);
+            }
         }
 
         List<RepositoryEvidence> selected = selection.selected().stream()
@@ -89,47 +100,77 @@ public class SelectedFileContentEnricher {
                 selected, decisions, finalUsedTokens), List.copyOf(warnings));
     }
 
+    private int metadataTokenDelta(
+            SelectedContentAllocationPolicy.Allocation allocation
+    ) {
+        RepositoryEvidence evidence = allocation.evidence();
+        String revision = evidence.extractionMetadata().get("resolvedRevision");
+        RepositoryEvidence metadataOnly = evidence.withContent(content(
+                RepositoryEvidenceContent.Status.SKIPPED, null,
+                BUDGET_EXHAUSTED, revision, allocation));
+        return Math.max(0,
+                metadataOnly.estimatedTokens() - evidence.estimatedTokens());
+    }
+
     private RepositoryEvidence enrichEvidence(
-            RepositoryEvidence evidence,
+            SelectedContentAllocationPolicy.Allocation allocation,
             ContextRequest request,
             BudgetState state,
             Map<String, Optional<SynchronizedWorkspace>> workspaces
     ) {
+        RepositoryEvidence evidence = allocation.evidence();
         String revision = evidence.extractionMetadata().get("resolvedRevision");
         if (state.enrichedFiles >= policy.getMaxEnrichedFiles()) {
             return evidence.withContent(content(RepositoryEvidenceContent.Status.SKIPPED,
-                    null, "ENRICHED_FILE_LIMIT", revision));
+                    null, "ENRICHED_FILE_LIMIT", revision, allocation));
         }
-        int maximumCharacters = maximumCharacters(request, state);
+        int maximumCharacters = maximumCharacters(
+                request, state, evidence, allocation, revision);
         if (maximumCharacters < 1) {
             return evidence.withContent(content(RepositoryEvidenceContent.Status.SKIPPED,
-                    null, BUDGET_EXHAUSTED, revision));
+                    null, BUDGET_EXHAUSTED, revision, allocation));
         }
         Optional<SynchronizedWorkspace> workspace = workspace(
                 evidence, request, revision, workspaces);
         if (workspace.isEmpty()) {
             return evidence.withContent(content(
                     RepositoryEvidenceContent.Status.UNAVAILABLE, null,
-                    "WORKSPACE_UNAVAILABLE", revision));
+                    "WORKSPACE_UNAVAILABLE", revision, allocation));
         }
         SecureRepositoryContentReader.ReadResult result = reader.read(
                 workspace.orElseThrow(), evidence.provenance().originatingFile(),
                 maximumCharacters);
         RepositoryEvidence updated = evidence.withContent(content(status(result.status()),
-                result.text(), result.reason(), revision));
+                result.text(), result.reason(), revision, allocation));
         int allowedTokens = request.budget().maximumTokens()
                 - state.usedTokens + evidence.estimatedTokens();
         if (updated.estimatedTokens() <= allowedTokens) return updated;
         return evidence.withContent(content(RepositoryEvidenceContent.Status.SKIPPED,
-                null, BUDGET_EXHAUSTED, revision));
+                null, BUDGET_EXHAUSTED, revision, allocation));
     }
 
-    private int maximumCharacters(ContextRequest request, BudgetState state) {
+    private int maximumCharacters(
+            ContextRequest request,
+            BudgetState state,
+            RepositoryEvidence evidence,
+            SelectedContentAllocationPolicy.Allocation allocation,
+            String revision
+    ) {
         int remainingCharacters = policy.getMaxTotalCharacters()
                 - state.usedCharacters;
-        int remainingTokens = request.budget().maximumTokens() - state.usedTokens;
+        int remainingTokens = request.budget().maximumTokens()
+                - state.usedTokens - state.reservedMetadataTokens;
+        int remainingFileSlots = Math.max(1,
+                policy.getMaxEnrichedFiles() - state.enrichedFiles);
+        RepositoryEvidence metadataOnly = evidence.withContent(content(
+                RepositoryEvidenceContent.Status.SKIPPED, null,
+                BUDGET_EXHAUSTED, revision, allocation));
+        int metadataTokens = Math.max(0,
+                metadataOnly.estimatedTokens() - evidence.estimatedTokens());
+        int contentTokensPerSlot = Math.max(0,
+                remainingTokens / remainingFileSlots - metadataTokens);
         return Math.min(policy.getMaxCharactersPerFile(),
-                Math.min(remainingCharacters, remainingTokens * 4));
+                Math.min(remainingCharacters, contentTokensPerSlot * 4));
     }
 
     private void addWarning(
@@ -175,11 +216,15 @@ public class SelectedFileContentEnricher {
             RepositoryEvidenceContent.Status status,
             String text,
             String reason,
-            String revision
+            String revision,
+            SelectedContentAllocationPolicy.Allocation allocation
     ) {
         return new RepositoryEvidenceContent(status, text, reason,
                 RepositoryContentPolicy.POLICY_ID,
-                RepositoryContentPolicy.POLICY_VERSION, revision);
+                RepositoryContentPolicy.POLICY_VERSION, revision,
+                SelectedContentAllocationPolicy.POLICY_ID,
+                SelectedContentAllocationPolicy.POLICY_VERSION,
+                allocation.rank(), allocation.reasons());
     }
 
     private RepositoryEvidenceContent.Status status(
@@ -201,18 +246,36 @@ public class SelectedFileContentEnricher {
         private int usedTokens;
         private int usedCharacters;
         private int enrichedFiles;
+        private int reservedMetadataTokens;
 
-        private BudgetState(int usedTokens) {
+        private BudgetState(int usedTokens, int reservedMetadataTokens) {
             this.usedTokens = usedTokens;
+            this.reservedMetadataTokens = reservedMetadataTokens;
+        }
+
+        private void releaseMetadata(int tokens) {
+            reservedMetadataTokens = Math.max(0,
+                    reservedMetadataTokens - tokens);
         }
 
         private void accountFor(
                 RepositoryEvidence original,
                 RepositoryEvidence enriched
         ) {
-            enrichedFiles++;
-            usedCharacters += enriched.content().text().length();
             usedTokens += enriched.estimatedTokens() - original.estimatedTokens();
+            if (enriched.content() != null && enriched.content().text() != null) {
+                enrichedFiles++;
+                usedCharacters += enriched.content().text().length();
+            }
+        }
+
+        private boolean fits(
+                RepositoryEvidence original,
+                RepositoryEvidence enriched,
+                int maximumTokens
+        ) {
+            return usedTokens + enriched.estimatedTokens()
+                    - original.estimatedTokens() <= maximumTokens;
         }
     }
 }

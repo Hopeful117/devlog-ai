@@ -76,6 +76,33 @@ class DeterministicEvidenceRankerTest {
                 .anyMatch(value -> value.contains("matched=shared,term;common=")));
     }
 
+    @Test
+    void preservesUncappedStrengthWhenSemanticCriteriaSaturate() {
+        List<RepositoryEvidence> candidates = List.of(
+                evidence("weaker", "SOURCE_FILE",
+                        "selected content allocation policy", "src/A.java"),
+                evidence("stronger", "SOURCE_FILE",
+                        "selected content allocation precision policy",
+                        "src/Z.java"));
+
+        List<RepositoryEvidence> ranked = ranker.rank(candidates,
+                request("selected content allocation precision policy",
+                        EvidencePrecisionPolicy.UNRESTRICTED));
+        RepositoryEvidence weaker = ranked.stream()
+                .filter(value -> value.reference().equals("weaker"))
+                .findFirst().orElseThrow();
+        RepositoryEvidence stronger = ranked.stream()
+                .filter(value -> value.reference().equals("stronger"))
+                .findFirst().orElseThrow();
+
+        assertEquals(100, weaker.score().criteria()
+                .get(EvidenceCriterion.SEMANTIC_RELEVANCE));
+        assertEquals(100, stronger.score().criteria()
+                .get(EvidenceCriterion.SEMANTIC_RELEVANCE));
+        assertTrue(stronger.score().matchStrength().semantic()
+                > weaker.score().matchStrength().semantic());
+    }
+
     private ContextRequest request(String objective, EvidencePrecisionPolicy policy) {
         AnalysisContext context = mock(AnalysisContext.class);
         AnalysisContext.AnalysisSnapshot analysis = mock(

@@ -67,6 +67,16 @@ class EngineeringStoryContextControllerWebMvcTest
                         .value("TRUNCATED"))
                 .andExpect(jsonPath("$.repositoryContext.evidence[0].content.text")
                         .value("class App"))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].content.allocationPolicyId")
+                        .value("selected-content-allocation"))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].content.allocationPolicyVersion")
+                        .value("v1"))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].content.allocationRank")
+                        .value(1))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].content.allocationReasons[1]")
+                        .value("SEMANTIC_MATCH_STRENGTH=7"))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].score.matchStrength.semantic")
+                        .value(7))
                 .andExpect(jsonPath("$.repositoryContext.evidence[1].content")
                         .doesNotExist());
 
@@ -187,13 +197,18 @@ class EngineeringStoryContextControllerWebMvcTest
         var sourceEvidence = new RepositoryEvidence(
                 RepositoryContextLayer.RELATED_SOURCE_CODE, "SOURCE_FILE",
                 "file:src/App.java", "src/App.java", Instant.EPOCH,
-                EvidenceScore.unscored(), List.of(),
+                new EvidenceScore("multi-criteria-v1", Map.of(), Map.of(), 49,
+                        List.of("RANKED"), new EvidenceScore.MatchStrength(7, 3)),
+                List.of(),
                 new RepositoryEvidence.EvidenceProvenance(
                         "REPOSITORY_STRUCTURE", "source", "src/App.java", "id"),
                 Map.of("collectorId", "repository-structure"), 10, List.of(),
                 new RepositoryEvidenceContent(
                         RepositoryEvidenceContent.Status.TRUNCATED, "class App",
-                        "CONTENT_TRUNCATED", "selected-file-content", "v1", "abc"));
+                        "CONTENT_TRUNCATED", "selected-file-content", "v1", "abc",
+                        "selected-content-allocation", "v1", 1,
+                        List.of("FINAL_SCORE=49", "SEMANTIC_MATCH_STRENGTH=7",
+                                "GUIDANCE_MATCH_STRENGTH=3")));
         var configEvidence = new RepositoryEvidence(
                 RepositoryContextLayer.RELATED_SOURCE_CODE, "CONFIG_FILE",
                 "config:pom.xml", "pom.xml", Instant.EPOCH,

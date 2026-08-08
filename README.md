@@ -385,8 +385,16 @@ provenance. Context construction remains entirely inside Java Core; the AI Engin
 the bounded result.
 
 After path-level selection, a versioned enrichment phase may attach bounded source/test text. It
-does not rerank evidence, read configuration content, or create trusted knowledge. Final token
-estimates, decisions, warnings and the digest are calculated from the returned evidence. See
+does not rerank evidence, read configuration content, or create trusted knowledge. When more
+selected files are eligible than the content limit permits, the versioned allocation policy uses
+the existing final score followed by uncapped typed semantic and guidance match strength; the
+evidence reference is only the final deterministic tiebreaker. Each eligible content state exposes
+the allocation policy, rank and bounded reasons. When the remaining token budget is tighter than
+the character bounds, metadata for all eligible decisions is reserved first and the remaining
+content budget is shared across the available slots. An early long file therefore cannot silently
+consume either later content slots or their explanations. Final token estimates, decisions,
+warnings and the digest are calculated from the returned evidence. The policy still reasons from path-level
+metadata, not source semantics, and the current repository remains authoritative. See
 [ADR-044](docs/decisions/ADR-044.md).
 
 ### Context Intelligence and Evidence scoring
@@ -404,6 +412,10 @@ Context Intelligence composes the profile weighting and diversity policies into 
 relevance, historical relevance, recency, deterministic source confidence, and User Guidance
 alignment. The final 0–100 score is the weighted result of those visible criteria; collectors no
 longer assign an arbitrary final relevance score.
+
+The serialized score also retains uncapped semantic and guidance match strength for deterministic
+post-selection allocation when several files saturate the same capped criterion. This precision
+does not change global evidence ranking or diverse selection.
 
 For V1, semantic relevance is a deterministic lexical and metadata comparison. It does not use
 embeddings or a vector store. Evidence confidence describes the reliability of its deterministic

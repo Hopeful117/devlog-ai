@@ -66,7 +66,8 @@ class SelectedFileContentEnricherTest {
         when(workspaces.synchronize(source, "abc123")).thenReturn(
                 new SynchronizedWorkspace(sourceId, workspacePath, "abc123"));
         SelectedFileContentEnricher enricher = new SelectedFileContentEnricher(
-                policy, new SecureRepositoryContentReader(new CollectorLimits()),
+                policy, new SelectedContentAllocationPolicy(),
+                new SecureRepositoryContentReader(new CollectorLimits()),
                 sources, workspaces);
         List<RepositoryEvidence> selected = List.of(
                 evidence(sourceId, "SOURCE_FILE", "src/main/java/App.java"),
@@ -103,7 +104,8 @@ class SelectedFileContentEnricherTest {
         when(sources.findByIdAndProject_IdAndActiveTrue(sourceId, projectId))
                 .thenReturn(Optional.empty());
         SelectedFileContentEnricher enricher = new SelectedFileContentEnricher(
-                policy, new SecureRepositoryContentReader(new CollectorLimits()),
+                policy, new SelectedContentAllocationPolicy(),
+                new SecureRepositoryContentReader(new CollectorLimits()),
                 sources, workspaces);
         RepositoryEvidence original = evidence(
                 sourceId, "SOURCE_FILE", "src/main/java/App.java");
@@ -136,7 +138,8 @@ class SelectedFileContentEnricherTest {
         when(workspaces.synchronize(source, "abc123")).thenReturn(
                 new SynchronizedWorkspace(sourceId, workspacePath, "abc123"));
         SelectedFileContentEnricher enricher = new SelectedFileContentEnricher(
-                policy, new SecureRepositoryContentReader(new CollectorLimits()),
+                policy, new SelectedContentAllocationPolicy(),
+                new SecureRepositoryContentReader(new CollectorLimits()),
                 sources, workspaces);
 
         var result = enricher.enrich(request(projectId, 1000), selection(List.of(
@@ -150,6 +153,92 @@ class SelectedFileContentEnricherTest {
         assertEquals("ENRICHED_FILE_LIMIT",
                 result.selection().selected().get(1).content().reason());
         assertTrue(result.warnings().contains("CONTENT_ENRICHMENT_LIMIT_APPLIED"));
+    }
+
+    @Test
+    void enrichesStrongerEqualScoreMatchBeforeAlphabeticalDistractor()
+            throws IOException {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        Files.createDirectories(workspacePath.resolve("src/aaa"));
+        Files.createDirectories(workspacePath.resolve("src/zzz"));
+        Files.writeString(workspacePath.resolve("src/aaa/Distractor.java"),
+                "class Distractor {}");
+        Files.writeString(workspacePath.resolve("src/zzz/Central.java"),
+                "class Central {}");
+        RepositoryContentPolicy policy = new RepositoryContentPolicy();
+        policy.setMaxEnrichedFiles(1);
+        SourceRepository sources = mock(SourceRepository.class);
+        WorkspaceManager workspaces = mock(WorkspaceManager.class);
+        Source source = source(projectId, sourceId);
+        when(sources.findByIdAndProject_IdAndActiveTrue(sourceId, projectId))
+                .thenReturn(Optional.of(source));
+        when(workspaces.synchronize(source, "abc123")).thenReturn(
+                new SynchronizedWorkspace(sourceId, workspacePath, "abc123"));
+        SelectedFileContentEnricher enricher = new SelectedFileContentEnricher(
+                policy, new SelectedContentAllocationPolicy(),
+                new SecureRepositoryContentReader(new CollectorLimits()),
+                sources, workspaces);
+
+        var result = enricher.enrich(request(projectId, 1000), selection(List.of(
+                evidence(sourceId, "SOURCE_FILE", "src/aaa/Distractor.java",
+                        49, 100),
+                evidence(sourceId, "SOURCE_FILE", "src/zzz/Central.java",
+                        49, 200))));
+
+        RepositoryEvidence distractor = result.selection().selected().get(0);
+        RepositoryEvidence central = result.selection().selected().get(1);
+        assertEquals(RepositoryEvidenceContent.Status.SKIPPED,
+                distractor.content().status());
+        assertEquals("ENRICHED_FILE_LIMIT", distractor.content().reason());
+        assertEquals(RepositoryEvidenceContent.Status.COMPLETE,
+                central.content().status());
+        assertEquals("class Central {}", central.content().text());
+        assertEquals(1, central.content().allocationRank());
+        assertTrue(central.content().allocationReasons().contains(
+                "SEMANTIC_MATCH_STRENGTH=200"));
+    }
+
+    @Test
+    void reservesRemainingTokenBudgetForEveryAvailableContentSlot()
+            throws IOException {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        Files.createDirectories(workspacePath.resolve("src"));
+        Files.writeString(workspacePath.resolve("src/First.java"), "x".repeat(4000));
+        Files.writeString(workspacePath.resolve("src/Second.java"), "y".repeat(4000));
+        RepositoryContentPolicy policy = new RepositoryContentPolicy();
+        policy.setMaxEnrichedFiles(2);
+        SourceRepository sources = mock(SourceRepository.class);
+        WorkspaceManager workspaces = mock(WorkspaceManager.class);
+        Source source = source(projectId, sourceId);
+        when(sources.findByIdAndProject_IdAndActiveTrue(sourceId, projectId))
+                .thenReturn(Optional.of(source));
+        when(workspaces.synchronize(source, "abc123")).thenReturn(
+                new SynchronizedWorkspace(sourceId, workspacePath, "abc123"));
+        SelectedFileContentEnricher enricher = new SelectedFileContentEnricher(
+                policy, new SelectedContentAllocationPolicy(),
+                new SecureRepositoryContentReader(new CollectorLimits()),
+                sources, workspaces);
+        List<RepositoryEvidence> selected = List.of(
+                evidence(sourceId, "SOURCE_FILE", "src/First.java", 49, 200),
+                evidence(sourceId, "SOURCE_FILE", "src/Second.java", 49, 100));
+        int initialTokens = selection(selected).usedTokens();
+
+        var result = enricher.enrich(request(projectId, initialTokens + 300),
+                selection(selected));
+
+        RepositoryEvidence first = result.selection().selected().get(0);
+        RepositoryEvidence second = result.selection().selected().get(1);
+        assertTrue(!first.content().text().isEmpty());
+        assertTrue(!second.content().text().isEmpty());
+        assertEquals(RepositoryEvidenceContent.Status.TRUNCATED,
+                first.content().status());
+        assertEquals(RepositoryEvidenceContent.Status.TRUNCATED,
+                second.content().status());
+        assertTrue(result.selection().usedTokens() <= initialTokens + 300);
+        assertTrue(!result.warnings().contains(
+                "CONTENT_ALLOCATION_METADATA_BUDGET_EXHAUSTED"));
     }
 
     private Source source(UUID projectId, UUID sourceId) {
@@ -184,9 +273,21 @@ class SelectedFileContentEnricherTest {
     }
 
     private RepositoryEvidence evidence(UUID sourceId, String kind, String path) {
+        return evidence(sourceId, kind, path, 0, 0);
+    }
+
+    private RepositoryEvidence evidence(
+            UUID sourceId,
+            String kind,
+            String path,
+            int finalScore,
+            int semanticStrength
+    ) {
+        EvidenceScore score = new EvidenceScore("test", Map.of(), Map.of(), finalScore,
+                List.of(), new EvidenceScore.MatchStrength(semanticStrength, 0));
         return new RepositoryEvidence(RepositoryContextLayer.RELATED_SOURCE_CODE,
                 kind, (kind.equals("CONFIG_FILE") ? "config:" : "file:") + path,
-                path, Instant.EPOCH, EvidenceScore.unscored(), List.of(),
+                path, Instant.EPOCH, score, List.of(),
                 new RepositoryEvidence.EvidenceProvenance("REPOSITORY_STRUCTURE",
                         sourceId.toString(), path, "structure:" + path),
                 Map.of("collectorId", "repository-structure",

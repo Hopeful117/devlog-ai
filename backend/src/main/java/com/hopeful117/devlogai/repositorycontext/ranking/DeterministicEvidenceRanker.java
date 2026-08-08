@@ -78,7 +78,11 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
         if (request.guidance() != null && !request.guidance().isEmpty())
             explanations.add("GUIDANCE_TERMS:" + guidanceTerms.explain(evidence));
         EvidenceScore score = new EvidenceScore(POLICY_VERSION, criteria,
-                request.contextPlan().composedWeights(), finalScore, explanations);
+                request.contextPlan().composedWeights(), finalScore, explanations,
+                new EvidenceScore.MatchStrength(
+                        semanticTerms.strength(evidence),
+                        request.guidance() == null || request.guidance().isEmpty()
+                                ? 0 : guidanceTerms.strength(evidence)));
         return evidence.withRanking(score, explanations);
     }
 
@@ -87,8 +91,8 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
             TermModel terms
     ) {
         int score = terms.score(evidence);
-        if (evidence.layer() == RepositoryContextLayer.CURRENT_ANALYSIS)
-            score = Math.max(score, 90);
+        if (evidence.layer() == RepositoryContextLayer.CURRENT_ANALYSIS && score < 90)
+            score = 90;
         return score;
     }
 
@@ -199,14 +203,17 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
         }
 
         private int score(RepositoryEvidence evidence) {
+            return Math.min(100, strength(evidence));
+        }
+
+        private int strength(RepositoryEvidence evidence) {
             if (candidateCount == 0) return 0;
             String candidate = searchableText(evidence);
-            int score = frequency.entrySet().stream()
+            return frequency.entrySet().stream()
                     .filter(entry -> candidate.contains(entry.getKey()))
                     .filter(entry -> isDiscriminating(entry.getValue()))
                     .mapToInt(entry -> contribution(entry.getValue()))
                     .sum();
-            return Math.min(100, score);
         }
 
         private boolean isDiscriminating(int occurrences) {
