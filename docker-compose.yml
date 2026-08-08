@@ -1,5 +1,29 @@
 services:
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: devlog-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${FRONTEND_PORT:-18083}:8080"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://127.0.0.1:8080/health
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
   backend:
     build:
       context: ./backend
@@ -18,12 +42,13 @@ services:
       AI_ENGINE_BASE_URL: http://ai-engine:8000
       AI_ENGINE_CONNECT_TIMEOUT: ${AI_ENGINE_CONNECT_TIMEOUT:-2s}
       AI_ENGINE_READ_TIMEOUT: ${AI_ENGINE_READ_TIMEOUT:-45s}
+      SERVER_PORT: 8080
       COLLECTION_WORKSPACE_ROOT: /var/lib/devlog-ai/workspaces
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
       LOG_LEVEL_ROOT: ${BACKEND_LOG_LEVEL_ROOT:-INFO}
       LOG_LEVEL_APP: ${BACKEND_LOG_LEVEL_APP:-INFO}
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "${BACKEND_PORT:-18080}:8080"
     volumes:
       - devlog-workspaces:/var/lib/devlog-ai/workspaces
 
@@ -46,7 +71,7 @@ services:
       CORE_CALLBACK_MAX_DELAY_MS: ${CORE_CALLBACK_MAX_DELAY_MS:-1000}
       LOG_LEVEL: ${AI_ENGINE_LOG_LEVEL:-INFO}
     ports:
-      - "${AI_ENGINE_PORT:-8000}:8000"
+      - "${AI_ENGINE_PORT:-18081}:8000"
     healthcheck:
       test:
         - CMD
@@ -69,7 +94,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-devlog}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devlog}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-18082}:5432"
     volumes:
       - devlog-postgres-data:/var/lib/postgresql/data
     healthcheck:

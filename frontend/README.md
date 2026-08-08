@@ -6,6 +6,12 @@ authentication is not implemented.
 
 ## Development
 
+Docker Compose serves the production frontend at `http://localhost:18083/` by default and proxies
+same-origin `/api` requests to Java Core over the internal Compose network. The host port can be
+overridden with `FRONTEND_PORT`.
+
+For standalone Angular development with live reload:
+
 ```bash
 npm install
 npm start
@@ -13,16 +19,16 @@ npm start
 
 The development server is available at `http://localhost:4200/`.
 
-The Java Core must be running locally on `http://localhost:8080`. Angular's development server uses
+The Java Core must be running locally on `http://localhost:18080`. Angular's development server uses
 `proxy.conf.json` to forward `/api` requests to that address, avoiding browser CORS concerns without
 changing backend CORS policy. Run the backend using the repository's documented Maven or Docker
 Compose workflow before opening a Project page.
 
 The typed `AppEnvironment` is supplied through Angular dependency injection. Development values use
 Angular CLI file replacement (`environment.development.ts`); the default production configuration
-uses same-origin relative API paths so a future reverse proxy or container deployment can route
-Java Core traffic without service changes. Update the environment value and deployment routing when
-a different Core origin is required.
+uses same-origin relative API paths so the Docker frontend can route Java Core traffic without
+application changes. The container serves Angular deep links through an `index.html` fallback and
+never exposes the AI Engine or PostgreSQL directly to the browser.
 
 ## Implemented routes
 

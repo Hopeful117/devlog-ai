@@ -2,8 +2,9 @@
 
 ## Prerequisites
 
-- PostgreSQL, Java Core, and the Python AI Engine are running.
-- Angular is running at `http://localhost:4200` with its `/api` proxy.
+- The four-service Docker Compose runtime is running.
+- The Docker-served Angular application is available at `http://localhost:18083` with its `/api`
+  proxy. The standalone `npm start` workflow on `4200` remains optional.
 - At least one Project has an active Git Source reachable by the Java Core process.
 - Keep a reviewer UUID available for the unauthenticated MVP decision form.
 
@@ -13,20 +14,17 @@ Start the platform from the repository root:
 docker compose up --build
 ```
 
-Start the frontend in another terminal:
-
-```bash
-cd frontend
-npm start
-```
-
 Useful diagnostics:
 
 ```bash
 docker compose ps
+docker compose logs frontend
 docker compose logs backend
 docker compose logs ai-engine
-curl -sS http://localhost:8080/api/v1/intents
+curl -fsS http://localhost:18083/health
+curl -fsS http://localhost:18083/projects >/dev/null
+curl -sS http://localhost:18083/api/v1/intents
+curl -sS http://localhost:18080/api/v1/intents
 ```
 
 ## Scenario A — Mock provider

@@ -94,7 +94,7 @@ Important documentation:
 
 - Docker Engine with the Compose plugin
 - Git, only for cloning this repository
-- Approximately 2 GB of free memory for the three services
+- Approximately 2 GB of free memory for the four services
 
 No LLM API key is required for the default deterministic mock provider.
 
@@ -107,34 +107,28 @@ docker compose up --build -d
 docker compose ps
 ```
 
-Wait until `postgres` and `ai-engine` are healthy and the backend is running. Flyway applies the
-database migrations automatically when the backend starts.
+Wait until `frontend`, `postgres`, and `ai-engine` are healthy and the backend is running. Flyway
+applies the database migrations automatically when the backend starts.
 
 Available services:
 
-| Service          | URL                                   |
-| ---------------- | ------------------------------------- |
-| Core API         | http://localhost:8080                 |
-| Swagger UI       | http://localhost:8080/swagger-ui.html |
-| OpenAPI JSON     | http://localhost:8080/v3/api-docs     |
-| AI Engine health | http://localhost:8000/health          |
-| PostgreSQL       | `localhost:5432`                      |
+| Service          | URL                                     |
+| ---------------- | --------------------------------------- |
+| Frontend         | http://localhost:18083                  |
+| Core API         | http://localhost:18080                  |
+| Swagger UI       | http://localhost:18080/swagger-ui.html  |
+| OpenAPI JSON     | http://localhost:18080/v3/api-docs      |
+| AI Engine health | http://localhost:18081/health           |
+| PostgreSQL       | `localhost:18082`                       |
 
-Docker Compose starts PostgreSQL, Java Core, and the AI Engine. Start Angular separately:
-
-```bash
-cd frontend
-npm install
-npm start
-```
-
-The dashboard is then available at http://localhost:4200. Its development proxy forwards `/api`
-to Java Core on port 8080 without weakening backend CORS.
+Docker Compose starts the complete frontend, PostgreSQL, Java Core, and AI Engine runtime. The
+frontend serves its production build, supports Angular deep links, and forwards same-origin `/api`
+requests to Java Core through the internal Compose network.
 
 Useful commands:
 
 ```bash
-docker compose logs -f backend ai-engine
+docker compose logs -f frontend backend ai-engine
 docker compose stop
 docker compose down
 ```
@@ -145,6 +139,20 @@ docker compose down
 ## Configuration
 
 Docker Compose accepts environment variables from the shell or a local `.env` file.
+
+### Local ports
+
+DevLog uses a dedicated host range while preserving conventional ports inside the Compose network:
+
+| Variable         | Host default | Container target |
+| ---------------- | ------------ | ---------------- |
+| `BACKEND_PORT`   | `18080`      | `8080`           |
+| `AI_ENGINE_PORT` | `18081`      | `8000`           |
+| `POSTGRES_PORT`  | `18082`      | `5432`           |
+| `FRONTEND_PORT`  | `18083`      | `8080`           |
+
+Override any host publication through the shell or ignored `.env` file. Internal service URLs
+continue to use `backend:8080`, `ai-engine:8000`, and `postgres:5432`.
 
 ### AI provider
 
@@ -191,7 +199,7 @@ and non-default database credentials must be supplied by the deployment environm
 
 The normal MVP path is:
 
-1. Ensure a Project exists in Core, then open http://localhost:4200/projects and select it.
+1. Ensure a Project exists in Core, then open http://localhost:18083/projects and select it.
 2. Register and activate a Git repository Source in the Project workspace.
 3. Choose a Core-provided Intent and optional structured User Guidance.
 4. Create and explicitly launch the Analysis.
@@ -229,7 +237,7 @@ limited by the HTTP request target:
 
 ```bash
 curl -X POST \
-  "http://localhost:8080/api/projects/<project-id>/engineering-story-context" \
+  "http://localhost:18080/api/projects/<project-id>/engineering-story-context" \
   -H "Content-Type: application/json" \
   --data-binary '{"description":"<complete Engineering Story>"}'
 ```
@@ -404,7 +412,7 @@ as safe text rather than injected HTML.
 ### Requirements
 
 - Java 21
-- PostgreSQL 17 available on `localhost:5432`
+- PostgreSQL 17 available on `localhost:18082`
 - Python 3.10 or newer
 - Node.js 22 and npm for the Angular frontend
 - Git
@@ -420,7 +428,7 @@ cd ai-engine
 python -m venv .venv
 . .venv/bin/activate
 python -m pip install -e ".[dev]"
-LLM_PROVIDER=mock uvicorn app.main:app --reload --port 8000
+LLM_PROVIDER=mock uvicorn app.main:app --reload --port 18081
 ```
 
 In another terminal, start the Core:
@@ -437,6 +445,9 @@ cd frontend
 npm install
 npm start
 ```
+
+The standalone dashboard remains available at http://localhost:4200 and proxies `/api` to the
+standalone Core at http://localhost:18080.
 
 ### Tests
 

@@ -7,7 +7,7 @@
 Run DevLog continuously without occupying common development ports
 
 ## Status
-Draft
+Completed
 
 ## Priority
 High
@@ -37,6 +37,8 @@ These defaults are convenient for an isolated project but create avoidable confl
 
 DevLog already allows host-port overrides through `BACKEND_PORT`, `AI_ENGINE_PORT` and `POSTGRES_PORT`, but the default values still occupy the conventional ports. Several local consumers and documents also assume those values, including the Angular development proxy, standalone backend defaults, AI Engine callback defaults, README instructions and manual test commands.
 
+The Angular frontend is currently the only application component excluded from Docker Compose. Developers must install Node dependencies and run `npm start` separately on the conventional Angular development port `4200`. Since the frontend already uses relative `/api` URLs, it can be built as static assets and served by a small container that forwards `/api` to Java Core on the internal Compose network. Including it in the normal runtime would make DevLog a complete continuously running local platform rather than a three-service backend runtime plus a separately managed development server.
+
 Docker-internal service communication already uses service names and container ports:
 
 ```text
@@ -53,6 +55,8 @@ Those internal ports do not collide with other host applications and should not 
 
 Give DevLog a coherent, documented and configurable set of non-standard local host ports so its normal Docker runtime can remain active alongside other development environments.
 
+Include the production-built Angular frontend in Docker Compose as a fourth application service, with its own dedicated host port and same-origin internal proxy to Java Core.
+
 The implementation should minimize disruption by separating:
 
 * stable container-internal ports used only inside the DevLog Compose network;
@@ -64,9 +68,9 @@ The implementation should minimize disruption by separating:
 
 ### AC-1: Dedicated host-port defaults
 
-The default Docker Compose configuration must no longer bind DevLog services to host ports `8080`, `8000` or `5432`.
+The default Docker Compose configuration must no longer bind DevLog services to host ports `8080`, `8000`, `5432` or the conventional Angular development port `4200`.
 
-The Java Core, AI Engine and PostgreSQL host bindings must use a coherent DevLog-specific port range selected during Repository Analysis and Implementation Planning.
+The Angular frontend, Java Core, AI Engine and PostgreSQL host bindings must use a coherent DevLog-specific port range selected during Repository Analysis and Implementation Planning.
 
 The selected defaults must:
 
@@ -81,7 +85,8 @@ Existing environment-based overrides must remain supported:
 
 * `BACKEND_PORT`;
 * `AI_ENGINE_PORT`;
-* `POSTGRES_PORT`.
+* `POSTGRES_PORT`;
+* `FRONTEND_PORT` for the new frontend publication.
 
 A developer must be able to override any published port without editing tracked files.
 
@@ -96,7 +101,24 @@ Changing host bindings must not break:
 * backend-to-PostgreSQL connectivity;
 * backend-to-AI-Engine requests;
 * AI-Engine-to-backend callbacks;
+* frontend-to-backend `/api` forwarding over the Compose network;
 * health checks.
+
+### AC-3a: Angular frontend is part of the Compose runtime
+
+Docker Compose must build and run the Angular frontend without requiring a host Node.js process.
+
+The frontend container must:
+
+* use a deterministic production build based on the tracked lock file;
+* serve the generated `dist/frontend/browser` assets from a minimal maintained static web server image;
+* run without root privileges in its runtime stage;
+* support Angular client-side routes through an `index.html` fallback;
+* forward `/api` requests to Java Core through `http://backend:8080` or the equivalent internal service URL;
+* expose a container health check;
+* remain independently buildable and testable from the other services.
+
+The browser must continue to call Java Core only and must never contact the AI Engine or PostgreSQL directly.
 
 ### AC-4: Local non-Docker consumers use the new defaults
 
@@ -105,6 +127,7 @@ Tracked local-development configuration that communicates through host ports mus
 Repository Analysis must identify and classify at least:
 
 * the Angular development proxy;
+* the containerized frontend's internal `/api` proxy;
 * standalone backend datasource and AI Engine defaults;
 * standalone AI Engine Core callback default;
 * test fixtures that intentionally assert configuration defaults;
@@ -122,7 +145,7 @@ The API path and response contract must remain unchanged.
 
 ### AC-6: Persistent local runtime coexists with conventional ports
 
-DevLog's normal Docker Compose runtime must be able to start while unrelated local processes occupy host ports `8080`, `8000` and `5432`.
+DevLog's normal Docker Compose runtime must be able to start while unrelated local processes occupy host ports `8080`, `8000`, `5432` and `4200`.
 
 Validation must demonstrate this behavior without modifying or stopping unrelated applications.
 
@@ -131,6 +154,7 @@ Validation must demonstrate this behavior without modifying or stopping unrelate
 Current operational documentation must accurately describe:
 
 * the new default service URLs;
+* the Docker-served frontend URL and the optional standalone Angular workflow;
 * environment-variable overrides;
 * Docker-internal versus host-facing ports;
 * Angular proxy expectations;
@@ -158,6 +182,8 @@ Validation must include:
 * startup and health verification using the new defaults;
 * a Java Core API request through the new host port;
 * an AI Engine health request through its new host port;
+* a frontend health/static-content request through its new host port;
+* a frontend `/api` request proving internal proxy connectivity to Java Core;
 * PostgreSQL reachability where host access is intentionally retained;
 * backend tests affected by local configuration defaults;
 * frontend tests/build and proxy validation where affected;
@@ -176,6 +202,8 @@ Tracked examples may document supported variables and defaults without containin
 ### In Scope
 
 * Select dedicated default host ports for DevLog's local runtime.
+* Add a production-built Angular frontend service to Docker Compose.
+* Add the minimal frontend container and static-server/proxy configuration required for SPA routing and `/api` forwarding.
 * Update Docker Compose host bindings while preserving environment overrides.
 * Align tracked host-facing development configuration and directly affected tests.
 * Align the Angular proxy if its backend target uses the changed host port.
@@ -191,7 +219,7 @@ Tracked examples may document supported variables and defaults without containin
 * Automatic service discovery.
 * Introducing a reverse proxy, service mesh or container orchestrator.
 * Adding TLS, authentication or production network exposure.
-* Redesigning Docker Compose topology.
+* Redesigning Docker Compose topology beyond adding the bounded frontend service.
 * Database migrations or data resets.
 * Rewriting historical Story validation evidence.
 * Implementing the proposed DevLog/Delegate Task provider architecture.
@@ -206,6 +234,7 @@ Repository Analysis should confirm the exact affected set. Likely components inc
 * backend local configuration defaults and their tests;
 * AI Engine local Core callback configuration and its tests;
 * `frontend/proxy.conf.json` and potentially Angular serve configuration;
+* a new frontend Dockerfile and static-server configuration;
 * `README.md` and current operational documentation;
 * manual test scripts or commands that target host URLs;
 * external deployment notes for Kiko's configured DevLog base URL.
@@ -219,6 +248,7 @@ Production controller, domain, persistence and Repository Context components are
 * Docker Compose owns default local service exposure and internal service wiring.
 * Each application owns its standalone local-development defaults.
 * Frontend configuration owns the development proxy target.
+* The frontend container owns static asset serving, SPA fallback, and same-origin `/api` forwarding; it does not become a business API gateway or own backend workflow logic.
 * Environment variables own machine-specific overrides.
 * Engineering-Skills/OpenClaw owns Kiko's repository-to-DevLog mapping and must be updated separately by its operator, not by this Story.
 * Container-internal ports are implementation details of the DevLog runtime network; host ports are the public local-development contract.
@@ -245,6 +275,10 @@ Application-context tests and manual commands may rely on conventional localhost
 
 Kiko's base URL is configured outside DevLog and cannot be updated atomically by this Story. The final implementation report must clearly state the required operational adjustment.
 
+### Frontend routing or proxy regression
+
+Serving Angular as static files without SPA fallback would break deep links, while forwarding `/api` to a host URL would fail inside Compose. The frontend runtime must verify both client-side routes and internal service-name proxying.
+
 ### False collision validation
 
 Stopping existing applications to make DevLog start would not prove coexistence. Validation must preserve unrelated processes and demonstrate that DevLog no longer claims the conventional ports.
@@ -255,14 +289,16 @@ Stopping existing applications to make DevLog start would not prove coexistence.
 
 Use configuration inspection first, then targeted application tests, followed by a real Compose startup. Verify both default and overridden mappings.
 
-A practical coexistence test should temporarily bind harmless local listeners or use already-running unrelated services on the conventional ports, start DevLog with its new defaults, and confirm both sets remain reachable. The validation must be non-destructive and must not interfere with existing project data.
+A practical coexistence test should temporarily bind harmless local listeners or use already-running unrelated services on the conventional ports, start the complete four-service DevLog runtime with its new defaults, and confirm both sets remain reachable. The validation must be non-destructive and must not interfere with existing project data.
 
 ---
 
 ## Definition of Done
 
 * [ ] All acceptance criteria are satisfied.
-* [ ] DevLog no longer occupies host ports `8080`, `8000` or `5432` by default.
+* [ ] DevLog no longer occupies host ports `8080`, `8000`, `5432` or `4200` by default.
+* [ ] The Angular frontend is built and served by Docker Compose on its dedicated host port without requiring host `npm start`.
+* [ ] Angular deep links and same-origin `/api` forwarding work through the frontend container.
 * [ ] Host-port environment overrides remain functional.
 * [ ] Docker-internal service communication and health checks remain functional.
 * [ ] Host-side consumers and current documentation use the new defaults consistently.

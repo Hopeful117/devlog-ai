@@ -10,7 +10,7 @@ class Settings:
     llm_api_key: str | None = None
     llm_timeout_seconds: float = 30.0
     llm_max_output_tokens: int = 2_000
-    core_base_url: str = "http://localhost:8080"
+    core_base_url: str = "http://localhost:18080"
     core_callback_timeout_seconds: float = 5.0
     core_callback_max_attempts: int = 5
     core_callback_initial_delay_ms: int = 100
@@ -26,7 +26,7 @@ class Settings:
             llm_max_output_tokens=int(
                 os.getenv("LLM_MAX_OUTPUT_TOKENS", "2000")
             ),
-            core_base_url=os.getenv("CORE_BASE_URL", "http://localhost:8080"),
+            core_base_url=os.getenv("CORE_BASE_URL", "http://localhost:18080"),
             core_callback_timeout_seconds=float(
                 os.getenv("CORE_CALLBACK_TIMEOUT_SECONDS", "5")
             ),

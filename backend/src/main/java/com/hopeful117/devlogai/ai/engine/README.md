@@ -24,7 +24,7 @@ the AI task service.
 ## Configuration
 
 ```properties
-ai-engine.base-url=${AI_ENGINE_BASE_URL:http://localhost:8000}
+ai-engine.base-url=${AI_ENGINE_BASE_URL:http://localhost:18081}
 ai-engine.connect-timeout=${AI_ENGINE_CONNECT_TIMEOUT:2s}
 ai-engine.read-timeout=${AI_ENGINE_READ_TIMEOUT:5s}
 ```
