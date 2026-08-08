@@ -43,6 +43,11 @@ limits. Paths are normalized relative to the workspace, symbolic links are not
 followed, generated/dependency directories are excluded, and repository tools
 or scripts are never executed.
 
+The Repository Context Engine may subsequently request bounded text for selected source/test paths
+through a targeted reader. That reader preserves the same workspace confinement, symlink,
+excluded-directory, regular-file, size and UTF-8 boundaries. It does not read configuration files,
+and an unavailable or unsuitable content read preserves the original path evidence.
+
 Each collected Fact carries the Collector version as its source and a SHA-256
 fingerprint derived from its normalized content, evidence, type, version and
 resolved Git revision. The unique Analysis/fingerprint identity makes retries

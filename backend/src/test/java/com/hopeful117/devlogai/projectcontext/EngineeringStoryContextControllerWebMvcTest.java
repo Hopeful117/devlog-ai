@@ -17,6 +17,9 @@ import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextDiagnostics;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
+import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -59,7 +62,13 @@ class EngineeringStoryContextControllerWebMvcTest
                 .andExpect(jsonPath("$.repositoryContext.diagnostics.candidatesByKind.TEST_FILE")
                         .value(4))
                 .andExpect(jsonPath("$.repositoryContext.diagnostics.preferredLayerAvailability[0].reason")
-                        .value("NO_CANDIDATE_FOR_PREFERRED_LAYER"));
+                        .value("NO_CANDIDATE_FOR_PREFERRED_LAYER"))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].content.status")
+                        .value("TRUNCATED"))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].content.text")
+                        .value("class App"))
+                .andExpect(jsonPath("$.repositoryContext.evidence[1].content")
+                        .doesNotExist());
 
         verify(service).buildWithRepositoryContext(projectId, description);
     }
@@ -175,11 +184,30 @@ class EngineeringStoryContextControllerWebMvcTest
                 List.of(new RepositoryContextDiagnostics.PreferredLayerAvailability(
                         RepositoryContextLayer.ADR, false,
                         "NO_CANDIDATE_FOR_PREFERRED_LAYER")), 4, 0);
+        var sourceEvidence = new RepositoryEvidence(
+                RepositoryContextLayer.RELATED_SOURCE_CODE, "SOURCE_FILE",
+                "file:src/App.java", "src/App.java", Instant.EPOCH,
+                EvidenceScore.unscored(), List.of(),
+                new RepositoryEvidence.EvidenceProvenance(
+                        "REPOSITORY_STRUCTURE", "source", "src/App.java", "id"),
+                Map.of("collectorId", "repository-structure"), 10, List.of(),
+                new RepositoryEvidenceContent(
+                        RepositoryEvidenceContent.Status.TRUNCATED, "class App",
+                        "CONTENT_TRUNCATED", "selected-file-content", "v1", "abc"));
+        var configEvidence = new RepositoryEvidence(
+                RepositoryContextLayer.RELATED_SOURCE_CODE, "CONFIG_FILE",
+                "config:pom.xml", "pom.xml", Instant.EPOCH,
+                EvidenceScore.unscored(), List.of(),
+                new RepositoryEvidence.EvidenceProvenance(
+                        "REPOSITORY_STRUCTURE", "source", "pom.xml", "config"),
+                Map.of("collectorId", "repository-structure"), 10, List.of());
         var repositoryContext = new RepositoryContext("v1",
                 ContextProfile.ENGINEERING_STORY, List.of("engineering-story-v1"),
-                "context-intelligence-v2", List.of(), List.of(), Map.of(), diagnostics,
+                "context-intelligence-v2", List.of(),
+                List.of(sourceEvidence, configEvidence),
+                Map.of(RepositoryContextLayer.RELATED_SOURCE_CODE, 2), diagnostics,
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
-                0, 4, 4, true, List.of(), List.of(), "digest");
+                20, 4, 2, true, List.of(), List.of(), "digest");
         return new EngineeringStoryContext(
                 null, Instant.parse("2026-08-08T12:00:00Z"), projectId,
                 repositoryContext);

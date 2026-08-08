@@ -38,6 +38,8 @@ Scope:
   ranking, diversity-aware selection and a token budget (ADR-038 implemented),
 - compose versioned Context Profiles and calculate explainable multi-criteria Evidence scores
   through deterministic Context Intelligence (ADR-039 implemented),
+- enrich selected source/test evidence with bounded revision-traceable content while preserving
+  token budgets and configuration exclusion (ADR-044 implemented),
 - implement repository bootstrap analysis.
 
 Current boundary:

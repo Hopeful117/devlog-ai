@@ -32,6 +32,8 @@ OpenAPI documentation, and traceable Deliverables generated from human-validated
   history, changed files, ADRs, project documentation, and validated knowledge.
 - Provide Engineering Story Context so external engineering workflows can use repository evidence
   for discovery and prioritization before verifying exact behavior in the current repository.
+- Enrich a bounded set of selected source and test evidence with revision-traceable text while
+  keeping configuration content excluded and the repository authoritative.
 
 ## Knowledge pipeline
 
@@ -252,6 +254,10 @@ curl -X POST \
 ```
 
 The response is the existing `EngineeringStoryContext`, including its selected Repository Context.
+Selected `SOURCE_FILE` and `TEST_FILE` evidence may include an additive `content` object describing
+complete, truncated, skipped, or unavailable bounded text. `CONFIG_FILE` and all other evidence
+kinds remain content-free. Returned content comes from DevLog's synchronized Git revision and is
+context for navigation; verify exact behavior against the current working repository.
 For compatibility with existing consumers and short descriptions, the GET operation remains
 available:
 
@@ -342,6 +348,14 @@ Repository-context limits are configurable with:
 - `REPOSITORY_CONTEXT_MAX_HISTORY_ITEMS` (default `20`);
 - `REPOSITORY_CONTEXT_MAX_TOKENS` (default `6000`).
 
+Selected source/test content adds three independent limits:
+
+- `REPOSITORY_CONTEXT_CONTENT_MAX_FILES` (default `6`);
+- `REPOSITORY_CONTEXT_CONTENT_MAX_CHARACTERS_PER_FILE` (default `4000`);
+- `REPOSITORY_CONTEXT_CONTENT_MAX_TOTAL_CHARACTERS` (default `12000`).
+
+These limits always remain subordinate to the complete Repository Context token budget.
+
 ### Repository Context Engine
 
 [ADR-038](docs/decisions/ADR-038.md) turns repository-first selection into an explicit Core
@@ -369,6 +383,11 @@ generation, release summary, knowledge extraction and history analysis. The cont
 the selected profile, token allocation, ranking reasons, selected/discarded decisions and evidence
 provenance. Context construction remains entirely inside Java Core; the AI Engine only interprets
 the bounded result.
+
+After path-level selection, a versioned enrichment phase may attach bounded source/test text. It
+does not rerank evidence, read configuration content, or create trusted knowledge. Final token
+estimates, decisions, warnings and the digest are calculated from the returned evidence. See
+[ADR-044](docs/decisions/ADR-044.md).
 
 ### Context Intelligence and Evidence scoring
 

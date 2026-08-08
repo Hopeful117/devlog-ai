@@ -18,6 +18,7 @@ import com.hopeful117.devlogai.repositorycontext.collector.GitHistoryContextColl
 import com.hopeful117.devlogai.repositorycontext.collector.ProjectKnowledgeContextCollector;
 import com.hopeful117.devlogai.repositorycontext.collector.RepositoryContextCollector;
 import com.hopeful117.devlogai.repositorycontext.intelligence.DeterministicContextIntelligence;
+import com.hopeful117.devlogai.repositorycontext.enrichment.SelectedFileContentEnricher;
 import com.hopeful117.devlogai.repositorycontext.ranking.DeterministicEvidenceRanker;
 import com.hopeful117.devlogai.repositorycontext.selection.BudgetedDiverseEvidenceSelector;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -209,6 +211,36 @@ class RepositoryContextServiceTest {
         assertEquals(result.candidateCount(), result.selectionDecisions().size());
     }
 
+    @Test
+    void includesEnrichedContentAndMetadataInContextDigest() {
+        ProjectCommitRepository commits = mock(ProjectCommitRepository.class);
+        UUID projectId = UUID.randomUUID();
+        when(commits.findByProjectIdOrderByCommittedAtDescCommitHashDesc(
+                eq(projectId), any(Pageable.class))).thenReturn(List.of());
+        EvidenceFactory factory = new EvidenceFactory();
+        RepositoryContextCollector structure = new RepositoryContextCollector() {
+            @Override public String collectorId() { return "repository-structure"; }
+            @Override public String collectorVersion() { return "v2"; }
+            @Override
+            public List<RepositoryEvidence> collect(ContextRequest request) {
+                return List.of(fileEvidence(factory, request, "SOURCE_FILE",
+                        "backend/src/main/java/example/App.java"));
+            }
+        };
+        AnalysisContext context = context(projectId, List.of());
+
+        RepositoryContext first = engine(commits, 20, 200, 0, 1000,
+                structure, contentEnricher("class App {}"))
+                .build(context, engineeringStoryIntent(), null, List.of());
+        RepositoryContext second = engine(commits, 20, 200, 0, 1000,
+                structure, contentEnricher("class App { int value; }"))
+                .build(context, engineeringStoryIntent(), null, List.of());
+
+        assertNotEquals(first.contextDigest(), second.contextDigest());
+        assertEquals("class App {}", first.evidence().getFirst().content().text());
+        assertEquals("abc123", first.evidence().getFirst().content().revision());
+    }
+
     private RepositoryEvidence fileEvidence(
             EvidenceFactory factory,
             ContextRequest request,
@@ -284,6 +316,23 @@ class RepositoryContextServiceTest {
             int maximumTokens,
             RepositoryContextCollector extension
     ) {
+        SelectedFileContentEnricher enricher = mock(SelectedFileContentEnricher.class);
+        when(enricher.enrich(any(), any())).thenAnswer(invocation ->
+                new SelectedFileContentEnricher.EnrichmentResult(
+                        invocation.getArgument(1), List.of()));
+        return engine(commits, maximumItems, maximumSummary, maximumHistory,
+                maximumTokens, extension, enricher);
+    }
+
+    private RepositoryContextEngine engine(
+            ProjectCommitRepository commits,
+            int maximumItems,
+            int maximumSummary,
+            int maximumHistory,
+            int maximumTokens,
+            RepositoryContextCollector extension,
+            SelectedFileContentEnricher enricher
+    ) {
         EvidenceFactory factory = new EvidenceFactory();
         var collectors = new java.util.ArrayList<RepositoryContextCollector>(List.of(
                 new CurrentAnalysisContextCollector(factory),
@@ -296,7 +345,27 @@ class RepositoryContextServiceTest {
                 new DeterministicContextIntelligence(),
                 new DeterministicEvidenceRanker(),
                 new BudgetedDiverseEvidenceSelector(),
+                enricher,
                 new ObjectMapper(), maximumItems, maximumSummary,
                 maximumHistory, maximumTokens);
+    }
+
+    private SelectedFileContentEnricher contentEnricher(String text) {
+        SelectedFileContentEnricher enricher = mock(SelectedFileContentEnricher.class);
+        when(enricher.enrich(any(), any())).thenAnswer(invocation -> {
+            com.hopeful117.devlogai.repositorycontext.selection.EvidenceSelector.SelectionResult
+                    selection = invocation.getArgument(1);
+            List<RepositoryEvidence> enriched = selection.selected().stream()
+                    .map(value -> value.withContent(new RepositoryEvidenceContent(
+                            RepositoryEvidenceContent.Status.COMPLETE, text, null,
+                            "selected-file-content", "v1", "abc123")))
+                    .toList();
+            int usedTokens = enriched.stream()
+                    .mapToInt(RepositoryEvidence::estimatedTokens).sum();
+            return new SelectedFileContentEnricher.EnrichmentResult(
+                    new com.hopeful117.devlogai.repositorycontext.selection.EvidenceSelector.SelectionResult(
+                            enriched, selection.decisions(), usedTokens), List.of());
+        });
+        return enricher;
     }
 }

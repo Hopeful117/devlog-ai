@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.repositorycontext.collector.RepositoryContextCollector;
+import com.hopeful117.devlogai.repositorycontext.enrichment.SelectedFileContentEnricher;
 import com.hopeful117.devlogai.repositorycontext.intelligence.ContextIntelligence;
 import com.hopeful117.devlogai.repositorycontext.intelligence.ContextPlan;
 import com.hopeful117.devlogai.repositorycontext.ranking.EvidenceRanker;
@@ -29,6 +30,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
     private final ContextIntelligence contextIntelligence;
     private final EvidenceRanker ranker;
     private final EvidenceSelector selector;
+    private final SelectedFileContentEnricher contentEnricher;
     private final ObjectMapper objectMapper;
     private final RepositoryContext.ContextBudget budget;
 
@@ -37,6 +39,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
             ContextIntelligence contextIntelligence,
             EvidenceRanker ranker,
             EvidenceSelector selector,
+            SelectedFileContentEnricher contentEnricher,
             ObjectMapper objectMapper,
             @Value("${devlog.repository-context.max-evidence-items:60}") int maximumEvidenceItems,
             @Value("${devlog.repository-context.max-summary-characters:500}") int maximumSummaryCharacters,
@@ -50,6 +53,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
         this.contextIntelligence = contextIntelligence;
         this.ranker = ranker;
         this.selector = selector;
+        this.contentEnricher = contentEnricher;
         this.objectMapper = objectMapper;
         this.budget = new RepositoryContext.ContextBudget(maximumEvidenceItems,
                 maximumSummaryCharacters, maximumHistoryItems, maximumTokens);
@@ -68,7 +72,10 @@ public class RepositoryContextEngine implements RepositoryContextService {
         List<RepositoryEvidence> candidates = new ArrayList<>();
         collectors.forEach(collector -> candidates.addAll(collector.collect(request)));
         List<RepositoryEvidence> ranked = ranker.rank(candidates, request);
-        EvidenceSelector.SelectionResult selection = selector.select(ranked, request);
+        EvidenceSelector.SelectionResult pathSelection = selector.select(ranked, request);
+        SelectedFileContentEnricher.EnrichmentResult enrichment =
+                contentEnricher.enrich(request, pathSelection);
+        EvidenceSelector.SelectionResult selection = enrichment.selection();
         List<RepositoryEvidence> selected = selection.selected().stream()
                 .sorted(Comparator.comparingInt(
                                 (RepositoryEvidence value) -> value.layer().ordinal())
@@ -90,6 +97,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
             warnings.add("REPOSITORY_CONTEXT_BUDGET_APPLIED");
         if (candidates.stream().anyMatch(value -> value.summary().endsWith("...")))
             warnings.add("EVIDENCE_SUMMARY_TRUNCATED");
+        warnings.addAll(enrichment.warnings());
         String digest = digest(contextPlan, selected, byLayer, diagnostics,
                 selection, warnings);
         return new RepositoryContext(VERSION, contextPlan.primaryProfile(),

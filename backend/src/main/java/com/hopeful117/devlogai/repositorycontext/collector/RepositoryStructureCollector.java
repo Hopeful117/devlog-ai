@@ -121,7 +121,8 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
 
             // File-level evidence (new)
             evidence.addAll(produceModuleEvidence(scan, source.getId().toString(), request));
-            evidence.addAll(produceFileLevelEvidence(scan, source.getId().toString(), request));
+            evidence.addAll(produceFileLevelEvidence(scan, source.getId().toString(),
+                    workspace.resolvedRevision(), request));
 
             return List.copyOf(evidence);
         } catch (Exception e) {
@@ -417,11 +418,12 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
     private List<RepositoryEvidence> produceFileLevelEvidence(
             RepositoryScan scan,
             String sourceId,
+            String resolvedRevision,
             com.hopeful117.devlogai.repositorycontext.ContextRequest request
     ) {
         Set<String> storyTerms = extractStoryTerms(request);
         Map<FileEvidenceKind, List<RepositoryEvidence>> candidates =
-                collectFileCandidates(scan, sourceId, request);
+                collectFileCandidates(scan, sourceId, resolvedRevision, request);
         sortFileCandidates(candidates, storyTerms);
         return allocateFileCandidates(candidates);
     }
@@ -429,6 +431,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
     private Map<FileEvidenceKind, List<RepositoryEvidence>> collectFileCandidates(
             RepositoryScan scan,
             String sourceId,
+            String resolvedRevision,
             ContextRequest request
     ) {
         Map<FileEvidenceKind, List<RepositoryEvidence>> candidates =
@@ -441,7 +444,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             String path = file.relativePath();
             FileEvidenceKind kind = classify(path);
             if (kind != null) candidates.get(kind).add(fileEvidence(
-                    kind, path, sourceId, request));
+                    kind, path, sourceId, resolvedRevision, request));
         }
         return candidates;
     }
@@ -488,9 +491,10 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             FileEvidenceKind kind,
             String path,
             String sourceId,
+            String resolvedRevision,
             ContextRequest request
     ) {
-        return evidenceFactory.create(
+        RepositoryEvidence evidence = evidenceFactory.create(
                 metadata(),
                 new EvidenceFactory.EvidenceInput(
                         RepositoryContextLayer.RELATED_SOURCE_CODE,
@@ -503,6 +507,10 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                         path,
                         "repository-structure:" + kind.identifierSegment + ":" + path),
                 request.budget().maximumSummaryCharacters());
+        Map<String, String> metadata = new LinkedHashMap<>(
+                evidence.extractionMetadata());
+        metadata.put("resolvedRevision", resolvedRevision);
+        return evidence.withExtractionMetadata(metadata);
     }
 
     private int storyTermMatches(String path, Set<String> storyTerms) {
