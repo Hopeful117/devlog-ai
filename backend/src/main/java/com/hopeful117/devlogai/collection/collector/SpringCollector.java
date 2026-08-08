@@ -17,6 +17,8 @@ public class SpringCollector extends AbstractFileCollector {
     private static final String VERSION = "spring-v1";
     private static final Pattern TYPE_NAME = Pattern.compile(
             "(?:class|interface|record|enum)\\s+([A-Za-z_$][A-Za-z0-9_$]*)");
+    private static final Pattern SPRING_BOOT_GRADLE_VERSION = Pattern.compile(
+            "org\\.springframework\\.boot\\D{0,20}+(\\d++\\.\\d++(?:\\.\\d++)?)");
     private static final Map<String, FactType> DEPENDENCIES = new LinkedHashMap<>();
     static {
         DEPENDENCIES.put("spring-boot", FactType.SPRING_BOOT_DETECTED);
@@ -38,22 +40,24 @@ public class SpringCollector extends AbstractFileCollector {
         RepositoryScan scan = scan(context, this::springRelevant);
         FactAccumulator facts = accumulator(context, scan);
         for (RepositoryFile file : scan.files()) {
-            if (file.content() == null) continue;
-            String path = file.relativePath();
-            String name = fileName(path).toLowerCase(Locale.ROOT);
-            if (name.equals("application.properties") || name.equals("application.yml")
-                    || name.equals("application.yaml")) {
-                facts.add(FactType.SPRING_CONFIGURATION_FILE_PRESENT,
-                        "configurationFile=" + path, path);
-                continue;
-            }
-            if (name.equals("pom.xml") || name.endsWith(".gradle") || name.endsWith(".gradle.kts")) {
-                detectDependencies(file, facts);
-            } else if (name.endsWith(".java") || name.endsWith(".kt")) {
-                detectStereotypes(file, facts);
-            }
+            if (file.content() != null) collectFileFacts(file, facts);
         }
         return result(facts);
+    }
+
+    private void collectFileFacts(RepositoryFile file, FactAccumulator facts) {
+        String path = file.relativePath();
+        String name = fileName(path).toLowerCase(Locale.ROOT);
+        if (name.equals("application.properties") || name.equals("application.yml")
+                || name.equals("application.yaml")) {
+            facts.add(FactType.SPRING_CONFIGURATION_FILE_PRESENT,
+                    "configurationFile=" + path, path);
+        } else if (name.equals("pom.xml") || name.endsWith(".gradle")
+                || name.endsWith(".gradle.kts")) {
+            detectDependencies(file, facts);
+        } else if (name.endsWith(".java") || name.endsWith(".kt")) {
+            detectStereotypes(file, facts);
+        }
     }
 
     private boolean springRelevant(String path) {
@@ -69,15 +73,24 @@ public class SpringCollector extends AbstractFileCollector {
         DEPENDENCIES.forEach((token, type) -> {
             if (lower.contains(token)) facts.add(type, "declaration=" + token, file.relativePath());
         });
-        Matcher bootVersion = Pattern.compile(
-                "<spring-boot.version>\\s*([^<]+)\\s*</spring-boot.version>|" +
-                        "org\\.springframework\\.boot[^0-9]{0,20}([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)")
-                .matcher(file.content());
-        if (bootVersion.find()) {
-            String value = bootVersion.group(1) != null ? bootVersion.group(1) : bootVersion.group(2);
+        String value = springBootVersion(file.content());
+        if (value != null) {
             facts.add(FactType.SPRING_BOOT_VERSION_DECLARED,
                     "version=" + value.trim(), file.relativePath());
         }
+    }
+
+    private String springBootVersion(String content) {
+        String opening = "<spring-boot.version>";
+        String closing = "</spring-boot.version>";
+        int start = content.indexOf(opening);
+        if (start >= 0) {
+            int valueStart = start + opening.length();
+            int end = content.indexOf(closing, valueStart);
+            if (end >= 0) return content.substring(valueStart, end);
+        }
+        Matcher matcher = SPRING_BOOT_GRADLE_VERSION.matcher(content);
+        return matcher.find() ? matcher.group(1) : null;
     }
 
     private void detectStereotypes(RepositoryFile file, FactAccumulator facts) {

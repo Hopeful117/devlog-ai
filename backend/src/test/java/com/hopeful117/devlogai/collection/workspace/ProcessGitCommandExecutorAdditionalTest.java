@@ -25,8 +25,9 @@ class ProcessGitCommandExecutorAdditionalTest {
     @Test
     void shouldThrowOnInvalidCommand() {
         var executor = new ProcessGitCommandExecutor();
+        List<String> arguments = List.of("status", "--nonexistent-flag");
 
         assertThrows(GitCommandException.class,
-                () -> executor.execute(tempDir, List.of("status", "--nonexistent-flag")));
+                () -> executor.execute(tempDir, arguments));
     }
 }

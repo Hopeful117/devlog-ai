@@ -31,7 +31,7 @@ class SecureRepositoryScannerTest {
     }
 
     @Test
-    void shouldScanEmptyDirectory() throws IOException {
+    void shouldScanEmptyDirectory() {
         var scanner = new SecureRepositoryScanner(createLimits());
         var context = createContext(tempDir);
         var result = scanner.scan(context, p -> true);
@@ -105,7 +105,7 @@ class SecureRepositoryScannerTest {
         var result = scanner.scan(context, p -> true);
 
         assertEquals(1, result.files().size());
-        assertTrue(result.files().getFirst().relativePath().equals("real.txt"));
+        assertEquals("real.txt", result.files().getFirst().relativePath());
     }
 
     @Test

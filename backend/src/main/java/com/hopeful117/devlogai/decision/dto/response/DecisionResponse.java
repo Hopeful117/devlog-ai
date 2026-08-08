@@ -1,6 +1,5 @@
 package com.hopeful117.devlogai.decision.dto.response;
 
-import lombok.Data;
 
 import java.time.Instant;
 import java.util.UUID;

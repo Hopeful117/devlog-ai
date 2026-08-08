@@ -14,24 +14,17 @@ import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 public class EvidenceFactory {
     public RepositoryEvidence create(
             ContextRequestMetadata metadata,
-            RepositoryContextLayer layer,
-            String kind,
-            String reference,
-            String summary,
-            Instant occurredAt,
-            List<String> relatedReferences,
-            String repositoryLocation,
-            String originatingFile,
-            String identifier,
+            EvidenceInput input,
             int maximumSummaryCharacters
     ) {
-        String bounded = bound(summary, maximumSummaryCharacters);
+        String bounded = bound(input.summary(), maximumSummaryCharacters);
         int estimatedTokens = Math.max(1,
-                (bounded.length() + reference.length() + 3) / 4);
-        return new RepositoryEvidence(layer, kind, reference, bounded, occurredAt,
-                EvidenceScore.unscored(), relatedReferences,
+                (bounded.length() + input.reference().length() + 3) / 4);
+        return new RepositoryEvidence(input.layer(), input.kind(), input.reference(), bounded,
+                input.occurredAt(), EvidenceScore.unscored(), input.relatedReferences(),
                 new RepositoryEvidence.EvidenceProvenance(
-                        metadata.sourceType(), repositoryLocation, originatingFile, identifier),
+                        metadata.sourceType(), input.repositoryLocation(),
+                        input.originatingFile(), input.identifier()),
                 Map.of("collectorId", metadata.collectorId(),
                         "collectorVersion", metadata.collectorVersion()),
                 estimatedTokens, List.of("COLLECTED_NOT_RANKED"));
@@ -48,6 +41,19 @@ public class EvidenceFactory {
             String collectorId,
             String collectorVersion,
             String sourceType
+    ) {
+    }
+
+    public record EvidenceInput(
+            RepositoryContextLayer layer,
+            String kind,
+            String reference,
+            String summary,
+            Instant occurredAt,
+            List<String> relatedReferences,
+            String repositoryLocation,
+            String originatingFile,
+            String identifier
     ) {
     }
 }

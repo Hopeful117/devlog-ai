@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -69,8 +70,9 @@ public class CommandLineGitHistoryProvider implements GitHistoryProvider {
         if (output.isBlank()) return List.of();
         String[] tokens = output.split("\u0000");
         List<GitFileChange> changes = new ArrayList<>();
-        for (int index = 0; index < tokens.length;) {
-            String status = tokens[index++];
+        Iterator<String> values = List.of(tokens).iterator();
+        while (values.hasNext()) {
+            String status = values.next();
             FileChangeType type = switch (status.charAt(0)) {
                 case 'A' -> FileChangeType.ADDED;
                 case 'D' -> FileChangeType.DELETED;
@@ -78,15 +80,23 @@ public class CommandLineGitHistoryProvider implements GitHistoryProvider {
                 case 'C' -> FileChangeType.COPIED;
                 default -> FileChangeType.MODIFIED;
             };
-            String first = tokens[index++];
+            String first = values.next();
             String second = (type == FileChangeType.RENAMED || type == FileChangeType.COPIED)
-                    ? tokens[index++] : null;
+                    ? values.next() : null;
             changes.add(new GitFileChange(type,
-                    type == FileChangeType.ADDED ? null : first,
-                    type == FileChangeType.DELETED ? null : (second == null ? first : second),
+                    oldPath(type, first), newPath(type, first, second),
                     false, 0, 0));
         }
         return changes;
+    }
+
+    private String oldPath(FileChangeType type, String first) {
+        return type == FileChangeType.ADDED ? null : first;
+    }
+
+    private String newPath(FileChangeType type, String first, String second) {
+        if (type == FileChangeType.DELETED) return null;
+        return second == null ? first : second;
     }
 
     private LineStatsResult readLineStats(Path repository, String base, String hash) {

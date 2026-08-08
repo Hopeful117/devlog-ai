@@ -36,7 +36,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,7 +68,7 @@ class RepositoryStructureCollectorTest {
     void setUp() {
         evidenceFactory = new EvidenceFactory();
         collector = new RepositoryStructureCollector(
-                scanner, limits, sourceRepository, workspaceManager, evidenceFactory);
+                scanner, sourceRepository, workspaceManager, evidenceFactory);
 
         projectId = UUID.randomUUID();
         analysisId = UUID.randomUUID();
@@ -88,7 +87,7 @@ class RepositoryStructureCollectorTest {
 
         SynchronizedWorkspace workspace = new SynchronizedWorkspace(
                 sourceId, tempDir, "abc123");
-        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
 
         RepositoryScan scan = new RepositoryScan(
                 List.of(
@@ -117,7 +116,7 @@ class RepositoryStructureCollectorTest {
 
         SynchronizedWorkspace workspace = new SynchronizedWorkspace(
                 sourceId, tempDir, "abc123");
-        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
 
         RepositoryScan scan = new RepositoryScan(
                 List.of(
@@ -151,7 +150,7 @@ class RepositoryStructureCollectorTest {
 
         SynchronizedWorkspace workspace = new SynchronizedWorkspace(
                 sourceId, tempDir, "abc123");
-        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
 
         RepositoryScan scan = new RepositoryScan(
                 List.of(
@@ -181,7 +180,7 @@ class RepositoryStructureCollectorTest {
 
         SynchronizedWorkspace workspace = new SynchronizedWorkspace(
                 sourceId, tempDir, "abc123");
-        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
 
         RepositoryScan scan = new RepositoryScan(
                 List.of(
@@ -213,7 +212,7 @@ class RepositoryStructureCollectorTest {
 
         SynchronizedWorkspace workspace = new SynchronizedWorkspace(
                 sourceId, tempDir, "abc123");
-        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
 
         RepositoryScan scan = new RepositoryScan(
                 List.of(
@@ -248,7 +247,7 @@ class RepositoryStructureCollectorTest {
 
         SynchronizedWorkspace workspace = new SynchronizedWorkspace(
                 sourceId, tempDir, "abc123");
-        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
 
         // Create 50 source files (exceeds MAX_FILE_EVIDENCE_ITEMS = 40)
         List<RepositoryFile> files = new java.util.ArrayList<>();
@@ -278,7 +277,7 @@ class RepositoryStructureCollectorTest {
 
         SynchronizedWorkspace workspace = new SynchronizedWorkspace(
                 sourceId, tempDir, "abc123");
-        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
 
         RepositoryScan scan = new RepositoryScan(
                 List.of(
@@ -312,7 +311,7 @@ class RepositoryStructureCollectorTest {
 
         SynchronizedWorkspace workspace = new SynchronizedWorkspace(
                 sourceId, tempDir, "abc123");
-        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
 
         RepositoryScan scan = new RepositoryScan(
                 List.of(
@@ -345,7 +344,7 @@ class RepositoryStructureCollectorTest {
 
         SynchronizedWorkspace workspace = new SynchronizedWorkspace(
                 sourceId, tempDir, "abc123");
-        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
 
         RepositoryScan scan = new RepositoryScan(
                 List.of(
@@ -385,7 +384,7 @@ class RepositoryStructureCollectorTest {
                 .build();
         when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
                 .thenReturn(List.of(source));
-        when(workspaceManager.synchronize(eq(source), eq(null)))
+        when(workspaceManager.synchronize(source, null))
                 .thenThrow(new RuntimeException("Workspace unavailable"));
 
         List<RepositoryEvidence> evidence = collector.collect(createRequest());

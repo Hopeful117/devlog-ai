@@ -67,9 +67,11 @@ class ValidatableProposalServiceAdditionalTest {
     void shouldThrowWhenProjectNotFound() {
         UUID projectId = UUID.randomUUID();
         when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
+        CreateValidatableProposalRequest request = createRequest(
+                projectId, UUID.randomUUID());
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.create(createRequest(projectId, UUID.randomUUID())));
+                () -> service.create(request));
     }
 
     @Test
@@ -78,9 +80,10 @@ class ValidatableProposalServiceAdditionalTest {
         UUID analysisId = UUID.randomUUID();
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(Project.builder().id(projectId).build()));
         when(analysisRepository.findById(analysisId)).thenReturn(Optional.empty());
+        CreateValidatableProposalRequest request = createRequest(projectId, analysisId);
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.create(createRequest(projectId, analysisId)));
+                () -> service.create(request));
     }
 
     @Test
@@ -94,9 +97,10 @@ class ValidatableProposalServiceAdditionalTest {
 
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
         when(analysisRepository.findById(analysisId)).thenReturn(Optional.of(analysis));
+        CreateValidatableProposalRequest request = createRequest(projectId, analysisId);
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.create(createRequest(projectId, analysisId)));
+                () -> service.create(request));
     }
 
     @Test
@@ -114,7 +118,8 @@ class ValidatableProposalServiceAdditionalTest {
     @Test
     void shouldThrowWhenGetByIdNotFound() {
         when(proposalRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
-        assertThrows(IllegalArgumentException.class, () -> service.getById(UUID.randomUUID()));
+        UUID proposalId = UUID.randomUUID();
+        assertThrows(IllegalArgumentException.class, () -> service.getById(proposalId));
     }
 
     @Test

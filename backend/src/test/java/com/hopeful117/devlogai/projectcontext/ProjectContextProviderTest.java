@@ -1,6 +1,5 @@
 package com.hopeful117.devlogai.projectcontext;
 
-import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
@@ -269,18 +268,24 @@ class ProjectContextProviderTest {
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
 
+        var recentKnowledgeEvents = snapshot.recentKnowledgeEvents();
         assertThrows(UnsupportedOperationException.class,
-                () -> snapshot.recentKnowledgeEvents().add(null));
+                () -> recentKnowledgeEvents.add(null));
+        var validatedProposals = snapshot.validatedProposals();
         assertThrows(UnsupportedOperationException.class,
-                () -> snapshot.validatedProposals().add(null));
+                () -> validatedProposals.add(null));
+        var architectureArtifacts = snapshot.architectureArtifacts();
         assertThrows(UnsupportedOperationException.class,
-                () -> snapshot.architectureArtifacts().add(null));
+                () -> architectureArtifacts.add(null));
+        var relatedDecisions = snapshot.relatedDecisions();
         assertThrows(UnsupportedOperationException.class,
-                () -> snapshot.relatedDecisions().add(null));
+                () -> relatedDecisions.add(null));
+        var recentMilestones = snapshot.recentMilestones();
         assertThrows(UnsupportedOperationException.class,
-                () -> snapshot.recentMilestones().add(null));
+                () -> recentMilestones.add(null));
+        var recentAnalyses = snapshot.recentAnalyses();
         assertThrows(UnsupportedOperationException.class,
-                () -> snapshot.recentAnalyses().add(null));
+                () -> recentAnalyses.add(null));
     }
 
     @Test

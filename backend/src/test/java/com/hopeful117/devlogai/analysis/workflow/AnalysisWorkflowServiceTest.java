@@ -8,7 +8,6 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.ai.engine.client.AIEngineClient;
-import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.context.AnalysisContextService;

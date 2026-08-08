@@ -7,7 +7,6 @@ import com.hopeful117.devlogai.decision.mapper.DecisionMapper;
 import com.hopeful117.devlogai.decision.repository.DecisionRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
-import com.hopeful117.devlogai.project.service.ProjectService;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class DecisionServiceTest {
+class DecisionServiceTest {
     @Mock
     DecisionRepository decisionRepository;
 

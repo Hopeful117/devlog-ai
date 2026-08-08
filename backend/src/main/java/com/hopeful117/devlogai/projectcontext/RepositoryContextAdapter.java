@@ -32,6 +32,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class RepositoryContextAdapter {
 
+    private static final String ENGINEERING_STORY_PREPARATION =
+            "engineering-story-preparation";
+
     private final ProjectContextProvider projectContextProvider;
     private final RepositoryContextService repositoryContextService;
     private final InsightRepository insightRepository;
@@ -41,8 +44,7 @@ public class RepositoryContextAdapter {
 
         ProjectContextSnapshot snapshot = projectContextProvider.build(projectId);
 
-        AnalysisContext syntheticContext = synthesizeAnalysisContext(
-                projectId, snapshot, storyDescription);
+        AnalysisContext syntheticContext = synthesizeAnalysisContext(projectId, snapshot);
 
         IntentDefinition intent = createIntentDefinition(storyDescription);
 
@@ -57,8 +59,7 @@ public class RepositoryContextAdapter {
 
     private AnalysisContext synthesizeAnalysisContext(
             UUID projectId,
-            ProjectContextSnapshot snapshot,
-            String storyDescription) {
+            ProjectContextSnapshot snapshot) {
 
         AnalysisContext.ProjectSnapshot projectSnapshot =
                 new AnalysisContext.ProjectSnapshot(
@@ -75,7 +76,7 @@ public class RepositoryContextAdapter {
                 new AnalysisContext.AnalysisSnapshot(
                         syntheticAnalysisId,
                         AnalysisType.ARCHITECTURE_REVIEW,
-                        "engineering-story-preparation",
+                        ENGINEERING_STORY_PREPARATION,
                         "v1",
                         AnalysisStatus.COMPLETED,
                         Instant.now(),
@@ -102,7 +103,7 @@ public class RepositoryContextAdapter {
                 : "Engineering Story preparation";
 
         return new IntentDefinition(
-                "engineering-story-preparation",
+                ENGINEERING_STORY_PREPARATION,
                 "v1",
                 objective,
                 List.of(),
@@ -121,7 +122,7 @@ public class RepositoryContextAdapter {
                 "kiko",
                 "focused",
                 "analytical",
-                "engineering-story-preparation",
+                ENGINEERING_STORY_PREPARATION,
                 List.of());
     }
 }

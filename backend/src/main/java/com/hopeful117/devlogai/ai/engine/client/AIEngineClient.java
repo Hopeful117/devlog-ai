@@ -12,6 +12,10 @@ public interface AIEngineClient {
 
     DeliverableGenerationResponse generateDeliverable(DeliverableGenerationRequest request);
 
-    @Deprecated
+    /**
+     * @deprecated The legacy request does not carry selected repository knowledge.
+     * Use {@link #submit(PromptRequest)} instead.
+     */
+    @Deprecated(since = "0.3.0", forRemoval = false)
     AiTaskSubmissionResponse submit(AiTaskSubmissionRequest request);
 }

@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -96,7 +97,7 @@ class RepositoryContextServiceTest {
         assertTrue(first.usedTokens() <= first.budget().maximumTokens());
         assertEquals(first.candidateCount(), first.selectionDecisions().size());
         assertTrue(first.contextDigest().matches("[0-9a-f]{64}"));
-        verify(commits, org.mockito.Mockito.times(2))
+        verify(commits, times(2))
                 .findByProjectIdOrderByCommittedAtDescCommitHashDesc(
                         eq(projectId), any(Pageable.class));
     }
@@ -138,9 +139,10 @@ class RepositoryContextServiceTest {
                 return List.of(factory.create(
                         new EvidenceFactory.ContextRequestMetadata(
                                 collectorId(), collectorVersion(), "EXTENSION"),
+                        new EvidenceFactory.EvidenceInput(
                         RepositoryContextLayer.COMMIT_DIFF, "EXTENSION_EVIDENCE",
                         "extension:1", "bounded extension evidence", Instant.EPOCH,
-                        List.of(), "repository", "extension.txt", "1",
+                        List.of(), "repository", "extension.txt", "1"),
                         request.budget().maximumSummaryCharacters()));
             }
         };

@@ -60,8 +60,10 @@ class DeterministicObservationEngineTest {
     @Test
     void shouldRejectTransientFactsToKeepTraceability() {
         Fact transientFact = Fact.builder().type(FactType.DOCKERFILE_PRESENT).build();
+        Fact persistedFact = fact(FactType.DOCKER_COMPOSE_PRESENT);
+        List<Fact> facts = List.of(transientFact, persistedFact);
         assertThrows(IllegalArgumentException.class,
-                () -> engine.derive(List.of(transientFact, fact(FactType.DOCKER_COMPOSE_PRESENT))));
+                () -> engine.derive(facts));
     }
 
     private Fact fact(FactType type) {

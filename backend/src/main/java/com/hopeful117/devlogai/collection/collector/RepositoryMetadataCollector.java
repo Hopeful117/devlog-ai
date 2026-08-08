@@ -15,6 +15,7 @@ import java.util.Set;
         name = "enabled", havingValue = "true", matchIfMissing = true)
 public class RepositoryMetadataCollector extends AbstractFileCollector {
     private static final String VERSION = "repository-metadata-v1";
+    private static final String REPOSITORY_ROOT = "repository:/";
     private static final List<String> SOURCE_DIRECTORIES = List.of(
             "src/main/java", "src/main/kotlin", "src/main/python", "src", "app", "lib");
     private static final Set<String> CONFIGURATION_FILES = Set.of(
@@ -36,7 +37,7 @@ public class RepositoryMetadataCollector extends AbstractFileCollector {
                 "resolvedRevision=" + context.resolvedRevision(), "git:" + context.resolvedRevision());
         facts.add(FactType.REPOSITORY_STRUCTURE_SUMMARY,
                 "fileCount=%d%ndirectoryCount=%d".formatted(
-                        scan.visitedFileCount(), scan.directoryCount()), "repository:/");
+                        scan.visitedFileCount(), scan.directoryCount()), REPOSITORY_ROOT);
 
         Map<String, Integer> extensions = new LinkedHashMap<>();
         for (RepositoryFile file : scan.files()) {
@@ -58,7 +59,7 @@ public class RepositoryMetadataCollector extends AbstractFileCollector {
                 .limit(10)
                 .forEach(entry -> facts.add(FactType.PRIMARY_FILE_EXTENSION,
                         "extension=%s%nfileCount=%d".formatted(entry.getKey(), entry.getValue()),
-                        "repository:/"));
+                        REPOSITORY_ROOT));
         long moduleDescriptors = scan.files().stream()
                 .filter(file -> file.relativePath().endsWith("/pom.xml")
                         || file.relativePath().endsWith("/build.gradle")
@@ -66,7 +67,7 @@ public class RepositoryMetadataCollector extends AbstractFileCollector {
                 .count();
         if (moduleDescriptors > 0) {
             facts.add(FactType.MULTI_MODULE_STRUCTURE_PRESENT,
-                    "nestedBuildDescriptorCount=" + moduleDescriptors, "repository:/");
+                    "nestedBuildDescriptorCount=" + moduleDescriptors, REPOSITORY_ROOT);
         }
         return result(facts);
     }

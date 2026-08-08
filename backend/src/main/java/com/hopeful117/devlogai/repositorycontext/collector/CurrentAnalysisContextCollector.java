@@ -23,11 +23,11 @@ public class CurrentAnalysisContextCollector implements RepositoryContextCollect
     @Override
     public List<RepositoryEvidence> collect(ContextRequest request) {
         var analysis = request.analysisContext().analysis();
-        return List.of(evidenceFactory.create(metadata(),
+        return List.of(evidenceFactory.create(metadata(), new EvidenceFactory.EvidenceInput(
                 RepositoryContextLayer.CURRENT_ANALYSIS, "ANALYSIS",
                 "analysis:" + analysis.id(), request.intent().objective(),
                 analysis.createdAt(), List.of(), null, null,
-                analysis.id().toString(), request.budget().maximumSummaryCharacters()));
+                analysis.id().toString()), request.budget().maximumSummaryCharacters()));
     }
 
     private EvidenceFactory.ContextRequestMetadata metadata() {

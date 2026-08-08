@@ -237,13 +237,16 @@ class AnalysisContextServiceTest {
         assertEquals(proposalSnap.id(), context.validatedProposals().getFirst().id());
         assertEquals(java.util.Map.of("summary", "accepted"),
                 context.validatedProposals().getFirst().payload());
+        List<AnalysisContext.ValidatedProposalSnapshot> validatedProposals =
+                context.validatedProposals();
         assertThrows(
                 UnsupportedOperationException.class,
-                () -> context.validatedProposals().add(null)
+                () -> validatedProposals.add(null)
         );
+        List<AnalysisContext.FactSnapshot> facts = context.facts();
         assertThrows(
                 UnsupportedOperationException.class,
-                () -> context.facts().add(null)
+                () -> facts.add(null)
         );
     }
 

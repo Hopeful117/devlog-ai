@@ -22,6 +22,9 @@ import java.util.*;
 @RequiredArgsConstructor
 public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService {
     static final String VERSION = "knowledge-selection-v2";
+    private static final String BUILD = "BUILD";
+    private static final String CONTAINER = "CONTAINER";
+    private static final String DOCKER = "DOCKER";
     static final SelectedKnowledge.KnowledgeBudget BUDGET =
             new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 60);
 
@@ -98,19 +101,19 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
     private int observationScore(String intentId, AnalysisContext.ObservationSnapshot value) {
         String type = value.type().name();
         if (intentId.equals("architecture-overview"))
-            return containsAny(type, "ARCHITECTURE", "COMMUNICATION", "CONTAINER", "MODULE") ? 100 : 10;
+            return containsAny(type, "ARCHITECTURE", "COMMUNICATION", CONTAINER, "MODULE") ? 100 : 10;
         if (intentId.equals("generate-readme"))
-            return containsAny(type, "DOCUMENTATION", "APPLICATION", "TEST", "CONTAINER") ? 100 : 20;
-        return containsAny(type, "ARCHITECTURE", "APPLICATION", "TECHNOLOGY", "CONTAINER") ? 80 : 40;
+            return containsAny(type, "DOCUMENTATION", "APPLICATION", "TEST", CONTAINER) ? 100 : 20;
+        return containsAny(type, "ARCHITECTURE", "APPLICATION", "TECHNOLOGY", CONTAINER) ? 80 : 40;
     }
 
     private int factScore(String intentId, AnalysisContext.FactSnapshot value) {
         String type = value.type().name();
         if (intentId.equals("architecture-overview"))
-            return containsAny(type, "SPRING", "DOCKER", "REST", "BUILD", "MODULE") ? 100 : 10;
+            return containsAny(type, "SPRING", DOCKER, "REST", BUILD, "MODULE") ? 100 : 10;
         if (intentId.equals("generate-readme"))
-            return containsAny(type, "README", "DOCUMENTATION", "BUILD", "DOCKER", "JAVA_VERSION") ? 100 : 20;
-        return containsAny(type, "REPOSITORY", "BUILD", "SPRING", "DOCKER", "README") ? 80 : 40;
+            return containsAny(type, "README", "DOCUMENTATION", BUILD, DOCKER, "JAVA_VERSION") ? 100 : 20;
+        return containsAny(type, "REPOSITORY", BUILD, "SPRING", DOCKER, "README") ? 80 : 40;
     }
 
     private boolean containsAny(String value, String... candidates) {

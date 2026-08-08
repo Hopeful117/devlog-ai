@@ -1,7 +1,6 @@
 package com.hopeful117.devlogai.repositorycontext.collector;
 
 import com.hopeful117.devlogai.collection.collector.CollectionContext;
-import com.hopeful117.devlogai.collection.collector.CollectorLimits;
 import com.hopeful117.devlogai.collection.collector.RepositoryFile;
 import com.hopeful117.devlogai.collection.collector.RepositoryScan;
 import com.hopeful117.devlogai.collection.collector.SecureRepositoryScanner;
@@ -61,20 +60,17 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             ".java", ".kt", ".py", ".ts", ".tsx", ".js", ".jsx");
 
     private final SecureRepositoryScanner scanner;
-    private final CollectorLimits limits;
     private final SourceRepository sourceRepository;
     private final WorkspaceManager workspaceManager;
     private final EvidenceFactory evidenceFactory;
 
     public RepositoryStructureCollector(
             SecureRepositoryScanner scanner,
-            CollectorLimits limits,
             SourceRepository sourceRepository,
             WorkspaceManager workspaceManager,
             EvidenceFactory evidenceFactory
     ) {
         this.scanner = scanner;
-        this.limits = limits;
         this.sourceRepository = sourceRepository;
         this.workspaceManager = workspaceManager;
         this.evidenceFactory = evidenceFactory;
@@ -157,6 +153,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
 
         return evidenceFactory.create(
                 metadata(),
+                new EvidenceFactory.EvidenceInput(
                 RepositoryContextLayer.RELATED_SOURCE_CODE,
                 "MODULE_SUMMARY",
                 reference,
@@ -165,7 +162,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                 List.of(),
                 sourceId,
                 null,
-                "repository-structure:module-summary",
+                "repository-structure:module-summary"),
                 request.budget().maximumSummaryCharacters()
         );
     }
@@ -196,6 +193,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
 
         return List.of(evidenceFactory.create(
                 metadata(),
+                new EvidenceFactory.EvidenceInput(
                 RepositoryContextLayer.RELATED_SOURCE_CODE,
                 "SOURCE_DIRECTORIES",
                 reference,
@@ -204,7 +202,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                 List.of(),
                 sourceId,
                 null,
-                "repository-structure:source-directories",
+                "repository-structure:source-directories"),
                 request.budget().maximumSummaryCharacters()
         ));
     }
@@ -235,6 +233,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
 
         return List.of(evidenceFactory.create(
                 metadata(),
+                new EvidenceFactory.EvidenceInput(
                 RepositoryContextLayer.RELATED_SOURCE_CODE,
                 "TEST_DIRECTORIES",
                 reference,
@@ -243,7 +242,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                 List.of(),
                 sourceId,
                 null,
-                "repository-structure:test-directories",
+                "repository-structure:test-directories"),
                 request.budget().maximumSummaryCharacters()
         ));
     }
@@ -274,6 +273,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
 
         return List.of(evidenceFactory.create(
                 metadata(),
+                new EvidenceFactory.EvidenceInput(
                 RepositoryContextLayer.RELATED_SOURCE_CODE,
                 "CONFIGURATION_FILES",
                 reference,
@@ -282,7 +282,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                 List.of(),
                 sourceId,
                 null,
-                "repository-structure:config-files",
+                "repository-structure:config-files"),
                 request.budget().maximumSummaryCharacters()
         ));
     }
@@ -318,6 +318,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
 
         return List.of(evidenceFactory.create(
                 metadata(),
+                new EvidenceFactory.EvidenceInput(
                 RepositoryContextLayer.RELATED_SOURCE_CODE,
                 "FILE_EXTENSIONS",
                 reference,
@@ -326,7 +327,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                 List.of(),
                 sourceId,
                 null,
-                "repository-structure:file-extensions",
+                "repository-structure:file-extensions"),
                 request.budget().maximumSummaryCharacters()
         ));
     }
@@ -429,6 +430,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             if (isSourceFile(path)) {
                 fileEvidence.add(evidenceFactory.create(
                         metadata(),
+                        new EvidenceFactory.EvidenceInput(
                         RepositoryContextLayer.RELATED_SOURCE_CODE,
                         "SOURCE_FILE",
                         "file:" + path,
@@ -437,12 +439,13 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                         List.of(),
                         sourceId,
                         path,
-                        "repository-structure:source-file:" + path,
+                        "repository-structure:source-file:" + path),
                         request.budget().maximumSummaryCharacters()
                 ));
             } else if (isTestFile(path)) {
                 fileEvidence.add(evidenceFactory.create(
                         metadata(),
+                        new EvidenceFactory.EvidenceInput(
                         RepositoryContextLayer.RELATED_SOURCE_CODE,
                         "TEST_FILE",
                         "file:" + path,
@@ -451,12 +454,13 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                         List.of(),
                         sourceId,
                         path,
-                        "repository-structure:test-file:" + path,
+                        "repository-structure:test-file:" + path),
                         request.budget().maximumSummaryCharacters()
                 ));
             } else if (isConfigFile(path)) {
                 fileEvidence.add(evidenceFactory.create(
                         metadata(),
+                        new EvidenceFactory.EvidenceInput(
                         RepositoryContextLayer.RELATED_SOURCE_CODE,
                         "CONFIG_FILE",
                         "config:" + path,
@@ -465,7 +469,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                         List.of(),
                         sourceId,
                         path,
-                        "repository-structure:config-file:" + path,
+                        "repository-structure:config-file:" + path),
                         request.budget().maximumSummaryCharacters()
                 ));
             }
@@ -477,7 +481,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                     .<RepositoryEvidence, Integer>comparing(e -> {
                         String pathLower = e.provenance().originatingFile().toLowerCase();
                         return (int) storyTerms.stream()
-                                .filter(term -> pathLower.contains(term))
+                                .filter(pathLower::contains)
                                 .count();
                     }).reversed()
                     .thenComparing(e -> e.provenance().originatingFile()));
@@ -505,6 +509,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             long fileCount = entry.getValue();
             moduleEvidence.add(evidenceFactory.create(
                     metadata(),
+                    new EvidenceFactory.EvidenceInput(
                     RepositoryContextLayer.RELATED_SOURCE_CODE,
                     "MODULE",
                     "module:" + moduleName,
@@ -513,7 +518,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                     List.of(),
                     sourceId,
                     null,
-                    "repository-structure:module:" + moduleName,
+                    "repository-structure:module:" + moduleName),
                     request.budget().maximumSummaryCharacters()
             ));
         }

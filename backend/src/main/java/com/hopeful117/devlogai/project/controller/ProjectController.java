@@ -6,7 +6,6 @@ import com.hopeful117.devlogai.project.dto.response.ProjectResponse;
 import com.hopeful117.devlogai.project.service.ProjectService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

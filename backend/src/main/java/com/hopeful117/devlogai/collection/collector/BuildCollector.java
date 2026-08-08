@@ -13,21 +13,26 @@ import java.util.regex.Pattern;
         name = "enabled", havingValue = "true", matchIfMissing = true)
 public class BuildCollector extends AbstractFileCollector {
     private static final String VERSION = "build-v1";
+    private static final String MAVEN_COORDINATES = "groupId=%s%nartifactId=%s";
     private static final Pattern XML_DEPENDENCY = Pattern.compile(
-            "<dependency>\\s*.*?<groupId>\\s*([^<]+)\\s*</groupId>\\s*.*?" +
-                    "<artifactId>\\s*([^<]+)\\s*</artifactId>.*?</dependency>", Pattern.DOTALL);
+            "<dependency>\\s*+<groupId>\\s*+([^<]++)</groupId>\\s*+" +
+                    "<artifactId>\\s*+([^<]++)</artifactId>");
     private static final Pattern XML_PLUGIN = Pattern.compile(
-            "<plugin>\\s*.*?(?:<groupId>\\s*([^<]+)\\s*</groupId>\\s*.*?)?" +
-                    "<artifactId>\\s*([^<]+)\\s*</artifactId>.*?</plugin>", Pattern.DOTALL);
-    private static final Pattern XML_MODULE = Pattern.compile("<module>\\s*([^<]+)\\s*</module>");
-    private static final Pattern XML_VERSION = Pattern.compile("<(?:maven.compiler.release|java.version|" +
-            "maven.compiler.source|maven.compiler.target)>\\s*([^<]+)\\s*</[^>]+>");
+            "<plugin>\\s*+(?:<groupId>\\s*+([^<]++)</groupId>\\s*+)?" +
+                    "<artifactId>\\s*+([^<]++)</artifactId>");
+    private static final Pattern XML_MODULE = Pattern.compile("<module>\\s*+([^<]++)</module>");
+    private static final Pattern XML_VERSION = Pattern.compile("<(maven.compiler.release|java.version|" +
+            "maven.compiler.source|maven.compiler.target)>\\s*+([^<]++)</\\1>");
     private static final Pattern GRADLE_DEPENDENCY = Pattern.compile(
-            "(?m)^\\s*(implementation|api|compileOnly|runtimeOnly|testImplementation)\\s*" +
-                    "[('\\\"]+([A-Za-z0-9_.-]+):([A-Za-z0-9_.-]+)(?::([^'\"\\s)]+))?");
+            "(?m)^[ \\t]*+(implementation|api|compileOnly|runtimeOnly|testImplementation)[ \\t]*+" +
+                    "[('\\\"]++([A-Za-z0-9_.-]++):([A-Za-z0-9_.-]++)(?::([^'\"\\s)]++))?");
     private static final Pattern GRADLE_JAVA = Pattern.compile(
-            "(?m)(?:sourceCompatibility|targetCompatibility|languageVersion)\\s*[=. ]+" +
-                    "(?:JavaVersion\\.VERSION_|JavaLanguageVersion\\.of\\()?['\"]?([0-9_]+)");
+            "(?m)(?:sourceCompatibility|targetCompatibility|languageVersion)[ \\t]*+[=. ]++" +
+                    "(?:JavaVersion\\.VERSION_|JavaLanguageVersion\\.of\\()?['\"]?(\\d[_\\d]*+)");
+    private static final Pattern GRADLE_MODULE = Pattern.compile(
+            "(?m)^[ \\t]*+include[ \\t]*+(?:\\([ \\t]*+)?['\"]([^'\"\\r\\n]++)['\"]");
+    private static final Pattern GRADLE_VERSION = Pattern.compile(
+            "(?m)^[ \\t]*+version[ \\t]*+=[ \\t]*+['\"]([^'\"\\r\\n]++)['\"]");
 
     public BuildCollector(SecureRepositoryScanner scanner, CollectorLimits limits) {
         super(scanner, limits);
@@ -67,25 +72,21 @@ public class BuildCollector extends AbstractFileCollector {
         }
         facts.add(FactType.BUILD_SYSTEM_DETECTED, "buildSystem=MAVEN", file.relativePath());
         matches(XML_DEPENDENCY, content, matcher -> facts.add(FactType.DEPENDENCY_DECLARED,
-                "groupId=%s%nartifactId=%s".formatted(clean(matcher.group(1)), clean(matcher.group(2))),
+                MAVEN_COORDINATES.formatted(clean(matcher.group(1)), clean(matcher.group(2))),
                 file.relativePath()));
         matches(XML_PLUGIN, content, matcher -> facts.add(FactType.BUILD_PLUGIN_DECLARED,
-                "groupId=%s%nartifactId=%s".formatted(
+                MAVEN_COORDINATES.formatted(
                         matcher.group(1) == null ? "org.apache.maven.plugins" : clean(matcher.group(1)),
                         clean(matcher.group(2))), file.relativePath()));
         matches(XML_MODULE, content, matcher -> facts.add(FactType.BUILD_MODULE_DECLARED,
                 "module=" + clean(matcher.group(1)), file.relativePath()));
         matches(XML_VERSION, content, matcher -> facts.add(FactType.JAVA_VERSION_DECLARED,
-                "javaVersion=" + clean(matcher.group(1)), file.relativePath()));
-        String projectCoordinates = content
-                .replaceAll("(?s)<parent>.*?</parent>", "")
-                .replaceAll("(?s)<dependencies>.*?</dependencies>", "")
-                .replaceAll("(?s)<build>.*?</build>", "")
-                .replaceAll("(?s)<properties>.*?</properties>", "");
-        Matcher version = Pattern.compile("<version>\\s*([^<]+)\\s*</version>")
-                .matcher(projectCoordinates);
-        if (version.find()) facts.add(FactType.PROJECT_VERSION_DECLARED,
-                "version=" + clean(version.group(1)), file.relativePath());
+                "javaVersion=" + clean(matcher.group(2)), file.relativePath()));
+        String projectCoordinates = removeSections(content,
+                "parent", "dependencies", "build", "properties");
+        String projectVersion = firstTagValue(projectCoordinates, "version");
+        if (projectVersion != null) facts.add(FactType.PROJECT_VERSION_DECLARED,
+                "version=" + clean(projectVersion), file.relativePath());
     }
 
     private void parseGradle(RepositoryFile file, FactAccumulator facts) {
@@ -93,7 +94,7 @@ public class BuildCollector extends AbstractFileCollector {
         facts.add(FactType.BUILD_SYSTEM_DETECTED, "buildSystem=GRADLE", file.relativePath());
         int dependencyCount = matches(GRADLE_DEPENDENCY, content,
                 matcher -> facts.add(FactType.DEPENDENCY_DECLARED,
-                "groupId=%s%nartifactId=%s".formatted(matcher.group(2), matcher.group(3)),
+                MAVEN_COORDINATES.formatted(matcher.group(2), matcher.group(3)),
                 file.relativePath()));
         if (content.contains("dependencies") && dependencyCount == 0) {
             facts.warning("UNSUPPORTED_GRADLE_DECLARATION",
@@ -101,10 +102,10 @@ public class BuildCollector extends AbstractFileCollector {
         }
         matches(GRADLE_JAVA, content, matcher -> facts.add(FactType.JAVA_VERSION_DECLARED,
                 "javaVersion=" + matcher.group(1).replace('_', '.'), file.relativePath()));
-        matches(Pattern.compile("(?m)^\\s*include\\s*[( ]?['\"]([^'\"]+)['\"]"), content,
+        matches(GRADLE_MODULE, content,
                 matcher -> facts.add(FactType.BUILD_MODULE_DECLARED,
                         "module=" + matcher.group(1), file.relativePath()));
-        matches(Pattern.compile("(?m)^\\s*version\\s*=\\s*['\"]([^'\"]+)['\"]"), content,
+        matches(GRADLE_VERSION, content,
                 matcher -> facts.add(FactType.PROJECT_VERSION_DECLARED,
                         "version=" + matcher.group(1), file.relativePath()));
     }
@@ -117,6 +118,30 @@ public class BuildCollector extends AbstractFileCollector {
             count++;
         }
         return count;
+    }
+
+    private String removeSections(String content, String... names) {
+        String result = content;
+        for (String name : names) {
+            int start;
+            while ((start = result.indexOf("<" + name + ">")) >= 0) {
+                int end = result.indexOf("</" + name + ">", start);
+                if (end < 0) break;
+                result = result.substring(0, start)
+                        + result.substring(end + name.length() + 3);
+            }
+        }
+        return result;
+    }
+
+    private String firstTagValue(String content, String name) {
+        String opening = "<" + name + ">";
+        String closing = "</" + name + ">";
+        int start = content.indexOf(opening);
+        if (start < 0) return null;
+        int valueStart = start + opening.length();
+        int end = content.indexOf(closing, valueStart);
+        return end < 0 ? null : content.substring(valueStart, end);
     }
 
     private String clean(String value) { return value.trim().replaceAll("\\s+", " "); }

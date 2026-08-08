@@ -57,7 +57,9 @@ class CollectorLimitsTest {
         CollectorLimits limits = new CollectorLimits();
         assertThrows(IllegalArgumentException.class, () -> limits.setCollectorTimeout(null));
         assertThrows(IllegalArgumentException.class, () -> limits.setCollectorTimeout(Duration.ZERO));
-        assertThrows(IllegalArgumentException.class, () -> limits.setCollectorTimeout(Duration.ofSeconds(-1)));
+        Duration negativeTimeout = Duration.ofSeconds(-1);
+        assertThrows(IllegalArgumentException.class,
+                () -> limits.setCollectorTimeout(negativeTimeout));
     }
 
     @Test

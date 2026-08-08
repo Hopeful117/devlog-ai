@@ -24,31 +24,12 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
         Set<String> selectedReferences = new HashSet<>();
         int usedTokens = 0;
 
-        // Context Intelligence determines which layers must receive diversity priority.
-        Set<RepositoryContextLayer> represented = new HashSet<>();
-        for (RepositoryContextLayer preferred
-                : request.contextPlan().preferredLayers()) {
-            if (represented.size() >= request.contextPlan().minimumDiverseLayers())
-                break;
-            for (RepositoryEvidence candidate : deduplicated) {
-                if (candidate.layer() != preferred
-                        || selectedReferences.contains(candidate.reference())) continue;
-                if (fits(candidate, selected.size(), usedTokens, request)) {
-                    selected.add(candidate);
-                    selectedReferences.add(candidate.reference());
-                    represented.add(candidate.layer());
-                    usedTokens += candidate.estimatedTokens();
-                    break;
-                }
-            }
-        }
+        usedTokens = selectDiverseEvidence(
+                deduplicated, request, selected, selectedReferences, usedTokens);
         for (RepositoryEvidence candidate : deduplicated) {
-            if (selectedReferences.contains(candidate.reference())) continue;
-            if (fits(candidate, selected.size(), usedTokens, request)) {
-                selected.add(candidate);
-                selectedReferences.add(candidate.reference());
-                usedTokens += candidate.estimatedTokens();
-            }
+            if (!selectedReferences.contains(candidate.reference())
+                    && fits(candidate, selected.size(), usedTokens, request))
+                usedTokens = add(candidate, selected, selectedReferences, usedTokens);
         }
         int finalUsedTokens = usedTokens;
         int finalSelectedCount = selected.size();
@@ -62,6 +43,49 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
                         value.relevanceScore(), value.estimatedTokens()))
                 .toList();
         return new SelectionResult(selected, decisions, usedTokens);
+    }
+
+    private int selectDiverseEvidence(
+            List<RepositoryEvidence> candidates,
+            ContextRequest request,
+            List<RepositoryEvidence> selected,
+            Set<String> selectedReferences,
+            int usedTokens
+    ) {
+        Set<RepositoryContextLayer> represented = new HashSet<>();
+        for (RepositoryContextLayer preferred : request.contextPlan().preferredLayers()) {
+            if (represented.size() >= request.contextPlan().minimumDiverseLayers()) break;
+            RepositoryEvidence candidate = firstEligible(
+                    candidates, preferred, selected, selectedReferences, usedTokens, request);
+            if (candidate != null) {
+                usedTokens = add(candidate, selected, selectedReferences, usedTokens);
+                represented.add(candidate.layer());
+            }
+        }
+        return usedTokens;
+    }
+
+    private RepositoryEvidence firstEligible(
+            List<RepositoryEvidence> candidates,
+            RepositoryContextLayer layer,
+            List<RepositoryEvidence> selected,
+            Set<String> selectedReferences,
+            int usedTokens,
+            ContextRequest request
+    ) {
+        return candidates.stream()
+                .filter(candidate -> candidate.layer() == layer)
+                .filter(candidate -> !selectedReferences.contains(candidate.reference()))
+                .filter(candidate -> fits(candidate, selected.size(), usedTokens, request))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private int add(RepositoryEvidence candidate, List<RepositoryEvidence> selected,
+            Set<String> selectedReferences, int usedTokens) {
+        selected.add(candidate);
+        selectedReferences.add(candidate.reference());
+        return usedTokens + candidate.estimatedTokens();
     }
 
     private List<RepositoryEvidence> deduplicate(List<RepositoryEvidence> ranked) {

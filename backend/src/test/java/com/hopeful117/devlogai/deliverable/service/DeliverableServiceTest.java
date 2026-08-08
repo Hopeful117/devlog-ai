@@ -74,8 +74,9 @@ class DeliverableServiceTest {
         UUID projectId = UUID.randomUUID();
         when(projects.findById(projectId)).thenReturn(Optional.of(Project.builder().id(projectId).build()));
         when(insights.findByProjectIdOrderByCreatedAtDescIdDesc(projectId)).thenReturn(List.of());
-        assertThrows(ConflictException.class, () -> service.generate(new CreateDeliverableRequest(
-                projectId, null, DeliverableType.README, "Engineers", "Concise", "en", null)));
+        CreateDeliverableRequest request = new CreateDeliverableRequest(
+                projectId, null, DeliverableType.README, "Engineers", "Concise", "en", null);
+        assertThrows(ConflictException.class, () -> service.generate(request));
         verifyNoInteractions(aiEngine);
     }
 }

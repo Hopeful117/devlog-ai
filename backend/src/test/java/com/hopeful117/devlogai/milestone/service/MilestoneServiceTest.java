@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class MilestoneServiceTest {
+class MilestoneServiceTest {
 
     @Mock
     MilestoneRepository milestoneRepository;

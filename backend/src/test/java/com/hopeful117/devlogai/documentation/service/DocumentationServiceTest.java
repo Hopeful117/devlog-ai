@@ -7,7 +7,6 @@ import com.hopeful117.devlogai.documentation.entity.DocumentationType;
 import com.hopeful117.devlogai.documentation.mapper.DocumentationMapper;
 import com.hopeful117.devlogai.documentation.repository.DocumentationRepository;
 import com.hopeful117.devlogai.project.entity.Project;
-import com.hopeful117.devlogai.project.mapper.ProjectMapper;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -25,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class DocumentationServiceTest {
+class DocumentationServiceTest {
 
     @Mock
     DocumentationRepository documentationRepository;

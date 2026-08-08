@@ -1,7 +1,6 @@
 package com.hopeful117.devlogai.observation.service;
 
 import com.hopeful117.devlogai.observation.dto.response.ObservationResponse;
-import com.hopeful117.devlogai.observation.entity.Observation;
 import com.hopeful117.devlogai.observation.mapper.ObservationMapper;
 import com.hopeful117.devlogai.observation.repository.ObservationRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;

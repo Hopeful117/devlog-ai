@@ -159,8 +159,9 @@ class KnowledgeSelectionServiceAdditionalTest {
     @Test
     void shouldThrowWhenMandatoryKnowledgeUnavailable() {
         var service = createService();
+        IntentDefinition intent = architectureIntent();
         assertThrows(IllegalStateException.class,
-                () -> service.select(null, architectureIntent(), null));
+                () -> service.select(null, intent, null));
     }
 
     @Test
@@ -170,13 +171,14 @@ class KnowledgeSelectionServiceAdditionalTest {
                 UUID.randomUUID(), AnalysisType.ARCHITECTURE_REVIEW, "different-intent", "v1",
                 AnalysisStatus.IN_PROGRESS, null, null, Instant.now());
         var context = createMinimalContext(analysis);
+        IntentDefinition intent = architectureIntent();
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.select(context, architectureIntent(), null));
+                () -> service.select(context, intent, null));
     }
 
     @Test
-    void shouldThrowWhenDiagnosticsUnavailable() throws Exception {
+    void shouldThrowWhenDiagnosticsUnavailable() {
         var service = createService();
         var context = createMinimalContext(testAnalysis());
 
@@ -187,8 +189,9 @@ class KnowledgeSelectionServiceAdditionalTest {
                 0, 0, 0, false, List.of(), List.of(), "digest");
         when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
         when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.empty());
+        IntentDefinition intent = architectureIntent();
 
         assertThrows(IllegalStateException.class,
-                () -> service.select(context, architectureIntent(), null));
+                () -> service.select(context, intent, null));
     }
 }

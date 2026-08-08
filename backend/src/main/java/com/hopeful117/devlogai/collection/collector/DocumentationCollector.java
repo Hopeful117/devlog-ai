@@ -5,15 +5,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Component
 @ConditionalOnProperty(prefix = "devlog.collection.collectors.documentation",
         name = "enabled", havingValue = "true", matchIfMissing = true)
 public class DocumentationCollector extends AbstractFileCollector {
     private static final String VERSION = "documentation-v1";
-    private static final Pattern HEADING = Pattern.compile("(?m)^#\\s+(.+?)\\s*$");
 
     public DocumentationCollector(SecureRepositoryScanner scanner, CollectorLimits limits) {
         super(scanner, limits);
@@ -30,24 +27,10 @@ public class DocumentationCollector extends AbstractFileCollector {
         for (RepositoryFile file : scan.files()) {
             String path = file.relativePath();
             String lower = path.toLowerCase(Locale.ROOT);
-            String name = fileName(lower);
             if (lower.startsWith("docs/") || lower.contains("/docs/")) docsDirectory = true;
             if (lower.contains("/adr/") || lower.contains("/adrs/")
                     || lower.contains("/decisions/")) adrDirectory = true;
-            if (file.content() == null) continue;
-            String metadata = "path=%s%nsize=%d%ntitle=%s".formatted(
-                    path, file.size(), firstHeading(file.content()));
-            facts.add(FactType.MARKDOWN_DOCUMENT_PRESENT, metadata, path);
-            if (!path.contains("/") && name.startsWith("readme"))
-                facts.add(FactType.README_PRESENT, metadata, path);
-            if (name.matches("(?:adr[-_])?\\d+.*\\.md") || lower.contains("/decisions/"))
-                facts.add(FactType.ADR_DOCUMENT_PRESENT, metadata, path);
-            if (name.startsWith("contributing")) facts.add(FactType.CONTRIBUTING_GUIDE_PRESENT, metadata, path);
-            if (name.startsWith("changelog") || name.startsWith("changes"))
-                facts.add(FactType.CHANGELOG_PRESENT, metadata, path);
-            if (lower.contains("api") || lower.contains("openapi") || lower.contains("swagger"))
-                facts.add(FactType.API_DOCUMENTATION_PRESENT, metadata, path);
-            if (lower.contains("architect")) facts.add(FactType.ARCHITECTURE_DOCUMENTATION_PRESENT, metadata, path);
+            if (file.content() != null) addDocumentFacts(file, facts, lower);
         }
         if (docsDirectory) facts.add(FactType.DOCUMENTATION_DIRECTORY_PRESENT,
                 "documentationDirectory=docs", "docs/");
@@ -56,13 +39,59 @@ public class DocumentationCollector extends AbstractFileCollector {
         return result(facts);
     }
 
-    private String firstHeading(String content) {
-        Matcher matcher = HEADING.matcher(content);
-        if (!matcher.find()) return "";
-        String title = matcher.group(1).trim().replaceAll("\\s+", " ");
-        if (title.matches("(?i).*(?:password|secret|token|api[-_ ]?key)\\s*[:=].*")) {
-            return "[redacted]";
+    private void addDocumentFacts(RepositoryFile file, FactAccumulator facts, String lowerPath) {
+        String path = file.relativePath();
+        String name = fileName(lowerPath);
+        String metadata = "path=%s%nsize=%d%ntitle=%s".formatted(
+                path, file.size(), firstHeading(file.content()));
+        facts.add(FactType.MARKDOWN_DOCUMENT_PRESENT, metadata, path);
+        if (!path.contains("/") && name.startsWith("readme"))
+            facts.add(FactType.README_PRESENT, metadata, path);
+        if (isAdrName(name) || lowerPath.contains("/decisions/"))
+            facts.add(FactType.ADR_DOCUMENT_PRESENT, metadata, path);
+        if (name.startsWith("contributing"))
+            facts.add(FactType.CONTRIBUTING_GUIDE_PRESENT, metadata, path);
+        if (name.startsWith("changelog") || name.startsWith("changes"))
+            facts.add(FactType.CHANGELOG_PRESENT, metadata, path);
+        if (lowerPath.contains("api") || lowerPath.contains("openapi")
+                || lowerPath.contains("swagger"))
+            facts.add(FactType.API_DOCUMENTATION_PRESENT, metadata, path);
+        if (lowerPath.contains("architect"))
+            facts.add(FactType.ARCHITECTURE_DOCUMENTATION_PRESENT, metadata, path);
+    }
+
+    private boolean isAdrName(String name) {
+        if (!name.endsWith(".md")) return false;
+        String stem = name.substring(0, name.length() - 3);
+        if (stem.startsWith("adr-") || stem.startsWith("adr_")) stem = stem.substring(4);
+        int digitCount = 0;
+        while (digitCount < stem.length() && Character.isDigit(stem.charAt(digitCount))) {
+            digitCount++;
         }
-        return title.substring(0, Math.min(title.length(), 200));
+        return digitCount > 0;
+    }
+
+    private String firstHeading(String content) {
+        for (String line : content.lines().toList()) {
+            if (!line.startsWith("# ")) continue;
+            String title = normalizeWhitespace(line.substring(2));
+            return containsSensitiveAssignment(title) ? "[redacted]" :
+                    title.substring(0, Math.min(title.length(), 200));
+        }
+        return "";
+    }
+
+    private String normalizeWhitespace(String value) {
+        return String.join(" ", value.trim().split("\\s++"));
+    }
+
+    private boolean containsSensitiveAssignment(String title) {
+        String lower = title.toLowerCase(Locale.ROOT);
+        int separator = Math.max(lower.indexOf(':'), lower.indexOf('='));
+        if (separator < 0) return false;
+        String key = lower.substring(0, separator).replace("-", "").replace("_", "")
+                .replace(" ", "");
+        return key.contains("password") || key.contains("secret")
+                || key.contains("token") || key.contains("apikey");
     }
 }

@@ -4,7 +4,6 @@ import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 
 import java.util.List;
-import java.util.UUID;
 
 public record ProjectContextSnapshot(
         AnalysisContext.ProjectSnapshot project,

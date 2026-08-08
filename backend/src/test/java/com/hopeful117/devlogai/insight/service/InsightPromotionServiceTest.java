@@ -72,9 +72,10 @@ class InsightPromotionServiceTest {
                 .type(ProposalType.INSIGHT)
                 .payload(Map.of("insightType", "TECHNOLOGY_DESCRIPTION", "title", "Stack"))
                 .build();
+        InsightPromotionService service = new InsightPromotionService(repository);
+        Validation validation = new Validation();
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> new InsightPromotionService(repository).promote(
-                        proposal, new Validation(), InsightSeverity.INFO));
+                () -> service.promote(proposal, validation, InsightSeverity.INFO));
         assertEquals("Accepted insight proposal is missing payload field: summary", error.getMessage());
         verifyNoInteractions(repository);
     }
@@ -89,8 +90,10 @@ class InsightPromotionServiceTest {
                         "summary", "The project uses Spring Boot."
                 ))
                 .build();
+        InsightPromotionService service = new InsightPromotionService(repository);
+        Validation validation = new Validation();
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> new InsightPromotionService(repository).promote(proposal, new Validation(), null));
+                () -> service.promote(proposal, validation, null));
         assertEquals("Severity is required when accepting an insight proposal", error.getMessage());
         verifyNoInteractions(repository);
     }

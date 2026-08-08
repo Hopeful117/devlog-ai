@@ -57,16 +57,24 @@ public class SecureRepositoryScanner {
         if (depth > 0 && excluded(directory.getFileName().toString())) return;
         state.directories++;
 
-        List<Path> children;
+        List<Path> children = children(directory, state);
+
+        for (Path child : children) {
+            if (state.terminated || expired(state)) return;
+            scanChild(child, depth, state);
+        }
+    }
+
+    private List<Path> children(Path directory, ScanState state) {
         try (var paths = Files.list(directory)) {
-            children = paths.limit((long) limits.getMaxFiles() + 1).toList();
+            List<Path> children = paths.limit((long) limits.getMaxFiles() + 1).toList();
             if (children.size() > limits.getMaxFiles()) {
                 warningOnce(state.warnings, "MAX_DIRECTORY_ENTRIES_REACHED",
                         "Maximum entries in one directory reached");
                 state.terminated = true;
-                return;
+                return List.of();
             }
-            children = children.stream()
+            return children.stream()
                     .sorted(Comparator.comparing(path -> path.getFileName().toString()))
                     .toList();
         } catch (IOException exception) {
@@ -75,17 +83,16 @@ public class SecureRepositoryScanner {
             }
             state.warnings.add(new CollectionWarning(
                     "DIRECTORY_READ_FAILED", "Unable to inspect directory: " + safeRelative(state.root, directory)));
-            return;
+            return List.of();
         }
+    }
 
-        for (Path child : children) {
-            if (state.terminated || expired(state)) return;
-            if (Files.isSymbolicLink(child)) continue;
-            if (Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)) {
-                scanDirectory(child, depth + 1, state);
-            } else if (Files.isRegularFile(child, LinkOption.NOFOLLOW_LINKS)) {
-                scanFile(child, state);
-            }
+    private void scanChild(Path child, int parentDepth, ScanState state) {
+        if (Files.isSymbolicLink(child)) return;
+        if (Files.isDirectory(child, LinkOption.NOFOLLOW_LINKS)) {
+            scanDirectory(child, parentDepth + 1, state);
+        } else if (Files.isRegularFile(child, LinkOption.NOFOLLOW_LINKS)) {
+            scanFile(child, state);
         }
     }
 

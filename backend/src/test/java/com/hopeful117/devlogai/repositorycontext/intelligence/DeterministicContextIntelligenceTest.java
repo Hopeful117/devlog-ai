@@ -43,8 +43,10 @@ class DeterministicContextIntelligenceTest {
 
     @Test
     void rejectsUnknownProfileAndUsesDeterministicFallbackForLegacyIntent() {
+        AnalysisContext analysisContext = context();
+        IntentDefinition unknownProfileIntent = intent(List.of("unknown-v1"));
         assertThrows(IllegalArgumentException.class,
-                () -> intelligence.plan(context(), intent(List.of("unknown-v1"))));
+                () -> intelligence.plan(analysisContext, unknownProfileIntent));
 
         ContextPlan fallback = intelligence.plan(context(), intent(List.of()));
 

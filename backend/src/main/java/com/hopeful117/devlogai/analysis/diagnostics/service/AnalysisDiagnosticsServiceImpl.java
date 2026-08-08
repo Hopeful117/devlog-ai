@@ -24,6 +24,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AnalysisDiagnosticsServiceImpl implements AnalysisDiagnosticsService {
     private static final String CONTEXT_BUILDER_VERSION = "analysis-context-v3";
+    private static final String COMPLETED = "COMPLETED";
+    private static final String PENDING = "PENDING";
     private final AnalysisRepository analysisRepository;
     private final AnalysisExecutionDiagnosticRepository diagnosticRepository;
     private final CollectionWarningRepository warningRepository;
@@ -95,14 +97,14 @@ public class AnalysisDiagnosticsServiceImpl implements AnalysisDiagnosticsServic
             AnalysisExecutionDiagnostic d, AiTask task, long proposalCount,
             ProjectProfileSnapshot profile) {
         return List.of(
-                new AnalysisDiagnosticsResponse.PipelineStage("WORKSPACE", "COMPLETED", d.getSourceCount()),
-                new AnalysisDiagnosticsResponse.PipelineStage("COLLECTORS", d.isCollectionComplete() ? "COMPLETED" : "PARTIAL", d.getCollectorCount()),
-                new AnalysisDiagnosticsResponse.PipelineStage("FACTS", "COMPLETED", d.getFactCount()),
-                new AnalysisDiagnosticsResponse.PipelineStage("OBSERVATIONS", "COMPLETED", d.getObservationCount()),
-                new AnalysisDiagnosticsResponse.PipelineStage("PROJECT_PROFILE", profile == null ? "PENDING" : "COMPLETED", profile == null ? 0 : 1),
-                new AnalysisDiagnosticsResponse.PipelineStage("ANALYSIS_CONTEXT", task == null ? "PENDING" : "COMPLETED", task == null ? 0 : 1),
-                new AnalysisDiagnosticsResponse.PipelineStage("AI_TASK", task == null ? "PENDING" : task.getStatus().name(), task == null ? 0 : 1),
-                new AnalysisDiagnosticsResponse.PipelineStage("PROPOSALS", task == null ? "PENDING" : "AVAILABLE", proposalCount)
+                new AnalysisDiagnosticsResponse.PipelineStage("WORKSPACE", COMPLETED, d.getSourceCount()),
+                new AnalysisDiagnosticsResponse.PipelineStage("COLLECTORS", d.isCollectionComplete() ? COMPLETED : "PARTIAL", d.getCollectorCount()),
+                new AnalysisDiagnosticsResponse.PipelineStage("FACTS", COMPLETED, d.getFactCount()),
+                new AnalysisDiagnosticsResponse.PipelineStage("OBSERVATIONS", COMPLETED, d.getObservationCount()),
+                new AnalysisDiagnosticsResponse.PipelineStage("PROJECT_PROFILE", profile == null ? PENDING : COMPLETED, profile == null ? 0 : 1),
+                new AnalysisDiagnosticsResponse.PipelineStage("ANALYSIS_CONTEXT", task == null ? PENDING : COMPLETED, task == null ? 0 : 1),
+                new AnalysisDiagnosticsResponse.PipelineStage("AI_TASK", task == null ? PENDING : task.getStatus().name(), task == null ? 0 : 1),
+                new AnalysisDiagnosticsResponse.PipelineStage("PROPOSALS", task == null ? PENDING : "AVAILABLE", proposalCount)
         );
     }
 }

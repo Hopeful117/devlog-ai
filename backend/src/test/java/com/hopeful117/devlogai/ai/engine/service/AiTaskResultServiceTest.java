@@ -179,13 +179,12 @@ class AiTaskResultServiceTest {
         AiTask task = task(correlationId, AiTaskStatus.CREATED);
         when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
                 .thenReturn(Optional.of(task));
+        AiTaskResultRequest request = completedRequest(
+                correlationId, Instant.now(), List.of());
 
         AiTaskResultConflictException result = assertThrows(
                 AiTaskResultConflictException.class,
-                () -> service.handle(
-                        correlationId,
-                        completedRequest(correlationId, Instant.now(), List.of())
-                )
+                () -> service.handle(correlationId, request)
         );
 
         assertEquals("AI_TASK_NOT_READY", result.getCode());
@@ -199,13 +198,12 @@ class AiTaskResultServiceTest {
         AiTask task = task(correlationId, AiTaskStatus.FAILED);
         when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
                 .thenReturn(Optional.of(task));
+        AiTaskResultRequest request = completedRequest(
+                correlationId, Instant.now(), List.of());
 
         AiTaskResultConflictException result = assertThrows(
                 AiTaskResultConflictException.class,
-                () -> service.handle(
-                        correlationId,
-                        completedRequest(correlationId, Instant.now(), List.of())
-                )
+                () -> service.handle(correlationId, request)
         );
 
         assertEquals("AI_TASK_TERMINAL_CONFLICT", result.getCode());
@@ -232,17 +230,12 @@ class AiTaskResultServiceTest {
         when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
                 .thenReturn(Optional.of(task));
         when(factRepository.findAllById(any())).thenReturn(List.of(foreignFact));
+        AiTaskResultRequest request = completedRequest(
+                correlationId, Instant.now(), List.of(proposal));
 
         assertThrows(
                 InvalidAiTaskResultException.class,
-                () -> service.handle(
-                        correlationId,
-                        completedRequest(
-                                correlationId,
-                                Instant.now(),
-                                List.of(proposal)
-                        )
-                )
+                () -> service.handle(correlationId, request)
         );
 
         verify(proposalRepository, never()).saveAll(any());

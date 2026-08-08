@@ -3,7 +3,7 @@ package com.hopeful117.devlogai.collection.collector;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -16,9 +16,10 @@ public class CollectorRunner {
     }
 
     public CollectionResult run(KnowledgeCollector collector, CollectionContext context) {
-        var executor = Executors.newVirtualThreadPerTaskExecutor();
+        var task = new FutureTask<>(() -> collector.collect(context));
+        Thread worker = Thread.startVirtualThread(task);
         try {
-            return executor.submit(() -> collector.collect(context)).get(
+            return task.get(
                     limits.getCollectorTimeout().toMillis(), TimeUnit.MILLISECONDS);
         } catch (TimeoutException exception) {
             throw new NonFatalCollectionException(
@@ -30,7 +31,8 @@ public class CollectorRunner {
             if (exception.getCause() instanceof RuntimeException runtime) throw runtime;
             throw new IllegalStateException("Collector execution failed", exception.getCause());
         } finally {
-            executor.shutdownNow();
+            task.cancel(true);
+            if (worker.isAlive()) worker.interrupt();
         }
     }
 }

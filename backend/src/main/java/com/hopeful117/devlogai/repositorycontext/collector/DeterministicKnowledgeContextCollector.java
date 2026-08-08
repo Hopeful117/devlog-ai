@@ -15,6 +15,7 @@ import java.util.Locale;
 @Order(20)
 public class DeterministicKnowledgeContextCollector
         implements RepositoryContextCollector {
+    private static final String FACT_REFERENCE_PREFIX = "fact:";
     private final EvidenceFactory evidenceFactory;
 
     public DeterministicKnowledgeContextCollector(EvidenceFactory evidenceFactory) {
@@ -29,21 +30,22 @@ public class DeterministicKnowledgeContextCollector
         List<RepositoryEvidence> evidence = new ArrayList<>();
         for (AnalysisContext.FactSnapshot fact : request.analysisContext().facts()) {
             String location = fact.evidenceReferences().stream().findFirst().orElse(fact.source());
-            evidence.add(evidenceFactory.create(metadata(), layer(location), "FACT",
-                    location == null ? "fact:" + fact.id() : location,
+            evidence.add(evidenceFactory.create(metadata(), new EvidenceFactory.EvidenceInput(
+                    layer(location), "FACT",
+                    location == null ? FACT_REFERENCE_PREFIX + fact.id() : location,
                     fact.content(), fact.detectedAt(),
-                    List.of("fact:" + fact.id()), location, location,
-                    fact.id().toString(), request.budget().maximumSummaryCharacters()));
+                    List.of(FACT_REFERENCE_PREFIX + fact.id()), location, location,
+                    fact.id().toString()), request.budget().maximumSummaryCharacters()));
         }
         for (AnalysisContext.ObservationSnapshot observation
                 : request.analysisContext().observations()) {
-            evidence.add(evidenceFactory.create(metadata(),
+            evidence.add(evidenceFactory.create(metadata(), new EvidenceFactory.EvidenceInput(
                     RepositoryContextLayer.RELATED_SOURCE_CODE, "OBSERVATION",
                     "observation:" + observation.id(), observation.content(),
                     observation.createdAt(),
                     observation.supportingFactIds().stream()
-                            .map(id -> "fact:" + id).toList(),
-                    null, null, observation.id().toString(),
+                            .map(id -> FACT_REFERENCE_PREFIX + id).toList(),
+                    null, null, observation.id().toString()),
                     request.budget().maximumSummaryCharacters()));
         }
         return List.copyOf(evidence);

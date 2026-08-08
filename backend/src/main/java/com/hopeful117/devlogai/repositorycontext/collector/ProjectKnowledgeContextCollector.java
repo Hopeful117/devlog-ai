@@ -26,37 +26,51 @@ public class ProjectKnowledgeContextCollector implements RepositoryContextCollec
     public List<RepositoryEvidence> collect(ContextRequest request) {
         List<RepositoryEvidence> result = new ArrayList<>();
         request.analysisContext().relatedDecisions().forEach(value -> result.add(create(
-                request, RepositoryContextLayer.ADR, "DECISION", "decision:" + value.id(),
+                request, new KnowledgeEvidence(RepositoryContextLayer.ADR, "DECISION", "decision:" + value.id(),
                 value.title() + " — " + Objects.toString(value.choice(), ""),
-                value.createdAt(), value.id().toString(), List.of())));
+                value.createdAt(), value.id().toString(), List.of()))));
         request.analysisContext().recentMilestones().forEach(value -> result.add(create(
-                request, RepositoryContextLayer.ROADMAP, "MILESTONE",
+                request, new KnowledgeEvidence(RepositoryContextLayer.ROADMAP, "MILESTONE",
                 "milestone:" + value.id(), value.name() + " — " + value.status(),
-                value.startedAt(), value.id().toString(), List.of())));
+                value.startedAt(), value.id().toString(), List.of()))));
         request.validatedInsights().forEach(value -> result.add(create(
-                request, RepositoryContextLayer.VALIDATED_INSIGHT, "INSIGHT",
+                request, new KnowledgeEvidence(RepositoryContextLayer.VALIDATED_INSIGHT, "INSIGHT",
                 "insight:" + value.getId(), value.getTitle() + " — " + value.getContent(),
                 value.getCreatedAt(), value.getId().toString(),
-                List.of("analysis:" + value.getAnalysis().getId()))));
+                List.of("analysis:" + value.getAnalysis().getId())))));
         request.analysisContext().relatedAnalyses().forEach(value -> result.add(create(
-                request, RepositoryContextLayer.PREVIOUS_ANALYSIS, "ANALYSIS",
+                request, new KnowledgeEvidence(RepositoryContextLayer.PREVIOUS_ANALYSIS, "ANALYSIS",
                 "analysis:" + value.id(), value.type() + " " + value.status(),
-                value.createdAt(), value.id().toString(), List.of())));
+                value.createdAt(), value.id().toString(), List.of()))));
         request.analysisContext().architectureArtifacts().forEach(value -> result.add(
-                evidenceFactory.create(metadata(),
+                evidenceFactory.create(metadata(), new EvidenceFactory.EvidenceInput(
                         RepositoryContextLayer.PROJECT_DOCUMENTATION, "ARTIFACT",
                         "artifact:" + value.id(),
                         value.name() + " — " + Objects.toString(value.description(), ""),
                         value.createdAt(),
                         value.path() == null ? List.of()
                                 : List.of("repository:" + value.path()),
-                        null, value.path(), value.id().toString(),
+                        null, value.path(), value.id().toString()),
                         request.budget().maximumSummaryCharacters())));
         return List.copyOf(result);
     }
 
     private RepositoryEvidence create(
             ContextRequest request,
+            KnowledgeEvidence value
+    ) {
+        return evidenceFactory.create(metadata(), new EvidenceFactory.EvidenceInput(
+                value.layer(), value.kind(), value.reference(), value.summary(),
+                value.timestamp(), value.related(), null, null, value.identifier()),
+                request.budget().maximumSummaryCharacters());
+    }
+
+    private EvidenceFactory.ContextRequestMetadata metadata() {
+        return new EvidenceFactory.ContextRequestMetadata(
+                collectorId(), collectorVersion(), "CORE_KNOWLEDGE");
+    }
+
+    private record KnowledgeEvidence(
             RepositoryContextLayer layer,
             String kind,
             String reference,
@@ -65,13 +79,5 @@ public class ProjectKnowledgeContextCollector implements RepositoryContextCollec
             String identifier,
             List<String> related
     ) {
-        return evidenceFactory.create(metadata(), layer, kind, reference, summary,
-                timestamp, related, null, null, identifier,
-                request.budget().maximumSummaryCharacters());
-    }
-
-    private EvidenceFactory.ContextRequestMetadata metadata() {
-        return new EvidenceFactory.ContextRequestMetadata(
-                collectorId(), collectorVersion(), "CORE_KNOWLEDGE");
     }
 }

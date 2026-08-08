@@ -176,7 +176,8 @@ public class ProjectProfileServiceImpl implements ProjectProfileService {
 
     private record Mapping(ProfileCategory category, String code, String label, String description) { }
     private static final class MutableCharacteristic {
-        private final Mapping mapping; private final SortedSet<UUID> observations = new TreeSet<>();
+        private final Mapping mapping;
+        private final SortedSet<UUID> observations = new TreeSet<>();
         private final Set<String> evidence = new TreeSet<>();
         private MutableCharacteristic(Mapping mapping) { this.mapping = mapping; }
         private void add(Observation observation) {

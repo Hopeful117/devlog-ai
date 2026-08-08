@@ -9,12 +9,14 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InitialCollectorsTest {
@@ -90,8 +92,22 @@ class InitialCollectorsTest {
 
     @Test
     void dockerCollectorShouldParseDescriptorsWithoutRunningDocker() throws IOException {
-        write("Dockerfile", "FROM eclipse-temurin:21 AS build\nFROM eclipse-temurin:21\nUSER app\nHEALTHCHECK CMD true");
-        write("compose.yml", "services:\n  backend:\n    image: app\nvolumes:\n  data:\n");
+        write("Dockerfile", """
+                FROM eclipse-temurin:21 AS build
+                FROM eclipse-temurin:21
+                USER app
+                HEALTHCHECK CMD true
+                EXPOSE 8080 # public port
+                """);
+        write("compose.yml", """
+                services: # applications
+                  backend:
+                    image: app
+                    healthcheck:
+                      test: true
+                volumes:
+                  data:
+                """);
         write(".dockerignore", "target\n");
         DockerCollector collector = new DockerCollector(scanner, limits);
 
@@ -101,6 +117,9 @@ class InitialCollectorsTest {
         assertTrue(has(result, FactType.DOCKER_MULTI_STAGE_BUILD_PRESENT));
         assertTrue(has(result, FactType.DOCKER_SERVICE_DECLARED));
         assertTrue(has(result, FactType.DOCKER_VOLUME_DECLARED));
+        assertTrue(has(result, FactType.DOCKER_NON_ROOT_USER_DECLARED));
+        assertTrue(has(result, FactType.DOCKER_HEALTHCHECK_DECLARED));
+        assertTrue(has(result, FactType.DOCKER_EXPOSED_PORT_DECLARED));
         assertTrue(has(result, FactType.DOCKERIGNORE_PRESENT));
     }
 
@@ -108,6 +127,11 @@ class InitialCollectorsTest {
     void documentationCollectorShouldInventoryMetadataWithoutJudgingQuality() throws IOException {
         write("README.md", "# Sample\nDocumentation");
         write("docs/decisions/ADR-001.md", "# ADR-001\nDecision");
+        write("docs/api.md", "# API Reference\nEndpoints");
+        write("docs/architecture.md", "# Architecture\nComponents");
+        write("CONTRIBUTING.md", "# Contributing\nGuidelines");
+        write("CHANGELOG.md", "# Changelog\nChanges");
+        write("docs/secrets.md", "# API key: private-value\nRedacted heading");
         DocumentationCollector collector = new DocumentationCollector(scanner, limits);
 
         CollectionResult result = collector.collect(context);
@@ -115,7 +139,37 @@ class InitialCollectorsTest {
         assertTrue(has(result, FactType.README_PRESENT));
         assertTrue(has(result, FactType.ADR_DOCUMENT_PRESENT));
         assertTrue(has(result, FactType.DOCUMENTATION_DIRECTORY_PRESENT));
+        assertTrue(has(result, FactType.ADR_DIRECTORY_PRESENT));
+        assertTrue(has(result, FactType.API_DOCUMENTATION_PRESENT));
+        assertTrue(has(result, FactType.ARCHITECTURE_DOCUMENTATION_PRESENT));
+        assertTrue(has(result, FactType.CONTRIBUTING_GUIDE_PRESENT));
+        assertTrue(has(result, FactType.CHANGELOG_PRESENT));
+        assertTrue(result.facts().stream()
+                .anyMatch(fact -> fact.content().contains("[redacted]")));
         assertTrue(result.facts().stream().noneMatch(fact -> fact.content().contains("quality")));
+    }
+
+    @Test
+    void textCollectorsShouldCompleteForLongAdversarialInput() throws IOException {
+        String longText = "x".repeat(250_000);
+        write("pom.xml", "<dependency><groupId>" + longText);
+        write("build.gradle", "org.springframework.boot" + longText);
+        write("Dockerfile", "FROM " + longText);
+        write("docs/ADR-123.md", "# token " + longText);
+        BuildCollector buildCollector = new BuildCollector(scanner, limits);
+        SpringCollector springCollector = new SpringCollector(scanner, limits);
+        DockerCollector dockerCollector = new DockerCollector(scanner, limits);
+        DocumentationCollector documentationCollector =
+                new DocumentationCollector(scanner, limits);
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2),
+                () -> buildCollector.collect(context));
+        assertTimeoutPreemptively(Duration.ofSeconds(2),
+                () -> springCollector.collect(context));
+        assertTimeoutPreemptively(Duration.ofSeconds(2),
+                () -> dockerCollector.collect(context));
+        assertTimeoutPreemptively(Duration.ofSeconds(2),
+                () -> documentationCollector.collect(context));
     }
 
     @Test
@@ -162,7 +216,7 @@ class InitialCollectorsTest {
                 "buildSystem=MAVEN", java.util.List.of("pom.xml"), "def");
 
         assertEquals(first.fingerprint(), same.fingerprint());
-        assertFalse(first.fingerprint().equals(differentRevision.fingerprint()));
+        assertNotEquals(first.fingerprint(), differentRevision.fingerprint());
         assertEquals(64, first.fingerprint().length());
     }
 

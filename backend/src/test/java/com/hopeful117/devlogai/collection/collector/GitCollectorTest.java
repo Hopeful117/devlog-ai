@@ -2,7 +2,6 @@ package com.hopeful117.devlogai.collection.collector;
 
 import com.hopeful117.devlogai.collection.workspace.GitCommandExecutor;
 import com.hopeful117.devlogai.fact.entity.FactType;
-import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.entity.SourceType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

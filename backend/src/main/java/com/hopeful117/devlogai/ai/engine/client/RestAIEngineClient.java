@@ -85,8 +85,12 @@ public class RestAIEngineClient implements AIEngineClient {
         }
     }
 
+    /**
+     * @deprecated The legacy request does not carry selected repository knowledge.
+     * Use {@link #submit(PromptRequest)} instead.
+     */
     @Override
-    @Deprecated
+    @Deprecated(since = "0.3.0", forRemoval = false)
     public AiTaskSubmissionResponse submit(AiTaskSubmissionRequest request) {
         throw new AIEngineCommunicationException(
                 "Legacy AnalysisContext submission is disabled; submit a PromptRequest with SelectedKnowledge"

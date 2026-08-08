@@ -19,6 +19,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProjectServiceImpl implements ProjectService{
 
+    private static final String PROJECT_ENTITY = "Project";
+
     private final ProjectRepository projectRepository;
     private final ProjectMapper projectMapper;
     private final SlugService slugService;
@@ -40,7 +42,7 @@ public class ProjectServiceImpl implements ProjectService{
     public ProjectResponse getBySlug(String slug) {
         Project project = projectRepository.findBySlug(slug)
                 .orElseThrow(() ->
-                        new EntityNotFoundException("Project", slug)
+                        new EntityNotFoundException(PROJECT_ENTITY, slug)
                 );
 
         return projectMapper.toResponse(project);
@@ -59,7 +61,7 @@ public class ProjectServiceImpl implements ProjectService{
     public ProjectResponse update(String slug, UpdateProjectRequest request) {
         Project project = projectRepository.findBySlug(slug)
                 .orElseThrow(() ->
-                        new EntityNotFoundException("Project", slug)
+                        new EntityNotFoundException(PROJECT_ENTITY, slug)
                 );
 
 
@@ -74,7 +76,7 @@ public class ProjectServiceImpl implements ProjectService{
     public void archive(String slug) {
         Project project = projectRepository.findBySlug(slug)
                 .orElseThrow(() ->
-                        new EntityNotFoundException("Project", slug)
+                        new EntityNotFoundException(PROJECT_ENTITY, slug)
                 );
 
         project.setStatus(ProjectStatus.ARCHIVED);

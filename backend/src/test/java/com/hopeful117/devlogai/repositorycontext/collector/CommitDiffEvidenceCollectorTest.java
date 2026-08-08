@@ -19,7 +19,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -161,8 +160,8 @@ class CommitDiffEvidenceCollectorTest {
         List<RepositoryEvidence> evidence = collector.collect(createRequest());
 
         assertEquals(1, evidence.size());
-        assertTrue(evidence.getFirst().provenance().originatingFile()
-                .equals("src/main/java/com/App.java"));
+        assertEquals("src/main/java/com/App.java",
+                evidence.getFirst().provenance().originatingFile());
     }
 
     @Test
@@ -191,8 +190,8 @@ class CommitDiffEvidenceCollectorTest {
         List<RepositoryEvidence> evidence = collector.collect(createRequest());
 
         assertEquals(1, evidence.size());
-        assertTrue(evidence.getFirst().provenance().originatingFile()
-                .equals("src/main/java/com/App.java"));
+        assertEquals("src/main/java/com/App.java",
+                evidence.getFirst().provenance().originatingFile());
     }
 
     @Test
@@ -215,8 +214,8 @@ class CommitDiffEvidenceCollectorTest {
         List<RepositoryEvidence> evidence = collector.collect(createRequest());
 
         assertEquals(1, evidence.size());
-        assertTrue(evidence.getFirst().provenance().originatingFile()
-                .equals("src/main/java/com/App.java"));
+        assertEquals("src/main/java/com/App.java",
+                evidence.getFirst().provenance().originatingFile());
     }
 
     @Test

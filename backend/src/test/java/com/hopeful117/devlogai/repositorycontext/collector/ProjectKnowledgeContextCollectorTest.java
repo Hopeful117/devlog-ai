@@ -13,11 +13,7 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import com.hopeful117.devlogai.repositorycontext.intelligence.ContextPlan;
 import com.hopeful117.devlogai.repositorycontext.intelligence.ContextProfileDefinition;
-import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceCriterion;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
 import java.util.List;
@@ -25,13 +21,12 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
 class ProjectKnowledgeContextCollectorTest {
 
-    @Mock private EvidenceFactory evidenceFactory;
+    private final EvidenceFactory evidenceFactory = new EvidenceFactory();
 
     private ProjectKnowledgeContextCollector createCollector() {
         return new ProjectKnowledgeContextCollector(evidenceFactory);
@@ -73,18 +68,12 @@ class ProjectKnowledgeContextCollectorTest {
                 null, testAnalysis(), null, List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(decision), List.of(), List.of()));
 
-        RepositoryEvidence evidence = mock(RepositoryEvidence.class);
-        when(evidenceFactory.create(any(), eq(RepositoryContextLayer.ADR), eq("DECISION"),
-                contains("decision:"), anyString(), any(), anyList(), isNull(), isNull(),
-                eq(decisionId.toString()), anyInt()))
-                .thenReturn(evidence);
 
         List<RepositoryEvidence> result = collector.collect(request);
 
         assertEquals(1, result.size());
-        verify(evidenceFactory).create(any(), eq(RepositoryContextLayer.ADR), eq("DECISION"),
-                eq("decision:" + decisionId), contains("Use PostgreSQL"), any(), anyList(),
-                isNull(), isNull(), eq(decisionId.toString()), anyInt());
+        assertEvidence(result.getFirst(), RepositoryContextLayer.ADR,
+                "DECISION", "decision:" + decisionId, "Use PostgreSQL");
     }
 
     @Test
@@ -98,18 +87,12 @@ class ProjectKnowledgeContextCollectorTest {
                 null, testAnalysis(), null, List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of(milestone), List.of()));
 
-        RepositoryEvidence evidence = mock(RepositoryEvidence.class);
-        when(evidenceFactory.create(any(), eq(RepositoryContextLayer.ROADMAP), eq("MILESTONE"),
-                contains("milestone:"), anyString(), any(), anyList(), isNull(), isNull(),
-                eq(milestoneId.toString()), anyInt()))
-                .thenReturn(evidence);
 
         List<RepositoryEvidence> result = collector.collect(request);
 
         assertEquals(1, result.size());
-        verify(evidenceFactory).create(any(), eq(RepositoryContextLayer.ROADMAP), eq("MILESTONE"),
-                eq("milestone:" + milestoneId), contains("v2.0 Release"), any(), anyList(),
-                isNull(), isNull(), eq(milestoneId.toString()), anyInt());
+        assertEvidence(result.getFirst(), RepositoryContextLayer.ROADMAP,
+                "MILESTONE", "milestone:" + milestoneId, "v2.0 Release");
     }
 
     @Test
@@ -132,18 +115,13 @@ class ProjectKnowledgeContextCollectorTest {
                 null, testAnalysis(), null, List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of(), List.of()), List.of(insight));
 
-        RepositoryEvidence evidence = mock(RepositoryEvidence.class);
-        when(evidenceFactory.create(any(), eq(RepositoryContextLayer.VALIDATED_INSIGHT), eq("INSIGHT"),
-                contains("insight:"), anyString(), any(), anyList(), isNull(), isNull(),
-                eq(insightId.toString()), anyInt()))
-                .thenReturn(evidence);
 
         List<RepositoryEvidence> result = collector.collect(request);
 
         assertEquals(1, result.size());
-        verify(evidenceFactory).create(any(), eq(RepositoryContextLayer.VALIDATED_INSIGHT), eq("INSIGHT"),
-                eq("insight:" + insightId), contains("Key Insight"), any(), anyList(),
-                isNull(), isNull(), eq(insightId.toString()), anyInt());
+        assertEvidence(result.getFirst(), RepositoryContextLayer.VALIDATED_INSIGHT,
+                "INSIGHT", "insight:" + insightId, "Key Insight");
+        assertEquals(List.of("analysis:" + analysisId), result.getFirst().relatedReferences());
     }
 
     @Test
@@ -157,18 +135,12 @@ class ProjectKnowledgeContextCollectorTest {
                 null, testAnalysis(), null, List.of(), List.of(), List.of(),
                 List.of(related), List.of(), List.of(), List.of(), List.of()));
 
-        RepositoryEvidence evidence = mock(RepositoryEvidence.class);
-        when(evidenceFactory.create(any(), eq(RepositoryContextLayer.PREVIOUS_ANALYSIS), eq("ANALYSIS"),
-                contains("analysis:"), anyString(), any(), anyList(), isNull(), isNull(),
-                eq(relatedId.toString()), anyInt()))
-                .thenReturn(evidence);
 
         List<RepositoryEvidence> result = collector.collect(request);
 
         assertEquals(1, result.size());
-        verify(evidenceFactory).create(any(), eq(RepositoryContextLayer.PREVIOUS_ANALYSIS), eq("ANALYSIS"),
-                eq("analysis:" + relatedId), contains("ARCHITECTURE_REVIEW"), any(), anyList(),
-                isNull(), isNull(), eq(relatedId.toString()), anyInt());
+        assertEvidence(result.getFirst(), RepositoryContextLayer.PREVIOUS_ANALYSIS,
+                "ANALYSIS", "analysis:" + relatedId, "ARCHITECTURE_REVIEW");
     }
 
     @Test
@@ -181,18 +153,13 @@ class ProjectKnowledgeContextCollectorTest {
                 null, testAnalysis(), null, List.of(), List.of(), List.of(),
                 List.of(), List.of(artifact), List.of(), List.of(), List.of()));
 
-        RepositoryEvidence evidence = mock(RepositoryEvidence.class);
-        when(evidenceFactory.create(any(), eq(RepositoryContextLayer.PROJECT_DOCUMENTATION), eq("ARTIFACT"),
-                contains("artifact:"), anyString(), any(), anyList(), isNull(),
-                eq("docs/adr/001.md"), eq(artifactId.toString()), anyInt()))
-                .thenReturn(evidence);
 
         List<RepositoryEvidence> result = collector.collect(request);
 
         assertEquals(1, result.size());
-        verify(evidenceFactory).create(any(), eq(RepositoryContextLayer.PROJECT_DOCUMENTATION), eq("ARTIFACT"),
-                eq("artifact:" + artifactId), contains("ADR-001"), any(), anyList(),
-                isNull(), eq("docs/adr/001.md"), eq(artifactId.toString()), anyInt());
+        assertEvidence(result.getFirst(), RepositoryContextLayer.PROJECT_DOCUMENTATION,
+                "ARTIFACT", "artifact:" + artifactId, "ADR-001");
+        assertEquals("docs/adr/001.md", result.getFirst().provenance().originatingFile());
     }
 
     @Test
@@ -205,18 +172,14 @@ class ProjectKnowledgeContextCollectorTest {
                 null, testAnalysis(), null, List.of(), List.of(), List.of(),
                 List.of(), List.of(artifact), List.of(), List.of(), List.of()));
 
-        RepositoryEvidence evidence = mock(RepositoryEvidence.class);
-        when(evidenceFactory.create(any(), eq(RepositoryContextLayer.PROJECT_DOCUMENTATION), eq("ARTIFACT"),
-                contains("artifact:"), anyString(), any(), eq(List.of()), isNull(),
-                isNull(), eq(artifactId.toString()), anyInt()))
-                .thenReturn(evidence);
 
         List<RepositoryEvidence> result = collector.collect(request);
 
         assertEquals(1, result.size());
-        verify(evidenceFactory).create(any(), eq(RepositoryContextLayer.PROJECT_DOCUMENTATION), eq("ARTIFACT"),
-                eq("artifact:" + artifactId), contains("ADR-002"), any(), eq(List.of()),
-                isNull(), isNull(), eq(artifactId.toString()), anyInt());
+        assertEvidence(result.getFirst(), RepositoryContextLayer.PROJECT_DOCUMENTATION,
+                "ARTIFACT", "artifact:" + artifactId, "ADR-002");
+        assertTrue(result.getFirst().relatedReferences().isEmpty());
+        assertNull(result.getFirst().provenance().originatingFile());
     }
 
     @Test
@@ -229,7 +192,6 @@ class ProjectKnowledgeContextCollectorTest {
         List<RepositoryEvidence> result = collector.collect(request);
 
         assertTrue(result.isEmpty());
-        verifyNoInteractions(evidenceFactory);
     }
 
     @Test
@@ -253,14 +215,24 @@ class ProjectKnowledgeContextCollectorTest {
                 null, testAnalysis(), null, List.of(), List.of(), List.of(),
                 List.of(related), List.of(artifact), List.of(decision), List.of(milestone), List.of()));
 
-        when(evidenceFactory.create(any(), any(), any(), anyString(), anyString(), any(),
-                anyList(), isNull(), any(), anyString(), anyInt()))
-                .thenReturn(mock(RepositoryEvidence.class));
 
         List<RepositoryEvidence> result = collector.collect(request);
 
         assertEquals(4, result.size());
-        verify(evidenceFactory, times(4)).create(any(), any(), any(), anyString(), anyString(), any(),
-                anyList(), isNull(), any(), anyString(), anyInt());
+        assertEquals(List.of(
+                        RepositoryContextLayer.ADR,
+                        RepositoryContextLayer.ROADMAP,
+                        RepositoryContextLayer.PREVIOUS_ANALYSIS,
+                        RepositoryContextLayer.PROJECT_DOCUMENTATION),
+                result.stream().map(RepositoryEvidence::layer).toList());
+    }
+
+    private void assertEvidence(RepositoryEvidence evidence,
+            RepositoryContextLayer layer, String kind, String reference, String summaryFragment) {
+        assertEquals(layer, evidence.layer());
+        assertEquals(kind, evidence.kind());
+        assertEquals(reference, evidence.reference());
+        assertTrue(evidence.summary().contains(summaryFragment));
+        assertEquals("project-knowledge", evidence.extractionMetadata().get("collectorId"));
     }
 }

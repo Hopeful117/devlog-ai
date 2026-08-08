@@ -84,15 +84,7 @@ public class CommitDiffEvidenceCollector implements RepositoryContextCollector {
         Map<String, FileGroup> groups = new LinkedHashMap<>();
         for (ProjectCommit commit : commits) {
             for (ChangedFile file : commit.getChangedFiles()) {
-                String path = file.getNewPath() != null ? file.getNewPath() : file.getOldPath();
-                if (path == null) {
-                    continue;
-                }
-                if (isExcluded(path, file.isBinary())) {
-                    continue;
-                }
-                groups.computeIfAbsent(path, k -> new FileGroup(k, commit))
-                        .add(file, commit);
+                addFileGroup(groups, commit, file);
             }
         }
 
@@ -126,6 +118,7 @@ public class CommitDiffEvidenceCollector implements RepositoryContextCollector {
 
             evidence.add(evidenceFactory.create(
                     metadata(),
+                    new EvidenceFactory.EvidenceInput(
                     RepositoryContextLayer.COMMIT_DIFF,
                     "CHANGED_FILE",
                     reference,
@@ -134,12 +127,21 @@ public class CommitDiffEvidenceCollector implements RepositoryContextCollector {
                     group.commitHashes.stream().map(h -> "diff:" + h + ":" + group.path).toList(),
                     repositoryId,
                     group.path,
-                    "commit-diff:" + group.path,
+                    "commit-diff:" + group.path),
                     request.budget().maximumSummaryCharacters()
             ));
         }
 
         return evidence.stream().limit(maxItems).toList();
+    }
+
+    private void addFileGroup(Map<String, FileGroup> groups,
+            ProjectCommit commit, ChangedFile file) {
+        String path = file.getNewPath() != null ? file.getNewPath() : file.getOldPath();
+        if (path != null && !isExcluded(path, file.isBinary())) {
+            groups.computeIfAbsent(path, key -> new FileGroup(key, commit))
+                    .add(file, commit);
+        }
     }
 
     private EvidenceFactory.ContextRequestMetadata metadata() {
@@ -153,10 +155,7 @@ public class CommitDiffEvidenceCollector implements RepositoryContextCollector {
         if (GENERATED_SEGMENTS.stream().anyMatch(s -> normalized.contains("/" + s + "/"))) {
             return true;
         }
-        if (normalized.endsWith(".min.js/") || normalized.endsWith(".map/")) {
-            return true;
-        }
-        return false;
+        return normalized.endsWith(".min.js/") || normalized.endsWith(".map/");
     }
 
     private String formatSummary(FileChangeType changeType, String path,

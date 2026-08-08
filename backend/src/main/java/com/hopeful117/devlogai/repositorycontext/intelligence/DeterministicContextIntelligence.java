@@ -7,7 +7,6 @@ import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -17,6 +16,7 @@ import java.util.Map;
 @Component
 public class DeterministicContextIntelligence implements ContextIntelligence {
     static final String PLAN_VERSION = "context-intelligence-v1";
+    private static final String HISTORY_PROFILE = "history-v1";
     private static final Map<String, ContextProfileDefinition> PROFILES = profiles();
 
     @Override
@@ -58,8 +58,8 @@ public class DeterministicContextIntelligence implements ContextIntelligence {
 
     private List<String> fallbackProfiles(AnalysisType type) {
         return switch (type) {
-            case ARCHITECTURE_REVIEW -> List.of("architecture-v1", "history-v1");
-            case PROJECT_EVOLUTION -> List.of("project-state-v1", "history-v1");
+            case ARCHITECTURE_REVIEW -> List.of("architecture-v1", HISTORY_PROFILE);
+            case PROJECT_EVOLUTION -> List.of("project-state-v1", HISTORY_PROFILE);
             default -> List.of("knowledge-extraction-v1");
         };
     }
@@ -78,7 +78,7 @@ public class DeterministicContextIntelligence implements ContextIntelligence {
                         RepositoryContextLayer.RELATED_SOURCE_CODE,
                         RepositoryContextLayer.VALIDATED_INSIGHT,
                         RepositoryContextLayer.COMMIT_DIFF), 3, 100));
-        register(result, profile("history-v1", ContextProfile.HISTORY_ANALYSIS,
+        register(result, profile(HISTORY_PROFILE, ContextProfile.HISTORY_ANALYSIS,
                 weights(15, 5, 35, 25, 15, 5),
                 List.of(RepositoryContextLayer.GIT_HISTORY,
                         RepositoryContextLayer.COMMIT_DIFF,

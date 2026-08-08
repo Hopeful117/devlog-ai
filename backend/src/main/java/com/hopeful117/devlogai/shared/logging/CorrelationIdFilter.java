@@ -24,6 +24,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
     public static final String REQUEST_ATTRIBUTE =
             CorrelationIdFilter.class.getName() + ".correlationId";
     private static final int MAX_CORRELATION_ID_LENGTH = 128;
+    private static final String COMPLETION_LOG =
+            "HTTP request completed method={} path={} status={} durationMs={}";
     private static final Logger log = LoggerFactory.getLogger(CorrelationIdFilter.class);
 
     @Override
@@ -43,16 +45,16 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             long durationMs = (System.nanoTime() - startedAt) / 1_000_000;
             int status = response.getStatus();
             if (status >= 500) {
-                log.error("HTTP request completed method={} path={} status={} durationMs={}",
+                log.error(COMPLETION_LOG,
                         request.getMethod(), request.getRequestURI(), status, durationMs);
             } else if (status >= 400) {
-                log.warn("HTTP request completed method={} path={} status={} durationMs={}",
+                log.warn(COMPLETION_LOG,
                         request.getMethod(), request.getRequestURI(), status, durationMs);
             } else if (isHealthCheck(request.getRequestURI())) {
                 log.debug("HTTP health check completed path={} status={} durationMs={}",
                         request.getRequestURI(), status, durationMs);
             } else {
-                log.info("HTTP request completed method={} path={} status={} durationMs={}",
+                log.info(COMPLETION_LOG,
                         request.getMethod(), request.getRequestURI(), status, durationMs);
             }
             MDC.remove(MDC_KEY);

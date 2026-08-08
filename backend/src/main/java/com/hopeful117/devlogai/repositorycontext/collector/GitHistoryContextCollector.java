@@ -40,7 +40,7 @@ public class GitHistoryContextCollector implements RepositoryContextCollector {
         for (ProjectCommit commit : commits) {
             String repositoryId = commit.getSource().getId().toString();
             String reference = "git:" + repositoryId + ":" + commit.getCommitHash();
-            evidence.add(evidenceFactory.create(metadata(),
+            evidence.add(evidenceFactory.create(metadata(), new EvidenceFactory.EvidenceInput(
                     RepositoryContextLayer.GIT_HISTORY, "COMMIT", reference,
                     commit.getSubject() + " — " + commit.getFilesChanged()
                             + " files, +" + commit.getInsertions()
@@ -48,7 +48,7 @@ public class GitHistoryContextCollector implements RepositoryContextCollector {
                     commit.getCommittedAt(),
                     commit.getParents().stream().map(parent ->
                             "git:" + repositoryId + ":" + parent.getParentHash()).toList(),
-                    repositoryId, null, commit.getCommitHash(),
+                    repositoryId, null, commit.getCommitHash()),
                     request.budget().maximumSummaryCharacters()));
         }
         return List.copyOf(evidence);

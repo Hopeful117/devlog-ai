@@ -27,7 +27,7 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class ValidationServiceTest {
+class ValidationServiceTest {
     @Mock
     ValidationRepository validationRepository;
 

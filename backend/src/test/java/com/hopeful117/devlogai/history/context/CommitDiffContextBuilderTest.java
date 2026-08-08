@@ -8,9 +8,11 @@ import com.hopeful117.devlogai.source.entity.Source;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommitDiffContextBuilderTest {
@@ -50,6 +52,25 @@ class CommitDiffContextBuilderTest {
         assertTrue(context.changedFiles().get(2).excludedFromAnalysis());
         assertEquals("GENERATED_OR_VENDOR_PATH",
                 context.changedFiles().get(2).exclusionReason());
+    }
+
+    @Test
+    void classifiesLongChangedFilePathsWithinBoundedTime() {
+        ProjectCommit commit = ProjectCommit.builder()
+                .project(Project.builder().id(UUID.randomUUID()).build())
+                .source(Source.builder().id(UUID.randomUUID()).build())
+                .commitHash("long-path").committedAt(Instant.parse("2026-07-23T10:00:00Z"))
+                .fullMessage("long path").subject("long path")
+                .rootCommit(true).mergeCommit(false).filesChanged(1)
+                .insertions(1).deletions(0).binaryFiles(0).importedAt(Instant.now()).build();
+        commit.addChangedFile(file("src/" + "segment/".repeat(25_000) + "Source.java",
+                false, 1));
+        CommitDiffContextBuilder builder = new CommitDiffContextBuilder(3, 50);
+
+        CommitDiffAnalysisContext result = assertTimeoutPreemptively(
+                Duration.ofSeconds(2), () -> builder.build(commit));
+
+        assertEquals(1, result.changedFiles().size());
     }
 
     private ChangedFile file(String path, boolean binary, int insertions) {

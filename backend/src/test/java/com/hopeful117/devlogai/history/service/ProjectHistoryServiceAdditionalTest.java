@@ -103,9 +103,10 @@ class ProjectHistoryServiceAdditionalTest {
     void shouldThrowWhenSourceNotFound() {
         UUID sourceId = UUID.randomUUID();
         when(sourceRepository.findById(sourceId)).thenReturn(Optional.empty());
+        ProjectHistoryService service = createService();
 
         assertThrows(EntityNotFoundException.class,
-                () -> createService().importHistory(sourceId, "main"));
+                () -> service.importHistory(sourceId, "main"));
     }
 
     @Test
@@ -145,9 +146,11 @@ class ProjectHistoryServiceAdditionalTest {
     void shouldThrowWhenCommitNotFound() {
         when(commitRepository.findBySourceIdAndCommitHash(any(), any()))
                 .thenReturn(Optional.empty());
+        UUID sourceId = UUID.randomUUID();
+        ProjectHistoryService service = createService();
 
         assertThrows(EntityNotFoundException.class,
-                () -> createService().getCommitContext(UUID.randomUUID(), "nonexistent"));
+                () -> service.getCommitContext(sourceId, "nonexistent"));
     }
 
     @Test

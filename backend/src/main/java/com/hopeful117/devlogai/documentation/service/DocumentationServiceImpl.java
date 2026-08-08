@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.UUID;
 
-import static org.springframework.data.jpa.domain.AbstractPersistable_.id;
 
 @Service
 @RequiredArgsConstructor
@@ -93,4 +92,3 @@ public class DocumentationServiceImpl implements DocumentationService {
                 .toList();
     }
     }
-

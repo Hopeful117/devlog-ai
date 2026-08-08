@@ -9,7 +9,6 @@ import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.query.sqm.EntityTypeException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

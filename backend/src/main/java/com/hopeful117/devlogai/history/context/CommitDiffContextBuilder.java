@@ -53,7 +53,7 @@ public class CommitDiffContextBuilder {
         List<String> roadmap = commit.getChangedFiles().stream().map(this::path)
                 .filter(this::isRoadmap).distinct().toList();
         List<String> parents = commit.getParents().stream()
-                .map(parent -> parent.getParentHash()).toList();
+                .map(com.hopeful117.devlogai.history.entity.CommitParent::getParentHash).toList();
         return new CommitDiffAnalysisContext(
                 commit.getProject().getId(), commit.getSource().getId(), commit.getCommitHash(),
                 parents.isEmpty() ? null : parents.getFirst(), parents,
@@ -114,12 +114,21 @@ public class CommitDiffContextBuilder {
     }
 
     private boolean isAdr(String path) {
-        return path.toLowerCase(Locale.ROOT).matches(".*(?:^|/)adr[-_]?\\d+.*\\.md$")
-                || path.toLowerCase(Locale.ROOT).contains("/decisions/adr-");
+        String lower = path.toLowerCase(Locale.ROOT);
+        String name = lower.substring(lower.lastIndexOf('/') + 1);
+        if (lower.contains("/decisions/adr-")) return true;
+        if (!name.startsWith("adr") || !name.endsWith(".md")) return false;
+        int index = 3;
+        if (index < name.length() && (name.charAt(index) == '-' || name.charAt(index) == '_')) {
+            index++;
+        }
+        return index < name.length() && Character.isDigit(name.charAt(index));
     }
 
     private boolean isRoadmap(String path) {
-        return path.toLowerCase(Locale.ROOT).matches(".*(?:^|/)roadmap(?:\\.[^/]*)?$");
+        String lower = path.toLowerCase(Locale.ROOT);
+        String name = lower.substring(lower.lastIndexOf('/') + 1);
+        return name.equals("roadmap") || name.startsWith("roadmap.");
     }
 
     private String path(ChangedFile file) {
