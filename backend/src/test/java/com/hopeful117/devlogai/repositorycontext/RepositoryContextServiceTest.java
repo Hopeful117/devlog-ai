@@ -168,6 +168,64 @@ class RepositoryContextServiceTest {
         assertTrue(result.truncated());
     }
 
+    @Test
+    void composesMixedFileCandidatesWithEngineeringStoryPrecision() {
+        ProjectCommitRepository commits = mock(ProjectCommitRepository.class);
+        UUID projectId = UUID.randomUUID();
+        when(commits.findByProjectIdOrderByCommittedAtDescCommitHashDesc(
+                eq(projectId), any(Pageable.class))).thenReturn(List.of());
+        EvidenceFactory factory = new EvidenceFactory();
+        RepositoryContextCollector structure = new RepositoryContextCollector() {
+            @Override public String collectorId() { return "repository-structure"; }
+            @Override public String collectorVersion() { return "v2"; }
+            @Override
+            public List<RepositoryEvidence> collect(ContextRequest request) {
+                return List.of(
+                        fileEvidence(factory, request, "SOURCE_FILE",
+                                "backend/src/main/java/example/RepositoryCandidateService.java"),
+                        fileEvidence(factory, request, "TEST_FILE",
+                                "backend/src/test/java/example/RepositoryCandidateServiceTest.java"),
+                        fileEvidence(factory, request, "CONFIG_FILE", "backend/pom.xml"));
+            }
+        };
+        RepositoryContextEngine service = engine(
+                commits, 20, 200, 0, 1000, structure);
+
+        RepositoryContext result = service.build(context(projectId, List.of()),
+                engineeringStoryIntent(), null, List.of());
+
+        assertEquals(1, result.diagnostics().candidatesByKind().get("SOURCE_FILE"));
+        assertEquals(1, result.diagnostics().candidatesByKind().get("TEST_FILE"));
+        assertEquals(1, result.diagnostics().candidatesByKind().get("CONFIG_FILE"));
+        assertTrue(result.evidence().stream().anyMatch(value ->
+                value.kind().equals("SOURCE_FILE")));
+        assertTrue(result.evidence().stream().anyMatch(value ->
+                value.kind().equals("TEST_FILE")));
+        assertTrue(result.evidence().stream().anyMatch(value ->
+                value.kind().equals("CONFIG_FILE")));
+        assertTrue(result.evidence().stream().filter(value -> value.kind().endsWith("_FILE"))
+                .allMatch(value -> value.extractionMetadata().get("collectorVersion").equals("v2")));
+        assertTrue(result.usedTokens() <= result.budget().maximumTokens());
+        assertEquals(result.candidateCount(), result.selectionDecisions().size());
+    }
+
+    private RepositoryEvidence fileEvidence(
+            EvidenceFactory factory,
+            ContextRequest request,
+            String kind,
+            String path
+    ) {
+        String prefix = kind.equals("CONFIG_FILE") ? "config:" : "file:";
+        return factory.create(
+                new EvidenceFactory.ContextRequestMetadata(
+                        "repository-structure", "v2", "REPOSITORY_STRUCTURE"),
+                new EvidenceFactory.EvidenceInput(
+                        RepositoryContextLayer.RELATED_SOURCE_CODE, kind,
+                        prefix + path, path, Instant.EPOCH, List.of(),
+                        "repository", path, "repository-structure:" + kind + ":" + path),
+                request.budget().maximumSummaryCharacters());
+    }
+
     private AnalysisContext context(
             UUID projectId,
             List<AnalysisContext.FactSnapshot> facts
@@ -197,6 +255,14 @@ class RepositoryContextServiceTest {
                 List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
                 Map.of("type", "object"), "architecture-overview-prompt-v1",
                 List.of("architecture-v1", "history-v1"));
+    }
+
+    private IntentDefinition engineeringStoryIntent() {
+        return new IntentDefinition("engineering-story-preparation", "v1",
+                "Produce repository source test configuration candidates",
+                List.of(), List.of("deterministic evidence only"),
+                Map.of(), "engineering-story-context-v1",
+                List.of("engineering-story-v1"));
     }
 
     private RepositoryContextEngine engine(

@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,12 +41,12 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
     private static final Set<String> MODULE_BUILD_FILES = Set.of(
             "pom.xml", "build.gradle", "build.gradle.kts");
 
-    private static final Set<String> SOURCE_ROOTS = Set.of(
+    private static final List<String> SOURCE_ROOTS = List.of(
             "src/main/java", "src/main/kotlin", "src/main/python",
             "src/main/typescript", "src/app", "src/lib");
 
-    private static final Set<String> TEST_ROOTS = Set.of(
-            "src/test/", "__tests__/", "test/", "tests/");
+    private static final List<String> TEST_ROOTS = List.of(
+            "src/test", "__tests__", "test", "tests");
 
     private static final Set<String> CONFIGURATION_FILE_NAMES = Set.of(
             "pom.xml", "build.gradle", "build.gradle.kts",
@@ -83,7 +84,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
 
     @Override
     public String collectorVersion() {
-        return "v1";
+        return "v2";
     }
 
     @Override
@@ -176,7 +177,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
         for (String root : SOURCE_ROOTS) {
             long count = scan.files().stream()
                     .map(RepositoryFile::relativePath)
-                    .filter(path -> path.startsWith(root + "/") || path.equals(root))
+                    .filter(path -> containsPathRoot(path, root))
                     .count();
             if (count > 0) {
                 sourceDirCounts.put(root, (int) count);
@@ -216,7 +217,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
         for (String root : TEST_ROOTS) {
             long count = scan.files().stream()
                     .map(RepositoryFile::relativePath)
-                    .filter(path -> path.contains(root))
+                    .filter(path -> containsPathRoot(path, root))
                     .count();
             if (count > 0) {
                 testDirCounts.put(root, (int) count);
@@ -388,21 +389,18 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
     }
 
     private static boolean containsSourceRoot(String relativePath) {
-        for (String root : SOURCE_ROOTS) {
-            if (relativePath.startsWith(root + "/") || relativePath.equals(root)) {
-                return true;
-            }
-        }
-        return false;
+        return SOURCE_ROOTS.stream().anyMatch(root -> containsPathRoot(relativePath, root));
     }
 
     private static boolean containsTestRoot(String relativePath) {
-        for (String root : TEST_ROOTS) {
-            if (relativePath.contains(root)) {
-                return true;
-            }
-        }
-        return false;
+        return TEST_ROOTS.stream().anyMatch(root -> containsPathRoot(relativePath, root));
+    }
+
+    private static boolean containsPathRoot(String relativePath, String root) {
+        return relativePath.equals(root)
+                || relativePath.startsWith(root + "/")
+                || relativePath.contains("/" + root + "/")
+                || relativePath.endsWith("/" + root);
     }
 
     private static boolean hasSourceExtension(String relativePath) {
@@ -422,74 +420,94 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             com.hopeful117.devlogai.repositorycontext.ContextRequest request
     ) {
         Set<String> storyTerms = extractStoryTerms(request);
-        List<RepositoryEvidence> fileEvidence = new ArrayList<>();
+        Map<FileEvidenceKind, List<RepositoryEvidence>> candidates =
+                collectFileCandidates(scan, sourceId, request);
+        sortFileCandidates(candidates, storyTerms);
+        return allocateFileCandidates(candidates);
+    }
+
+    private Map<FileEvidenceKind, List<RepositoryEvidence>> collectFileCandidates(
+            RepositoryScan scan,
+            String sourceId,
+            ContextRequest request
+    ) {
+        Map<FileEvidenceKind, List<RepositoryEvidence>> candidates =
+                new EnumMap<>(FileEvidenceKind.class);
+        for (FileEvidenceKind kind : FileEvidenceKind.values()) {
+            candidates.put(kind, new ArrayList<>());
+        }
 
         for (RepositoryFile file : scan.files()) {
             String path = file.relativePath();
+            FileEvidenceKind kind = classify(path);
+            if (kind != null) candidates.get(kind).add(fileEvidence(
+                    kind, path, sourceId, request));
+        }
+        return candidates;
+    }
 
-            if (isSourceFile(path)) {
-                fileEvidence.add(evidenceFactory.create(
-                        metadata(),
-                        new EvidenceFactory.EvidenceInput(
-                        RepositoryContextLayer.RELATED_SOURCE_CODE,
-                        "SOURCE_FILE",
-                        "file:" + path,
-                        path,
-                        Instant.now(),
-                        List.of(),
-                        sourceId,
-                        path,
-                        "repository-structure:source-file:" + path),
-                        request.budget().maximumSummaryCharacters()
-                ));
-            } else if (isTestFile(path)) {
-                fileEvidence.add(evidenceFactory.create(
-                        metadata(),
-                        new EvidenceFactory.EvidenceInput(
-                        RepositoryContextLayer.RELATED_SOURCE_CODE,
-                        "TEST_FILE",
-                        "file:" + path,
-                        path,
-                        Instant.now(),
-                        List.of(),
-                        sourceId,
-                        path,
-                        "repository-structure:test-file:" + path),
-                        request.budget().maximumSummaryCharacters()
-                ));
-            } else if (isConfigFile(path)) {
-                fileEvidence.add(evidenceFactory.create(
-                        metadata(),
-                        new EvidenceFactory.EvidenceInput(
-                        RepositoryContextLayer.RELATED_SOURCE_CODE,
-                        "CONFIG_FILE",
-                        "config:" + path,
-                        path,
-                        Instant.now(),
-                        List.of(),
-                        sourceId,
-                        path,
-                        "repository-structure:config-file:" + path),
-                        request.budget().maximumSummaryCharacters()
-                ));
+    private void sortFileCandidates(
+            Map<FileEvidenceKind, List<RepositoryEvidence>> candidates,
+            Set<String> storyTerms
+    ) {
+        Comparator<RepositoryEvidence> priority = Comparator
+                .<RepositoryEvidence, Integer>comparing(value -> storyTermMatches(
+                        value.provenance().originatingFile(), storyTerms))
+                .reversed()
+                .thenComparing(value -> value.provenance().originatingFile());
+        candidates.values().forEach(values -> values.sort(priority));
+    }
+
+    private List<RepositoryEvidence> allocateFileCandidates(
+            Map<FileEvidenceKind, List<RepositoryEvidence>> candidates
+    ) {
+        List<RepositoryEvidence> allocated = new ArrayList<>();
+        for (int index = 0; allocated.size() < MAX_FILE_EVIDENCE_ITEMS; index++) {
+            boolean added = false;
+            for (FileEvidenceKind kind : FileEvidenceKind.values()) {
+                List<RepositoryEvidence> values = candidates.get(kind);
+                if (index < values.size()) {
+                    allocated.add(values.get(index));
+                    added = true;
+                    if (allocated.size() == MAX_FILE_EVIDENCE_ITEMS) break;
+                }
             }
+            if (!added) break;
         }
+        return List.copyOf(allocated);
+    }
 
-        // Story-term prioritization
-        if (!storyTerms.isEmpty()) {
-            fileEvidence.sort(Comparator
-                    .<RepositoryEvidence, Integer>comparing(e -> {
-                        String pathLower = e.provenance().originatingFile().toLowerCase();
-                        return (int) storyTerms.stream()
-                                .filter(pathLower::contains)
-                                .count();
-                    }).reversed()
-                    .thenComparing(e -> e.provenance().originatingFile()));
-        } else {
-            fileEvidence.sort(Comparator.comparing(e -> e.provenance().originatingFile()));
-        }
+    private FileEvidenceKind classify(String path) {
+        if (isTestFile(path)) return FileEvidenceKind.TEST;
+        if (isSourceFile(path)) return FileEvidenceKind.SOURCE;
+        if (isConfigFile(path)) return FileEvidenceKind.CONFIGURATION;
+        return null;
+    }
 
-        return fileEvidence.stream().limit(MAX_FILE_EVIDENCE_ITEMS).toList();
+    private RepositoryEvidence fileEvidence(
+            FileEvidenceKind kind,
+            String path,
+            String sourceId,
+            ContextRequest request
+    ) {
+        return evidenceFactory.create(
+                metadata(),
+                new EvidenceFactory.EvidenceInput(
+                        RepositoryContextLayer.RELATED_SOURCE_CODE,
+                        kind.evidenceKind,
+                        kind.referencePrefix + path,
+                        path,
+                        Instant.now(),
+                        List.of(),
+                        sourceId,
+                        path,
+                        "repository-structure:" + kind.identifierSegment + ":" + path),
+                request.budget().maximumSummaryCharacters());
+    }
+
+    private int storyTermMatches(String path, Set<String> storyTerms) {
+        String normalized = path.toLowerCase();
+        return (int) storyTerms.stream().filter(normalized::contains).count();
     }
 
     private List<RepositoryEvidence> produceModuleEvidence(
@@ -524,5 +542,25 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
         }
 
         return moduleEvidence;
+    }
+
+    private enum FileEvidenceKind {
+        SOURCE("SOURCE_FILE", "file:", "source-file"),
+        TEST("TEST_FILE", "file:", "test-file"),
+        CONFIGURATION("CONFIG_FILE", "config:", "config-file");
+
+        private final String evidenceKind;
+        private final String referencePrefix;
+        private final String identifierSegment;
+
+        FileEvidenceKind(
+                String evidenceKind,
+                String referencePrefix,
+                String identifierSegment
+        ) {
+            this.evidenceKind = evidenceKind;
+            this.referencePrefix = referencePrefix;
+            this.identifierSegment = identifierSegment;
+        }
     }
 }

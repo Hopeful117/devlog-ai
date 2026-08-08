@@ -300,6 +300,115 @@ class RepositoryStructureCollectorTest {
     }
 
     @Test
+    void producesDiverseFileCandidatesForMultiModuleRepository() {
+        List<RepositoryFile> files = new java.util.ArrayList<>();
+        files.add(new RepositoryFile(
+                "backend/src/main/java/com/example/RepositoryContextEngine.java", 100, null));
+        files.add(new RepositoryFile(
+                "backend/src/main/java/com/example/RepositoryContextEngineTest.java", 100, null));
+        files.add(new RepositoryFile(
+                "backend/src/test/java/com/example/RepositoryContextEngineTest.java", 100, null));
+        files.add(new RepositoryFile(
+                "module-a/src/main/kotlin/com/example/ContextPolicy.kt", 100, null));
+        files.add(new RepositoryFile(
+                "service/src/main/python/context_builder.py", 100, null));
+        files.add(new RepositoryFile("frontend/src/app/context.ts", 100, null));
+        files.add(new RepositoryFile("backend/pom.xml", 100, null));
+        files.add(new RepositoryFile(
+                "backend/src/main/resources/application.properties", 100, null));
+        for (int index = 0; index < 50; index++) {
+            files.add(new RepositoryFile(
+                    "backend/src/test/java/com/example/Other" + index + "Test.java",
+                    100, null));
+        }
+        configureSourceAndScan(files);
+
+        List<RepositoryEvidence> evidence = collector.collect(
+                createRequestWithObjective("Repository context policy"));
+        List<RepositoryEvidence> fileEvidence = fileEvidence(evidence);
+
+        assertEquals(40, fileEvidence.size());
+        assertTrue(fileEvidence.stream().anyMatch(value ->
+                value.kind().equals("SOURCE_FILE")
+                        && value.provenance().originatingFile().equals(
+                        "backend/src/main/java/com/example/RepositoryContextEngine.java")));
+        assertTrue(fileEvidence.stream().anyMatch(value ->
+                value.kind().equals("SOURCE_FILE")
+                        && value.provenance().originatingFile().endsWith(
+                        "RepositoryContextEngineTest.java")));
+        assertTrue(fileEvidence.stream().anyMatch(value ->
+                value.kind().equals("TEST_FILE")));
+        assertTrue(fileEvidence.stream().anyMatch(value ->
+                value.kind().equals("CONFIG_FILE")
+                        && value.provenance().originatingFile().equals("backend/pom.xml")));
+        assertEquals("v2", collector.collectorVersion());
+        assertTrue(fileEvidence.stream().allMatch(value ->
+                value.extractionMetadata().get("collectorId").equals("repository-structure")
+                        && value.extractionMetadata().get("collectorVersion").equals("v2")));
+        assertTrue(evidence.stream().filter(value -> value.kind().equals("SOURCE_DIRECTORIES"))
+                .findFirst().orElseThrow().summary().contains("src/main/java"));
+    }
+
+    @Test
+    void usesPathSegmentBoundariesForSourceAndTestRoots() {
+        configureSourceAndScan(List.of(
+                new RepositoryFile("module/src/main/java/Valid.java", 100, null),
+                new RepositoryFile("module/not-src/main/java/Invalid.java", 100, null),
+                new RepositoryFile("module/src/main/java-copy/Invalid.java", 100, null),
+                new RepositoryFile("module/src/test/java/ValidTest.java", 100, null),
+                new RepositoryFile("module/contest/helpers/InvalidTest.java", 100, null)));
+
+        List<RepositoryEvidence> evidence = fileEvidence(collector.collect(createRequest()));
+
+        assertEquals(List.of(
+                        "module/src/main/java/Valid.java",
+                        "module/src/test/java/ValidTest.java"),
+                evidence.stream().map(value -> value.provenance().originatingFile()).toList());
+    }
+
+    @Test
+    void allocatesMixedCandidatesByDeterministicRoundRobin() {
+        List<RepositoryFile> files = new java.util.ArrayList<>();
+        for (int index = 0; index < 50; index++) {
+            files.add(new RepositoryFile(
+                    "module/src/main/java/com/example/Source" + index + ".java", 100, null));
+            files.add(new RepositoryFile(
+                    "module/src/test/java/com/example/Test" + index + ".java", 100, null));
+            files.add(new RepositoryFile("config-" + index + "/pom.xml", 100, null));
+        }
+        configureSourceAndScan(files);
+
+        List<RepositoryEvidence> first = fileEvidence(collector.collect(createRequest()));
+        List<RepositoryEvidence> second = fileEvidence(collector.collect(createRequest()));
+
+        assertEquals(40, first.size());
+        assertEquals(List.of("SOURCE_FILE", "TEST_FILE", "CONFIG_FILE"),
+                first.subList(0, 3).stream().map(RepositoryEvidence::kind).toList());
+        assertTrue(first.stream().filter(value -> value.kind().equals("SOURCE_FILE")).count() >= 13);
+        assertTrue(first.stream().filter(value -> value.kind().equals("TEST_FILE")).count() >= 13);
+        assertTrue(first.stream().filter(value -> value.kind().equals("CONFIG_FILE")).count() >= 13);
+        assertEquals(first.stream().map(value -> value.kind() + ":"
+                        + value.provenance().originatingFile()).toList(),
+                second.stream().map(value -> value.kind() + ":"
+                        + value.provenance().originatingFile()).toList());
+    }
+
+    @Test
+    void redistributesUnusedCapacityToAvailableCategory() {
+        List<RepositoryFile> files = new java.util.ArrayList<>();
+        for (int index = 0; index < 50; index++) {
+            files.add(new RepositoryFile(
+                    "module/src/main/java/com/example/Source" + index + ".java", 100, null));
+        }
+        configureSourceAndScan(files);
+
+        List<RepositoryEvidence> evidence = fileEvidence(collector.collect(createRequest()));
+
+        assertEquals(40, evidence.size());
+        assertTrue(evidence.stream().allMatch(value -> value.kind().equals("SOURCE_FILE")));
+    }
+
+    @Test
     void producesModuleSummaryEvidence() {
         Source source = Source.builder()
                 .id(sourceId)
@@ -390,6 +499,26 @@ class RepositoryStructureCollectorTest {
         List<RepositoryEvidence> evidence = collector.collect(createRequest());
 
         assertTrue(evidence.isEmpty());
+    }
+
+    private void configureSourceAndScan(List<RepositoryFile> files) {
+        Source source = Source.builder()
+                .id(sourceId)
+                .type(SourceType.GIT_REPOSITORY)
+                .active(true)
+                .build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+        when(workspaceManager.synchronize(source, null)).thenReturn(
+                new SynchronizedWorkspace(sourceId, tempDir, "abc123"));
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(
+                new RepositoryScan(files, files.size(), 1, List.of()));
+    }
+
+    private List<RepositoryEvidence> fileEvidence(List<RepositoryEvidence> evidence) {
+        return evidence.stream().filter(value -> value.kind().equals("SOURCE_FILE")
+                || value.kind().equals("TEST_FILE")
+                || value.kind().equals("CONFIG_FILE")).toList();
     }
 
     private ContextRequest createRequest() {

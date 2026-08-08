@@ -28,8 +28,8 @@ OpenAPI documentation, and traceable Deliverables generated from human-validated
 - Use an Angular engineering dashboard to manage Projects and Sources, launch guided Analyses,
   monitor deterministic and AI execution, review evidence, decide Proposals, and consult Insights.
 - Generate traceable user-facing Deliverables exclusively from human-validated Insights.
-- Build bounded, ranked Repository Context from source/test/configuration paths, Git history,
-  changed files, ADRs, project documentation, and validated knowledge.
+- Build bounded, ranked Repository Context from multi-module source/test/configuration paths, Git
+  history, changed files, ADRs, project documentation, and validated knowledge.
 - Provide Engineering Story Context so external engineering workflows can use repository evidence
   for discovery and prioritization before verifying exact behavior in the current repository.
 
@@ -360,7 +360,9 @@ The initial collectors cover the current Analysis, deterministic Facts and Obser
 history, and existing Core knowledge such as ADR decisions, roadmap milestones, validated Insights,
 previous analyses and documentation artifacts. Collectors implement a common interface and carry
 their identifier and version in extraction metadata, so adding a collector does not require changes
-to the engine.
+to the engine. Repository-structure collection recognizes source and test roots at module-relative
+path boundaries and allocates its bounded file candidates across source, test and configuration
+evidence before deterministic ranking and selection.
 
 Profiles currently distinguish project state, architecture review, documentation, README
 generation, release summary, knowledge extraction and history analysis. The context snapshot records
