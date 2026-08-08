@@ -7,8 +7,8 @@ context, and asks an AI engine for structured interpretations. AI output is neve
 it becomes a proposal that must be accepted by a human before it is promoted to an immutable
 Insight.
 
-The project now includes a usable Angular MVP for the complete traceable interaction flow, alongside
-the REST APIs and OpenAPI documentation. Document projections remain future work.
+The project includes a usable Angular MVP for the complete traceable interaction flow, REST APIs,
+OpenAPI documentation, and traceable Deliverables generated from human-validated Insights.
 
 ## Current capabilities
 
@@ -28,6 +28,10 @@ the REST APIs and OpenAPI documentation. Document projections remain future work
 - Use an Angular engineering dashboard to manage Projects and Sources, launch guided Analyses,
   monitor deterministic and AI execution, review evidence, decide Proposals, and consult Insights.
 - Generate traceable user-facing Deliverables exclusively from human-validated Insights.
+- Build bounded, ranked Repository Context from source/test/configuration paths, Git history,
+  changed files, ADRs, project documentation, and validated knowledge.
+- Provide Engineering Story Context so external engineering workflows can use repository evidence
+  for discovery and prioritization before verifying exact behavior in the current repository.
 
 ## Knowledge pipeline
 
@@ -57,6 +61,11 @@ The Java Core owns repositories, deterministic knowledge, workflow state, valida
 Insights. Its Knowledge Selection Engine ranks, deduplicates, and budgets project knowledge for the
 resolved Intent. The Python AI Engine only interprets the immutable `SelectedKnowledge` supplied by
 the Core. It does not read repositories or create trusted knowledge directly.
+
+Repository Evidence and Trusted Knowledge remain distinct. Deterministic evidence helps locate and
+prioritize relevant project material; validated Insights carry human-approved interpretation. When
+DevLog assists an engineering workflow, the current repository remains the source of truth for
+implementation details and verification.
 
 At the AI boundary, the Core sends a provider-independent `PromptRequest`. The AI Engine builds an
 immutable `Prompt`, and the configured provider only adapts it to its API. Prompt versions,
@@ -470,13 +479,64 @@ npm test
 npm run build
 ```
 
+### Backend coverage and local SonarQube
+
+The backend Maven lifecycle runs the complete test suite, generates the JaCoCo XML report, and
+enforces at least 80% bundle line coverage:
+
+```bash
+cd backend
+./mvnw clean verify
+```
+
+SonarQube is an additional local quality signal. It is not a replacement for Maven tests or the
+JaCoCo check. The project pins the official Sonar Maven scanner and uses project key `devlog-ai`.
+The default server is `http://localhost:9000`; override it with `-Dsonar.host.url=<url>` when needed.
+
+Create a Project Analysis Token in SonarQube under **My Account → Security**, then expose it only to
+the current private shell session:
+
+```bash
+export SONAR_TOKEN='<private-project-analysis-token>'
+cd backend
+./mvnw clean verify sonar:sonar -Dsonar.qualitygate.wait=true
+```
+
+For repeated local use, the token may instead be stored as `SONAR_TOKEN=...` in the repository-root
+`.env`, which Git ignores. Maven does not load that file automatically; load it from `backend` before
+running the same command:
+
+```bash
+set -a
+source ../.env
+set +a
+./mvnw clean verify sonar:sonar -Dsonar.qualitygate.wait=true
+```
+
+Never commit `.env` or place the token in `.env.example`, Maven settings, scripts, documentation, or
+Story artifacts. An absent or rejected token must fail the scanner explicitly. A successful Maven
+build, JaCoCo check, or scanner upload does not by itself mean that the SonarQube Quality Gate
+passed; use the final scanner result and the project page in SonarQube as separate evidence.
+
+Common failure boundaries:
+
+- `No plugin found for prefix 'sonar'` means the project-declared scanner could not be resolved;
+- HTTP `401` means `SONAR_TOKEN` is absent, invalid, expired, or unauthorized for `devlog-ai`;
+- a connection failure means the configured SonarQube server is unavailable;
+- a failed Quality Gate is a real quality result and must not be reported as successful validation.
+
+The GitHub workflow in `.github/workflows/quality.yml` runs backend Maven tests and JaCoCo coverage
+on hosted runners. It does not submit to the developer's local SonarQube instance. Connecting CI to
+a securely reachable SonarQube service is a separate infrastructure decision.
+
 ## Project status and next steps
 
 Implemented foundations include the domain model, deterministic repository collection, diagnostic
 reporting, immutable project profiles, AnalysisContext construction, deterministic knowledge
 selection, intent-driven AI processing, human validation, production-oriented correlation logging,
 immutable Insight promotion, and a reactive Angular dashboard covering the first complete
-Project-to-Insight workflow.
+Project-to-Insight workflow. They also include validated-Insight-based Deliverable generation and a
+bounded Repository Context Engine used by the Engineering Story Context API.
 
 The main remaining product work is:
 

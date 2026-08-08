@@ -23,6 +23,7 @@
 		<java.version>21</java.version>
 		<mapstruct.version>1.6.3</mapstruct.version>
 		<springdoc.version>3.0.3</springdoc.version>
+		<sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
 		<sonar.projectKey>devlog-ai</sonar.projectKey>
 		<sonar.host.url>http://localhost:9000</sonar.host.url>
 		<sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
@@ -104,6 +105,12 @@
 
 	<build>
 		<plugins>
+
+			<plugin>
+				<groupId>org.sonarsource.scanner.maven</groupId>
+				<artifactId>sonar-maven-plugin</artifactId>
+				<version>${sonar-maven-plugin.version}</version>
+			</plugin>
 
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
