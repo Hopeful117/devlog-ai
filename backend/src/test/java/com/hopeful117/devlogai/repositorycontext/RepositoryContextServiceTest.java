@@ -69,12 +69,20 @@ class RepositoryContextServiceTest {
         assertEquals(ContextProfile.ARCHITECTURE_REVIEW, first.profile());
         assertEquals(List.of("architecture-v1", "history-v1"),
                 first.activeProfileKeys());
-        assertEquals("context-intelligence-v1", first.contextPlanVersion());
+        assertEquals("context-intelligence-v2", first.contextPlanVersion());
         assertTrue(first.selectedByLayer().containsKey(RepositoryContextLayer.CURRENT_ANALYSIS));
         assertTrue(first.selectedByLayer().containsKey(RepositoryContextLayer.GIT_HISTORY));
         assertTrue(first.selectedByLayer().containsKey(RepositoryContextLayer.ADR));
         assertTrue(first.selectedByLayer().containsKey(
                 RepositoryContextLayer.PROJECT_DOCUMENTATION));
+        assertEquals(first.candidateCount(), first.diagnostics().candidatesByLayer()
+                .values().stream().mapToInt(Integer::intValue).sum());
+        assertEquals(first.evidence().size(), first.diagnostics().selectedByKind()
+                .values().stream().mapToInt(Integer::intValue).sum());
+        assertTrue(first.diagnostics().preferredLayerAvailability().stream()
+                .anyMatch(value -> value.layer() == RepositoryContextLayer.COMMIT_DIFF
+                        && !value.candidateAvailable()
+                        && value.reason().equals("NO_CANDIDATE_FOR_PREFERRED_LAYER")));
         RepositoryEvidence history = first.evidence().stream()
                 .filter(value -> value.layer() == RepositoryContextLayer.GIT_HISTORY)
                 .findFirst().orElseThrow();
@@ -83,7 +91,7 @@ class RepositoryContextServiceTest {
         assertFalse(history.summary().contains("source of truth"));
         assertEquals("GIT", history.provenance().sourceType());
         assertEquals("git-history", history.extractionMetadata().get("collectorId"));
-        assertEquals("multi-criteria-v1", history.score().policyVersion());
+        assertEquals("multi-criteria-v2", history.score().policyVersion());
         assertTrue(history.score().criteria().size() >= 6);
         int weightedScore = history.score().criteria().entrySet().stream()
                 .mapToInt(entry -> entry.getValue()

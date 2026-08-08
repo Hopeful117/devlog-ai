@@ -11,6 +11,7 @@ public record RepositoryContext(
         List<String> contextIntelligenceExplanations,
         List<RepositoryEvidence> evidence,
         Map<RepositoryContextLayer, Integer> selectedByLayer,
+        RepositoryContextDiagnostics diagnostics,
         ContextBudget budget,
         int usedTokens,
         int candidateCount,
@@ -26,8 +27,25 @@ public record RepositoryContext(
         contextIntelligenceExplanations =
                 List.copyOf(contextIntelligenceExplanations);
         selectedByLayer = Map.copyOf(selectedByLayer);
+        if (diagnostics == null) diagnostics = RepositoryContextDiagnostics.empty();
         selectionDecisions = List.copyOf(selectionDecisions);
         warnings = List.copyOf(warnings);
+    }
+
+    public RepositoryContext(String contextVersion, ContextProfile profile,
+            List<String> activeProfileKeys, String contextPlanVersion,
+            List<String> contextIntelligenceExplanations,
+            List<RepositoryEvidence> evidence,
+            Map<RepositoryContextLayer, Integer> selectedByLayer,
+            ContextBudget budget, int usedTokens, int candidateCount,
+            int discardedCount, boolean truncated,
+            List<SelectionDecision> selectionDecisions, List<String> warnings,
+            String contextDigest) {
+        this(contextVersion, profile, activeProfileKeys, contextPlanVersion,
+                contextIntelligenceExplanations, evidence, selectedByLayer,
+                RepositoryContextDiagnostics.empty(), budget, usedTokens,
+                candidateCount, discardedCount, truncated, selectionDecisions,
+                warnings, contextDigest);
     }
 
     public record ContextBudget(

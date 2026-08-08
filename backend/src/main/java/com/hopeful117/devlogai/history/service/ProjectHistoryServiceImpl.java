@@ -7,6 +7,7 @@ import com.hopeful117.devlogai.history.context.CommitDiffContextBuilder;
 import com.hopeful117.devlogai.history.dto.HistoryImportResult;
 import com.hopeful117.devlogai.history.dto.ProjectCommitResponse;
 import com.hopeful117.devlogai.history.entity.ChangedFile;
+import com.hopeful117.devlogai.history.entity.CommitParent;
 import com.hopeful117.devlogai.history.entity.ProjectCommit;
 import com.hopeful117.devlogai.history.model.GitCommitData;
 import com.hopeful117.devlogai.history.provider.GitHistoryProvider;
@@ -98,7 +99,7 @@ public class ProjectHistoryServiceImpl implements ProjectHistoryService {
     private ProjectCommitResponse toResponse(ProjectCommit commit) {
         return new ProjectCommitResponse(commit.getId(), commit.getProject().getId(),
                 commit.getSource().getId(), commit.getCommitHash(),
-                commit.getParents().stream().map(parent -> parent.getParentHash()).toList(),
+                commit.getParents().stream().map(CommitParent::getParentHash).toList(),
                 commit.getAuthorName(), commit.getAuthorEmail(), commit.getAuthoredAt(),
                 commit.getCommittedAt(), commit.getSubject(), commit.getFullMessage(),
                 commit.isRootCommit(), commit.isMergeCommit(), commit.getFilesChanged(),

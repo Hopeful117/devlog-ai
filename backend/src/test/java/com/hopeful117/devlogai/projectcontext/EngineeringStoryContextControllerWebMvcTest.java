@@ -9,7 +9,14 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+
+import com.hopeful117.devlogai.repositorycontext.ContextProfile;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextDiagnostics;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -48,7 +55,11 @@ class EngineeringStoryContextControllerWebMvcTest
                         .content("{\"description\":\"" + description + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.projectId").value(projectId.toString()))
-                .andExpect(jsonPath("$.generatedAt").value("2026-08-08T12:00:00Z"));
+                .andExpect(jsonPath("$.generatedAt").value("2026-08-08T12:00:00Z"))
+                .andExpect(jsonPath("$.repositoryContext.diagnostics.candidatesByKind.TEST_FILE")
+                        .value(4))
+                .andExpect(jsonPath("$.repositoryContext.diagnostics.preferredLayerAvailability[0].reason")
+                        .value("NO_CANDIDATE_FOR_PREFERRED_LAYER"));
 
         verify(service).buildWithRepositoryContext(projectId, description);
     }
@@ -158,7 +169,19 @@ class EngineeringStoryContextControllerWebMvcTest
     }
 
     private EngineeringStoryContext context(UUID projectId) {
+        var diagnostics = new RepositoryContextDiagnostics(
+                Map.of(RepositoryContextLayer.RELATED_SOURCE_CODE, 4),
+                Map.of("TEST_FILE", 4), Map.of("TEST_FILE", 1),
+                List.of(new RepositoryContextDiagnostics.PreferredLayerAvailability(
+                        RepositoryContextLayer.ADR, false,
+                        "NO_CANDIDATE_FOR_PREFERRED_LAYER")), 4, 0);
+        var repositoryContext = new RepositoryContext("v1",
+                ContextProfile.ENGINEERING_STORY, List.of("engineering-story-v1"),
+                "context-intelligence-v2", List.of(), List.of(), Map.of(), diagnostics,
+                new RepositoryContext.ContextBudget(60, 500, 20, 6000),
+                0, 4, 4, true, List.of(), List.of(), "digest");
         return new EngineeringStoryContext(
-                null, Instant.parse("2026-08-08T12:00:00Z"), projectId, null);
+                null, Instant.parse("2026-08-08T12:00:00Z"), projectId,
+                repositoryContext);
     }
 }

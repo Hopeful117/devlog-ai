@@ -29,7 +29,7 @@ class DeterministicContextIntelligenceTest {
         ContextPlan plan = intelligence.plan(context(), intent(
                 List.of("architecture-v1", "history-v1")));
 
-        assertEquals("context-intelligence-v1", plan.planVersion());
+        assertEquals("context-intelligence-v2", plan.planVersion());
         assertEquals(List.of("architecture-v1", "history-v1"), plan.profileKeys());
         assertEquals(ContextProfile.ARCHITECTURE_REVIEW, plan.primaryProfile());
         assertEquals(18, plan.composedWeights().get(
@@ -39,6 +39,8 @@ class DeterministicContextIntelligenceTest {
         assertEquals(23, plan.composedWeights().get(
                 EvidenceCriterion.HISTORICAL_RELEVANCE));
         assertEquals(3, plan.minimumDiverseLayers());
+        assertEquals(EvidencePrecisionPolicy.UNRESTRICTED.maximumKindSharePercentage(),
+                plan.precisionPolicy().maximumKindSharePercentage());
     }
 
     @Test
@@ -80,6 +82,12 @@ class DeterministicContextIntelligenceTest {
         assertEquals(5, plan.composedWeights().get(
                 EvidenceCriterion.USER_GUIDANCE_BOOST));
         assertEquals(3, plan.minimumDiverseLayers());
+        assertEquals("engineering-story-precision:v1",
+                plan.precisionPolicy().key());
+        assertEquals(25, plan.precisionPolicy().maximumKindSharePercentage());
+        assertEquals(35, plan.precisionPolicy().minimumRelevanceScore());
+        assertTrue(plan.explanations().stream().anyMatch(
+                value -> value.startsWith("PRECISION_POLICY:")));
         assertTrue(plan.preferredLayers().contains(
                 RepositoryContextLayer.GIT_HISTORY));
         assertTrue(plan.preferredLayers().contains(

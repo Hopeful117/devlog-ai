@@ -12,13 +12,23 @@ public record ContextPlan(
         Map<EvidenceCriterion, Integer> composedWeights,
         List<RepositoryContextLayer> preferredLayers,
         int minimumDiverseLayers,
+        EvidencePrecisionPolicy precisionPolicy,
         List<String> explanations
 ) {
     public ContextPlan {
         profiles = List.copyOf(profiles);
         composedWeights = Map.copyOf(composedWeights);
         preferredLayers = List.copyOf(preferredLayers);
+        if (precisionPolicy == null) precisionPolicy = EvidencePrecisionPolicy.UNRESTRICTED;
         explanations = List.copyOf(explanations);
+    }
+
+    public ContextPlan(String planVersion, List<ContextProfileDefinition> profiles,
+            Map<EvidenceCriterion, Integer> composedWeights,
+            List<RepositoryContextLayer> preferredLayers, int minimumDiverseLayers,
+            List<String> explanations) {
+        this(planVersion, profiles, composedWeights, preferredLayers,
+                minimumDiverseLayers, EvidencePrecisionPolicy.UNRESTRICTED, explanations);
     }
 
     public ContextProfile primaryProfile() {

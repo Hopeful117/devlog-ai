@@ -15,7 +15,10 @@ import java.util.Map;
 
 @Component
 public class DeterministicContextIntelligence implements ContextIntelligence {
-    static final String PLAN_VERSION = "context-intelligence-v1";
+    static final String PLAN_VERSION = "context-intelligence-v2";
+    private static final EvidencePrecisionPolicy ENGINEERING_STORY_PRECISION =
+            new EvidencePrecisionPolicy("engineering-story-precision", "v1",
+                    50, 35, 25, 75);
     private static final String HISTORY_PROFILE = "history-v1";
     private static final Map<String, ContextProfileDefinition> PROFILES = profiles();
 
@@ -34,12 +37,19 @@ public class DeterministicContextIntelligence implements ContextIntelligence {
         selected.forEach(profile -> layers.addAll(profile.preferredLayers()));
         int diversity = selected.stream()
                 .mapToInt(ContextProfileDefinition::minimumDiverseLayers).max().orElse(1);
+        EvidencePrecisionPolicy precision = EvidencePrecisionPolicy.compose(selected.stream()
+                .map(ContextProfileDefinition::precisionPolicy).toList());
         return new ContextPlan(PLAN_VERSION, selected, weights, List.copyOf(layers),
-                diversity, List.of(
+                diversity, precision, List.of(
                 "INTENT_CONTEXT_PROFILES:" + String.join(",", requested),
                 "PROFILE_COMPOSITION:AVERAGED_CRITERION_WEIGHTS",
-                "RANKING_POLICY:multi-criteria-v1",
-                "DIVERSITY_POLICY:minimum-" + diversity + "-layers"));
+                "RANKING_POLICY:multi-criteria-v2",
+                "DIVERSITY_POLICY:minimum-" + diversity + "-layers",
+                "PRECISION_POLICY:" + precision.key() + ":" + precision.version(),
+                "PRECISION_BOUNDS:common=" + precision.maximumCommonTermPercentage()
+                        + ",minimum=" + precision.minimumRelevanceScore()
+                        + ",kind-share=" + precision.maximumKindSharePercentage()
+                        + ",strong=" + precision.strongRelevanceScore()));
     }
 
     private Map<EvidenceCriterion, Integer> composeWeights(
@@ -109,7 +119,8 @@ public class DeterministicContextIntelligence implements ContextIntelligence {
                         RepositoryContextLayer.COMMIT_DIFF,
                         RepositoryContextLayer.ADR,
                         RepositoryContextLayer.PROJECT_DOCUMENTATION,
-                        RepositoryContextLayer.ROADMAP), 3, 100));
+                        RepositoryContextLayer.ROADMAP), 3, 100,
+                ENGINEERING_STORY_PRECISION));
         return Map.copyOf(result);
     }
 
@@ -123,6 +134,15 @@ public class DeterministicContextIntelligence implements ContextIntelligence {
     ) {
         return new ContextProfileDefinition(key, profile, "v1", weights, layers,
                 diversity, tokenPriority);
+    }
+
+    private static ContextProfileDefinition profile(
+            String key, ContextProfile profile, Map<EvidenceCriterion, Integer> weights,
+            List<RepositoryContextLayer> layers, int diversity, int tokenPriority,
+            EvidencePrecisionPolicy precisionPolicy
+    ) {
+        return new ContextProfileDefinition(key, profile, "v1", weights, layers,
+                diversity, tokenPriority, precisionPolicy);
     }
 
     private static Map<EvidenceCriterion, Integer> weights(

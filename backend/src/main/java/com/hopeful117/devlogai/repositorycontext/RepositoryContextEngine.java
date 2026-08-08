@@ -79,16 +79,22 @@ public class RepositoryContextEngine implements RepositoryContextService {
         Map<RepositoryContextLayer, Integer> byLayer =
                 new EnumMap<>(RepositoryContextLayer.class);
         selected.forEach(value -> byLayer.merge(value.layer(), 1, Integer::sum));
+        RepositoryContextDiagnostics diagnostics = diagnostics(
+                candidates, selected, contextPlan);
         int discarded = candidates.size() - selected.size();
         boolean truncated = discarded > 0;
         List<String> warnings = new ArrayList<>();
-        if (truncated) warnings.add("REPOSITORY_CONTEXT_BUDGET_APPLIED");
+        if (selection.decisions().stream().anyMatch(value ->
+                value.reason().equals("EVIDENCE_ITEM_BUDGET_EXCEEDED")
+                        || value.reason().equals("TOKEN_BUDGET_EXCEEDED")))
+            warnings.add("REPOSITORY_CONTEXT_BUDGET_APPLIED");
         if (candidates.stream().anyMatch(value -> value.summary().endsWith("...")))
             warnings.add("EVIDENCE_SUMMARY_TRUNCATED");
-        String digest = digest(contextPlan, selected, byLayer, selection, warnings);
+        String digest = digest(contextPlan, selected, byLayer, diagnostics,
+                selection, warnings);
         return new RepositoryContext(VERSION, contextPlan.primaryProfile(),
                 contextPlan.profileKeys(), contextPlan.planVersion(),
-                contextPlan.explanations(), selected, byLayer, budget,
+                contextPlan.explanations(), selected, byLayer, diagnostics, budget,
                 selection.usedTokens(), candidates.size(), discarded, truncated,
                 selection.decisions(), warnings, digest);
     }
@@ -97,20 +103,53 @@ public class RepositoryContextEngine implements RepositoryContextService {
             ContextPlan contextPlan,
             List<RepositoryEvidence> selected,
             Map<RepositoryContextLayer, Integer> byLayer,
+            RepositoryContextDiagnostics diagnostics,
             EvidenceSelector.SelectionResult selection,
             List<String> warnings
     ) {
-        byte[] input = objectMapper.writeValueAsBytes(Map.of(
-                "version", VERSION, "profiles", contextPlan.profileKeys(),
-                "contextPlanVersion", contextPlan.planVersion(), "evidence", selected,
-                "layers", byLayer, "budget", budget,
-                "usedTokens", selection.usedTokens(),
-                "selectionDecisions", selection.decisions(), "warnings", warnings));
+        byte[] input = objectMapper.writeValueAsBytes(Map.ofEntries(
+                Map.entry("version", VERSION),
+                Map.entry("profiles", contextPlan.profileKeys()),
+                Map.entry("contextPlanVersion", contextPlan.planVersion()),
+                Map.entry("evidence", selected), Map.entry("layers", byLayer),
+                Map.entry("budget", budget),
+                Map.entry("precisionPolicy", contextPlan.precisionPolicy()),
+                Map.entry("diagnostics", diagnostics),
+                Map.entry("usedTokens", selection.usedTokens()),
+                Map.entry("selectionDecisions", selection.decisions()),
+                Map.entry("warnings", warnings)));
         try {
             return HexFormat.of().formatHex(
                     MessageDigest.getInstance("SHA-256").digest(input));
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("SHA-256 is unavailable", impossible);
         }
+    }
+
+    private RepositoryContextDiagnostics diagnostics(
+            List<RepositoryEvidence> candidates,
+            List<RepositoryEvidence> selected,
+            ContextPlan contextPlan
+    ) {
+        Map<RepositoryContextLayer, Integer> candidatesByLayer =
+                new EnumMap<>(RepositoryContextLayer.class);
+        Map<String, Integer> candidatesByKind = new java.util.TreeMap<>();
+        Map<String, Integer> selectedByKind = new java.util.TreeMap<>();
+        candidates.forEach(value -> {
+            candidatesByLayer.merge(value.layer(), 1, Integer::sum);
+            candidatesByKind.merge(value.kind(), 1, Integer::sum);
+        });
+        selected.forEach(value -> selectedByKind.merge(value.kind(), 1, Integer::sum));
+        List<RepositoryContextDiagnostics.PreferredLayerAvailability> availability =
+                contextPlan.preferredLayers().stream().map(layer -> {
+                    boolean available = candidatesByLayer.containsKey(layer);
+                    return new RepositoryContextDiagnostics.PreferredLayerAvailability(
+                            layer, available,
+                            available ? null : "NO_CANDIDATE_FOR_PREFERRED_LAYER");
+                }).toList();
+        int unique = (int) candidates.stream().map(RepositoryEvidence::reference)
+                .distinct().count();
+        return new RepositoryContextDiagnostics(candidatesByLayer, candidatesByKind,
+                selectedByKind, availability, unique, candidates.size() - unique);
     }
 }

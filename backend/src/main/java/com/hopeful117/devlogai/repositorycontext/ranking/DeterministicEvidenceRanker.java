@@ -18,17 +18,28 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.LinkedHashMap;
 
 @Component
 public class DeterministicEvidenceRanker implements EvidenceRanker {
-    static final String POLICY_VERSION = "multi-criteria-v1";
+    static final String POLICY_VERSION = "multi-criteria-v2";
 
     @Override
     public List<RepositoryEvidence> rank(
             List<RepositoryEvidence> evidence,
             ContextRequest request
     ) {
-        return evidence.stream().map(value -> rank(value, request))
+        TermModel semanticTerms = termModel(
+                request.intent().id() + " " + request.intent().objective(), evidence,
+                request.contextPlan().precisionPolicy().maximumCommonTermPercentage());
+        UserGuidance guidance = request.guidance();
+        String guidanceQuery = guidance == null ? "" : String.join(" ", guidance.priorities())
+                + " " + Objects.toString(guidance.focus(), "") + " "
+                + Objects.toString(guidance.outputContext(), "");
+        TermModel guidanceTerms = termModel(guidanceQuery, evidence,
+                request.contextPlan().precisionPolicy().maximumCommonTermPercentage());
+        return evidence.stream().map(value -> rank(
+                        value, request, semanticTerms, guidanceTerms))
                 .sorted(Comparator.comparingInt(RepositoryEvidence::relevanceScore).reversed()
                         .thenComparing(value -> value.layer().ordinal())
                         .thenComparing(RepositoryEvidence::reference))
@@ -37,12 +48,14 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
 
     private RepositoryEvidence rank(
             RepositoryEvidence evidence,
-            ContextRequest request
+            ContextRequest request,
+            TermModel semanticTerms,
+            TermModel guidanceTerms
     ) {
         Map<EvidenceCriterion, Integer> criteria =
                 new EnumMap<>(EvidenceCriterion.class);
         criteria.put(EvidenceCriterion.SEMANTIC_RELEVANCE,
-                semanticRelevance(evidence, request));
+                semanticRelevance(evidence, semanticTerms));
         criteria.put(EvidenceCriterion.ARCHITECTURAL_RELEVANCE,
                 architecturalRelevance(evidence));
         criteria.put(EvidenceCriterion.HISTORICAL_RELEVANCE,
@@ -52,14 +65,18 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
                         request.analysisContext().analysis().createdAt()));
         criteria.put(EvidenceCriterion.CONFIDENCE, confidence(evidence));
         criteria.put(EvidenceCriterion.USER_GUIDANCE_BOOST,
-                guidanceRelevance(request.guidance(), evidence.summary()));
+                guidanceRelevance(request.guidance(), evidence, guidanceTerms));
         int finalScore = weightedScore(criteria,
                 request.contextPlan().composedWeights());
-        List<String> explanations = criteria.entrySet().stream()
+        List<String> explanations = new java.util.ArrayList<>(criteria.entrySet().stream()
                 .map(entry -> entry.getKey().name() + "=" + entry.getValue()
                         + "@" + request.contextPlan().composedWeights()
                         .getOrDefault(entry.getKey(), 0))
-                .toList();
+                .toList());
+        explanations.add("RANKING_POLICY:" + POLICY_VERSION);
+        explanations.add("SEMANTIC_TERMS:" + semanticTerms.explain(evidence));
+        if (request.guidance() != null && !request.guidance().isEmpty())
+            explanations.add("GUIDANCE_TERMS:" + guidanceTerms.explain(evidence));
         EvidenceScore score = new EvidenceScore(POLICY_VERSION, criteria,
                 request.contextPlan().composedWeights(), finalScore, explanations);
         return evidence.withRanking(score, explanations);
@@ -67,15 +84,9 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
 
     private int semanticRelevance(
             RepositoryEvidence evidence,
-            ContextRequest request
+            TermModel terms
     ) {
-        String query = request.intent().id() + " " + request.intent().objective();
-        Set<String> terms = normalizedTerms(query);
-        String candidate = evidence.kind() + " " + evidence.summary() + " "
-                + Objects.toString(evidence.provenance().originatingFile(), "");
-        long matches = terms.stream().filter(
-                candidate.toLowerCase(Locale.ROOT)::contains).count();
-        int score = (int) Math.min(100, matches * 25);
+        int score = terms.score(evidence);
         if (evidence.layer() == RepositoryContextLayer.CURRENT_ANALYSIS)
             score = Math.max(score, 90);
         return score;
@@ -128,15 +139,13 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
         };
     }
 
-    private int guidanceRelevance(UserGuidance guidance, String candidate) {
+    private int guidanceRelevance(
+            UserGuidance guidance,
+            RepositoryEvidence evidence,
+            TermModel terms
+    ) {
         if (guidance == null || guidance.isEmpty()) return 0;
-        String query = String.join(" ", guidance.priorities()) + " "
-                + Objects.toString(guidance.focus(), "") + " "
-                + Objects.toString(guidance.outputContext(), "");
-        Set<String> terms = normalizedTerms(query);
-        String normalized = candidate.toLowerCase(Locale.ROOT);
-        return (int) Math.min(100,
-                terms.stream().filter(normalized::contains).count() * 25);
+        return terms.score(evidence);
     }
 
     private int weightedScore(
@@ -157,6 +166,74 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
                 .filter(term -> term.length() >= 3)
                 .collect(java.util.stream.Collectors.toCollection(
                         java.util.LinkedHashSet::new));
+    }
+
+    private TermModel termModel(
+            String query,
+            List<RepositoryEvidence> evidence,
+            int maximumCommonPercentage
+    ) {
+        Set<String> terms = normalizedTerms(query);
+        Map<String, Integer> frequency = new LinkedHashMap<>();
+        terms.forEach(term -> frequency.put(term, (int) evidence.stream()
+                .map(this::searchableText).filter(value -> value.contains(term)).count()));
+        return new TermModel(frequency, evidence.size(), maximumCommonPercentage);
+    }
+
+    private String searchableText(RepositoryEvidence evidence) {
+        return (evidence.kind() + " " + evidence.summary() + " "
+                + Objects.toString(evidence.provenance().originatingFile(), ""))
+                .toLowerCase(Locale.ROOT);
+    }
+
+    private final class TermModel {
+        private final Map<String, Integer> frequency;
+        private final int candidateCount;
+        private final int maximumCommonPercentage;
+
+        private TermModel(Map<String, Integer> frequency, int candidateCount,
+                int maximumCommonPercentage) {
+            this.frequency = Map.copyOf(frequency);
+            this.candidateCount = candidateCount;
+            this.maximumCommonPercentage = maximumCommonPercentage;
+        }
+
+        private int score(RepositoryEvidence evidence) {
+            if (candidateCount == 0) return 0;
+            String candidate = searchableText(evidence);
+            int score = frequency.entrySet().stream()
+                    .filter(entry -> candidate.contains(entry.getKey()))
+                    .filter(entry -> isDiscriminating(entry.getValue()))
+                    .mapToInt(entry -> contribution(entry.getValue()))
+                    .sum();
+            return Math.min(100, score);
+        }
+
+        private boolean isDiscriminating(int occurrences) {
+            return maximumCommonPercentage == 100 || candidateCount <= 1
+                    || occurrences * 100 < maximumCommonPercentage * candidateCount;
+        }
+
+        private int contribution(int occurrences) {
+            if (maximumCommonPercentage == 100) return 25;
+            return Math.max(1, (int) Math.round(
+                    25.0 * (candidateCount - occurrences + 1) / candidateCount));
+        }
+
+        private String explain(RepositoryEvidence evidence) {
+            String candidate = searchableText(evidence);
+            String matched = frequency.entrySet().stream()
+                    .filter(entry -> candidate.contains(entry.getKey()))
+                    .filter(entry -> isDiscriminating(entry.getValue()))
+                    .map(Map.Entry::getKey).sorted().collect(
+                            java.util.stream.Collectors.joining(","));
+            String common = frequency.entrySet().stream()
+                    .filter(entry -> candidate.contains(entry.getKey()))
+                    .filter(entry -> !isDiscriminating(entry.getValue()))
+                    .map(Map.Entry::getKey).sorted().collect(
+                            java.util.stream.Collectors.joining(","));
+            return "matched=" + matched + ";common=" + common;
+        }
     }
 
     private boolean containsAny(String value, String... terms) {
