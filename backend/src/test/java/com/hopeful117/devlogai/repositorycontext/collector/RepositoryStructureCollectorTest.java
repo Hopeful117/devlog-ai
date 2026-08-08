@@ -106,6 +106,201 @@ class RepositoryStructureCollectorTest {
     }
 
     @Test
+    void producesSourceFileEvidenceForSourceFiles() {
+        Source source = Source.builder()
+                .id(sourceId)
+                .type(SourceType.GIT_REPOSITORY)
+                .active(true)
+                .build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+
+        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
+                sourceId, tempDir, "abc123");
+        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+
+        RepositoryScan scan = new RepositoryScan(
+                List.of(
+                        new RepositoryFile("src/main/java/com/hopeful117/App.java", 500, null),
+                        new RepositoryFile("src/main/java/com/hopeful117/Service.java", 300, null),
+                        new RepositoryFile("README.md", 100, null)),
+                3, 1, List.of());
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(scan);
+
+        List<RepositoryEvidence> evidence = collector.collect(createRequest());
+
+        List<RepositoryEvidence> sourceFileEvidence = evidence.stream()
+                .filter(e -> "SOURCE_FILE".equals(e.kind()))
+                .toList();
+        assertEquals(2, sourceFileEvidence.size());
+        for (RepositoryEvidence item : sourceFileEvidence) {
+            assertTrue(item.provenance().originatingFile().startsWith("src/main/java/"));
+            assertTrue(item.summary().contains("src/main/java/"));
+        }
+    }
+
+    @Test
+    void producesTestFileEvidenceForTestFiles() {
+        Source source = Source.builder()
+                .id(sourceId)
+                .type(SourceType.GIT_REPOSITORY)
+                .active(true)
+                .build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+
+        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
+                sourceId, tempDir, "abc123");
+        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+
+        RepositoryScan scan = new RepositoryScan(
+                List.of(
+                        new RepositoryFile("src/test/java/com/hopeful117/AppTest.java", 400, null),
+                        new RepositoryFile("src/main/java/com/hopeful117/App.java", 500, null)),
+                2, 1, List.of());
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(scan);
+
+        List<RepositoryEvidence> evidence = collector.collect(createRequest());
+
+        List<RepositoryEvidence> testFileEvidence = evidence.stream()
+                .filter(e -> "TEST_FILE".equals(e.kind()))
+                .toList();
+        assertEquals(1, testFileEvidence.size());
+        assertTrue(testFileEvidence.getFirst().provenance().originatingFile().contains("src/test/"));
+    }
+
+    @Test
+    void producesConfigFileEvidenceForConfigFiles() {
+        Source source = Source.builder()
+                .id(sourceId)
+                .type(SourceType.GIT_REPOSITORY)
+                .active(true)
+                .build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+
+        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
+                sourceId, tempDir, "abc123");
+        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+
+        RepositoryScan scan = new RepositoryScan(
+                List.of(
+                        new RepositoryFile("pom.xml", 200, null),
+                        new RepositoryFile("backend/src/main/resources/application.properties", 100, null),
+                        new RepositoryFile("src/main/java/com/App.java", 500, null)),
+                3, 1, List.of());
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(scan);
+
+        List<RepositoryEvidence> evidence = collector.collect(createRequest());
+
+        List<RepositoryEvidence> configFileEvidence = evidence.stream()
+                .filter(e -> "CONFIG_FILE".equals(e.kind()))
+                .toList();
+        assertTrue(configFileEvidence.size() >= 1);
+        assertTrue(configFileEvidence.stream()
+                .anyMatch(e -> e.provenance().originatingFile().equals("pom.xml")));
+    }
+
+    @Test
+    void producesModuleEvidenceForMultiModuleRepos() {
+        Source source = Source.builder()
+                .id(sourceId)
+                .type(SourceType.GIT_REPOSITORY)
+                .active(true)
+                .build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+
+        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
+                sourceId, tempDir, "abc123");
+        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+
+        RepositoryScan scan = new RepositoryScan(
+                List.of(
+                        new RepositoryFile("backend/pom.xml", 200, null),
+                        new RepositoryFile("backend/src/main/java/App.java", 500, null),
+                        new RepositoryFile("frontend/pom.xml", 200, null),
+                        new RepositoryFile("frontend/src/main/ts/App.ts", 300, null)),
+                4, 1, List.of());
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(scan);
+
+        List<RepositoryEvidence> evidence = collector.collect(createRequest());
+
+        List<RepositoryEvidence> moduleEvidence = evidence.stream()
+                .filter(e -> "MODULE".equals(e.kind()))
+                .toList();
+        assertFalse(moduleEvidence.isEmpty());
+        assertTrue(moduleEvidence.stream()
+                .anyMatch(e -> e.summary().contains("backend")));
+        assertTrue(moduleEvidence.stream()
+                .anyMatch(e -> e.summary().contains("frontend")));
+    }
+
+    @Test
+    void limitsFileEvidenceItems() {
+        Source source = Source.builder()
+                .id(sourceId)
+                .type(SourceType.GIT_REPOSITORY)
+                .active(true)
+                .build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+
+        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
+                sourceId, tempDir, "abc123");
+        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+
+        // Create 50 source files (exceeds MAX_FILE_EVIDENCE_ITEMS = 40)
+        List<RepositoryFile> files = new java.util.ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            files.add(new RepositoryFile("src/main/java/com/pkg/File" + i + ".java", 100, null));
+        }
+        RepositoryScan scan = new RepositoryScan(files, 50, 1, List.of());
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(scan);
+
+        List<RepositoryEvidence> evidence = collector.collect(createRequest());
+
+        long fileEvidenceCount = evidence.stream()
+                .filter(e -> "SOURCE_FILE".equals(e.kind()))
+                .count();
+        assertTrue(fileEvidenceCount <= 40);
+    }
+
+    @Test
+    void prioritizesFilesMatchingStoryTerms() {
+        Source source = Source.builder()
+                .id(sourceId)
+                .type(SourceType.GIT_REPOSITORY)
+                .active(true)
+                .build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+
+        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
+                sourceId, tempDir, "abc123");
+        when(workspaceManager.synchronize(eq(source), eq(null))).thenReturn(workspace);
+
+        RepositoryScan scan = new RepositoryScan(
+                List.of(
+                        new RepositoryFile("src/main/java/com/other/Unrelated.java", 100, null),
+                        new RepositoryFile("src/main/java/com/auth/AuthService.java", 200, null),
+                        new RepositoryFile("src/main/java/com/auth/AuthConfig.java", 150, null),
+                        new RepositoryFile("src/main/java/com/auth/AuthTest.java", 120, null)),
+                4, 1, List.of());
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(scan);
+
+        ContextRequest request = createRequestWithObjective("Implement authentication module");
+        List<RepositoryEvidence> evidence = collector.collect(request);
+
+        List<RepositoryEvidence> sourceFileEvidence = evidence.stream()
+                .filter(e -> "SOURCE_FILE".equals(e.kind()))
+                .toList();
+        assertFalse(sourceFileEvidence.isEmpty());
+        // First evidence item should match 'auth' term
+        assertTrue(sourceFileEvidence.getFirst().provenance().originatingFile().toLowerCase().contains("auth"));
+    }
+
+    @Test
     void producesModuleSummaryEvidence() {
         Source source = Source.builder()
                 .id(sourceId)
@@ -211,6 +406,33 @@ class RepositoryStructureCollectorTest {
         com.hopeful117.devlogai.intent.model.IntentDefinition intent =
                 new com.hopeful117.devlogai.intent.model.IntentDefinition(
                         "test-intent", "v1", "Test objective",
+                        List.of(com.hopeful117.devlogai.intent.model.InsightType
+                                .ARCHITECTURE_DESCRIPTION),
+                        List.of("grounded"), Map.of("type", "object"),
+                        "test-prompt", List.of("architecture-v1"));
+
+        return new ContextRequest(
+                analysisContext,
+                intent,
+                null,
+                List.of(),
+                mockContextPlan(),
+                new RepositoryContext.ContextBudget(10, 100, 5, 1000));
+    }
+
+    private ContextRequest createRequestWithObjective(String objective) {
+        AnalysisContext analysisContext = new AnalysisContext(
+                new AnalysisContext.ProjectSnapshot(projectId, "TestProject",
+                        "test-project", "A test project", ProjectStatus.ACTIVE),
+                new AnalysisContext.AnalysisSnapshot(analysisId,
+                        AnalysisType.ARCHITECTURE_REVIEW, "test-intent", "v1",
+                        AnalysisStatus.IN_PROGRESS, Instant.EPOCH, null, Instant.EPOCH),
+                null, List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of());
+
+        com.hopeful117.devlogai.intent.model.IntentDefinition intent =
+                new com.hopeful117.devlogai.intent.model.IntentDefinition(
+                        "test-intent", "v1", objective,
                         List.of(com.hopeful117.devlogai.intent.model.InsightType
                                 .ARCHITECTURE_DESCRIPTION),
                         List.of("grounded"), Map.of("type", "object"),
