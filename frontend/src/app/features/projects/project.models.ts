@@ -21,3 +21,8 @@ export interface CreateProjectRequest {
   readonly name: string;
   readonly description?: string;
 }
+
+export interface UpdateProjectRequest {
+  readonly name?: string;
+  readonly description?: string;
+}

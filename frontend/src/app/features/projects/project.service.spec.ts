@@ -72,4 +72,29 @@ describe('ProjectService', () => {
 
     expect(result).toEqual(summary);
   });
+
+  it('updates a project using its encoded slug', () => {
+    let result: ProjectDetail | undefined;
+    service
+      .updateProject('devlog ai', { name: 'DevLog Updated', description: 'Updated' })
+      .subscribe((project) => (result = project));
+
+    const request = http.expectOne('http://core.test/api/v1/projects/devlog%20ai');
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body).toEqual({ name: 'DevLog Updated', description: 'Updated' });
+    request.flush({ ...summary, name: 'DevLog Updated', description: 'Updated' });
+
+    expect(result?.name).toBe('DevLog Updated');
+  });
+
+  it('deletes a project using its encoded slug', () => {
+    let completed = false;
+    service.deleteProject('devlog ai').subscribe({ complete: () => (completed = true) });
+
+    const request = http.expectOne('http://core.test/api/v1/projects/devlog%20ai');
+    expect(request.request.method).toBe('DELETE');
+    request.flush(null);
+
+    expect(completed).toBe(true);
+  });
 });

@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.project.dto.response.ProjectResponse;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.project.exception.ProjectSlugAlreadyExistsException;
 import com.hopeful117.devlogai.project.service.ProjectService;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,11 +18,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -62,6 +65,28 @@ class ProjectControllerWebMvcTest extends ControllerWebMvcTestSupport {
         mvc.perform(patch("/api/v1/projects/devlog-ai/archive"))
                 .andExpect(status().isNoContent());
         verify(service).archive("devlog-ai");
+        mvc.perform(delete("/api/v1/projects/devlog-ai"))
+                .andExpect(status().isNoContent());
+        verify(service).delete("devlog-ai");
+    }
+
+    @Test
+    void shouldRejectBlankUpdatedName() throws Exception {
+        mvc.perform(put("/api/v1/projects/devlog-ai")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"   \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void shouldReturnNotFoundWhenDeletingUnknownProject() throws Exception {
+        doThrow(new EntityNotFoundException("Project", "unknown"))
+                .when(service).delete("unknown");
+
+        mvc.perform(delete("/api/v1/projects/unknown"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ENTITY_NOT_FOUND"));
     }
 
     @Test

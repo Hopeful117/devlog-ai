@@ -52,6 +52,56 @@
 .project-strip strong {
   font-size: 0.78rem;
 }
+.project-actions,
+.danger-zone {
+  margin: 1.4rem 0 2rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgb(17 26 43 / 0.55);
+}
+.project-actions__heading,
+.danger-zone {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.project-actions h2,
+.danger-zone h2,
+.project-actions .eyebrow,
+.danger-zone .eyebrow {
+  margin-bottom: 0.35rem;
+}
+.project-actions form,
+.delete-confirmation {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+.project-actions input,
+.project-actions textarea,
+.delete-confirmation input {
+  width: 100%;
+}
+.danger-zone {
+  margin-top: 2rem;
+  border-color: var(--danger);
+}
+.danger-zone > div:first-child {
+  max-width: 46rem;
+}
+.danger-zone p:last-child {
+  margin-bottom: 0;
+}
+.delete-confirmation {
+  min-width: min(100%, 26rem);
+}
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
 .section-heading {
   display: flex;
   align-items: end;
@@ -191,7 +241,9 @@ app-dashboard-card p {
 }
 @media (max-width: 42rem) {
   .cockpit-header,
-  .section-heading {
+  .section-heading,
+  .project-actions__heading,
+  .danger-zone {
     align-items: flex-start;
     flex-direction: column;
   }

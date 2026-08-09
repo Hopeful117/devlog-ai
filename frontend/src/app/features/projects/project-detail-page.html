@@ -31,6 +31,60 @@
           </div>
         </header>
 
+        @if (updateState$ | async; as updateState) {
+          <section class="project-actions" aria-labelledby="project-actions-title">
+            <div class="project-actions__heading">
+              <div>
+                <p class="eyebrow">Project settings</p>
+                <h2 id="project-actions-title">Manage project</h2>
+              </div>
+              @if (!showEdit) {
+                <button type="button" (click)="beginEdit(viewModel.project)">Edit project</button>
+              }
+            </div>
+
+            @if (showEdit) {
+              <form [formGroup]="editForm" (ngSubmit)="updateProject(viewModel.project)" novalidate>
+                <label for="edit-project-name">Name</label>
+                <input id="edit-project-name" formControlName="name" maxlength="100" />
+                @if (
+                  editForm.controls.name.touched && editForm.controls.name.hasError('required')
+                ) {
+                  <p class="field-error" role="alert">A project name is required.</p>
+                }
+                <label for="edit-project-description">Description</label>
+                <textarea
+                  id="edit-project-description"
+                  formControlName="description"
+                  maxlength="5000"
+                  rows="4"
+                ></textarea>
+                @if (updateState.state === 'error') {
+                  <p class="inline-message inline-message--error" role="alert">
+                    {{ updateState.error.message }}
+                  </p>
+                }
+                <div class="form-actions">
+                  <button
+                    type="submit"
+                    [disabled]="editForm.invalid || updateState.state === 'pending'"
+                  >
+                    {{ updateState.state === 'pending' ? 'Saving…' : 'Save changes' }}
+                  </button>
+                  <button
+                    class="secondary-button"
+                    type="button"
+                    (click)="cancelEdit()"
+                    [disabled]="updateState.state === 'pending'"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            }
+          </section>
+        }
+
         <div class="project-strip">
           <span><small>Branch</small><strong>default</strong></span>
           <span
@@ -207,6 +261,73 @@
         <section class="analysis-launcher">
           <app-project-analyses-section [projectId]="viewModel.project.id" />
         </section>
+
+        @if (deleteState$ | async; as deleteState) {
+          <section class="danger-zone" aria-labelledby="danger-zone-title">
+            <div>
+              <p class="eyebrow">Destructive action</p>
+              <h2 id="danger-zone-title">Danger zone</h2>
+              <p>
+                Permanently delete this project and all of its DevLog-owned data. Connected Git
+                repositories and workspace files will not be deleted.
+              </p>
+            </div>
+            @if (!showDelete) {
+              <button class="danger-button" type="button" (click)="beginDelete()">
+                Delete project
+              </button>
+            } @else {
+              <form
+                class="delete-confirmation"
+                [formGroup]="deleteForm"
+                (ngSubmit)="deleteProject(viewModel.project)"
+              >
+                <p><strong>This action cannot be undone.</strong></p>
+                <label for="delete-project-confirmation">
+                  Enter <strong>{{ viewModel.project.name }}</strong> to confirm
+                </label>
+                <input
+                  id="delete-project-confirmation"
+                  formControlName="confirmation"
+                  autocomplete="off"
+                />
+                @if (
+                  deleteForm.controls.confirmation.touched &&
+                  deleteForm.controls.confirmation.hasError('projectNameMismatch')
+                ) {
+                  <p class="field-error" role="alert">The project name does not match.</p>
+                }
+                @if (deleteState.state === 'error') {
+                  <p class="inline-message inline-message--error" role="alert">
+                    {{ deleteState.error.message }}
+                  </p>
+                }
+                <div class="form-actions">
+                  <button
+                    class="danger-button"
+                    type="submit"
+                    [disabled]="
+                      deleteForm.controls.confirmation.value !== viewModel.project.name ||
+                      deleteState.state === 'pending'
+                    "
+                  >
+                    {{
+                      deleteState.state === 'pending' ? 'Deleting…' : 'Permanently delete project'
+                    }}
+                  </button>
+                  <button
+                    class="secondary-button"
+                    type="button"
+                    (click)="cancelDelete()"
+                    [disabled]="deleteState.state === 'pending'"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            }
+          </section>
+        }
       }
     }
   }

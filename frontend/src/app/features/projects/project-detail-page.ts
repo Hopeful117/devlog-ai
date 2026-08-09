@@ -1,7 +1,20 @@
 import { AsyncPipe, DatePipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
-import { catchError, forkJoin, map, Observable, of, startWith, switchMap } from 'rxjs';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import {
+  catchError,
+  exhaustMap,
+  forkJoin,
+  map,
+  Observable,
+  of,
+  shareReplay,
+  startWith,
+  Subject,
+  switchMap,
+  tap,
+} from 'rxjs';
 
 import { RequestError, toRequestError } from '../../core/http/request-error';
 import { DashboardCard } from '../../shared/components/dashboard-card';
@@ -30,19 +43,57 @@ type ProjectDetailViewState =
   | { readonly state: 'not-found' }
   | { readonly state: 'error'; readonly error: RequestError };
 
+type ProjectActionState =
+  | { readonly state: 'idle' }
+  | { readonly state: 'pending' }
+  | { readonly state: 'success' }
+  | { readonly state: 'error'; readonly error: RequestError };
+
 @Component({
   selector: 'app-project-detail-page',
-  imports: [AsyncPipe, DatePipe, RouterLink, DashboardCard, ProjectAnalysesSection],
+  imports: [
+    AsyncPipe,
+    DatePipe,
+    ReactiveFormsModule,
+    RouterLink,
+    DashboardCard,
+    ProjectAnalysesSection,
+  ],
   templateUrl: './project-detail-page.html',
   styleUrl: './project-detail-page.scss',
 })
 export class ProjectDetailPage {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
   private readonly sourceService = inject(SourceService);
   private readonly analysisService = inject(AnalysisService);
   private readonly deliverableService = inject(DeliverableService);
   private readonly insightService = inject(InsightService);
+  private readonly projectChanges = new Subject<ProjectDetail>();
+  private readonly updates = new Subject<{
+    readonly project: ProjectDetail;
+    readonly name: string;
+    readonly description: string;
+  }>();
+  private readonly deletions = new Subject<ProjectDetail>();
+  showEdit = false;
+  showDelete = false;
+
+  readonly editForm = new FormGroup({
+    name: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.maxLength(100)],
+    }),
+    description: new FormControl('', {
+      nonNullable: true,
+      validators: Validators.maxLength(5000),
+    }),
+  });
+
+  readonly deleteForm = new FormGroup({
+    confirmation: new FormControl('', { nonNullable: true, validators: Validators.required }),
+  });
 
   readonly viewModel$: Observable<ProjectDetailViewState> = this.route.paramMap.pipe(
     map((params) => params.get('id') ?? ''),
@@ -62,7 +113,18 @@ export class ProjectDetailPage {
             knowledge: this.insightService
               .getInsightsByProject(project.id)
               .pipe(catchError(() => of([] as readonly InsightSummary[]))),
-          }).pipe(map((data) => ({ state: 'loaded' as const, project, ...data }))),
+          }).pipe(
+            switchMap((data) =>
+              this.projectChanges.pipe(
+                startWith(project),
+                map((currentProject) => ({
+                  state: 'loaded' as const,
+                  project: currentProject,
+                  ...data,
+                })),
+              ),
+            ),
+          ),
         ),
         catchError((error: unknown) => {
           const requestError = toRequestError(error);
@@ -73,7 +135,85 @@ export class ProjectDetailPage {
         startWith({ state: 'loading' as const }),
       ),
     ),
+    shareReplay({ bufferSize: 1, refCount: true }),
   );
+
+  readonly updateState$: Observable<ProjectActionState> = this.updates.pipe(
+    exhaustMap(({ project, name, description }) =>
+      this.projectService.updateProject(project.slug, { name, description }).pipe(
+        tap((updated) => {
+          this.projectChanges.next(updated);
+          this.showEdit = false;
+          this.editForm.reset();
+          this.deleteForm.reset();
+        }),
+        map((): ProjectActionState => ({ state: 'success' })),
+        catchError((error: unknown) =>
+          of<ProjectActionState>({ state: 'error', error: toRequestError(error, 'project') }),
+        ),
+        startWith<ProjectActionState>({ state: 'pending' }),
+      ),
+    ),
+    startWith<ProjectActionState>({ state: 'idle' }),
+    shareReplay({ bufferSize: 1, refCount: true }),
+  );
+
+  readonly deleteState$: Observable<ProjectActionState> = this.deletions.pipe(
+    exhaustMap((project) =>
+      this.projectService.deleteProject(project.slug).pipe(
+        tap(() => void this.router.navigate(['/projects'])),
+        map((): ProjectActionState => ({ state: 'success' })),
+        catchError((error: unknown) =>
+          of<ProjectActionState>({ state: 'error', error: toRequestError(error, 'project') }),
+        ),
+        startWith<ProjectActionState>({ state: 'pending' }),
+      ),
+    ),
+    startWith<ProjectActionState>({ state: 'idle' }),
+    shareReplay({ bufferSize: 1, refCount: true }),
+  );
+
+  beginEdit(project: ProjectDetail): void {
+    this.showDelete = false;
+    this.showEdit = true;
+    this.editForm.setValue({ name: project.name, description: project.description ?? '' });
+  }
+
+  cancelEdit(): void {
+    this.showEdit = false;
+    this.editForm.reset();
+  }
+
+  updateProject(project: ProjectDetail): void {
+    const value = this.editForm.getRawValue();
+    const name = value.name.trim();
+    if (!name) this.editForm.controls.name.setErrors({ required: true });
+    if (this.editForm.invalid) {
+      this.editForm.markAllAsTouched();
+      return;
+    }
+    this.updates.next({ project, name, description: value.description.trim() });
+  }
+
+  beginDelete(): void {
+    this.showEdit = false;
+    this.showDelete = true;
+    this.deleteForm.reset();
+  }
+
+  cancelDelete(): void {
+    this.showDelete = false;
+    this.deleteForm.reset();
+  }
+
+  deleteProject(project: ProjectDetail): void {
+    if (this.deleteForm.controls.confirmation.value !== project.name) {
+      this.deleteForm.controls.confirmation.setErrors({ projectNameMismatch: true });
+      this.deleteForm.controls.confirmation.markAsTouched();
+      return;
+    }
+    this.deletions.next(project);
+  }
 
   latestAnalysis(items: readonly AnalysisSummary[]): AnalysisSummary | undefined {
     return [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];

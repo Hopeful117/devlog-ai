@@ -9,15 +9,18 @@ import com.hopeful117.devlogai.project.exception.ProjectSlugAlreadyExistsExcepti
 import com.hopeful117.devlogai.project.mapper.ProjectMapper;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.service.SlugService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -123,7 +126,7 @@ class ProjectServiceTest {
         // Arrange
         String slug = "trading-os";
 
-        Project project = new Project();
+        Project project = Project.builder().id(UUID.randomUUID()).slug(slug).build();
         ProjectResponse response = new ProjectResponse();
 
         when(projectRepository.findBySlug(any(String.class)))
@@ -248,7 +251,7 @@ class ProjectServiceTest {
         when(projectRepository.findBySlug(any(String.class)))
                 .thenReturn(Optional.of(project));
 
-        when(projectRepository.save(project))
+        when(projectRepository.saveAndFlush(project))
                 .thenReturn(project);
 
         when(projectMapper.toResponse(project))
@@ -271,10 +274,59 @@ class ProjectServiceTest {
                 .updateProject(request, project);
 
         verify(projectRepository)
-                .save(project);
+                .existsByNameAndIdNot("Trading OS Updated", project.getId());
+
+        verify(projectRepository)
+                .saveAndFlush(project);
 
         verify(projectMapper)
                 .toResponse(project);
+    }
+
+    @Test
+    void shouldPreserveDescriptionOnlyUpdateCompatibility() {
+        UpdateProjectRequest request = UpdateProjectRequest.builder()
+                .description("")
+                .build();
+        Project project = Project.builder().id(UUID.randomUUID()).slug("devlog-ai").build();
+        ProjectResponse response = new ProjectResponse();
+        when(projectRepository.findBySlug("devlog-ai")).thenReturn(Optional.of(project));
+        when(projectRepository.saveAndFlush(project)).thenReturn(project);
+        when(projectMapper.toResponse(project)).thenReturn(response);
+
+        assertSame(response, projectService.update("devlog-ai", request));
+
+        verify(projectRepository, never()).existsByNameAndIdNot(anyString(), any());
+        verify(projectMapper).updateProject(request, project);
+    }
+
+    @Test
+    void shouldRejectDuplicateUpdatedName() {
+        UUID projectId = UUID.randomUUID();
+        UpdateProjectRequest request = UpdateProjectRequest.builder().name(" Existing ").build();
+        Project project = Project.builder().id(projectId).slug("devlog-ai").build();
+        when(projectRepository.findBySlug("devlog-ai")).thenReturn(Optional.of(project));
+        when(projectRepository.existsByNameAndIdNot("Existing", projectId)).thenReturn(true);
+
+        assertThrows(ConflictException.class,
+                () -> projectService.update("devlog-ai", request));
+
+        verify(projectMapper, never()).updateProject(any(), any());
+        verify(projectRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void shouldNotMisreportUnrelatedIntegrityFailureAsDuplicateName() {
+        UUID projectId = UUID.randomUUID();
+        UpdateProjectRequest request = UpdateProjectRequest.builder().name("Updated").build();
+        Project project = Project.builder().id(projectId).slug("devlog-ai").build();
+        DataIntegrityViolationException failure =
+                new DataIntegrityViolationException("fk_unrelated_constraint");
+        when(projectRepository.findBySlug("devlog-ai")).thenReturn(Optional.of(project));
+        when(projectRepository.saveAndFlush(project)).thenThrow(failure);
+
+        assertSame(failure, assertThrows(DataIntegrityViolationException.class,
+                () -> projectService.update("devlog-ai", request)));
     }
     @Test
     void shouldThrowExceptionWhenUpdatingUnknownProject() {
@@ -295,7 +347,7 @@ class ProjectServiceTest {
 
 
         verify(projectRepository, never())
-                .save(any(Project.class));
+                .saveAndFlush(any(Project.class));
     }
     @Test
     void shouldArchiveProjectSuccessfully() {
@@ -346,6 +398,27 @@ class ProjectServiceTest {
 
         verify(projectRepository, never())
                 .save(any(Project.class));
+    }
+
+    @Test
+    void shouldDeleteProjectAndFlush() {
+        Project project = Project.builder().id(UUID.randomUUID()).slug("devlog-ai").build();
+        when(projectRepository.findBySlug("devlog-ai")).thenReturn(Optional.of(project));
+
+        projectService.delete("devlog-ai");
+
+        verify(projectRepository).delete(project);
+        verify(projectRepository).flush();
+    }
+
+    @Test
+    void shouldRejectDeletingUnknownProject() {
+        when(projectRepository.findBySlug("unknown")).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () -> projectService.delete("unknown"));
+
+        verify(projectRepository, never()).delete(any());
+        verify(projectRepository, never()).flush();
     }
 
 }

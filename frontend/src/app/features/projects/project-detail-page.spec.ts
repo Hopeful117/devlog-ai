@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { BehaviorSubject, of, throwError } from 'rxjs';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
+import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { ProjectDetail } from './project.models';
 import { ProjectDetailPage } from './project-detail-page';
@@ -25,10 +25,14 @@ const project: ProjectDetail = {
 describe('ProjectDetailPage', () => {
   const paramMap = new BehaviorSubject(convertToParamMap({ id: 'devlog-ai' }));
   const getProject = vi.fn();
+  const updateProject = vi.fn();
+  const deleteProject = vi.fn();
 
   beforeEach(() => {
     paramMap.next(convertToParamMap({ id: 'devlog-ai' }));
     getProject.mockReset();
+    updateProject.mockReset();
+    deleteProject.mockReset();
   });
 
   afterEach(() => TestBed.resetTestingModule());
@@ -39,7 +43,7 @@ describe('ProjectDetailPage', () => {
       providers: [
         provideRouter([]),
         { provide: ActivatedRoute, useValue: { paramMap } },
-        { provide: ProjectService, useValue: { getProject } },
+        { provide: ProjectService, useValue: { getProject, updateProject, deleteProject } },
         {
           provide: SourceService,
           useValue: {
@@ -89,5 +93,74 @@ describe('ProjectDetailPage', () => {
 
   it('does not implement an imperative subscription', () => {
     expect(ProjectDetailPage.toString()).not.toContain('.subscribe(');
+  });
+
+  it('pre-populates and submits the edit form with normalized values', async () => {
+    getProject.mockReturnValue(of(project));
+    updateProject.mockReturnValue(of({ ...project, name: 'DevLog Updated' }));
+    const element = await render();
+    const fixture = TestBed.createComponent(ProjectDetailPage);
+    fixture.componentInstance.beginEdit(project);
+    fixture.componentInstance.editForm.setValue({
+      name: '  DevLog Updated  ',
+      description: '  Updated description  ',
+    });
+    fixture.componentInstance.updateState$.subscribe();
+    fixture.componentInstance.updateProject(project);
+
+    expect(updateProject).toHaveBeenCalledWith('devlog-ai', {
+      name: 'DevLog Updated',
+      description: 'Updated description',
+    });
+    expect(element.textContent).toContain('Edit project');
+  });
+
+  it('requires the exact project name before deletion', async () => {
+    getProject.mockReturnValue(of(project));
+    await render();
+    const fixture = TestBed.createComponent(ProjectDetailPage);
+    fixture.componentInstance.deleteState$.subscribe();
+    fixture.componentInstance.beginDelete();
+    fixture.componentInstance.deleteForm.controls.confirmation.setValue('Wrong name');
+
+    fixture.componentInstance.deleteProject(project);
+
+    expect(deleteProject).not.toHaveBeenCalled();
+    expect(
+      fixture.componentInstance.deleteForm.controls.confirmation.hasError('projectNameMismatch'),
+    ).toBe(true);
+  });
+
+  it('navigates only after successful deletion', async () => {
+    getProject.mockReturnValue(of(project));
+    deleteProject.mockReturnValue(of(undefined));
+    await render();
+    const fixture = TestBed.createComponent(ProjectDetailPage);
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    fixture.componentInstance.deleteState$.subscribe();
+    fixture.componentInstance.deleteForm.controls.confirmation.setValue(project.name);
+
+    fixture.componentInstance.deleteProject(project);
+
+    expect(deleteProject).toHaveBeenCalledWith('devlog-ai');
+    expect(navigate).toHaveBeenCalledWith(['/projects']);
+  });
+
+  it('keeps the page on deletion failure', async () => {
+    getProject.mockReturnValue(of(project));
+    const failure = new Subject<void>();
+    deleteProject.mockReturnValue(failure);
+    await render();
+    const fixture = TestBed.createComponent(ProjectDetailPage);
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+    fixture.componentInstance.deleteState$.subscribe();
+    fixture.componentInstance.deleteForm.controls.confirmation.setValue(project.name);
+
+    fixture.componentInstance.deleteProject(project);
+    failure.error(new HttpErrorResponse({ status: 500 }));
+
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

@@ -17,4 +17,6 @@ public interface ProjectService {
 
    void archive(String slug);
 
+   void delete(String slug);
+
 }

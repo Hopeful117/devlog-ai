@@ -10,4 +10,5 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     Optional<Project>findBySlug(String slug);
     boolean existsBySlug(String slug);
+    boolean existsByNameAndIdNot(String name, UUID id);
 }

@@ -63,4 +63,10 @@ public class ProjectController {
 
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping("/{slug}")
+    public ResponseEntity<Void> delete(@PathVariable String slug) {
+        projectService.delete(slug);
+        return ResponseEntity.noContent().build();
+    }
 }

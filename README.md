@@ -12,7 +12,7 @@ OpenAPI documentation, and traceable Deliverables generated from human-validated
 
 ## Current capabilities
 
-- Manage projects and Git repository sources.
+- Create, edit, archive, and permanently delete projects, and manage their Git repository sources.
 - Clone and synchronize repository workspaces at a branch, tag, or commit.
 - Collect versioned Facts about repository metadata, builds, Spring, Docker, documentation, and
   test structure.
@@ -224,6 +224,12 @@ prompts, accepts Proposals automatically, or exposes provider credentials. The d
 identifies itself as `mock` / `deterministic-v1` and returns zero Proposals unless deterministic test
 output is configured.
 
+Project names and descriptions can be edited from the project cockpit. Editing preserves the
+project UUID and slug, so existing project URLs remain stable. Permanent deletion is a separate
+danger-zone action that requires entering the exact project name. It removes the project and its
+DevLog-owned database records through transactional PostgreSQL cascades; it never deletes connected
+remote Git repositories or filesystem workspaces.
+
 For a complete Mock/OpenAI walkthrough and troubleshooting, use the
 [manual MVP test guide](frontend/docs/manual-mvp-test.md).
 
@@ -240,6 +246,16 @@ The complete API is documented in Swagger. The minimal workflow is:
 
 7. Accept or reject a proposal with `POST /api/v1/validations`.
 8. Retrieve trusted knowledge with `GET /api/v1/insights/analysis/{analysisId}`.
+
+Project management also exposes:
+
+- `PUT /api/v1/projects/{slug}` to update the name and/or description while preserving the slug;
+- `PATCH /api/v1/projects/{slug}/archive` for the reversible lifecycle action;
+- `DELETE /api/v1/projects/{slug}` for permanent deletion, returning `204 No Content` after the
+  complete database transaction succeeds.
+
+Unknown projects use the standard `404 ENTITY_NOT_FOUND` response. Invalid updates return the
+standard validation contract, and duplicate project names return `409 RESOURCE_CONFLICT`.
 
 ### Engineering Story Context
 

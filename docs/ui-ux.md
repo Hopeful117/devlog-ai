@@ -101,6 +101,12 @@ Display:
 * repository status;
 * last repository analysis.
 
+The Cockpit also provides a project-management action area. Editing is an ordinary reversible
+interaction for the project name and description; it keeps the stable project URL. Permanent
+deletion is isolated in a danger zone, explains its DevLog-owned data scope, and requires the user
+to enter the exact project name before submission. Cancellation and request failure leave the
+project unchanged and visible.
+
 ---
 
 ## Project Health
