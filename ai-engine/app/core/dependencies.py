@@ -10,6 +10,8 @@ from app.providers.openai import OpenAiLlmProvider
 from app.services.insight_generation_service import InsightGenerationService
 from app.services.task_processing_service import AiTaskProcessingService
 from app.services.deliverable_generation_service import DeliverableGenerationService
+from app.prompts.engineering_event import EngineeringEventPromptBuilder
+from app.services.engineering_event_generation_service import EngineeringEventGenerationService
 
 
 def build_llm_provider(settings: Settings) -> LlmProvider:
@@ -42,7 +44,10 @@ def get_task_processing_service() -> AiTaskProcessingService:
         prompt_builder=InsightPromptBuilder(),
         callback_client=callback_client,
     )
-    return AiTaskProcessingService(insight_service, callback_client)
+    event_service = EngineeringEventGenerationService(
+        provider=build_llm_provider(settings), prompt_builder=EngineeringEventPromptBuilder(),
+        callback_client=callback_client)
+    return AiTaskProcessingService(insight_service, callback_client, event_service)
 
 
 @lru_cache

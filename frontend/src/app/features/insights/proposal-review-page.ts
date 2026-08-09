@@ -80,7 +80,7 @@ export class ProposalReviewPage {
           ? this.proposals.acceptProposal(item.id, {
               validatedBy,
               comment,
-              insightSeverity: this.form.controls.severity.value,
+              insightSeverity: item.type === 'INSIGHT' ? this.form.controls.severity.value : null,
             })
           : this.proposals.rejectProposal(item.id, { validatedBy, comment });
       return request.pipe(

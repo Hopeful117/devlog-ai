@@ -4,8 +4,8 @@
 
 DevLog AI analyzes Git repositories through deterministic collectors, builds an immutable project
 context, and asks an AI engine for structured interpretations. AI output is never trusted directly:
-it becomes a proposal that must be accepted by a human before it is promoted to an immutable
-Insight.
+it becomes a proposal that must be accepted by a human before it is promoted to immutable trusted
+knowledge: an Insight or, for a bounded Git evolution, an Engineering Event.
 
 The project includes a usable Angular MVP for the complete traceable interaction flow, REST APIs,
 OpenAPI documentation, and traceable Deliverables generated from human-validated Insights.
@@ -26,6 +26,8 @@ OpenAPI documentation, and traceable Deliverables generated from human-validated
 - Generate structured Insight Proposals from versioned Intents.
 - Build deterministic, versioned Prompts with output contracts, traceability metadata, and content digests.
 - Validate proposals manually and promote accepted Insight Proposals to immutable Insights.
+- Explicitly analyze one complete non-root Git commit against its first parent, review grounded
+  Engineering Event proposals individually, and query accepted events with full revision provenance.
 - Retrieve Insights by project, analysis, type, and severity.
 - Use an Angular engineering dashboard to manage Projects and Sources, launch guided Analyses,
   monitor deterministic and AI execution, review evidence, decide Proposals, and consult Insights.

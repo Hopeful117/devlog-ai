@@ -47,6 +47,11 @@ This includes technologies, architecture, dependencies, infrastructure, and rela
 
 ### Engineering Events
 
+The first implemented vertical slice uses a dedicated immutable `EngineeringEvent` aggregate.
+Legacy `KnowledgeEvent` records remain raw/manual occurrences and are neither migrated nor treated
+as validated memory. Core owns the exact Source and first-parent revision boundary, output contract,
+validation transaction, and promotion; the AI Engine only interprets the selected snapshot.
+
 Meaningful evolutions of a project representing changes, milestones, or important transitions.
 
 Engineering Events are not limited to individual commits. They represent knowledge extracted from project evolution and can be supported by multiple sources such as repository activity, documentation, or human input.

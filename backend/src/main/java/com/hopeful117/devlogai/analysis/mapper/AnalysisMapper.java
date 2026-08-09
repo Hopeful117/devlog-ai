@@ -22,6 +22,7 @@ public interface AnalysisMapper {
     @Mapping(target = "selectedSource", ignore = true)
     @Mapping(target = "selectedSourceSnapshot", ignore = true)
     @Mapping(target = "understandingExecutionKey", ignore = true)
+    @Mapping(target = "evolutionExecutionKey", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "intentId", ignore = true)
     @Mapping(target = "intentVersion", ignore = true)

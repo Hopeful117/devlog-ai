@@ -48,7 +48,7 @@ export interface ProposalDecisionRequest {
 export interface AcceptProposalRequest {
   readonly comment: string | null;
   readonly validatedBy: string;
-  readonly insightSeverity: InsightSeverity;
+  readonly insightSeverity: InsightSeverity | null;
 }
 export interface RejectProposalRequest {
   readonly comment: string | null;
@@ -83,6 +83,13 @@ export interface ProposalReviewItem
     readonly type: string;
     readonly severity: InsightSeverity;
     readonly title: string;
+  } | null;
+  readonly engineeringEvent?: {
+    readonly id: string;
+    readonly category: string;
+    readonly title: string;
+    readonly baseCommit: string;
+    readonly targetCommit: string;
   } | null;
 }
 export interface ProposalReviewResponse {

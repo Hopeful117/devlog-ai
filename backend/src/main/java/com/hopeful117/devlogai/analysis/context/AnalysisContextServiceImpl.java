@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import com.hopeful117.devlogai.engineeringevent.AnalysisEvolutionScopeRepository;
+import com.hopeful117.devlogai.history.service.ProjectHistoryService;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +33,8 @@ public class AnalysisContextServiceImpl implements AnalysisContextService {
     private final ObservationRepository observationRepository;
     private final ProjectProfileService projectProfileService;
     private final ProjectContextProvider projectContextProvider;
+    private final AnalysisEvolutionScopeRepository evolutionScopes;
+    private final ProjectHistoryService historyService;
 
     @Override
     public AnalysisContext build(UUID analysisId) {
@@ -68,6 +72,13 @@ public class AnalysisContextServiceImpl implements AnalysisContextService {
             recentMilestones = projectContext.recentMilestones();
         }
 
+        AnalysisContext.EvolutionContext evolution = evolutionScopes.findById(analysisId)
+                .map(scope -> new AnalysisContext.EvolutionContext(scope.getContextVersion(),
+                        scope.getProject().getId(), scope.getSource().getId(), scope.getBaseCommit(),
+                        scope.getTargetCommit(), scope.getComparisonPolicy().name(), scope.isMergeCommit(),
+                        scope.getTargetCommittedAt(), historyService.getCommitContext(
+                                scope.getSource().getId(), scope.getTargetCommit())))
+                .orElse(null);
         return new AnalysisContext(
                 projectContext.project(),
                 toAnalysisSnapshot(analysis),
@@ -79,7 +90,8 @@ public class AnalysisContextServiceImpl implements AnalysisContextService {
                 architectureArtifacts,
                 relatedDecisions,
                 recentMilestones,
-                projectContext.validatedProposals()
+                projectContext.validatedProposals(), evolution,
+                projectContext.validatedEngineeringEvents()
         );
     }
 

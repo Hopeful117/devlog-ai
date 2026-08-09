@@ -5,6 +5,8 @@ import com.hopeful117.devlogai.fact.entity.Fact;
 import com.hopeful117.devlogai.fact.repository.FactRepository;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEvent;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
 import com.hopeful117.devlogai.observation.entity.Observation;
 import com.hopeful117.devlogai.observation.repository.ObservationRepository;
 import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
@@ -33,6 +35,7 @@ public class ProposalReviewService {
     private final ObservationRepository observations;
     private final ValidationRepository validations;
     private final InsightRepository insights;
+    private final EngineeringEventRepository engineeringEvents;
     private final ProposalReviewPolicy policy;
 
     public ProposalReviewResponse get(UUID analysisId, int pageNumber, Integer requestedSize) {
@@ -59,9 +62,13 @@ public class ProposalReviewService {
         Map<UUID, Insight> insightMap = (proposalIds.isEmpty() ? List.<Insight>of()
                 : insights.findByProposalIdIn(proposalIds)).stream()
                 .collect(Collectors.toMap(i -> i.getProposal().getId(), Function.identity()));
+        Map<UUID, EngineeringEvent> eventMap = (proposalIds.isEmpty() ? List.<EngineeringEvent>of()
+                : engineeringEvents.findByProposalIdIn(proposalIds)).stream()
+                .collect(Collectors.toMap(i -> i.getProposal().getId(), Function.identity()));
         List<ProposalReviewResponse.Item> items = values.stream()
                 .map(value -> item(value, factMap, observationMap,
-                        validationMap.get(value.getId()), insightMap.get(value.getId()))).toList();
+                        validationMap.get(value.getId()), insightMap.get(value.getId()),
+                        eventMap.get(value.getId()))).toList();
         var counts = new ProposalReviewResponse.Counts(
                 proposals.countByAnalysisId(analysisId),
                 proposals.countByAnalysisIdAndStatus(analysisId, ProposalStatus.PROPOSED),
@@ -74,7 +81,8 @@ public class ProposalReviewService {
     }
 
     private ProposalReviewResponse.Item item(ValidatableProposal p, Map<UUID, Fact> factMap,
-            Map<UUID, Observation> observationMap, Validation validation, Insight insight) {
+            Map<UUID, Observation> observationMap, Validation validation, Insight insight,
+            EngineeringEvent engineeringEvent) {
         List<String> references = safe(p.getEvidenceReferences()).stream()
                 .limit(policy.getMaxEvidenceReferencesPerProposal()).toList();
         return new ProposalReviewResponse.Item(p.getId(), p.getProject().getId(),
@@ -84,7 +92,8 @@ public class ProposalReviewService {
                         policy.getMaxFactsPerProposal()),
                 evidence(safe(p.getSupportingObservationIds()), observationMap, false,
                         policy.getMaxObservationsPerProposal()),
-                decision(validation), resultingInsight(insight), p.getCreatedAt(), p.getDecidedAt());
+                decision(validation), resultingInsight(insight), resultingEvent(engineeringEvent),
+                p.getCreatedAt(), p.getDecidedAt());
     }
 
     private List<ProposalReviewResponse.Evidence> evidence(List<UUID> ids, Map<?, ?> values,
@@ -113,6 +122,12 @@ public class ProposalReviewService {
     private ProposalReviewResponse.ResultingInsight resultingInsight(Insight value) {
         return value == null ? null : new ProposalReviewResponse.ResultingInsight(value.getId(),
                 value.getType().name(), value.getSeverity().name(), value.getTitle());
+    }
+
+    private ProposalReviewResponse.ResultingEngineeringEvent resultingEvent(EngineeringEvent value) {
+        return value == null ? null : new ProposalReviewResponse.ResultingEngineeringEvent(
+                value.getId(), value.getCategory().name(), value.getTitle(),
+                value.getBaseCommit(), value.getTargetCommit());
     }
 
     private String truncate(String value) {

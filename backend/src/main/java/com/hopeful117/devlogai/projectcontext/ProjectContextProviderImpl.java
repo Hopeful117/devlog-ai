@@ -19,6 +19,8 @@ import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEvent;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     static final int MAX_ARCHITECTURE_DECISIONS = 20;
     static final int MAX_RECENT_MILESTONES = 10;
     static final int MAX_RELATED_ANALYSES = 10;
+    static final int MAX_VALIDATED_ENGINEERING_EVENTS = 10;
 
     private static final List<ArtifactType> ARCHITECTURE_ARTIFACT_TYPES = List.of(
             ArtifactType.API,
@@ -52,6 +55,7 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     private final DecisionRepository decisionRepository;
     private final MilestoneRepository milestoneRepository;
     private final AnalysisRepository analysisRepository;
+    private final EngineeringEventRepository engineeringEventRepository;
 
     @Override
     public ProjectContextSnapshot build(UUID projectId) {
@@ -102,6 +106,10 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                         .stream()
                         .map(this::toAnalysisSnapshot)
                         .toList();
+        List<ProjectContextSnapshot.EngineeringEventSnapshot> engineeringEvents =
+                engineeringEventRepository.findRecentByProjectIdOrderByOccurredAtDescTargetCommitDescIdAsc(
+                                projectId, PageRequest.of(0, MAX_VALIDATED_ENGINEERING_EVENTS))
+                        .stream().map(this::toEngineeringEvent).toList();
 
         return new ProjectContextSnapshot(
                 toProjectSnapshot(project),
@@ -111,8 +119,16 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                 architectureArtifacts,
                 relatedDecisions,
                 recentMilestones,
-                recentAnalyses
+                recentAnalyses,
+                engineeringEvents
         );
+    }
+
+    private ProjectContextSnapshot.EngineeringEventSnapshot toEngineeringEvent(EngineeringEvent event) {
+        return new ProjectContextSnapshot.EngineeringEventSnapshot(event.getId(),
+                event.getCategory().name(), event.getTitle(), event.getSummary(),
+                event.getSource().getId(), event.getBaseCommit(), event.getTargetCommit(),
+                event.getOccurredAt(), event.getProposal().getId());
     }
 
     private AnalysisContext.ProjectSnapshot toProjectSnapshot(Project project) {

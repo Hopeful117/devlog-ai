@@ -53,8 +53,8 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
         try {
             AnalysisResponse analysis = analysisService.start(analysisId);
             started = true;
-            AiTaskType taskType = taskTypeResolver.resolve(analysis.type());
             IntentDefinition intent = intentCatalog.resolve(analysis.intentId(), analysis.intentVersion());
+            AiTaskType taskType = taskTypeResolver.resolve(analysis.type(), intent);
             knowledgeCollectionService.collect(analysisId);
             DeterministicAnalysisResult deterministicResult =
                     deterministicAnalysisService.analyze(analysisId);

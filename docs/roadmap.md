@@ -82,7 +82,7 @@ Build the project's technical memory.
 
 Scope:
 
-- Engineering Events,
+- Engineering Events (single-commit, first-parent, explicitly launched validated vertical slice delivered),
 - Challenges,
 - Engineering Decisions,
 - Project Snapshot,

@@ -1,5 +1,14 @@
 # Pipeline
 
+## Validated Engineering Event path
+
+The user explicitly selects an active Git Source and a complete target commit. Core synchronizes
+that exact revision, derives its first parent, persists the immutable evolution scope, collects and
+selects bounded evidence, then invokes the dedicated `analyze-engineering-event-v1` Intent. The AI
+Engine can return zero or more grounded proposals but cannot change the scope or taxonomy. Core
+revalidates the output. Only an individual accepted Validation atomically creates one immutable
+Engineering Event; rejection creates none.
+
 ## Knowledge Processing Pipeline
 
 DevLog AI processes project evolution through a multi-stage pipeline separating data collection, deterministic analysis, AI interpretation, and human validation.

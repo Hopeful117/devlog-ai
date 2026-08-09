@@ -13,6 +13,7 @@ import { DeliverableService } from '../deliverables/deliverable.service';
 import { InsightService } from '../insights/insight.service';
 import { ProjectUnderstandingService } from './project-understanding.service';
 import { ProjectFreshnessService } from './project-freshness.service';
+import { EngineeringEventService } from '../engineering-events/engineering-event.service';
 
 const project: ProjectDetail = {
   id: 'a1ee6d55-e034-491a-a6e6-cdad70573b24',
@@ -69,6 +70,10 @@ describe('ProjectDetailPage', () => {
           useValue: { getByProject: () => of([]), generate: vi.fn() },
         },
         { provide: InsightService, useValue: { getInsightsByProject: () => of([]) } },
+        {
+          provide: EngineeringEventService,
+          useValue: { byProject: () => of({ content: [] }), execute: vi.fn() },
+        },
       ],
     }).compileComponents();
     const fixture = TestBed.createComponent(ProjectDetailPage);

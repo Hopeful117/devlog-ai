@@ -1,0 +1,36 @@
+<section class="event-section" aria-labelledby="engineering-events-title">
+  <div class="heading">
+    <div><p class="eyebrow">Validated history</p><h2 id="engineering-events-title">Engineering Events</h2></div>
+    <a [routerLink]="['/projects', projectId, 'events']">View all →</a>
+  </div>
+  <form [formGroup]="form" (ngSubmit)="execute()">
+    <p>Analyze one complete commit against its first parent. Nothing runs automatically.</p>
+    <label for="event-source">Git Source</label>
+    <select id="event-source" formControlName="sourceId">
+      @for (source of sources; track source.id) { @if (source.active) { <option [value]="source.id">{{ source.name }}</option> } }
+    </select>
+    <label for="event-target">Complete target commit</label>
+    <input id="event-target" formControlName="targetCommit" autocomplete="off" />
+    <button type="submit" [disabled]="form.invalid">Analyze evolution</button>
+  </form>
+  @if (execution$ | async; as execution) {
+    @if (execution.state === 'pending') { <p role="status">Preparing bounded evolution analysis…</p> }
+    @if (execution.state === 'error') { <p role="alert" class="error">{{ execution.error.message }}</p> }
+    @if (execution.state === 'success') {
+      <p role="status">{{ execution.result.outcome }} · {{ execution.result.baseCommit.slice(0, 8) }} → {{ execution.result.targetCommit.slice(0, 8) }}</p>
+      <a [routerLink]="['/analyses', execution.result.analysisId]">Open Analysis</a>
+    }
+  }
+  @if (events$ | async; as events) {
+    @if (events.state === 'loading') { <p role="status">Loading validated events…</p> }
+    @if (events.state === 'error') { <p role="alert" class="error">{{ events.error.message }}</p> }
+    @if (events.state === 'loaded') {
+      <ul>
+        @for (event of events.page.items; track event.id) {
+          <li><a [routerLink]="['/engineering-events', event.id]">{{ event.title }}</a>
+            <small>{{ event.category.replaceAll('_', ' ') }} · {{ event.occurredAt | date: 'medium' }}</small></li>
+        } @empty { <li>No validated Engineering Event yet.</li> }
+      </ul>
+    }
+  }
+</section>

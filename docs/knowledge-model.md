@@ -1,5 +1,13 @@
 # Knowledge model
 
+## Raw occurrences and validated Engineering Events
+
+`KnowledgeEvent` remains the legacy raw/manual occurrence layer. A validated `EngineeringEvent` is
+different: it is immutable human-approved interpretation tied to one Project, Analysis, proposal,
+Validation, Source, first-parent base commit, target commit, and selected evidence. Unvalidated
+proposals are never trusted project memory. Engineering Events do not assert a Decision, Challenge,
+developer intent, or causality.
+
 ## Knowledge Sources
 
 DevLog AI builds project knowledge from multiple sources of information.

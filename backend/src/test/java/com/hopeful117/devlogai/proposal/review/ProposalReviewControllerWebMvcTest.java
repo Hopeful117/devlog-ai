@@ -29,7 +29,7 @@ class ProposalReviewControllerWebMvcTest extends ControllerWebMvcTestSupport {
         mvc.perform(get("/api/v1/analyses/{id}/proposal-review", analysisId)
                         .param("page", "1").param("size", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.version").value("proposal-review-v1"))
+                .andExpect(jsonPath("$.version").value("proposal-review-v2"))
                 .andExpect(jsonPath("$.counts.pending").value(2))
                 .andExpect(jsonPath("$.page.hasPrevious").value(true));
         verify(service).get(analysisId, 1, 10);

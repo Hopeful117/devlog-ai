@@ -1,6 +1,6 @@
 # DevLog AI Engine
 
-Insight generation is intent-driven. Every accepted submission contains a
+Insight and Engineering Event generation are intent-driven. Every accepted submission contains a
 provider-independent `PromptRequest` with a versioned catalog Intent and an immutable `AnalysisContext`; arbitrary user
 prompts are not accepted. The prompt builder only supports registered template
 versions and validates generated Insight categories against the Intent before
@@ -27,7 +27,9 @@ to the provider. Historical AI Tasks persist both values.
 FastAPI service responsible for the AI-processing boundary of DevLog AI.
 
 The service implements health reporting, ADR-019 task acceptance, the ADR-020
-callback contract, and the ADR-022 structured `INSIGHT_GENERATION` workflow.
+callback contract, the ADR-022 structured `INSIGHT_GENERATION` workflow, and the dedicated
+`EVENT_PROPOSAL_GENERATION` workflow. Event prompts require Core's bounded first-parent evolution
+context and allow zero output when the selected evidence is insufficient.
 It interprets only the immutable `AnalysisContext` supplied by the Java Core.
 
 ## Local development

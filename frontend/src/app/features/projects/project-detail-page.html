@@ -111,6 +111,11 @@
           (refreshRequested)="requestUnderstanding($event)"
         />
 
+        <app-project-engineering-events-section
+          [projectId]="viewModel.project.id"
+          [sources]="viewModel.sources"
+        />
+
         <section aria-labelledby="health-title">
           <div class="section-heading">
             <div>

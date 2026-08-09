@@ -2,6 +2,13 @@
 
 ## Engineering Event Model
 
+The implemented V1 persistence model stores one validated event per proposal and Validation. It
+retains Project, Analysis, Source, category, title, summary, significance, base/target commits,
+occurrence time, and audit creation time. Database uniqueness on proposal and Validation makes
+promotion exactly-once. The associated `analysis_evolution_scopes` row records the immutable
+`FIRST_PARENT` comparison boundary; V1 accepts one complete non-root target commit, including merge
+commits compared only with their first parent.
+
 Engineering Events represent meaningful evolutions in the lifecycle of a software project.
 
 An Engineering Event is not a raw code change or a single commit. It represents a significant evolution identified from project activities and enriched with technical context.

@@ -6,6 +6,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.ai_task import AiTaskType
 from app.models.intent import InsightType
+from app.models.proposal import ProposalType
+from enum import Enum
+
+
+class IntentExecutionMode(str, Enum):
+    GENERIC = "GENERIC"
+    DEDICATED_ENGINEERING_EVENT = "DEDICATED_ENGINEERING_EVENT"
 
 
 class ContractModel(BaseModel):
@@ -35,9 +42,9 @@ class IntentDefinition(ContractModel):
     id: str = Field(min_length=1, max_length=80)
     version: str = Field(min_length=1, max_length=20)
     objective: str = Field(min_length=1, max_length=1000)
-    supported_insight_types: list[InsightType] = Field(
-        alias="supportedInsightTypes", min_length=1
-    )
+    output_proposal_type: ProposalType = Field(default=ProposalType.INSIGHT, alias="outputProposalType")
+    execution_mode: IntentExecutionMode = Field(default=IntentExecutionMode.GENERIC, alias="executionMode")
+    supported_insight_types: list[InsightType] = Field(alias="supportedInsightTypes")
     constraints: list[str] = Field(min_length=1)
     output_schema: dict[str, Any] = Field(alias="outputSchema")
     prompt_template: str = Field(alias="promptTemplate", min_length=1, max_length=100)

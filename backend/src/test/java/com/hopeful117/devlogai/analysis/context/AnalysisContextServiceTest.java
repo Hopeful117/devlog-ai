@@ -6,6 +6,8 @@ import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.fact.entity.Fact;
 import com.hopeful117.devlogai.fact.entity.FactType;
 import com.hopeful117.devlogai.fact.repository.FactRepository;
+import com.hopeful117.devlogai.engineeringevent.AnalysisEvolutionScopeRepository;
+import com.hopeful117.devlogai.history.service.ProjectHistoryService;
 import com.hopeful117.devlogai.observation.entity.Observation;
 import com.hopeful117.devlogai.observation.entity.ObservationType;
 import com.hopeful117.devlogai.observation.repository.ObservationRepository;
@@ -42,6 +44,8 @@ class AnalysisContextServiceTest {
     @Mock ObservationRepository observationRepository;
     @Mock ProjectProfileService projectProfileService;
     @Mock ProjectContextProvider projectContextProvider;
+    @Mock AnalysisEvolutionScopeRepository evolutionScopes;
+    @Mock ProjectHistoryService projectHistoryService;
 
     @InjectMocks AnalysisContextServiceImpl service;
 

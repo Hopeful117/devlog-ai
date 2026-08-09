@@ -29,6 +29,8 @@ public interface AnalysisRepository extends JpaRepository<Analysis, UUID> {
             String executionKey,
             java.util.Collection<AnalysisStatus> statuses
     );
+    Optional<Analysis> findByEvolutionExecutionKeyAndStatusIn(
+            String executionKey, java.util.Collection<AnalysisStatus> statuses);
     List<Analysis> findByProjectIdOrderByCreatedAtDesc(
             UUID projectId
     );

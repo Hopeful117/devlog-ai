@@ -88,7 +88,7 @@ class KnowledgeSelectionServiceTest {
                 .filter(value -> value.content().equals("duplicate")).count());
         assertEquals(ObservationType.ARCHITECTURE_MODULARIZATION,
                 first.selectedObservations().getFirst().type());
-        assertEquals("knowledge-selection-v2", first.selectionMetadata().selectionVersion());
+        assertEquals("knowledge-selection-v3", first.selectionMetadata().selectionVersion());
         assertTrue(first.selectionMetadata().discardedKnowledgeCount() > 0);
         assertTrue(first.selectionDigest().matches("[0-9a-f]{64}"));
         assertEquals(repositoryContext, first.repositoryContext());

@@ -128,7 +128,7 @@ async def test_submit_ai_task_rejects_unsupported_type_without_background_task()
     assert response.json() == {
         "code": "UNSUPPORTED_TASK_TYPE",
         "taskType": "DECISION_PROPOSAL_GENERATION",
-        "supportedTaskTypes": ["INSIGHT_GENERATION"],
+        "supportedTaskTypes": ["EVENT_PROPOSAL_GENERATION", "INSIGHT_GENERATION"],
     }
     assert processing_service.calls == []
 

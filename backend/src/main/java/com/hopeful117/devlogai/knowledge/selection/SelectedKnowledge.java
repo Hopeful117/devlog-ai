@@ -17,7 +17,10 @@ public record SelectedKnowledge(
         List<AnalysisContext.FactSnapshot> selectedFacts,
         DiagnosticSnapshot diagnostics,
         List<InsightSnapshot> selectedInsights,
+        List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
+                selectedEngineeringEvents,
         RepositoryContext repositoryContext,
+        AnalysisContext.EvolutionContext evolutionContext,
         SelectionMetadata selectionMetadata,
         String selectionDigest
 ) {
@@ -25,6 +28,17 @@ public record SelectedKnowledge(
         selectedObservations = List.copyOf(selectedObservations);
         selectedFacts = List.copyOf(selectedFacts);
         selectedInsights = List.copyOf(selectedInsights);
+        selectedEngineeringEvents = List.copyOf(selectedEngineeringEvents);
+    }
+
+    public SelectedKnowledge(AnalysisContext.ProjectSnapshot project,
+            AnalysisContext.AnalysisSnapshot analysis, ProjectProfileResponse projectProfile,
+            List<AnalysisContext.ObservationSnapshot> selectedObservations,
+            List<AnalysisContext.FactSnapshot> selectedFacts, DiagnosticSnapshot diagnostics,
+            List<InsightSnapshot> selectedInsights, RepositoryContext repositoryContext,
+            SelectionMetadata selectionMetadata, String selectionDigest) {
+        this(project, analysis, projectProfile, selectedObservations, selectedFacts, diagnostics,
+                selectedInsights, List.of(), repositoryContext, null, selectionMetadata, selectionDigest);
     }
 
     public record DiagnosticSnapshot(boolean collectionComplete, boolean truncated,

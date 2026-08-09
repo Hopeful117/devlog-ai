@@ -1,6 +1,5 @@
 package com.hopeful117.devlogai.projectunderstanding;
 
-import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.workflow.AnalysisAiTaskTypeResolver;
 import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
 import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
@@ -41,7 +40,7 @@ class ProjectUnderstandingPreparationService {
             throw new IllegalArgumentException("Project Understanding requires an active Git Source");
         }
         IntentDefinition intent = intentCatalog.resolve(INTENT_KEY);
-        taskTypeResolver.resolve(AnalysisType.ARCHITECTURE_REVIEW);
+        taskTypeResolver.resolve(intent);
         String revision = normalize(request.targetRevision());
         SynchronizedWorkspace workspace = workspaceManager.synchronize(source, revision);
         historyService.importHistory(source, workspace);

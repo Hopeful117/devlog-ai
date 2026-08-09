@@ -4,6 +4,11 @@ Angular 22 standalone application for the DevLog AI MVP. Project list and detail
 data from the Java Core. A Project workspace can also list and manage its Git repository Sources;
 authentication is not implemented.
 
+The Project cockpit also exposes an explicit Engineering Event analysis form. It requires an active
+Git Source and a complete 40- or 64-character target commit; merely opening the page never starts an
+analysis. Accepted events are available through the recent summary, project list, and immutable
+detail/provenance views. Proposal review requests severity only for Insight proposals.
+
 ## Development
 
 Docker Compose serves the production frontend at `http://localhost:18083/` by default and proxies

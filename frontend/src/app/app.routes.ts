@@ -26,6 +26,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'events',
+        loadComponent: () =>
+          import('./features/engineering-events/engineering-events-page').then(
+            (module) => module.EngineeringEventsPage,
+          ),
+      },
+      {
         path: 'activity',
         data: { workspaceSection: 'activity' },
         loadComponent: () =>
@@ -58,6 +65,13 @@ export const routes: Routes = [
           ),
       },
     ],
+  },
+  {
+    path: 'engineering-events/:id',
+    loadComponent: () =>
+      import('./features/engineering-events/engineering-event-detail-page').then(
+        (module) => module.EngineeringEventDetailPage,
+      ),
   },
   {
     path: 'analyses/:id/proposal-review',

@@ -21,7 +21,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService {
-    static final String VERSION = "knowledge-selection-v2";
+    static final String VERSION = "knowledge-selection-v3";
     private static final String BUILD = "BUILD";
     private static final String CONTAINER = "CONTAINER";
     private static final String DOCKER = "DOCKER";
@@ -37,6 +37,10 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
     public SelectedKnowledge select(AnalysisContext context, IntentDefinition intent,
                                     UserGuidance guidance) {
         requireMandatoryKnowledge(context, intent);
+        if (intent.outputProposalType() == com.hopeful117.devlogai.proposal.entity.ProposalType.ENGINEERING_EVENT
+                && context.evolutionContext() == null) {
+            throw new IllegalStateException("Evolution context is required for Engineering Event Intent");
+        }
         Comparator<AnalysisContext.ObservationSnapshot> observationOrder = Comparator
                 .comparingInt((AnalysisContext.ObservationSnapshot value) ->
                         observationScore(intent.id(), value) + guidanceScore(guidance, value.type() + " " + value.content())).reversed()
@@ -62,6 +66,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 .toList();
         List<SelectedKnowledge.InsightSnapshot> insights = insightCandidates.stream()
                 .limit(BUDGET.maximumInsights()).map(this::toInsight).toList();
+        var engineeringEvents = context.validatedEngineeringEvents().stream().limit(10).toList();
         RepositoryContext repositoryContext = repositoryContextService.build(
                 context, intent, guidance, insightCandidates);
         AnalysisExecutionDiagnostic diagnostic = diagnosticRepository.findById(context.analysis().id())
@@ -71,20 +76,24 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 diagnostic.isCollectionComplete(), diagnostic.isTruncated(),
                 diagnostic.getWarningCount(), diagnostic.getErrorCount());
         int candidates = context.observations().size() + context.facts().size()
-                + insightCandidates.size() + repositoryContext.candidateCount();
+                + insightCandidates.size() + context.validatedEngineeringEvents().size()
+                + repositoryContext.candidateCount();
         int selected = 1 + observations.size() + facts.size() + insights.size()
-                + repositoryContext.evidence().size() + 1;
+                + engineeringEvents.size() + repositoryContext.evidence().size() + 1
+                + (context.evolutionContext() == null ? 0 : 1);
         var metadata = new SelectedKnowledge.SelectionMetadata(
                 VERSION,
                 List.of("REPOSITORY_FIRST_LAYERING", "INTENT_SPECIFIC_RANKING",
                         "USER_GUIDANCE_KEYWORD_BOOST", "STABLE_TYPE_AND_ID_ORDER",
-                        "DUPLICATE_FACT_CONTENT_ELIMINATION", "KNOWLEDGE_BUDGET"),
+                        "DUPLICATE_FACT_CONTENT_ELIMINATION", "KNOWLEDGE_BUDGET",
+                        "EVOLUTION_CONTEXT_REQUIRED"),
                 selected, Math.max(0, candidates + 2 - selected), BUDGET,
                 diagnostic.isCollectionComplete() ? "COMPLETE" : "PARTIAL");
-        String digest = digest(context, observations, facts, diagnostics, insights,
-                repositoryContext, metadata);
+        String digest = digest(context, new DigestComponents(observations, facts, diagnostics,
+                insights, engineeringEvents, repositoryContext, metadata));
         return new SelectedKnowledge(context.project(), context.analysis(), context.projectProfile(),
-                observations, facts, diagnostics, insights, repositoryContext, metadata, digest);
+                observations, facts, diagnostics, insights, engineeringEvents, repositoryContext,
+                context.evolutionContext(), metadata, digest);
     }
 
     private void requireMandatoryKnowledge(AnalysisContext context, IntentDefinition intent) {
@@ -144,19 +153,15 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 insight.getType(), insight.getSeverity(), insight.getTitle(), insight.getContent());
     }
 
-    private String digest(AnalysisContext context,
-                          List<AnalysisContext.ObservationSnapshot> observations,
-                          List<AnalysisContext.FactSnapshot> facts,
-                          SelectedKnowledge.DiagnosticSnapshot diagnostics,
-                          List<SelectedKnowledge.InsightSnapshot> insights,
-                          RepositoryContext repositoryContext,
-                          SelectedKnowledge.SelectionMetadata metadata) {
+    private String digest(AnalysisContext context, DigestComponents selected) {
         record DigestInput(Object project, Object analysis, Object profile, Object selectedObservations,
                            Object selectedFacts, Object diagnostic, Object selectedInsights,
-                           Object repositoryContext, Object selectionMetadata) { }
+                           Object selectedEngineeringEvents,
+                           Object repositoryContext, Object evolutionContext, Object selectionMetadata) { }
         byte[] serialized = objectMapper.writeValueAsString(new DigestInput(
-                context.project(), context.analysis(), context.projectProfile(), observations,
-                facts, diagnostics, insights, repositoryContext, metadata))
+                context.project(), context.analysis(), context.projectProfile(), selected.observations(),
+                selected.facts(), selected.diagnostics(), selected.insights(), selected.engineeringEvents(),
+                selected.repositoryContext(), context.evolutionContext(), selected.metadata()))
                 .getBytes(StandardCharsets.UTF_8);
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(serialized));
@@ -164,4 +169,14 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
             throw new IllegalStateException("SHA-256 is unavailable", impossible);
         }
     }
+
+    private record DigestComponents(
+            List<AnalysisContext.ObservationSnapshot> observations,
+            List<AnalysisContext.FactSnapshot> facts,
+            SelectedKnowledge.DiagnosticSnapshot diagnostics,
+            List<SelectedKnowledge.InsightSnapshot> insights,
+            List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
+                    engineeringEvents,
+            RepositoryContext repositoryContext,
+            SelectedKnowledge.SelectionMetadata metadata) { }
 }

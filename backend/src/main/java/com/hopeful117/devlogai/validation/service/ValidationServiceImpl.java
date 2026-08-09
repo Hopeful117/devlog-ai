@@ -1,7 +1,6 @@
 package com.hopeful117.devlogai.validation.service;
 
 import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
-import com.hopeful117.devlogai.insight.service.InsightPromotionService;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
 import com.hopeful117.devlogai.validation.dto.request.CreateValidationRequest;
@@ -27,7 +26,7 @@ public class ValidationServiceImpl implements ValidationService {
     private final ValidatableProposalRepository proposalRepository;
 
     private final ValidationMapper validationMapper;
-    private final InsightPromotionService insightPromotionService;
+    private final ProposalPromotionService promotionService;
 
     @Override
     @Transactional
@@ -72,7 +71,7 @@ public class ValidationServiceImpl implements ValidationService {
                 validationRepository.save(validation);
 
         if (request.decision() == ValidationDecision.ACCEPTED) {
-            insightPromotionService.promote(proposal, savedValidation, request.insightSeverity());
+            promotionService.promote(proposal, savedValidation, request.insightSeverity());
         }
 
         return validationMapper.toResponse(savedValidation);

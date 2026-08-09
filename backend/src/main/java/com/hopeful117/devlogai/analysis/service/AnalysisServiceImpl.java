@@ -12,6 +12,7 @@ import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.model.IntentExecutionMode;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,9 @@ public class AnalysisServiceImpl implements AnalysisService {
         Analysis analysis =
                 analysisMapper.toEntity(request);
         IntentDefinition intent = intentCatalog.resolve(request.getIntentId());
+        if (intent.executionMode() != IntentExecutionMode.GENERIC) {
+            throw new IllegalArgumentException("Intent requires its dedicated execution endpoint");
+        }
 
         analysis.setProject(project);
         analysis.setIntentId(intent.id());

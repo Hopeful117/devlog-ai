@@ -51,6 +51,9 @@ class AiTaskResultServiceTest {
     @Mock
     private AnalysisRepository analysisRepository;
 
+    @Mock
+    private AiProposalContractValidator proposalContractValidator;
+
     @InjectMocks
     private AiTaskResultServiceImpl service;
 

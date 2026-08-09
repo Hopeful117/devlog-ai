@@ -9,7 +9,6 @@ import com.hopeful117.devlogai.validation.entity.Validation;
 import com.hopeful117.devlogai.validation.entity.ValidationDecision;
 import com.hopeful117.devlogai.validation.mapper.ValidationMapper;
 import com.hopeful117.devlogai.validation.repository.ValidationRepository;
-import com.hopeful117.devlogai.insight.service.InsightPromotionService;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
@@ -38,7 +37,7 @@ class ValidationServiceTest {
     ValidatableProposalRepository proposalRepository;
 
     @Mock
-    InsightPromotionService insightPromotionService;
+    ProposalPromotionService promotionService;
 
     @InjectMocks
     ValidationServiceImpl service;
@@ -110,7 +109,7 @@ class ValidationServiceTest {
         verify(validationRepository)
                 .save(validation);
 
-        verify(insightPromotionService).promote(proposal, savedValidation, InsightSeverity.WARNING);
+        verify(promotionService).promote(proposal, savedValidation, InsightSeverity.WARNING);
     }
     @Test
     void shouldRejectWhenProposalDoesNotExist() {

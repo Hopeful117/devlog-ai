@@ -8,6 +8,7 @@ import com.hopeful117.devlogai.artifact.entity.ArtifactType;
 import com.hopeful117.devlogai.artifact.repository.ArtifactRepository;
 import com.hopeful117.devlogai.decision.entity.Decision;
 import com.hopeful117.devlogai.decision.repository.DecisionRepository;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
 import com.hopeful117.devlogai.knowledge.entity.KnowledgeEvent;
 import com.hopeful117.devlogai.knowledge.entity.KnowledgeEventType;
 import com.hopeful117.devlogai.knowledge.repository.KnowledgeEventRepository;
@@ -51,6 +52,7 @@ class ProjectContextProviderTest {
     @Mock DecisionRepository decisionRepository;
     @Mock MilestoneRepository milestoneRepository;
     @Mock AnalysisRepository analysisRepository;
+    @Mock EngineeringEventRepository engineeringEventRepository;
 
     @InjectMocks ProjectContextProviderImpl provider;
 

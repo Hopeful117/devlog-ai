@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.hopeful117.devlogai.history.context.CommitDiffAnalysisContext;
 
 public record AnalysisContext(
         ProjectSnapshot project,
@@ -27,7 +28,10 @@ public record AnalysisContext(
         List<ArtifactSnapshot> architectureArtifacts,
         List<DecisionSnapshot> relatedDecisions,
         List<MilestoneSnapshot> recentMilestones,
-        List<ValidatedProposalSnapshot> validatedProposals
+        List<ValidatedProposalSnapshot> validatedProposals,
+        EvolutionContext evolutionContext,
+        List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
+                validatedEngineeringEvents
 ) {
     public AnalysisContext {
         facts = List.copyOf(facts);
@@ -38,7 +42,34 @@ public record AnalysisContext(
         relatedDecisions = List.copyOf(relatedDecisions);
         recentMilestones = List.copyOf(recentMilestones);
         validatedProposals = List.copyOf(validatedProposals);
+        validatedEngineeringEvents = List.copyOf(validatedEngineeringEvents);
     }
+
+    public AnalysisContext(ProjectSnapshot project, AnalysisSnapshot analysis,
+            ProjectProfileResponse projectProfile, List<FactSnapshot> facts,
+            List<ObservationSnapshot> observations, List<KnowledgeEventSnapshot> recentKnowledgeEvents,
+            List<AnalysisSnapshot> relatedAnalyses, List<ArtifactSnapshot> architectureArtifacts,
+            List<DecisionSnapshot> relatedDecisions, List<MilestoneSnapshot> recentMilestones,
+            List<ValidatedProposalSnapshot> validatedProposals) {
+        this(project, analysis, projectProfile, facts, observations, recentKnowledgeEvents,
+                relatedAnalyses, architectureArtifacts, relatedDecisions, recentMilestones,
+                validatedProposals, null, List.of());
+    }
+
+    public AnalysisContext(ProjectSnapshot project, AnalysisSnapshot analysis,
+            ProjectProfileResponse projectProfile, List<FactSnapshot> facts,
+            List<ObservationSnapshot> observations, List<KnowledgeEventSnapshot> recentKnowledgeEvents,
+            List<AnalysisSnapshot> relatedAnalyses, List<ArtifactSnapshot> architectureArtifacts,
+            List<DecisionSnapshot> relatedDecisions, List<MilestoneSnapshot> recentMilestones,
+            List<ValidatedProposalSnapshot> validatedProposals, EvolutionContext evolutionContext) {
+        this(project, analysis, projectProfile, facts, observations, recentKnowledgeEvents,
+                relatedAnalyses, architectureArtifacts, relatedDecisions, recentMilestones,
+                validatedProposals, evolutionContext, List.of());
+    }
+
+    public record EvolutionContext(String contextVersion, UUID projectId, UUID sourceId,
+            String baseCommit, String targetCommit, String comparisonPolicy, boolean mergeCommit,
+            Instant targetCommittedAt, CommitDiffAnalysisContext commitDiff) { }
 
     public record ProjectSnapshot(
             UUID id,

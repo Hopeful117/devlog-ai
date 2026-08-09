@@ -42,6 +42,9 @@ public class Analysis {
     @Column(name = "understanding_execution_key", length = 64, updatable = false)
     private String understandingExecutionKey;
 
+    @Column(name = "evolution_execution_key", length = 64, updatable = false)
+    private String evolutionExecutionKey;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private AnalysisType type;

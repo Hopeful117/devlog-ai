@@ -34,6 +34,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
     private final FactRepository factRepository;
     private final ObservationRepository observationRepository;
     private final AnalysisRepository analysisRepository;
+    private final AiProposalContractValidator proposalContractValidator;
 
     @Override
     @Transactional
@@ -97,6 +98,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         }
 
         validateReferences(task, request.proposals());
+        proposalContractValidator.validate(task, request.proposals());
         applyPromptExecution(task, request.promptExecution());
         proposalRepository.saveAll(toProposals(task, request.proposals()));
         completeTask(task, request.completedAt());

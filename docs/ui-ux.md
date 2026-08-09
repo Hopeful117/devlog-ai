@@ -1,5 +1,13 @@
 # Developer OS – Workspace UI/UX Specification (V1)
 
+## Explicit Engineering Event workflow
+
+The Project cockpit presents Engineering Event analysis as an on-demand action, never an automatic
+page-load or freshness side effect. The user chooses an active Git Source and enters a complete
+target commit. Recent events link to a paged Project history and immutable detail view. Proposal
+review labels the real proposal type, omits Insight severity for events, and links accepted proposals
+to the resulting event provenance.
+
 ## Purpose
 
 This document defines the first user experience of the Developer OS Workspace.
