@@ -1,0 +1,84 @@
+<section class="freshness" aria-labelledby="freshness-title">
+  <div>
+    <p class="eyebrow">Repository freshness</p>
+    <h2 id="freshness-title">Check project understanding</h2>
+    <p>Compare the current Git commit with the latest completed understanding.</p>
+  </div>
+
+  @if (compatibleSources.length === 0) {
+    <p role="status">Connect and activate a Git repository before checking freshness.</p>
+  } @else {
+    <label for="freshness-source">Repository</label>
+    <select id="freshness-source" [ngModel]="selectedSourceId" (ngModelChange)="select($event)">
+      @if (compatibleSources.length > 1) {
+        <option value="">Select a repository</option>
+      }
+      @for (source of compatibleSources; track source.id) {
+        <option [value]="source.id">
+          {{ source.name }} · {{ source.defaultBranch || 'default' }}
+        </option>
+      }
+    </select>
+
+    @if (view$ | async; as view) {
+      @if (view.state === 'loading') {
+        <p role="status">Loading the last explicit check…</p>
+      } @else if (view.state === 'checking') {
+        <p role="status" aria-live="polite">Resolving the current repository revision…</p>
+      } @else if (view.state === 'unchecked') {
+        <p role="status">Freshness has not been checked for this repository.</p>
+      } @else if (view.state === 'error') {
+        <p role="alert">
+          {{ view.error.message }} The previous project knowledge remains unchanged.
+        </p>
+      } @else {
+        <div class="freshness-result" aria-live="polite" [attr.data-status]="view.data.status">
+          <h3>{{ view.data.status.replaceAll('_', ' ') }}</h3>
+          <p>
+            Checked {{ view.data.checkedAt | date: 'medium' }}. This result is valid as of that
+            time.
+          </p>
+          <dl>
+            <div>
+              <dt>Current commit</dt>
+              <dd [title]="view.data.source.currentRevision">
+                {{ short(view.data.source.currentRevision) }}
+              </dd>
+            </div>
+            <div>
+              <dt>Analyzed commit</dt>
+              <dd [title]="view.data.baseline?.analyzedRevision || ''">
+                {{ short(view.data.baseline?.analyzedRevision) }}
+              </dd>
+            </div>
+            <div>
+              <dt>Pending review</dt>
+              <dd>{{ view.data.review.pending }} / {{ view.data.review.total }}</dd>
+            </div>
+          </dl>
+          @if (view.data.baseline) {
+            <a [routerLink]="['/analyses', view.data.baseline.analysisId]"
+              >Open baseline analysis</a
+            >
+          }
+          @if (view.data.guidance !== 'REFRESH_NOT_NEEDED') {
+            <button type="button" class="secondary-button" (click)="requestRefresh()">
+              {{
+                view.data.guidance === 'ESTABLISH_BASELINE'
+                  ? 'Understand project'
+                  : 'Refresh understanding'
+              }}
+            </button>
+          }
+        </div>
+      }
+      <button
+        type="button"
+        (click)="check()"
+        [disabled]="!selectedSourceId || view.state === 'checking'"
+      >
+        {{ view.state === 'checking' ? 'Checking…' : 'Check freshness' }}
+      </button>
+    }
+  }
+</section>

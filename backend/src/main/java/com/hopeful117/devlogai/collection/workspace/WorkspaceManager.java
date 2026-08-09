@@ -5,4 +5,6 @@ import com.hopeful117.devlogai.source.entity.Source;
 public interface WorkspaceManager {
 
     SynchronizedWorkspace synchronize(Source source, String targetRevision);
+
+    ResolvedSourceRevision resolveCurrentRevision(Source source);
 }

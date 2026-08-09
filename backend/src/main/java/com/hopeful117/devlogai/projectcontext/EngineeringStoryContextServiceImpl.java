@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.projectcontext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.projectcontext.projection.AgentContextProjectionService;
 import com.hopeful117.devlogai.projectcontext.projection.AgentEngineeringStoryContext;
+import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,13 @@ public class EngineeringStoryContextServiceImpl implements EngineeringStoryConte
     private final ProjectContextProvider projectContextProvider;
     private final RepositoryContextAdapter repositoryContextAdapter;
     private final AgentContextProjectionService projectionService;
+    private final ProjectFreshnessService freshnessService;
 
     @Override
     public EngineeringStoryContext build(UUID projectId) {
         ProjectContextSnapshot snapshot = projectContextProvider.build(projectId);
-        return new EngineeringStoryContext(snapshot, Instant.now(), projectId, null);
+        return new EngineeringStoryContext(snapshot, Instant.now(), projectId, null,
+                freshnessService.summary(projectId));
     }
 
     @Override
@@ -37,7 +40,8 @@ public class EngineeringStoryContextServiceImpl implements EngineeringStoryConte
                 repositoryContextAdapter.buildRepositoryContext(
                         projectId, storyDescription, snapshot);
         EngineeringStoryContext result = new EngineeringStoryContext(
-                snapshot, Instant.now(), projectId, repositoryContext);
+                snapshot, Instant.now(), projectId, repositoryContext,
+                freshnessService.summary(projectId));
         log.info("Engineering Story Context completed projectId={} mode=full snapshotMs={} contextMs={} candidates={} selected={} contextDigest={} totalMs={}",
                 projectId, snapshotMillis, elapsedMillis(contextStarted),
                 repositoryContext.candidateCount(), repositoryContext.evidence().size(),
@@ -58,7 +62,8 @@ public class EngineeringStoryContextServiceImpl implements EngineeringStoryConte
         long contextMillis = elapsedMillis(contextStarted);
         long projectionStarted = System.nanoTime();
         AgentEngineeringStoryContext result = projectionService.project(
-                projectId, snapshot, repositoryContext, Instant.now());
+                projectId, snapshot, repositoryContext, Instant.now(),
+                freshnessService.summary(projectId));
         var projected = result.repositoryContext();
         log.info("Engineering Story Context completed projectId={} mode=agent snapshotMs={} contextMs={} projectionMs={} candidates={} selected={} canonicalBytes={} contextDigest={} projectionDigest={} totalMs={}",
                 projectId, snapshotMillis, contextMillis,

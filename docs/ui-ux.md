@@ -348,6 +348,19 @@ generation is explicit and labelled as a session-local MVP identity, not authent
 layouts stack queue and content while preserving semantic buttons, labels, status text, and live
 regions.
 
+## Repository Freshness
+
+The Project Cockpit loads the last successful freshness result without contacting Git and exposes
+a separate **Check freshness** action. The result displays its as-of time, current and analyzed
+commits, one of `CURRENT`, `STALE`, `NO BASELINE`, or `UNKNOWN`, and proposal-review progress as an
+independent dimension. A current commit with pending proposals is never described as fully trusted
+knowledge.
+
+Stale or absent baselines offer a navigation/focus action toward the existing Project Understanding
+form; they never submit it automatically. Check failures use an alert, preserve existing knowledge,
+and do not degrade into a current/green state. The cockpit does not claim passive monitoring and no
+longer infers “up to date” from the presence of Sources, Analyses, or Deliverables.
+
 ---
 
 # Notifications

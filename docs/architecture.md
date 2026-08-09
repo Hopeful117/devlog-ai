@@ -158,6 +158,21 @@ resolves `describe-project-v1`, imports history, snapshots Source/revision prove
 equivalent work already pending or running. Completed and failed executions never disable later
 refresh. Passive monitoring remains a separate future capability.
 
+### Explicit Project Freshness
+
+Project freshness is an operational, Source-scoped projection rather than Trusted Knowledge. An
+explicit command resolves the Source's current default Git object ID through the confined workspace
+manager and compares it with the immutable revision in the latest comparable completed Project
+Understanding. Equality is the only path to `CURRENT`; missing or invalid provenance remains
+`UNKNOWN`, and absence of a baseline remains `NO_BASELINE`.
+
+Core retains one bounded latest successful check per Source with its `checkedAt` time. The cockpit
+and Engineering Story Context may display that as-of result without contacting Git. Git failures do
+not overwrite it or invalidate Analyses, proposals, Insights, or Deliverables. Checks never launch
+AI, refresh understanding, or authorize proposal decisions. Scheduled checks, webhooks,
+significance classification, and autonomous refresh remain part of the future passive-monitoring
+boundary defined by ADR-041 and ADR-043.
+
 The objective is not to reproduce the complete Git history, but to reconstruct the major evolution milestones that explain the current state of the project.
 
 ### Bootstrap Objectives

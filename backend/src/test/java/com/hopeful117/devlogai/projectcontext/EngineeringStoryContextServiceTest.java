@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.projectcontext.projection.AgentContextProjectionS
 import com.hopeful117.devlogai.projectcontext.projection.AgentEngineeringStoryContext;
 import com.hopeful117.devlogai.projectcontext.projection.AgentRepositoryContext;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,6 +28,9 @@ class EngineeringStoryContextServiceTest {
 
     @Mock
     AgentContextProjectionService projectionService;
+
+    @Mock
+    ProjectFreshnessService freshnessService;
 
     @InjectMocks
     EngineeringStoryContextServiceImpl service;
@@ -97,7 +101,7 @@ class EngineeringStoryContextServiceTest {
         when(projectContextProvider.build(projectId)).thenReturn(snapshot);
         when(repositoryContextAdapter.buildRepositoryContext(
                 projectId, description, snapshot)).thenReturn(repositoryContext);
-        when(projectionService.project(any(), any(), any(), any()))
+        when(projectionService.project(any(), any(), any(), any(), any()))
                 .thenReturn(projected);
         when(projected.repositoryContext()).thenReturn(projectedRepository);
         when(projectedRepository.evidence()).thenReturn(java.util.List.of());

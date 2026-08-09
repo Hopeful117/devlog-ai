@@ -65,6 +65,51 @@ public class GitWorkspaceManager implements WorkspaceManager {
         }
     }
 
+    @Override
+    public ResolvedSourceRevision resolveCurrentRevision(Source source) {
+        requireSupportedSource(source);
+        ReentrantLock lock = sourceLocks.computeIfAbsent(
+                source.getId(), ignored -> new ReentrantLock());
+        lock.lock();
+        try {
+            Files.createDirectories(workspaceRoot);
+            Path workspace = resolveWorkspace(source.getId());
+            if (!isGitWorkspace(workspace)) {
+                deleteWorkspace(workspace);
+                cloneWorkspace(source, workspace);
+            }
+            return resolveCurrentWithRecovery(source, workspace);
+        } catch (IOException exception) {
+            throw new UncheckedIOException(
+                    "Unable to prepare workspace for source " + source.getId(), exception);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private ResolvedSourceRevision resolveCurrentWithRecovery(Source source, Path workspace) {
+        try {
+            return resolveCurrent(source, workspace);
+        } catch (GitCommandException firstFailure) {
+            deleteWorkspace(workspace);
+            cloneWorkspace(source, workspace);
+            try {
+                return resolveCurrent(source, workspace);
+            } catch (GitCommandException retryFailure) {
+                retryFailure.addSuppressed(firstFailure);
+                throw retryFailure;
+            }
+        }
+    }
+
+    private ResolvedSourceRevision resolveCurrent(Source source, Path workspace) {
+        git.execute(workspace, List.of("remote", "set-url", ORIGIN, source.getRepositoryUrl()));
+        git.execute(workspace, List.of("fetch", "--prune", ORIGIN));
+        String requested = requestedRevision(source, null);
+        String resolved = resolveRevision(workspace, requested, null);
+        return new ResolvedSourceRevision(source.getId(), requested, resolved);
+    }
+
     private SynchronizedWorkspace synchronizeWithRecovery(
             Source source, Path workspace, String targetRevision) {
         try {

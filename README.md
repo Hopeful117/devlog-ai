@@ -276,6 +276,16 @@ pending/running work is reused across clients; terminal work never prevents a la
 Preparation failures create no Analysis, while failures after start retain a traceable failed
 execution. Proposals still require explicit human validation before becoming Trusted Knowledge.
 
+Repository freshness is checked only on explicit request. Use
+`POST /api/v1/projects/{projectId}/freshness-checks` with `{"sourceId":"<uuid>"}` to fetch the
+Source's current default commit and compare it with the latest completed default-revision
+`describe-project/v1` understanding for that exact Source. The versioned result is `CURRENT`,
+`STALE`, `NO_BASELINE`, or `UNKNOWN`; only equal complete Git object IDs can produce `CURRENT`.
+`GET /api/v1/projects/{projectId}/freshness-checks/latest?sourceId=<uuid>` reads the last successful
+explicit result without contacting Git. A resolution failure returns
+`503 SOURCE_REVISION_UNAVAILABLE` and preserves existing knowledge and the previous successful
+check. Freshness guidance never launches understanding or validates proposals automatically.
+
 ### Engineering Story Context
 
 Complete Engineering Stories should be submitted in a JSON request body so their size is not

@@ -78,6 +78,25 @@ class GitWorkspaceManagerTest {
         assertThrows(IllegalArgumentException.class, () -> manager.synchronize(source, null));
     }
 
+    @Test
+    void shouldResolveAdvancedRemoteRevisionWithoutChangingCheckedOutWorktree() throws IOException {
+        Path repository = createRepository();
+        Source source = source(repository);
+        GitWorkspaceManager manager = new GitWorkspaceManager(
+                temporaryDirectory.resolve("freshness-workspaces").toString(), git);
+        SynchronizedWorkspace synchronizedWorkspace = manager.synchronize(source, null);
+        String checkedOut = git.execute(synchronizedWorkspace.path(), List.of("rev-parse", "HEAD"));
+        commit(repository, "advanced", "remote advanced");
+        String advanced = git.execute(repository, List.of("rev-parse", "HEAD"));
+
+        ResolvedSourceRevision result = manager.resolveCurrentRevision(source);
+
+        assertEquals("origin/main", result.requestedRevision());
+        assertEquals(advanced, result.resolvedRevision());
+        assertEquals(checkedOut,
+                git.execute(synchronizedWorkspace.path(), List.of("rev-parse", "HEAD")));
+    }
+
     private Path createRepository() throws IOException {
         Path repository = temporaryDirectory.resolve("origin");
         Files.createDirectories(repository);

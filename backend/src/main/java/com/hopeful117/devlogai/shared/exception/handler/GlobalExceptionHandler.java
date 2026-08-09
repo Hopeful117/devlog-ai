@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTypeException;
 import com.hopeful117.devlogai.project.exception.ProjectSlugAlreadyExistsException;
+import com.hopeful117.devlogai.projectfreshness.SourceRevisionUnavailableException;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.exception.InvalidParameterException;
@@ -31,6 +32,14 @@ import java.time.Instant;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+    @ExceptionHandler(SourceRevisionUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleSourceRevisionUnavailable(
+            SourceRevisionUnavailableException ex, HttpServletRequest request) {
+        log.warn("Source revision resolution failed path={} message={}",
+                request.getRequestURI(), ex.getMessage());
+        return response(HttpStatus.SERVICE_UNAVAILABLE,
+                ApiErrorCode.SOURCE_REVISION_UNAVAILABLE, ex.getMessage(), request);
+    }
     @ExceptionHandler(AiTaskResultConflictException.class)
     public ResponseEntity<AiTaskConflictResponse> handleAiTaskResultConflict(
             AiTaskResultConflictException ex,

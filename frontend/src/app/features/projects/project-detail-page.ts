@@ -27,6 +27,7 @@ import { InsightService } from '../insights/insight.service';
 import { ProjectDetail } from './project.models';
 import { ProjectAnalysesSection } from '../analyses/project-analyses-section';
 import { ProjectUnderstandingSection } from './project-understanding-section';
+import { ProjectFreshnessSection } from './project-freshness-section';
 import { ProjectService } from './project.service';
 import { SourceSummary } from './source.models';
 import { SourceService } from './source.service';
@@ -60,6 +61,7 @@ type ProjectActionState =
     DashboardCard,
     ProjectAnalysesSection,
     ProjectUnderstandingSection,
+    ProjectFreshnessSection,
   ],
   templateUrl: './project-detail-page.html',
   styleUrl: './project-detail-page.scss',
@@ -81,6 +83,12 @@ export class ProjectDetailPage {
   private readonly deletions = new Subject<ProjectDetail>();
   showEdit = false;
   showDelete = false;
+  preferredUnderstandingSourceId = '';
+
+  requestUnderstanding(sourceId: string): void {
+    this.preferredUnderstandingSourceId = sourceId;
+    document.getElementById('project-understanding-title')?.focus();
+  }
 
   readonly editForm = new FormGroup({
     name: new FormControl('', {

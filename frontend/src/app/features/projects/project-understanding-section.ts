@@ -34,6 +34,7 @@ export class ProjectUnderstandingSection implements OnChanges {
   @Input({ required: true }) projectId = '';
   @Input({ required: true }) sources: readonly SourceSummary[] = [];
   @Input({ required: true }) analyses: readonly AnalysisSummary[] = [];
+  @Input() preferredSourceId = '';
 
   private readonly service = inject(ProjectUnderstandingService);
   private readonly router = inject(Router);
@@ -77,7 +78,9 @@ export class ProjectUnderstandingSection implements OnChanges {
 
   ngOnChanges(): void {
     const compatible = this.compatibleSources;
-    if (compatible.length === 1) this.form.controls.sourceId.setValue(compatible[0].id);
+    if (this.preferredSourceId && compatible.some((source) => source.id === this.preferredSourceId))
+      this.form.controls.sourceId.setValue(this.preferredSourceId);
+    else if (compatible.length === 1) this.form.controls.sourceId.setValue(compatible[0].id);
     else if (!compatible.some((source) => source.id === this.form.controls.sourceId.value))
       this.form.controls.sourceId.setValue('');
   }

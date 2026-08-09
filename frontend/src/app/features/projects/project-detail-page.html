@@ -89,7 +89,11 @@
           <span><small>Branch</small><strong>default</strong></span>
           <span
             ><small>Last synchronized</small
-            ><strong>{{ viewModel.project.updatedAt | date: 'medium' }}</strong></span
+            ><strong>{{
+              viewModel.sources[0]?.lastSynchronizedAt
+                ? (viewModel.sources[0]?.lastSynchronizedAt | date: 'medium')
+                : 'Not synchronized yet'
+            }}</strong></span
           >
           <span
             ><small>Last analysis</small
@@ -100,6 +104,12 @@
             }}</strong></span
           >
         </div>
+
+        <app-project-freshness-section
+          [projectId]="viewModel.project.id"
+          [sources]="viewModel.sources"
+          (refreshRequested)="requestUnderstanding($event)"
+        />
 
         <section aria-labelledby="health-title">
           <div class="section-heading">
@@ -192,8 +202,8 @@
                 <li>
                   <span>✓</span>
                   <div>
-                    <strong>Workspace is up to date</strong
-                    ><small>Review recent results when convenient</small>
+                    <strong>Core workflow is available</strong
+                    ><small>Check repository freshness and review pending results explicitly</small>
                   </div>
                 </li>
               }
@@ -208,7 +218,7 @@
                   ><strong>Repository Agent</strong
                   ><small>{{
                     viewModel.sources.length
-                      ? 'Idle · monitoring configured sources'
+                      ? 'Idle · ready for an explicit freshness check'
                       : 'Waiting for a source'
                   }}</small></span
                 >
@@ -263,6 +273,7 @@
             [projectId]="viewModel.project.id"
             [sources]="viewModel.sources"
             [analyses]="viewModel.analyses"
+            [preferredSourceId]="preferredUnderstandingSourceId"
           />
         </section>
 

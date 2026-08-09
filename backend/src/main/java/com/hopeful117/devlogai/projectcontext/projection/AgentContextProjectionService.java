@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.projectcontext.projection;
 
 import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
+import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
@@ -52,10 +53,20 @@ public class AgentContextProjectionService {
             RepositoryContext repositoryContext,
             Instant generatedAt
     ) {
+        return project(projectId, projectContext, repositoryContext, generatedAt, null);
+    }
+
+    public AgentEngineeringStoryContext project(
+            UUID projectId,
+            ProjectContextSnapshot projectContext,
+            RepositoryContext repositoryContext,
+            Instant generatedAt,
+            ProjectFreshnessSummary freshness
+    ) {
         ProjectionState state = initial(repositoryContext);
-        state = fit(projectId, projectContext, repositoryContext, state);
+        state = fit(projectId, projectContext, repositoryContext, state, freshness);
         CanonicalProjection canonical = canonical(
-                projectId, projectContext, repositoryContext, state);
+                projectId, projectContext, repositoryContext, state, freshness);
         byte[] bytes = objectMapper.writeValueAsBytes(canonical);
         int estimatedTokens = estimateTokens(bytes.length);
         AgentRepositoryContext.Accounting accounting = new AgentRepositoryContext.Accounting(
@@ -66,7 +77,7 @@ public class AgentContextProjectionService {
         AgentRepositoryContext projected = repositoryContext(
                 repositoryContext, state, digest(bytes), accounting);
         return new AgentEngineeringStoryContext(
-                projectContext, generatedAt, projectId, projected);
+                projectContext, generatedAt, projectId, projected, freshness);
     }
 
     private ProjectionState initial(RepositoryContext context) {
@@ -85,24 +96,25 @@ public class AgentContextProjectionService {
             UUID projectId,
             ProjectContextSnapshot projectContext,
             RepositoryContext repositoryContext,
-            ProjectionState initial
+            ProjectionState initial,
+            ProjectFreshnessSummary freshness
     ) {
         ProjectionState state = initial;
-        if (fits(projectId, projectContext, repositoryContext, state)) return state;
+        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
 
         state = removeRelatedReferences(state);
-        if (fits(projectId, projectContext, repositoryContext, state)) return state;
+        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
 
         state = compactReasons(state);
-        if (fits(projectId, projectContext, repositoryContext, state)) return state;
+        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
 
         state = removeDeclarations(state);
-        if (fits(projectId, projectContext, repositoryContext, state)) return state;
+        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
 
         state = removeContent(state);
-        if (fits(projectId, projectContext, repositoryContext, state)) return state;
+        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
 
-        return removeTailEvidence(projectId, projectContext, repositoryContext, state);
+        return removeTailEvidence(projectId, projectContext, repositoryContext, state, freshness);
     }
 
     private ProjectionState removeRelatedReferences(ProjectionState state) {
@@ -146,7 +158,8 @@ public class AgentContextProjectionService {
 
     private ProjectionState removeTailEvidence(
             UUID projectId, ProjectContextSnapshot projectContext,
-            RepositoryContext repositoryContext, ProjectionState state) {
+            RepositoryContext repositoryContext, ProjectionState state,
+            ProjectFreshnessSummary freshness) {
         List<AgentRepositoryContext.Evidence> remaining =
                 new ArrayList<>(state.evidence);
         List<String> warnings = new ArrayList<>(state.warnings);
@@ -159,7 +172,7 @@ public class AgentContextProjectionService {
                     List.copyOf(warnings), state.removedRelatedReferences,
                     state.removedReasons, state.removedDeclarationPayloads,
                     state.removedContentPayloads, removed);
-            if (fits(projectId, projectContext, repositoryContext, candidate)) {
+            if (fits(projectId, projectContext, repositoryContext, candidate, freshness)) {
                 return candidate;
             }
         }
@@ -189,10 +202,11 @@ public class AgentContextProjectionService {
             UUID projectId,
             ProjectContextSnapshot projectContext,
             RepositoryContext repositoryContext,
-            ProjectionState state
+            ProjectionState state,
+            ProjectFreshnessSummary freshness
     ) {
         int bytes = objectMapper.writeValueAsBytes(canonical(
-                projectId, projectContext, repositoryContext, state)).length;
+                projectId, projectContext, repositoryContext, state, freshness)).length;
         return bytes <= policy.maximumBytes()
                 && estimateTokens(bytes) <= policy.maximumEstimatedTokens();
     }
@@ -201,9 +215,10 @@ public class AgentContextProjectionService {
             UUID projectId,
             ProjectContextSnapshot projectContext,
             RepositoryContext context,
-            ProjectionState state
+            ProjectionState state,
+            ProjectFreshnessSummary freshness
     ) {
-        return new CanonicalProjection(projectContext, projectId,
+        return new CanonicalProjection(projectContext, projectId, freshness,
                 new CanonicalRepositoryContext(
                         AgentRepositoryContext.VERSION,
                         AgentContextProjectionPolicy.POLICY_ID,
@@ -370,6 +385,7 @@ public class AgentContextProjectionService {
     private record CanonicalProjection(
             ProjectContextSnapshot projectContext,
             UUID projectId,
+            ProjectFreshnessSummary freshness,
             CanonicalRepositoryContext repositoryContext
     ) { }
 

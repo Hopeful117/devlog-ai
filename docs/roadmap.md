@@ -44,6 +44,8 @@ Scope:
   content allocation, without semantic or dependency inference (ADR-045 implemented),
 - initialize or refresh repository understanding explicitly on demand (implemented through the
   single-source `describe-project-v1` workflow).
+- check default-revision freshness explicitly and provide deterministic manual refresh guidance
+  without passive monitoring or automatic analysis (implemented).
 
 Current boundary:
 

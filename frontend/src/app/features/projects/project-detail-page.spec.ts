@@ -12,6 +12,7 @@ import { IntentCatalogService } from '../analyses/intent-catalog.service';
 import { DeliverableService } from '../deliverables/deliverable.service';
 import { InsightService } from '../insights/insight.service';
 import { ProjectUnderstandingService } from './project-understanding.service';
+import { ProjectFreshnessService } from './project-freshness.service';
 
 const project: ProjectDetail = {
   id: 'a1ee6d55-e034-491a-a6e6-cdad70573b24',
@@ -59,6 +60,10 @@ describe('ProjectDetailPage', () => {
         },
         { provide: IntentCatalogService, useValue: { getSupportedIntents: () => of([]) } },
         { provide: ProjectUnderstandingService, useValue: { execute: vi.fn() } },
+        {
+          provide: ProjectFreshnessService,
+          useValue: { getLatest: () => of(null), check: vi.fn() },
+        },
         {
           provide: DeliverableService,
           useValue: { getByProject: () => of([]), generate: vi.fn() },
