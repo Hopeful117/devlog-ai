@@ -21,6 +21,8 @@ public interface FactRepository extends JpaRepository<Fact, UUID> {
             Pageable pageable
     );
 
+    List<Fact> findByAnalysisIdAndIdIn(UUID analysisId, java.util.Collection<UUID> ids);
+
     @Query("select f.fingerprint from Fact f where f.analysis.id = :analysisId " +
             "and f.fingerprint is not null")
     Set<String> findFingerprintsByAnalysisId(@Param("analysisId") UUID analysisId);

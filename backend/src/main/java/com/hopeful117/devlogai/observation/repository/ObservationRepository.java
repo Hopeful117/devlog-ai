@@ -21,4 +21,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             UUID analysisId,
             Pageable pageable
     );
+
+    List<Observation> findByAnalysisIdAndIdIn(UUID analysisId, java.util.Collection<UUID> ids);
 }

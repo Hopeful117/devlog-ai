@@ -60,6 +60,13 @@ export const routes: Routes = [
     ],
   },
   {
+    path: 'analyses/:id/proposal-review',
+    loadComponent: () =>
+      import('./features/insights/proposal-review-page').then(
+        (module) => module.ProposalReviewPage,
+      ),
+  },
+  {
     path: 'analyses/:id',
     loadComponent: () =>
       import('./features/analyses/analysis-detail-page').then(

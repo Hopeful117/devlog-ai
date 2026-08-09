@@ -36,7 +36,7 @@ public class ValidationServiceImpl implements ValidationService {
     ) {
 
         ValidatableProposal proposal =
-                proposalRepository.findById(request.proposalId())
+                proposalRepository.findByIdForValidation(request.proposalId())
                         .orElseThrow(() -> new EntityNotFoundException(
                                 "Proposal", request.proposalId()));
 

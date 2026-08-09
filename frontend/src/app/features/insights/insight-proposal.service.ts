@@ -9,6 +9,7 @@ import {
   ProposalDecisionRequest,
   ProposalDecisionResult,
   RejectProposalRequest,
+  ProposalReviewResponse,
 } from './insight.models';
 @Injectable({ providedIn: 'root' })
 export class InsightProposalService {
@@ -17,6 +18,12 @@ export class InsightProposalService {
   getProposalsByAnalysis(id: string): Observable<readonly InsightProposalSummary[]> {
     return this.http.get<readonly InsightProposalSummary[]>(
       `${this.base}/proposals/analysis/${encodeURIComponent(id)}`,
+    );
+  }
+  getProposalReview(id: string, page = 0, size = 10): Observable<ProposalReviewResponse> {
+    return this.http.get<ProposalReviewResponse>(
+      `${this.base}/analyses/${encodeURIComponent(id)}/proposal-review`,
+      { params: { page, size } },
     );
   }
   getProposal(id: string): Observable<InsightProposalDetail> {

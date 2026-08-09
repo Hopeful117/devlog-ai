@@ -77,7 +77,7 @@ class ValidationServiceTest {
         ValidationResponse response =
                 mock(ValidationResponse.class);
 
-        when(proposalRepository.findById(proposalId))
+        when(proposalRepository.findByIdForValidation(proposalId))
                 .thenReturn(Optional.of(proposal));
 
         when(validationRepository.existsByProposalId(proposalId))
@@ -125,7 +125,7 @@ class ValidationServiceTest {
                         UUID.randomUUID()
                 );
 
-        when(proposalRepository.findById(proposalId))
+        when(proposalRepository.findByIdForValidation(proposalId))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
@@ -135,7 +135,7 @@ class ValidationServiceTest {
                 .hasMessageContaining(proposalId.toString());
 
         verify(proposalRepository)
-                .findById(proposalId);
+                .findByIdForValidation(proposalId);
 
         verifyNoInteractions(validationRepository);
         verifyNoInteractions(validationMapper);
@@ -159,7 +159,7 @@ class ValidationServiceTest {
                         UUID.randomUUID()
                 );
 
-        when(proposalRepository.findById(proposalId))
+        when(proposalRepository.findByIdForValidation(proposalId))
                 .thenReturn(Optional.of(proposal));
 
         assertThatThrownBy(() ->
@@ -169,7 +169,7 @@ class ValidationServiceTest {
                 .hasMessage("Proposal has already been decided");
 
         verify(proposalRepository)
-                .findById(proposalId);
+                .findByIdForValidation(proposalId);
 
         verifyNoInteractions(validationRepository);
         verifyNoInteractions(validationMapper);
@@ -196,7 +196,7 @@ class ValidationServiceTest {
                         UUID.randomUUID()
                 );
 
-        when(proposalRepository.findById(proposalId))
+        when(proposalRepository.findByIdForValidation(proposalId))
                 .thenReturn(Optional.of(proposal));
 
         assertThatThrownBy(() ->
@@ -206,7 +206,7 @@ class ValidationServiceTest {
                 .hasMessage("Proposal has already been decided");
 
         verify(proposalRepository)
-                .findById(proposalId);
+                .findByIdForValidation(proposalId);
 
         verifyNoInteractions(validationRepository);
         verifyNoInteractions(validationMapper);
@@ -233,7 +233,7 @@ class ValidationServiceTest {
                         UUID.randomUUID()
                 );
 
-        when(proposalRepository.findById(proposalId))
+        when(proposalRepository.findByIdForValidation(proposalId))
                 .thenReturn(Optional.of(proposal));
 
         when(validationRepository.existsByProposalId(proposalId))
@@ -246,7 +246,7 @@ class ValidationServiceTest {
                 .hasMessage("Proposal has already been validated");
 
         verify(proposalRepository)
-                .findById(proposalId);
+                .findByIdForValidation(proposalId);
 
         verify(validationRepository)
                 .existsByProposalId(proposalId);

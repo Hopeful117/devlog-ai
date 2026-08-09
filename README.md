@@ -218,6 +218,15 @@ The normal MVP path is:
 4. Create and explicitly launch the Analysis.
 5. Monitor deterministic diagnostics and AI Task status on `/analyses/:id`.
 6. Inspect provider/model, Guidance snapshot, selection and prompt versions/digests, and proposals.
+7. Open **Review proposals** to process the Analysis queue without leaving the review workspace.
+
+The review projection is available at
+`GET /api/v1/analyses/{analysisId}/proposal-review?page=0&size=10`. It returns stable pending-first
+ordering, Analysis-wide progress counts, bounded evidence summaries, persisted decisions, and
+resulting Insights. Decisions still use one `POST /api/v1/validations` per proposal; there is no
+bulk or automatic validation. The reviewer UUID is an explicitly generated local MVP identity,
+kept only in browser session storage and never represented as authentication. The direct
+`/proposals/{id}` API and `/proposals/:id` UI route remain the audit surfaces.
 7. Open a Proposal, inspect its rationale and evidence, then explicitly accept or reject it.
 8. Confirm that only a Core-accepted Proposal appears as an immutable validated Insight.
 

@@ -334,6 +334,20 @@ The primary interaction reports preparation, failure, and navigation outcomes wi
 Intent, collector, context-profile, Prompt, or AI Task mechanics. Equivalent pending or running work
 navigates to the existing Analysis. Results remain proposals until explicit human validation.
 
+## Guided Proposal Review
+
+An Analysis containing proposals exposes a **Review proposals** action. The dedicated workspace
+keeps the queue, progress, rationale, structured payload, evidence summaries, reviewer identity,
+and decision controls together. Pending items appear first in deterministic source order;
+completed items stay inspectable and link back to their direct audit page.
+
+Accept and reject always require an individual confirmation. A successful Core response refreshes
+the counts and advances to the next pending item. A failure retains the current proposal and form;
+a concurrent `409` refreshes the authoritative persisted decision without retrying. Reviewer UUID
+generation is explicit and labelled as a session-local MVP identity, not authentication. Narrow
+layouts stack queue and content while preserving semantic buttons, labels, status text, and live
+regions.
+
 ---
 
 # Notifications

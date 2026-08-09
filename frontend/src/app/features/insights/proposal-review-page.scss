@@ -1,0 +1,34 @@
+.review-page {
+  display: grid;
+  gap: 1rem;
+}
+.queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.queue button[aria-current='true'] {
+  outline: 3px solid currentColor;
+}
+.review-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+  gap: 1rem;
+}
+.review-grid form {
+  display: grid;
+  gap: 0.75rem;
+}
+.pagination {
+  display: flex;
+  justify-content: space-between;
+}
+pre {
+  overflow: auto;
+  max-width: 100%;
+}
+@media (max-width: 760px) {
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
+}

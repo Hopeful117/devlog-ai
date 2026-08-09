@@ -11,6 +11,15 @@
         {{ vm.data | proposalCount: 'ACCEPTED' }} accepted ·
         {{ vm.data | proposalCount: 'REJECTED' }} rejected
       </p>
+      @if (vm.data.length > 0) {
+        <a class="review-link" [routerLink]="['/analyses', analysisId, 'proposal-review']">
+          {{
+            (vm.data | proposalCount: 'PROPOSED') > 0
+              ? 'Review proposals'
+              : 'Review completed decisions'
+          }}
+        </a>
+      }
       @if (vm.data.length === 0) {
         @if (executionStatus === 'COMPLETED' && provider?.toLowerCase() === 'mock') {
           <p data-testid="proposals-empty">

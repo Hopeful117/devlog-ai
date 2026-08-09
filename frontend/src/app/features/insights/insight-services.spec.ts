@@ -33,6 +33,17 @@ describe('Insight review services', () => {
       request.flush(url.endsWith('/a') ? [] : {});
     }
   });
+  it('reads the bounded proposal review page with exact query parameters', () => {
+    proposals.getProposalReview('analysis/id', 2, 10).subscribe();
+    const request = http.expectOne(
+      (candidate) =>
+        candidate.url === '/api/v1/analyses/analysis%2Fid/proposal-review' &&
+        candidate.params.get('page') === '2' &&
+        candidate.params.get('size') === '10',
+    );
+    expect(request.request.method).toBe('GET');
+    request.flush({});
+  });
   it('sends the exact Accept validation payload', () => {
     proposals
       .acceptProposal('p', {

@@ -62,6 +62,48 @@ export interface ProposalDecisionResult {
   readonly validatedBy: string;
   readonly comment: string | null;
 }
+export interface ProposalReviewEvidence {
+  readonly id: string;
+  readonly status: 'AVAILABLE' | 'MISSING';
+  readonly type: string | null;
+  readonly content: string | null;
+  readonly provenance: string | null;
+}
+export interface ProposalReviewItem
+  extends Omit<
+    ProposalFields,
+    'insight' | 'supportingFactIds' | 'supportingObservationIds'
+  > {
+  readonly sourceIndex: number | null;
+  readonly facts: readonly ProposalReviewEvidence[];
+  readonly observations: readonly ProposalReviewEvidence[];
+  readonly decision: ProposalDecisionResult | null;
+  readonly insight: {
+    readonly id: string;
+    readonly type: string;
+    readonly severity: InsightSeverity;
+    readonly title: string;
+  } | null;
+}
+export interface ProposalReviewResponse {
+  readonly version: string;
+  readonly analysisId: string;
+  readonly projectId: string;
+  readonly counts: {
+    readonly total: number;
+    readonly pending: number;
+    readonly accepted: number;
+    readonly rejected: number;
+  };
+  readonly page: {
+    readonly number: number;
+    readonly size: number;
+    readonly totalPages: number;
+    readonly hasPrevious: boolean;
+    readonly hasNext: boolean;
+  };
+  readonly items: readonly ProposalReviewItem[];
+}
 interface InsightFields {
   readonly id: string;
   readonly projectId: string;

@@ -1,0 +1,137 @@
+<section class="review-page">
+  <a [routerLink]="['/analyses', analysisId]">← Back to Analysis</a>
+  <h1>Proposal review</h1>
+  @if (action$ | async; as action) {
+    @if (action.state === 'pending') {
+      <p role="status">Recording human decision…</p>
+    }
+    @if (action.state === 'error') {
+      <p role="alert" class="error">{{ action.error.message }}</p>
+    }
+    @if (view$ | async; as vm) {
+      @if (vm.state === 'loading') {
+        <p role="status">Loading review queue…</p>
+      } @else if (vm.state === 'error') {
+        <p role="alert" class="error">{{ vm.error.message }}</p>
+      } @else {
+        <p aria-live="polite">
+          {{ vm.data.counts.total }} total · {{ vm.data.counts.pending }} pending ·
+          {{ vm.data.counts.accepted }} accepted · {{ vm.data.counts.rejected }} rejected
+        </p>
+        @if (vm.data.counts.pending === 0) {
+          <section class="panel">
+            <h2>Review complete</h2>
+            <p>Every proposal has an immutable human decision.</p>
+          </section>
+        }
+        <nav class="queue" aria-label="Proposal queue">
+          @for (item of vm.data.items; track item.id) {
+            <button
+              type="button"
+              (click)="select(item)"
+              [attr.aria-current]="item.id === currentId ? 'true' : null"
+            >
+              {{ item.payload['title'] || 'Untitled proposal' }} · {{ item.status }}
+            </button>
+          }
+        </nav>
+        @if (current(vm.data.items); as item) {
+          <article class="review-grid">
+            <main class="panel">
+              <h2 #proposalTitle tabindex="-1">
+                {{ item.payload['title'] || 'Insight proposal' }}
+              </h2>
+              <app-status-badge [value]="item.status" />
+              <p>{{ item.payload['summary'] }}</p>
+              <h3>Rationale</h3>
+              <p>{{ item.payload['rationale'] || 'Not provided' }}</p>
+              <h3>Facts</h3>
+              <ul>
+                @for (fact of item.facts; track fact.id) {
+                  <li>
+                    <strong>{{ fact.type || fact.status }}</strong> —
+                    {{ fact.content || 'Unavailable' }} <small>{{ fact.provenance }}</small>
+                  </li>
+                } @empty {
+                  <li>No supporting Facts.</li>
+                }
+              </ul>
+              <h3>Observations</h3>
+              <ul>
+                @for (observation of item.observations; track observation.id) {
+                  <li>
+                    <strong>{{ observation.type || observation.status }}</strong> —
+                    {{ observation.content || 'Unavailable' }}
+                  </li>
+                } @empty {
+                  <li>No supporting Observations.</li>
+                }
+              </ul>
+              <details>
+                <summary>Structured payload</summary>
+                <pre><code>{{ item.payload | json }}</code></pre>
+              </details>
+              <a [routerLink]="['/proposals', item.id]">Open direct audit page</a>
+            </main>
+            <aside class="panel">
+              @if (item.status === 'PROPOSED') {
+                <form [formGroup]="form">
+                  <h2>Human decision</h2>
+                  <label for="reviewer">Local reviewer UUID</label>
+                  <p>This is a session-local MVP identifier, not an authenticated identity.</p>
+                  <input id="reviewer" formControlName="validatedBy" />
+                  <button type="button" (click)="generateReviewer()">Generate local UUID</button>
+                  <button type="button" (click)="clearReviewer()">Clear</button>
+                  <label for="comment">Decision note</label
+                  ><textarea id="comment" formControlName="comment"></textarea>
+                  <label for="severity">Severity when accepted</label
+                  ><select id="severity" formControlName="severity">
+                    @for (severity of severities; track severity) {
+                      <option [value]="severity">{{ severity }}</option>
+                    }
+                  </select>
+                  <div>
+                    <button type="button" (click)="confirmation = 'ACCEPTED'">Accept</button
+                    ><button
+                      type="button"
+                      class="danger-button"
+                      (click)="confirmation = 'REJECTED'"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                  @if (confirmation) {
+                    <div role="group" aria-label="Confirm immutable decision">
+                      <p>Confirm {{ confirmation.toLowerCase() }}. This cannot be reversed.</p>
+                      <button
+                        type="button"
+                        (click)="decide(item)"
+                        [disabled]="form.invalid || action.state === 'pending'"
+                      >
+                        Confirm decision</button
+                      ><button type="button" (click)="confirmation = null">Cancel</button>
+                    </div>
+                  }
+                </form>
+              } @else {
+                <h2>Final decision</h2>
+                <p>{{ item.decision?.decision }} by {{ item.decision?.validatedBy }}</p>
+                <p>{{ item.decision?.comment || 'No decision note.' }}</p>
+                @if (item.insight) {
+                  <a [routerLink]="['/insights', item.insight.id]">{{ item.insight.title }}</a>
+                }
+              }
+            </aside>
+          </article>
+        }
+        <div class="pagination">
+          <button type="button" (click)="previous()" [disabled]="!vm.data.page.hasPrevious">
+            Previous page</button
+          ><button type="button" (click)="next()" [disabled]="!vm.data.page.hasNext">
+            Next page
+          </button>
+        </div>
+      }
+    }
+  }
+</section>
