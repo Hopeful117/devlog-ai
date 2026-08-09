@@ -49,13 +49,25 @@ public class ProjectHistoryServiceImpl implements ProjectHistoryService {
         Source source = sourceRepository.findById(repositoryId)
                 .orElseThrow(() -> new EntityNotFoundException("Source", repositoryId));
         SynchronizedWorkspace workspace = workspaceManager.synchronize(source, targetRevision);
+        return importHistory(source, workspace);
+    }
+
+    @Override
+    @Transactional
+    public HistoryImportResult importHistory(Source source, SynchronizedWorkspace workspace) {
+        UUID repositoryId = source.getId();
+        if (!repositoryId.equals(workspace.sourceId())) {
+            throw new IllegalArgumentException("Workspace belongs to another Source");
+        }
+        Source managedSource = sourceRepository.findById(repositoryId)
+                .orElseThrow(() -> new EntityNotFoundException("Source", repositoryId));
         List<GitCommitData> discovered =
                 historyProvider.readHistory(workspace.path(), workspace.resolvedRevision());
         int imported = 0;
         for (GitCommitData data : discovered) {
             if (commitRepository.existsBySourceIdAndCommitHash(repositoryId, data.commitHash()))
                 continue;
-            commitRepository.save(toEntity(source, data, Instant.now()));
+            commitRepository.save(toEntity(managedSource, data, Instant.now()));
             imported++;
         }
         return new HistoryImportResult(repositoryId, workspace.resolvedRevision(), discovered.size(),

@@ -42,7 +42,8 @@ Scope:
   token budgets and configuration exclusion (ADR-044 implemented),
 - expose bounded deterministic Java declaration symbols for selected source/test evidence before
   content allocation, without semantic or dependency inference (ADR-045 implemented),
-- implement repository bootstrap analysis.
+- initialize or refresh repository understanding explicitly on demand (implemented through the
+  single-source `describe-project-v1` workflow).
 
 Current boundary:
 

@@ -61,10 +61,7 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
     public KnowledgeCollectionResult collect(UUID analysisId) {
         Analysis analysis = analysisRepository.findWithProjectById(analysisId)
                 .orElseThrow(() -> new EntityNotFoundException("Analysis", analysisId));
-        List<Source> sources = sourceRepository
-                .findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(
-                        analysis.getProject().getId()
-                );
+        List<Source> sources = resolveSources(analysis);
         List<KnowledgeCollector> orderedCollectors = collectors.stream()
                 .sorted(Comparator.comparing(KnowledgeCollector::type))
                 .toList();
@@ -177,6 +174,18 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
                 revisions,
                 warnings
         );
+    }
+
+    private List<Source> resolveSources(Analysis analysis) {
+        if (analysis.getSelectedSource() == null) {
+            return sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(
+                    analysis.getProject().getId());
+        }
+        Source selected = sourceRepository.findByIdAndProject_IdAndActiveTrue(
+                        analysis.getSelectedSource().getId(), analysis.getProject().getId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Active project Source", analysis.getSelectedSource().getId()));
+        return List.of(selected);
     }
 
     private CollectionWarningEntity toWarningEntity(

@@ -12,12 +12,16 @@ public interface AnalysisMapper {
             target = "projectId",
             source = "project.id"
     )
+    @Mapping(target = "selectedSourceId", source = "selectedSource.id")
     AnalysisResponse toResponse(
             Analysis analysis
     );
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "project", ignore = true)
+    @Mapping(target = "selectedSource", ignore = true)
+    @Mapping(target = "selectedSourceSnapshot", ignore = true)
+    @Mapping(target = "understandingExecutionKey", ignore = true)
     @Mapping(target = "status", ignore = true)
     @Mapping(target = "intentId", ignore = true)
     @Mapping(target = "intentVersion", ignore = true)

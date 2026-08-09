@@ -323,6 +323,17 @@ Generate Documentation
 
 The UI should communicate outcomes rather than implementation steps.
 
+## Project Understanding Action
+
+The Project Cockpit exposes `Understand project` before the first canonical execution and `Refresh
+understanding` afterward. The action always remains available when an active Git Source exists. One
+Source is selected visibly; several Sources require a deliberate choice. The user may keep the
+Source default revision or provide a branch, tag, or commit.
+
+The primary interaction reports preparation, failure, and navigation outcomes without exposing
+Intent, collector, context-profile, Prompt, or AI Task mechanics. Equivalent pending or running work
+navigates to the existing Analysis. Results remain proposals until explicit human validation.
+
 ---
 
 # Notifications

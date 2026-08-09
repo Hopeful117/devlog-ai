@@ -26,6 +26,7 @@ import { InsightSummary } from '../insights/insight.models';
 import { InsightService } from '../insights/insight.service';
 import { ProjectDetail } from './project.models';
 import { ProjectAnalysesSection } from '../analyses/project-analyses-section';
+import { ProjectUnderstandingSection } from './project-understanding-section';
 import { ProjectService } from './project.service';
 import { SourceSummary } from './source.models';
 import { SourceService } from './source.service';
@@ -58,6 +59,7 @@ type ProjectActionState =
     RouterLink,
     DashboardCard,
     ProjectAnalysesSection,
+    ProjectUnderstandingSection,
   ],
   templateUrl: './project-detail-page.html',
   styleUrl: './project-detail-page.scss',

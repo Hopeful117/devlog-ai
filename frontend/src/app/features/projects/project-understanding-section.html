@@ -1,0 +1,62 @@
+<section class="understanding" aria-labelledby="project-understanding-title">
+  <div>
+    <p class="eyebrow">Project understanding</p>
+    <h2 id="project-understanding-title">
+      {{ refresh ? 'Refresh understanding' : 'Understand project' }}
+    </h2>
+    <p>
+      {{
+        refresh
+          ? 'Analyze the repository again after meaningful changes.'
+          : 'Build the first traceable understanding of this repository.'
+      }}
+    </p>
+  </div>
+
+  @if (compatibleSources.length === 0) {
+    <p class="unavailable" role="status">
+      Connect and activate a Git repository before starting project understanding.
+    </p>
+  } @else if (state$ | async; as state) {
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <label for="understanding-source">Repository</label>
+      <select id="understanding-source" formControlName="sourceId">
+        @if (compatibleSources.length > 1) {
+          <option value="">Select a repository</option>
+        }
+        @for (source of compatibleSources; track source.id) {
+          <option [value]="source.id">
+            {{ source.name }}{{ source.defaultBranch ? ' · ' + source.defaultBranch : '' }}
+          </option>
+        }
+      </select>
+      @if (form.controls.sourceId.touched && form.controls.sourceId.invalid) {
+        <p class="field-error" role="alert">Select the repository to understand.</p>
+      }
+
+      <label for="understanding-revision">Branch, tag, or commit <small>(optional)</small></label>
+      <input
+        id="understanding-revision"
+        formControlName="targetRevision"
+        maxlength="255"
+        placeholder="Use the repository default"
+      />
+
+      @if (state.state === 'pending') {
+        <p role="status">Preparing repository history and launching understanding…</p>
+      } @else if (state.state === 'error') {
+        <p class="field-error" role="alert">{{ state.error.message }}</p>
+      }
+
+      <button type="submit" [disabled]="form.invalid || state.state === 'pending'">
+        {{
+          state.state === 'pending'
+            ? 'Preparing…'
+            : refresh
+              ? 'Refresh understanding'
+              : 'Understand project'
+        }}
+      </button>
+    </form>
+  }
+</section>

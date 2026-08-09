@@ -11,6 +11,7 @@ import { AnalysisService } from '../analyses/analysis.service';
 import { IntentCatalogService } from '../analyses/intent-catalog.service';
 import { DeliverableService } from '../deliverables/deliverable.service';
 import { InsightService } from '../insights/insight.service';
+import { ProjectUnderstandingService } from './project-understanding.service';
 
 const project: ProjectDetail = {
   id: 'a1ee6d55-e034-491a-a6e6-cdad70573b24',
@@ -57,6 +58,7 @@ describe('ProjectDetailPage', () => {
           useValue: { getAnalysesByProject: () => of([]) },
         },
         { provide: IntentCatalogService, useValue: { getSupportedIntents: () => of([]) } },
+        { provide: ProjectUnderstandingService, useValue: { execute: vi.fn() } },
         {
           provide: DeliverableService,
           useValue: { getByProject: () => of([]), generate: vi.fn() },

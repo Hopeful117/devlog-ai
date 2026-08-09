@@ -24,6 +24,11 @@ public interface AnalysisRepository extends JpaRepository<Analysis, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select analysis from Analysis analysis where analysis.id = :id")
     Optional<Analysis> findByIdForUpdate(@Param("id") UUID id);
+
+    Optional<Analysis> findByUnderstandingExecutionKeyAndStatusIn(
+            String executionKey,
+            java.util.Collection<AnalysisStatus> statuses
+    );
     List<Analysis> findByProjectIdOrderByCreatedAtDesc(
             UUID projectId
     );

@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.analysis.entity;
 
 import com.hopeful117.devlogai.project.entity.Project;
+import com.hopeful117.devlogai.source.entity.Source;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -29,6 +30,17 @@ public class Analysis {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "project_id", nullable = false)
     private Project project;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "selected_source_id")
+    private Source selectedSource;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "selected_source_snapshot", updatable = false, columnDefinition = "jsonb")
+    private Map<String, Object> selectedSourceSnapshot;
+
+    @Column(name = "understanding_execution_key", length = 64, updatable = false)
+    private String understandingExecutionKey;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

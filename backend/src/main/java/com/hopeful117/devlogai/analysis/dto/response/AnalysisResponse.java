@@ -12,6 +12,8 @@ public record AnalysisResponse(
 
         UUID projectId,
 
+        UUID selectedSourceId,
+
         AnalysisType type,
 
         String intentId,
@@ -28,19 +30,29 @@ public record AnalysisResponse(
 
         Instant updatedAt,
 
-        Map<String, Object> userGuidance
+        Map<String, Object> userGuidance,
+
+        Map<String, Object> selectedSourceSnapshot
 
 
 ) {
     public AnalysisResponse(UUID id, UUID projectId, AnalysisType type, AnalysisStatus status,
                             Instant startedAt, Instant completedAt, Instant createdAt, Instant updatedAt) {
-        this(id, projectId, type, null, null, status, startedAt, completedAt, createdAt, updatedAt, null);
+        this(id, projectId, null, type, null, null, status, startedAt, completedAt, createdAt, updatedAt, null, null);
     }
 
     public AnalysisResponse(UUID id, UUID projectId, AnalysisType type, String intentId,
                             String intentVersion, AnalysisStatus status, Instant startedAt,
                             Instant completedAt, Instant createdAt, Instant updatedAt) {
-        this(id, projectId, type, intentId, intentVersion, status, startedAt,
-                completedAt, createdAt, updatedAt, null);
+        this(id, projectId, null, type, intentId, intentVersion, status, startedAt,
+                completedAt, createdAt, updatedAt, null, null);
+    }
+
+    public AnalysisResponse(UUID id, UUID projectId, AnalysisType type, String intentId,
+                            String intentVersion, AnalysisStatus status, Instant startedAt,
+                            Instant completedAt, Instant createdAt, Instant updatedAt,
+                            Map<String, Object> userGuidance) {
+        this(id, projectId, null, type, intentId, intentVersion, status, startedAt,
+                completedAt, createdAt, updatedAt, userGuidance, null);
     }
 }

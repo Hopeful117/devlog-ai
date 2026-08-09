@@ -149,7 +149,14 @@ The system observes silently and acts when additional understanding provides val
 
 ## Project Bootstrap Analysis
 
-When a repository is connected for the first time, DevLog AI performs an initial understanding phase.
+Repository connection does not trigger autonomous analysis. From the Project Cockpit, the user may
+explicitly start an initial understanding phase and request the same capability again after
+meaningful changes.
+
+Each execution targets one selected active Git Source and an optional branch, tag, or commit. Core
+resolves `describe-project-v1`, imports history, snapshots Source/revision provenance, and reuses
+equivalent work already pending or running. Completed and failed executions never disable later
+refresh. Passive monitoring remains a separate future capability.
 
 The objective is not to reproduce the complete Git history, but to reconstruct the major evolution milestones that explain the current state of the project.
 
@@ -299,5 +306,4 @@ Examples:
 - technical articles,
 - ADRs,
 - architecture documentation.
-
 

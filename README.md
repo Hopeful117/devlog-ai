@@ -14,6 +14,8 @@ OpenAPI documentation, and traceable Deliverables generated from human-validated
 
 - Create, edit, archive, and permanently delete projects, and manage their Git repository sources.
 - Clone and synchronize repository workspaces at a branch, tag, or commit.
+- Initialize or refresh project understanding on demand for one explicitly selected active Git
+  Source, with history import and concurrency-safe reuse of equivalent active work.
 - Collect versioned Facts about repository metadata, builds, Spring, Docker, documentation, and
   test structure.
 - Derive deterministic, traceable Observations from Facts.
@@ -256,6 +258,14 @@ Project management also exposes:
 
 Unknown projects use the standard `404 ENTITY_NOT_FOUND` response. Invalid updates return the
 standard validation contract, and duplicate project names return `409 RESOURCE_CONFLICT`.
+
+Project Understanding uses `POST /api/v1/projects/{projectId}/understanding-executions`. Its body
+contains `sourceId`, optional `targetRevision`, and optional `userGuidance`. The Source must be an
+active Git Source belonging to the Project. Core resolves `describe-project-v1`, snapshots Source
+provenance, imports history, and returns an Analysis with outcome `CREATED` or `REUSED`. Equivalent
+pending/running work is reused across clients; terminal work never prevents a later refresh.
+Preparation failures create no Analysis, while failures after start retain a traceable failed
+execution. Proposals still require explicit human validation before becoming Trusted Knowledge.
 
 ### Engineering Story Context
 

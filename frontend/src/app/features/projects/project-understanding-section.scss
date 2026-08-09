@@ -1,0 +1,33 @@
+.understanding {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid rgb(77 141 255 / 0.32);
+  border-radius: 1rem;
+  background: rgb(77 141 255 / 0.06);
+}
+
+.understanding h2,
+.understanding p {
+  margin: 0;
+}
+
+.understanding form {
+  display: grid;
+  max-width: 42rem;
+  gap: 0.65rem;
+}
+
+.understanding button {
+  justify-self: start;
+  margin-top: 0.35rem;
+}
+
+.understanding small,
+.unavailable {
+  color: var(--text-muted);
+}
+
+.field-error {
+  color: var(--danger);
+}

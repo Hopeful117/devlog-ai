@@ -13,8 +13,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 @SpringBootTest
 @Testcontainers
@@ -72,9 +75,73 @@ class ProjectDeletionPostgresIntegrationTest {
         assertEquals(1, count("sources", retainedSource));
         assertEquals(1, count("project_commits", retainedCommit));
         assertEquals(1, count("commit_changed_files", retainedCommit, "project_commit_id"));
-        assertEquals("30", jdbc.queryForObject(
+        assertEquals("31", jdbc.queryForObject(
                 "select version from flyway_schema_history where success order by installed_rank desc limit 1",
                 String.class));
+    }
+
+    @Test
+    void activeUnderstandingExecutionIsUniqueAndTerminalExecutionReleasesTheKey() throws Exception {
+        UUID project = UUID.randomUUID();
+        insertProject(project, "Understanding project", "understanding-project");
+        UUID source = insertSource(project, "Understanding source");
+        String key = "c".repeat(64);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var first = executor.submit(() -> concurrentInsert(project, source, key, ready, start));
+            var second = executor.submit(() -> concurrentInsert(project, source, key, ready, start));
+            ready.await();
+            start.countDown();
+            int successes = (first.get() ? 1 : 0) + (second.get() ? 1 : 0);
+            assertEquals(1, successes);
+        }
+
+        UUID active = jdbc.queryForObject(
+                "select id from analyses where understanding_execution_key = ?", UUID.class, key);
+        jdbc.update("update analyses set status = 'COMPLETED', completed_at = ? where id = ?",
+                OffsetDateTime.now(), active);
+        UUID refresh = insertUnderstanding(project, source, key);
+        assertEquals(2, jdbc.queryForObject(
+                "select count(*) from analyses where understanding_execution_key = ?",
+                Integer.class, key));
+
+        jdbc.update("delete from sources where id = ?", source);
+        assertNull(jdbc.queryForObject(
+                "select selected_source_id from analyses where id = ?", UUID.class, refresh));
+        assertEquals(source.toString(), jdbc.queryForObject(
+                "select selected_source_snapshot ->> 'id' from analyses where id = ?",
+                String.class, refresh));
+    }
+
+    private boolean concurrentInsert(UUID project, UUID source, String key,
+                                     CountDownLatch ready, CountDownLatch start) {
+        ready.countDown();
+        try {
+            start.await();
+            insertUnderstanding(project, source, key);
+            return true;
+        } catch (org.springframework.dao.DataIntegrityViolationException expected) {
+            return false;
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(interrupted);
+        }
+    }
+
+    private UUID insertUnderstanding(UUID project, UUID source, String key) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("""
+                insert into analyses
+                    (id, project_id, selected_source_id, selected_source_snapshot,
+                     understanding_execution_key, type, status, intent_id, intent_version,
+                     created_at, updated_at)
+                values (?, ?, ?, cast(? as jsonb), ?, 'ARCHITECTURE_REVIEW', 'PENDING',
+                        'describe-project', 'v1', ?, ?)
+                """, id, project, source, "{\"id\":\"" + source + "\"}", key,
+                OffsetDateTime.now(), OffsetDateTime.now());
+        return id;
     }
 
     private void assertDeleteRule(String constraint, String expected) {

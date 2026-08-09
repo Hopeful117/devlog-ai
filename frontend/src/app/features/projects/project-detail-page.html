@@ -259,6 +259,14 @@
         </div>
 
         <section class="analysis-launcher">
+          <app-project-understanding-section
+            [projectId]="viewModel.project.id"
+            [sources]="viewModel.sources"
+            [analyses]="viewModel.analyses"
+          />
+        </section>
+
+        <section class="analysis-launcher">
           <app-project-analyses-section [projectId]="viewModel.project.id" />
         </section>
 
