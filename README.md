@@ -258,6 +258,18 @@ Selected `SOURCE_FILE` and `TEST_FILE` evidence may include an additive `content
 complete, truncated, skipped, or unavailable bounded text. `CONFIG_FILE` and all other evidence
 kinds remain content-free. Returned content comes from DevLog's synchronized Git revision and is
 context for navigation; verify exact behavior against the current working repository.
+
+Selected Java source/test evidence may also include an additive `symbols` object. It reports a
+bounded outcome and structured classes, interfaces, records, enums, annotation declarations,
+constructors, methods, annotations, parameters, modifiers, return types, and source locations from
+the synchronized revision. This is syntax-only navigation context: DevLog does not infer method
+behavior, calls, dependency resolution, framework wiring, or source/test relationships. Malformed,
+unsupported, skipped, unavailable, and failed extraction remain explicit and do not remove path or
+content evidence.
+The symbol phase deterministically considers only the highest allocated files that fit both the
+configured file limit and a reserved compact-outcome budget. Every considered file has an explicit
+outcome; later selected Java evidence remains unchanged rather than receiving metadata that would
+exceed the global context budget. A response warning identifies this bounded condition.
 For compatibility with existing consumers and short descriptions, the GET operation remains
 available:
 
@@ -355,6 +367,22 @@ Selected source/test content adds three independent limits:
 - `REPOSITORY_CONTEXT_CONTENT_MAX_TOTAL_CHARACTERS` (default `12000`).
 
 These limits always remain subordinate to the complete Repository Context token budget.
+
+Java symbol extraction has separate bounds:
+
+- `REPOSITORY_CONTEXT_SYMBOL_MAX_FILES` (default `6`);
+- `REPOSITORY_CONTEXT_SYMBOL_MAX_INPUT_CHARACTERS` (default `200000`);
+- `REPOSITORY_CONTEXT_SYMBOL_MAX_SYMBOLS_PER_FILE` (default `40`);
+- `REPOSITORY_CONTEXT_SYMBOL_MAX_TOTAL_SYMBOLS` (default `120`);
+- `REPOSITORY_CONTEXT_SYMBOL_MAX_COMPONENT_CHARACTERS` (default `300`);
+- `REPOSITORY_CONTEXT_SYMBOL_MAX_TOKENS` (default `1500`);
+- `REPOSITORY_CONTEXT_SYMBOL_MAX_PARSE_DURATION` (default `500ms`);
+- `REPOSITORY_CONTEXT_SYMBOL_MAX_TOTAL_DURATION` (default `2s`).
+
+Symbols are extracted only after global selection and before bounded content allocation. Their token
+allowance is part of, not additional to, the complete Repository Context budget. The phase reserves
+compact outcome metadata before parsing and stops expanding its deterministic considered set when
+the next outcome cannot fit.
 
 ### Repository Context Engine
 

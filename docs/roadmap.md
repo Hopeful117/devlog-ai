@@ -40,13 +40,14 @@ Scope:
   through deterministic Context Intelligence (ADR-039 implemented),
 - enrich selected source/test evidence with bounded revision-traceable content while preserving
   token budgets and configuration exclusion (ADR-044 implemented),
+- expose bounded deterministic Java declaration symbols for selected source/test evidence before
+  content allocation, without semantic or dependency inference (ADR-045 implemented),
 - implement repository bootstrap analysis.
 
 Current boundary:
 
-- AI commit interpretation, validated historical events, multi-parent comparison and
-  language-specific symbol extraction remain deferred to later vertical slices of ADR-035 and
-  ADR-036.
+- AI commit interpretation, validated historical events, multi-parent comparison, non-Java symbol
+  extraction, symbol resolution and dependency relationships remain deferred.
 
 Output:
 

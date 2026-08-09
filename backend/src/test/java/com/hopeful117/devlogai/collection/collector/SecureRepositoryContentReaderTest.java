@@ -38,6 +38,20 @@ class SecureRepositoryContentReaderTest {
     }
 
     @Test
+    void completeReadRejectsInsteadOfParsingATruncatedPrefix() throws IOException {
+        Files.writeString(workspacePath.resolve("App.java"), "class Application {}");
+        SecureRepositoryContentReader reader = reader(new CollectorLimits());
+
+        var bounded = reader.readComplete(workspace(), "App.java", 5);
+        var complete = reader.readComplete(workspace(), "App.java", 100);
+
+        assertSkipped(bounded, "INPUT_TOO_LARGE");
+        assertEquals(SecureRepositoryContentReader.ReadResult.Status.COMPLETE,
+                complete.status());
+        assertEquals("class Application {}", complete.text());
+    }
+
+    @Test
     void rejectsTraversalSymlinkExcludedBinaryAndInvalidUtf8() throws IOException {
         Path outside = workspacePath.resolve("outside-secret.txt");
         Files.writeString(outside, "secret");

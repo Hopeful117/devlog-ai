@@ -19,6 +19,7 @@ import com.hopeful117.devlogai.repositorycontext.collector.ProjectKnowledgeConte
 import com.hopeful117.devlogai.repositorycontext.collector.RepositoryContextCollector;
 import com.hopeful117.devlogai.repositorycontext.intelligence.DeterministicContextIntelligence;
 import com.hopeful117.devlogai.repositorycontext.enrichment.SelectedFileContentEnricher;
+import com.hopeful117.devlogai.repositorycontext.enrichment.SelectedJavaSymbolEnricher;
 import com.hopeful117.devlogai.repositorycontext.ranking.DeterministicEvidenceRanker;
 import com.hopeful117.devlogai.repositorycontext.selection.BudgetedDiverseEvidenceSelector;
 import org.junit.jupiter.api.Test;
@@ -375,9 +376,18 @@ class RepositoryContextServiceTest {
                 new DeterministicContextIntelligence(),
                 new DeterministicEvidenceRanker(),
                 new BudgetedDiverseEvidenceSelector(),
+                symbolEnricher(),
                 enricher,
                 new ObjectMapper(), maximumItems, maximumSummary,
                 maximumHistory, maximumTokens);
+    }
+
+    private SelectedJavaSymbolEnricher symbolEnricher() {
+        SelectedJavaSymbolEnricher enricher = mock(SelectedJavaSymbolEnricher.class);
+        when(enricher.enrich(any(), any())).thenAnswer(invocation ->
+                new SelectedJavaSymbolEnricher.EnrichmentResult(
+                        invocation.getArgument(1), List.of()));
+        return enricher;
     }
 
     private SelectedFileContentEnricher contentEnricher(String text) {

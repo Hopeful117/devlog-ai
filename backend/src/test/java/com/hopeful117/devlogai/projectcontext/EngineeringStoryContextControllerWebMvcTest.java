@@ -19,6 +19,7 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryContextDiagnostics;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceSymbols;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -77,6 +78,12 @@ class EngineeringStoryContextControllerWebMvcTest
                         .value("SEMANTIC_MATCH_STRENGTH=7"))
                 .andExpect(jsonPath("$.repositoryContext.evidence[0].score.matchStrength.semantic")
                         .value(7))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].symbols.status")
+                        .value("EXTRACTED"))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].symbols.declarations[0].kind")
+                        .value("CLASS"))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].symbols.revision")
+                        .value("abc"))
                 .andExpect(jsonPath("$.repositoryContext.evidence[1].content")
                         .doesNotExist());
 
@@ -208,7 +215,15 @@ class EngineeringStoryContextControllerWebMvcTest
                         "CONTENT_TRUNCATED", "selected-file-content", "v1", "abc",
                         "selected-content-allocation", "v1", 1,
                         List.of("FINAL_SCORE=49", "SEMANTIC_MATCH_STRENGTH=7",
-                                "GUIDANCE_MATCH_STRENGTH=3")));
+                                "GUIDANCE_MATCH_STRENGTH=3")),
+                new RepositoryEvidenceSymbols(
+                        RepositoryEvidenceSymbols.Status.EXTRACTED, null,
+                        "selected-java-symbols", "v1", "java-declarations", "v1",
+                        "abc", 1, List.of("FINAL_SCORE=49"), false, 1, 1,
+                        List.of(new RepositoryEvidenceSymbols.JavaDeclaration(
+                                RepositoryEvidenceSymbols.Kind.CLASS, "App", "App",
+                                List.of("public"), null, List.of(), List.of(),
+                                new RepositoryEvidenceSymbols.SourceLocation(1, 1, 1, 10)))));
         var configEvidence = new RepositoryEvidence(
                 RepositoryContextLayer.RELATED_SOURCE_CODE, "CONFIG_FILE",
                 "config:pom.xml", "pom.xml", Instant.EPOCH,

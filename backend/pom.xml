@@ -24,6 +24,7 @@
 		<mapstruct.version>1.6.3</mapstruct.version>
 		<springdoc.version>3.0.3</springdoc.version>
 		<sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
+		<javaparser.version>3.27.0</javaparser.version>
 		<sonar.projectKey>devlog-ai</sonar.projectKey>
 		<sonar.host.url>http://localhost:9000</sonar.host.url>
 		<sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
@@ -32,6 +33,11 @@
 
 
 	<dependencies>
+		<dependency>
+			<groupId>com.github.javaparser</groupId>
+			<artifactId>javaparser-core</artifactId>
+			<version>${javaparser.version}</version>
+		</dependency>
 
 		<!-- Spring -->
 		<dependency>

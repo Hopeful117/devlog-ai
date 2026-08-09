@@ -29,6 +29,31 @@ public class SecureRepositoryContentReader {
             String relativePath,
             int maximumCharacters
     ) {
+        ReadResult result = readCompleteFile(workspace, relativePath);
+        if (result.status() != ReadResult.Status.COMPLETE
+                || result.text().length() <= maximumCharacters) {
+            return result;
+        }
+        return ReadResult.truncated(safePrefix(result.text(), maximumCharacters));
+    }
+
+    public ReadResult readComplete(
+            SynchronizedWorkspace workspace,
+            String relativePath,
+            int maximumCharacters
+    ) {
+        ReadResult result = readCompleteFile(workspace, relativePath);
+        if (result.status() == ReadResult.Status.COMPLETE
+                && result.text().length() > maximumCharacters) {
+            return ReadResult.skipped("INPUT_TOO_LARGE");
+        }
+        return result;
+    }
+
+    private ReadResult readCompleteFile(
+            SynchronizedWorkspace workspace,
+            String relativePath
+    ) {
         if (relativePath == null || relativePath.isBlank()) {
             return ReadResult.skipped("INVALID_PATH");
         }
@@ -55,10 +80,7 @@ public class SecureRepositoryContentReader {
                 return ReadResult.skipped("BINARY_CONTENT");
             }
             String text = decodeUtf8(bytes);
-            if (text.length() <= maximumCharacters) {
-                return ReadResult.complete(text);
-            }
-            return ReadResult.truncated(safePrefix(text, maximumCharacters));
+            return ReadResult.complete(text);
         } catch (CharacterCodingException exception) {
             return ReadResult.skipped("UNSUPPORTED_ENCODING");
         } catch (TimeoutException exception) {
