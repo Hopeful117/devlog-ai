@@ -193,6 +193,24 @@ DevLog AI follows a microservice-oriented architecture based on clear responsibi
 
 The objective is not to maximize the number of services, but to isolate domains with different responsibilities and evolution cycles.
 
+### Engineering Story Agent Projection
+
+The Repository Context Engine retains a rich deterministic domain representation for AI-task
+provenance, diagnostics and audit. External Engineering Story preparation consumes a distinct,
+versioned Agent-Ready projection built by the Java Core after collection, ranking, selection,
+symbol enrichment, content allocation and final accounting.
+
+The projection keeps selected navigation evidence, resolved revisions, essential provenance,
+bounded content and symbols, aggregate selection diagnostics and the authoritative Repository
+Context digest. It removes duplicated score detail and individual rejected-candidate rows under a
+separate serialized-payload budget. Mechanical degradation never re-ranks evidence or changes the
+internal context. The full rich representation remains explicitly available for diagnostics.
+
+Repository Context and projection digests have different authority: the first identifies the Core
+context decision, while the second identifies the final semantic agent payload. Synchronized Git
+evidence remains navigation context; the current working repository is still authoritative for
+implementation decisions. This boundary is recorded by ADR-046.
+
 ### Core Service (Java Spring)
 
 The Core Service contains the business logic and acts as the source of truth for project knowledge.
@@ -306,4 +324,3 @@ Examples:
 - technical articles,
 - ADRs,
 - architecture documentation.
-

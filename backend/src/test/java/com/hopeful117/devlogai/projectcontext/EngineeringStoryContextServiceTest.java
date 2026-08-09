@@ -1,6 +1,9 @@
 package com.hopeful117.devlogai.projectcontext;
 
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.projectcontext.projection.AgentContextProjectionService;
+import com.hopeful117.devlogai.projectcontext.projection.AgentEngineeringStoryContext;
+import com.hopeful117.devlogai.projectcontext.projection.AgentRepositoryContext;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +24,9 @@ class EngineeringStoryContextServiceTest {
 
     @Mock
     RepositoryContextAdapter repositoryContextAdapter;
+
+    @Mock
+    AgentContextProjectionService projectionService;
 
     @InjectMocks
     EngineeringStoryContextServiceImpl service;
@@ -60,7 +66,8 @@ class EngineeringStoryContextServiceTest {
         RepositoryContext repositoryContext = mock(RepositoryContext.class);
 
         when(projectContextProvider.build(projectId)).thenReturn(snapshot);
-        when(repositoryContextAdapter.buildRepositoryContext(projectId, description))
+        when(repositoryContextAdapter.buildRepositoryContext(
+                projectId, description, snapshot))
                 .thenReturn(repositoryContext);
 
         EngineeringStoryContext context =
@@ -73,6 +80,34 @@ class EngineeringStoryContextServiceTest {
         assertNotNull(context.generatedAt());
         verify(projectContextProvider).build(projectId);
         verify(repositoryContextAdapter)
-                .buildRepositoryContext(projectId, description);
+                .buildRepositoryContext(projectId, description, snapshot);
+    }
+
+    @Test
+    void shouldBuildAgentContextFromOneProjectSnapshot() {
+        UUID projectId = UUID.randomUUID();
+        String description = "Compact context";
+        ProjectContextSnapshot snapshot = mock(ProjectContextSnapshot.class);
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+        AgentEngineeringStoryContext projected = mock(AgentEngineeringStoryContext.class);
+        AgentRepositoryContext projectedRepository = mock(AgentRepositoryContext.class);
+        AgentRepositoryContext.Accounting accounting =
+                mock(AgentRepositoryContext.Accounting.class);
+
+        when(projectContextProvider.build(projectId)).thenReturn(snapshot);
+        when(repositoryContextAdapter.buildRepositoryContext(
+                projectId, description, snapshot)).thenReturn(repositoryContext);
+        when(projectionService.project(any(), any(), any(), any()))
+                .thenReturn(projected);
+        when(projected.repositoryContext()).thenReturn(projectedRepository);
+        when(projectedRepository.evidence()).thenReturn(java.util.List.of());
+        when(projectedRepository.accounting()).thenReturn(accounting);
+
+        assertSame(projected,
+                service.buildAgentWithRepositoryContext(projectId, description));
+
+        verify(projectContextProvider, times(1)).build(projectId);
+        verify(repositoryContextAdapter).buildRepositoryContext(
+                projectId, description, snapshot);
     }
 }

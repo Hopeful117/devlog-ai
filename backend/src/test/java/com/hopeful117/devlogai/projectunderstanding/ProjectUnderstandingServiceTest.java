@@ -95,9 +95,10 @@ class ProjectUnderstandingServiceTest {
         when(claims.claim(prepared)).thenReturn(
                 new ProjectUnderstandingClaim(analysis, ProjectUnderstandingOutcome.CREATED));
         doThrow(new IllegalStateException("start failed")).when(workflow).start(analysis.getId());
+        ProjectUnderstandingRequest request = new ProjectUnderstandingRequest(
+                prepared.sourceId(), null, null);
 
-        assertThatThrownBy(() -> service.execute(projectId,
-                new ProjectUnderstandingRequest(prepared.sourceId(), null, null)))
+        assertThatThrownBy(() -> service.execute(projectId, request))
                 .isInstanceOf(IllegalStateException.class);
         verify(claims).failPending(analysis.getId());
     }

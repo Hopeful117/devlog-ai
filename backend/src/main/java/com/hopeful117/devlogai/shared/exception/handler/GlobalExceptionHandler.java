@@ -7,6 +7,7 @@ import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTy
 import com.hopeful117.devlogai.project.exception.ProjectSlugAlreadyExistsException;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.shared.exception.InvalidParameterException;
 import com.hopeful117.devlogai.shared.logging.CorrelationIdFilter;
 import com.hopeful117.devlogai.shared.response.ApiErrorCode;
 import com.hopeful117.devlogai.shared.response.ApiErrorResponse;
@@ -102,6 +103,14 @@ public class GlobalExceptionHandler {
         String message = "Invalid value for parameter '" + ex.getName() + "'.";
         return response(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAMETER,
                 message, request);
+    }
+
+    @ExceptionHandler(InvalidParameterException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidParameter(
+            InvalidParameterException exception,
+            HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, ApiErrorCode.INVALID_PARAMETER,
+                exception.getMessage(), request);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

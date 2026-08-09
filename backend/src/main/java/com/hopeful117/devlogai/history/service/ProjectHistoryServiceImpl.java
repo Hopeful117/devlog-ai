@@ -45,16 +45,22 @@ public class ProjectHistoryServiceImpl implements ProjectHistoryService {
     }
 
     @Override
+    @Transactional
     public HistoryImportResult importHistory(UUID repositoryId, String targetRevision) {
         Source source = sourceRepository.findById(repositoryId)
                 .orElseThrow(() -> new EntityNotFoundException("Source", repositoryId));
         SynchronizedWorkspace workspace = workspaceManager.synchronize(source, targetRevision);
-        return importHistory(source, workspace);
+        return importSynchronizedHistory(source, workspace);
     }
 
     @Override
     @Transactional
     public HistoryImportResult importHistory(Source source, SynchronizedWorkspace workspace) {
+        return importSynchronizedHistory(source, workspace);
+    }
+
+    private HistoryImportResult importSynchronizedHistory(
+            Source source, SynchronizedWorkspace workspace) {
         UUID repositoryId = source.getId();
         if (!repositoryId.equals(workspace.sourceId())) {
             throw new IllegalArgumentException("Workspace belongs to another Source");

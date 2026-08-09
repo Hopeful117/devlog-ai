@@ -19,25 +19,31 @@ public class EngineeringStoryContextController {
     private final EngineeringStoryContextService engineeringStoryContextService;
 
     @GetMapping("/api/projects/{projectId}/engineering-story-context")
-    public ResponseEntity<EngineeringStoryContext> getEngineeringStoryContext(
+    public ResponseEntity<Object> getEngineeringStoryContext(
             @PathVariable UUID projectId,
-            @RequestParam(required = false) String description) {
-        return buildContext(projectId, description);
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) String detail) {
+        return buildContext(projectId, description, detail);
     }
 
     @PostMapping(
             value = "/api/projects/{projectId}/engineering-story-context",
             consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<EngineeringStoryContext> createEngineeringStoryContext(
+    public ResponseEntity<Object> createEngineeringStoryContext(
             @PathVariable UUID projectId,
-            @RequestBody EngineeringStoryContextRequest request) {
-        return buildContext(projectId, request.description());
+            @RequestBody EngineeringStoryContextRequest request,
+            @RequestParam(required = false) String detail) {
+        return buildContext(projectId, request.description(), detail);
     }
 
-    private ResponseEntity<EngineeringStoryContext> buildContext(
-            UUID projectId, String description) {
-        return ResponseEntity.ok(
-                engineeringStoryContextService.buildWithRepositoryContext(
-                        projectId, description));
+    private ResponseEntity<Object> buildContext(
+            UUID projectId, String description, String detail) {
+        EngineeringStoryContextDetail mode = EngineeringStoryContextDetail.parse(detail);
+        Object response = mode == EngineeringStoryContextDetail.FULL
+                ? engineeringStoryContextService.buildWithRepositoryContext(
+                        projectId, description)
+                : engineeringStoryContextService.buildAgentWithRepositoryContext(
+                        projectId, description);
+        return ResponseEntity.ok(response);
     }
 }

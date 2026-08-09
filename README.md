@@ -279,8 +279,25 @@ curl -X POST \
   --data-binary '{"description":"<complete Engineering Story>"}'
 ```
 
-The response is the existing `EngineeringStoryContext`, including its selected Repository Context.
-Selected `SOURCE_FILE` and `TEST_FILE` evidence may include an additive `content` object describing
+The default response is the versioned Agent-Ready projection of `EngineeringStoryContext`. It keeps
+the Project Context and selected Repository Context evidence, but replaces full score maps and
+individual rejected-candidate decisions with final scores, bounded non-duplicated reasons and
+aggregate counts. The adapter contract remains `repositoryContext.evidence` with stable
+`reference` and `summary` fields.
+
+Use `?detail=full` only for diagnostics and auditing. That mode returns the complete rich
+Repository Context, including criterion weights, explanations, diagnostics and every selection
+decision; it is intentionally not suitable for direct injection into an agent context window.
+
+The compact response exposes both the authoritative `repositoryContextDigest` and a
+projection-specific `projectionDigest`. Its accounting covers the canonical semantic JSON while
+excluding generated time, digest and accounting fields to avoid self-reference. Complete HTTP wire
+bytes may therefore be slightly larger. The projection uses a 32 KiB / 8,192 estimated-token
+default limit and mechanically removes related references, extra reasons, declaration payloads,
+content text and finally tail evidence when necessary. It never re-ranks evidence or promotes a
+rejected candidate.
+
+Selected `SOURCE_FILE` and `TEST_FILE` evidence may include a compact `content` object describing
 complete, truncated, skipped, or unavailable bounded text. `CONFIG_FILE` and all other evidence
 kinds remain content-free. Returned content comes from DevLog's synchronized Git revision and is
 context for navigation; verify exact behavior against the current working repository.
@@ -302,6 +319,16 @@ available:
 ```text
 GET /api/projects/{projectId}/engineering-story-context?description={description}
 ```
+
+Projection limits are configurable with:
+
+- `ENGINEERING_STORY_AGENT_CONTEXT_MAX_BYTES` (default `32768`);
+- `ENGINEERING_STORY_AGENT_CONTEXT_MAX_ESTIMATED_TOKENS` (default `8192`);
+- `ENGINEERING_STORY_AGENT_CONTEXT_MAX_REASONS` (default `3`);
+- `ENGINEERING_STORY_AGENT_CONTEXT_MAX_RELATED_REFERENCES` (default `3`).
+
+DevLog logs bounded snapshot, Repository Context and projection durations. Adapter failures remain
+non-blocking for Repository Analysis through the established `DEVLOG_CONTEXT_ERROR` fallback.
 
 Example validation of an Insight Proposal:
 
@@ -450,6 +477,11 @@ consume either later content slots or their explanations. Final token estimates,
 warnings and the digest are calculated from the returned evidence. The policy still reasons from path-level
 metadata, not source semantics, and the current repository remains authoritative. See
 [ADR-044](docs/decisions/ADR-044.md).
+
+The rich Repository Context is an internal diagnostic and provenance model. The Engineering Story
+endpoint derives a separate compact transport projection after final enrichment and accounting;
+the projection does not change collection, ranking, selection or AI-task snapshots. See
+[ADR-046](docs/decisions/ADR-046.md).
 
 ### Context Intelligence and Evidence scoring
 

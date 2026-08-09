@@ -21,6 +21,8 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceSymbols;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
+import com.hopeful117.devlogai.projectcontext.projection.AgentEngineeringStoryContext;
+import com.hopeful117.devlogai.projectcontext.projection.AgentRepositoryContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -51,8 +53,8 @@ class EngineeringStoryContextControllerWebMvcTest
     void shouldBuildContextFromPostBody() throws Exception {
         UUID projectId = UUID.randomUUID();
         String description = "Add a body-based context request";
-        when(service.buildWithRepositoryContext(projectId, description))
-                .thenReturn(context(projectId));
+        when(service.buildAgentWithRepositoryContext(projectId, description))
+                .thenReturn(agentContext(projectId));
 
         mvc.perform(post(PATH, projectId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -60,10 +62,9 @@ class EngineeringStoryContextControllerWebMvcTest
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.projectId").value(projectId.toString()))
                 .andExpect(jsonPath("$.generatedAt").value("2026-08-08T12:00:00Z"))
-                .andExpect(jsonPath("$.repositoryContext.diagnostics.candidatesByKind.TEST_FILE")
-                        .value(4))
-                .andExpect(jsonPath("$.repositoryContext.diagnostics.preferredLayerAvailability[0].reason")
-                        .value("NO_CANDIDATE_FOR_PREFERRED_LAYER"))
+                .andExpect(jsonPath("$.repositoryContext.projectionVersion")
+                        .value("engineering-story-agent-projection-v1"))
+                .andExpect(jsonPath("$.repositoryContext.candidateCount").value(4))
                 .andExpect(jsonPath("$.repositoryContext.evidence[0].content.status")
                         .value("TRUNCATED"))
                 .andExpect(jsonPath("$.repositoryContext.evidence[0].content.text")
@@ -74,10 +75,10 @@ class EngineeringStoryContextControllerWebMvcTest
                         .value("v1"))
                 .andExpect(jsonPath("$.repositoryContext.evidence[0].content.allocationRank")
                         .value(1))
-                .andExpect(jsonPath("$.repositoryContext.evidence[0].content.allocationReasons[1]")
-                        .value("SEMANTIC_MATCH_STRENGTH=7"))
-                .andExpect(jsonPath("$.repositoryContext.evidence[0].score.matchStrength.semantic")
-                        .value(7))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].content.allocationReasons")
+                        .doesNotExist())
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].relevanceScore")
+                        .value(49))
                 .andExpect(jsonPath("$.repositoryContext.evidence[0].symbols.status")
                         .value("EXTRACTED"))
                 .andExpect(jsonPath("$.repositoryContext.evidence[0].symbols.declarations[0].kind")
@@ -87,15 +88,44 @@ class EngineeringStoryContextControllerWebMvcTest
                 .andExpect(jsonPath("$.repositoryContext.evidence[1].content")
                         .doesNotExist());
 
-        verify(service).buildWithRepositoryContext(projectId, description);
+        verify(service).buildAgentWithRepositoryContext(projectId, description);
+    }
+
+    @Test
+    void shouldExposeFullDiagnosticMode() throws Exception {
+        UUID projectId = UUID.randomUUID();
+        when(service.buildWithRepositoryContext(projectId, "story"))
+                .thenReturn(context(projectId));
+
+        mvc.perform(post(PATH, projectId).param("detail", "full")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"story\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.repositoryContext.diagnostics.candidatesByKind.TEST_FILE")
+                        .value(4))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].score.matchStrength.semantic")
+                        .value(7))
+                .andExpect(jsonPath("$.repositoryContext.evidence[0].content.allocationReasons[1]")
+                        .value("SEMANTIC_MATCH_STRENGTH=7"));
+
+        verify(service).buildWithRepositoryContext(projectId, "story");
+    }
+
+    @Test
+    void shouldRejectUnknownDetailMode() throws Exception {
+        mvc.perform(post(PATH, UUID.randomUUID()).param("detail", "verbose")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"description\":\"story\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
     }
 
     @Test
     void shouldTransmitLargeStoryWithoutTruncation() throws Exception {
         UUID projectId = UUID.randomUUID();
         String description = "Engineering Story acceptance criterion. ".repeat(320);
-        when(service.buildWithRepositoryContext(projectId, description))
-                .thenReturn(context(projectId));
+        when(service.buildAgentWithRepositoryContext(projectId, description))
+                .thenReturn(agentContext(projectId));
 
         mvc.perform(post(PATH, projectId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -103,7 +133,7 @@ class EngineeringStoryContextControllerWebMvcTest
                 .andExpect(status().isOk());
 
         ArgumentCaptor<String> captured = ArgumentCaptor.forClass(String.class);
-        verify(service).buildWithRepositoryContext(
+        verify(service).buildAgentWithRepositoryContext(
                 org.mockito.ArgumentMatchers.eq(projectId), captured.capture());
         assertEquals(description, captured.getValue());
         assertEquals(description.length(), captured.getValue().length());
@@ -113,14 +143,14 @@ class EngineeringStoryContextControllerWebMvcTest
     void shouldPreserveGetCompatibility() throws Exception {
         UUID projectId = UUID.randomUUID();
         String description = "Short description";
-        when(service.buildWithRepositoryContext(projectId, description))
-                .thenReturn(context(projectId));
+        when(service.buildAgentWithRepositoryContext(projectId, description))
+                .thenReturn(agentContext(projectId));
 
         mvc.perform(get(PATH, projectId).param("description", description))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.projectId").value(projectId.toString()));
 
-        verify(service).buildWithRepositoryContext(projectId, description);
+        verify(service).buildAgentWithRepositoryContext(projectId, description);
     }
 
     @Test
@@ -128,12 +158,12 @@ class EngineeringStoryContextControllerWebMvcTest
         UUID missingProject = UUID.randomUUID();
         UUID nullProject = UUID.randomUUID();
         UUID blankProject = UUID.randomUUID();
-        when(service.buildWithRepositoryContext(missingProject, null))
-                .thenReturn(context(missingProject));
-        when(service.buildWithRepositoryContext(nullProject, null))
-                .thenReturn(context(nullProject));
-        when(service.buildWithRepositoryContext(blankProject, "   "))
-                .thenReturn(context(blankProject));
+        when(service.buildAgentWithRepositoryContext(missingProject, null))
+                .thenReturn(agentContext(missingProject));
+        when(service.buildAgentWithRepositoryContext(nullProject, null))
+                .thenReturn(agentContext(nullProject));
+        when(service.buildAgentWithRepositoryContext(blankProject, "   "))
+                .thenReturn(agentContext(blankProject));
 
         mvc.perform(post(PATH, missingProject)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -148,9 +178,9 @@ class EngineeringStoryContextControllerWebMvcTest
                         .content("{\"description\":\"   \"}"))
                 .andExpect(status().isOk());
 
-        verify(service).buildWithRepositoryContext(missingProject, null);
-        verify(service).buildWithRepositoryContext(nullProject, null);
-        verify(service).buildWithRepositoryContext(blankProject, "   ");
+        verify(service).buildAgentWithRepositoryContext(missingProject, null);
+        verify(service).buildAgentWithRepositoryContext(nullProject, null);
+        verify(service).buildAgentWithRepositoryContext(blankProject, "   ");
     }
 
     @Test
@@ -179,7 +209,7 @@ class EngineeringStoryContextControllerWebMvcTest
     @Test
     void shouldUseSharedErrorsForInvalidAndUnknownProject() throws Exception {
         UUID projectId = UUID.randomUUID();
-        when(service.buildWithRepositoryContext(projectId, "story"))
+        when(service.buildAgentWithRepositoryContext(projectId, "story"))
                 .thenThrow(new EntityNotFoundException("Project", projectId));
 
         mvc.perform(post(PATH, "not-a-uuid")
@@ -241,5 +271,36 @@ class EngineeringStoryContextControllerWebMvcTest
         return new EngineeringStoryContext(
                 null, Instant.parse("2026-08-08T12:00:00Z"), projectId,
                 repositoryContext);
+    }
+
+    private AgentEngineeringStoryContext agentContext(UUID projectId) {
+        var content = new AgentRepositoryContext.Content("TRUNCATED", "class App",
+                "CONTENT_TRUNCATED", "selected-file-content", "v1", "abc",
+                "selected-content-allocation", "v1", 1);
+        var symbols = new AgentRepositoryContext.Symbols("EXTRACTED", null,
+                "selected-java-symbols", "v1", "java-declarations", "v1", "abc",
+                1, false, 1, 1,
+                List.of(new RepositoryEvidenceSymbols.JavaDeclaration(
+                        RepositoryEvidenceSymbols.Kind.CLASS, "App", "App",
+                        List.of("public"), null, List.of(), List.of(),
+                        new RepositoryEvidenceSymbols.SourceLocation(1, 1, 1, 10))));
+        var evidence = new AgentRepositoryContext.Evidence(
+                "RELATED_SOURCE_CODE", "SOURCE_FILE", "file:src/App.java",
+                "src/App.java", Instant.EPOCH, 49, List.of("SELECTED_BY_RANK"),
+                List.of(), new AgentRepositoryContext.Provenance(
+                        "REPOSITORY_STRUCTURE", "source", "src/App.java", "id"),
+                new AgentRepositoryContext.Extraction(
+                        "repository-structure", "v2", "abc"), content, symbols);
+        var repositoryContext = new AgentRepositoryContext(
+                AgentRepositoryContext.VERSION, "agent-context-payload", "v1", "v1",
+                List.of("engineering-story-v1"), "context-intelligence-v2",
+                List.of("abc"), List.of(evidence), Map.of("RELATED_SOURCE_CODE", 1),
+                Map.of("SOURCE_FILE", 1), Map.of("TOKEN_BUDGET_EXCEEDED", 2),
+                4, 1, 3, 0, true, List.of("REPOSITORY_CONTEXT_BUDGET_APPLIED"),
+                "context-digest", "projection-digest",
+                new AgentRepositoryContext.Accounting(
+                        32768, 8192, 1000, 250, 0, 0, 0, 0, 0));
+        return new AgentEngineeringStoryContext(null,
+                Instant.parse("2026-08-08T12:00:00Z"), projectId, repositoryContext);
     }
 }

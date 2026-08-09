@@ -41,8 +41,16 @@ public class RepositoryContextAdapter {
 
     public RepositoryContext buildRepositoryContext(
             UUID projectId, String storyDescription) {
-
         ProjectContextSnapshot snapshot = projectContextProvider.build(projectId);
+
+        return buildRepositoryContext(projectId, storyDescription, snapshot);
+    }
+
+    public RepositoryContext buildRepositoryContext(
+            UUID projectId,
+            String storyDescription,
+            ProjectContextSnapshot snapshot
+    ) {
 
         AnalysisContext syntheticContext = synthesizeAnalysisContext(projectId, snapshot);
 
