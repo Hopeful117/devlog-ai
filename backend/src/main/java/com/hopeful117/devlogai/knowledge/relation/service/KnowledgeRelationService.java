@@ -20,4 +20,9 @@ public interface KnowledgeRelationService {
     List<KnowledgeRelationResponse> getByTarget(EntityType targetEntityType, UUID targetEntityId);
 
     void delete(UUID id);
+
+    List<KnowledgeRelationResponse> getByChallenge(UUID challengeId);
+    List<KnowledgeRelationResponse> getByDecision(UUID decisionId);
+    List<KnowledgeRelationResponse> getByEngineeringEvent(UUID engineeringEventId);
+    List<KnowledgeRelationResponse> getByInsight(UUID insightId);
 }

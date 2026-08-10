@@ -1,5 +1,9 @@
 # Story 0001 — Extraire `ProjectContextProvider` du contexte d'analyse
 
+## Status
+
+Completed
+
 ## 1. Title
 
 Extraire `ProjectContextProvider` et `ProjectContextSnapshot` pour découpler le contexte projet du cycle `Analysis`

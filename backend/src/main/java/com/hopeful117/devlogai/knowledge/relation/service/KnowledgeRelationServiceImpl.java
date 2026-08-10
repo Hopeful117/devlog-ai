@@ -111,4 +111,24 @@ public class KnowledgeRelationServiceImpl implements KnowledgeRelationService {
 
         knowledgeRelationRepository.delete(relation);
     }
+
+    @Override
+    public List<KnowledgeRelationResponse> getByChallenge(UUID challengeId) {
+        return getBySource(EntityType.CHALLENGE, challengeId);
+    }
+
+    @Override
+    public List<KnowledgeRelationResponse> getByDecision(UUID decisionId) {
+        return getBySource(EntityType.DECISION, decisionId);
+    }
+
+    @Override
+    public List<KnowledgeRelationResponse> getByEngineeringEvent(UUID engineeringEventId) {
+        return getBySource(EntityType.ENGINEERING_EVENT, engineeringEventId);
+    }
+
+    @Override
+    public List<KnowledgeRelationResponse> getByInsight(UUID insightId) {
+        return getBySource(EntityType.INSIGHT, insightId);
+    }
 }

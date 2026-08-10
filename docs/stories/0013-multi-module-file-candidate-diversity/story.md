@@ -7,7 +7,7 @@
 Produce balanced source, test, and configuration candidates for multi-module repositories
 
 ## Status
-Draft
+Completed
 
 ## Priority
 Critical

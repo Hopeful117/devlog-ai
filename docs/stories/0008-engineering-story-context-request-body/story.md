@@ -7,7 +7,7 @@
 Accept complete Engineering Stories through a body-based context request
 
 ## Status
-Draft
+Completed
 
 ## Priority
 High

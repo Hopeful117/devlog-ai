@@ -327,4 +327,144 @@ class KnowledgeRelationServiceTest {
         verify(knowledgeRelationRepository).findById(id);
         verify(knowledgeRelationRepository, never()).delete(any());
     }
+
+    @Test
+    void shouldReturnRelationsByChallenge() {
+        UUID challengeId = UUID.randomUUID();
+
+        KnowledgeRelation relation = new KnowledgeRelation();
+        KnowledgeRelationResponse response = new KnowledgeRelationResponse(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                EntityType.CHALLENGE,
+                challengeId,
+                EntityType.DECISION,
+                UUID.randomUUID(),
+                KnowledgeRelationType.RESOLVES,
+                null,
+                null
+        );
+
+        when(knowledgeRelationRepository
+                .findBySourceEntityTypeAndSourceEntityId(
+                        EntityType.CHALLENGE, challengeId))
+                .thenReturn(List.of(relation));
+        when(knowledgeRelationMapper.toResponse(relation))
+                .thenReturn(response);
+
+        List<KnowledgeRelationResponse> result =
+                knowledgeRelationService.getByChallenge(challengeId);
+
+        assertEquals(1, result.size());
+        assertEquals(response, result.get(0));
+
+        verify(knowledgeRelationRepository)
+                .findBySourceEntityTypeAndSourceEntityId(
+                        EntityType.CHALLENGE, challengeId);
+    }
+
+    @Test
+    void shouldReturnRelationsByDecision() {
+        UUID decisionId = UUID.randomUUID();
+
+        KnowledgeRelation relation = new KnowledgeRelation();
+        KnowledgeRelationResponse response = new KnowledgeRelationResponse(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                EntityType.DECISION,
+                decisionId,
+                EntityType.CHALLENGE,
+                UUID.randomUUID(),
+                KnowledgeRelationType.ADDRESSES,
+                null,
+                null
+        );
+
+        when(knowledgeRelationRepository
+                .findBySourceEntityTypeAndSourceEntityId(
+                        EntityType.DECISION, decisionId))
+                .thenReturn(List.of(relation));
+        when(knowledgeRelationMapper.toResponse(relation))
+                .thenReturn(response);
+
+        List<KnowledgeRelationResponse> result =
+                knowledgeRelationService.getByDecision(decisionId);
+
+        assertEquals(1, result.size());
+        assertEquals(response, result.get(0));
+
+        verify(knowledgeRelationRepository)
+                .findBySourceEntityTypeAndSourceEntityId(
+                        EntityType.DECISION, decisionId);
+    }
+
+    @Test
+    void shouldReturnRelationsByEngineeringEvent() {
+        UUID eventId = UUID.randomUUID();
+
+        KnowledgeRelation relation = new KnowledgeRelation();
+        KnowledgeRelationResponse response = new KnowledgeRelationResponse(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                EntityType.ENGINEERING_EVENT,
+                eventId,
+                EntityType.CHALLENGE,
+                UUID.randomUUID(),
+                KnowledgeRelationType.CAUSED_BY,
+                null,
+                null
+        );
+
+        when(knowledgeRelationRepository
+                .findBySourceEntityTypeAndSourceEntityId(
+                        EntityType.ENGINEERING_EVENT, eventId))
+                .thenReturn(List.of(relation));
+        when(knowledgeRelationMapper.toResponse(relation))
+                .thenReturn(response);
+
+        List<KnowledgeRelationResponse> result =
+                knowledgeRelationService.getByEngineeringEvent(eventId);
+
+        assertEquals(1, result.size());
+        assertEquals(response, result.get(0));
+
+        verify(knowledgeRelationRepository)
+                .findBySourceEntityTypeAndSourceEntityId(
+                        EntityType.ENGINEERING_EVENT, eventId);
+    }
+
+    @Test
+    void shouldReturnRelationsByInsight() {
+        UUID insightId = UUID.randomUUID();
+
+        KnowledgeRelation relation = new KnowledgeRelation();
+        KnowledgeRelationResponse response = new KnowledgeRelationResponse(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                EntityType.INSIGHT,
+                insightId,
+                EntityType.ENGINEERING_EVENT,
+                UUID.randomUUID(),
+                KnowledgeRelationType.DERIVED_FROM,
+                null,
+                null
+        );
+
+        when(knowledgeRelationRepository
+                .findBySourceEntityTypeAndSourceEntityId(
+                        EntityType.INSIGHT, insightId))
+                .thenReturn(List.of(relation));
+        when(knowledgeRelationMapper.toResponse(relation))
+                .thenReturn(response);
+
+        List<KnowledgeRelationResponse> result =
+                knowledgeRelationService.getByInsight(insightId);
+
+        assertEquals(1, result.size());
+        assertEquals(response, result.get(0));
+
+        verify(knowledgeRelationRepository)
+                .findBySourceEntityTypeAndSourceEntityId(
+                        EntityType.INSIGHT, insightId);
+    }
 }

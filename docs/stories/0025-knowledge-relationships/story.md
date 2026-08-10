@@ -34,3 +34,11 @@ which Challenge?" or "which Decision caused which Event?".
 - AC-9: MapStruct mapper for entity ↔ DTO conversion.
 - AC-10: Unit tests for service and controller.
 - AC-11: SonarQube Quality Gate passes with 0 new violations.
+
+## Artifacts
+
+- `repository-analysis.md`
+- `implementation-plan.md`
+- `implementation-report.md`
+- `code-review.md`
+- `engineering-report.md`

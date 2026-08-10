@@ -7,7 +7,7 @@
 Expose deterministic Java symbols for selected repository evidence
 
 ## Status
-Draft
+Completed
 
 ## Priority
 High

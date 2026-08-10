@@ -1,5 +1,9 @@
 # Story 0004 — Add Repository Structure Collector
 
+## Status
+
+Completed
+
 ## Metadata
 
 **ID:**
@@ -9,7 +13,7 @@
 Add Repository Structure Collector to the Repository Context Engine
 
 **Status:**
-Draft
+Completed
 
 **Created:**
 2026-08-08

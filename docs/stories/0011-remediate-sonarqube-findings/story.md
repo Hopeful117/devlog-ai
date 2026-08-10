@@ -7,7 +7,7 @@
 Remediate the current SonarQube bug and code-smell baseline
 
 ## Status
-Draft
+Completed
 
 ## Priority
 High

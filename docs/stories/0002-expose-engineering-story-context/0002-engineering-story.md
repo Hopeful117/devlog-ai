@@ -1,10 +1,14 @@
 # Engineering Story 0002
 
+## Status
+
+Completed
+
 ## Metadata
 
 - **Story ID:** 0002
 - **Title:** Expose deterministic EngineeringStoryContext from ProjectContextProvider
-- **Status:** Draft
+- **Status:** Completed
 - **Created:** 2026-08-07
 - **Author:** Kiko (OpenClaw)
 - **Depends on:** Story 0001 (ProjectContextProvider)

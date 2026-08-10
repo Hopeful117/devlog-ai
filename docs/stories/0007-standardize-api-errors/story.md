@@ -7,7 +7,7 @@
 Return explicit, stable and traceable API errors
 
 ## Status
-Draft
+Completed
 
 ## Priority
 High

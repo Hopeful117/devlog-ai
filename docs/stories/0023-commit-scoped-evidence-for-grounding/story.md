@@ -1,5 +1,9 @@
 # Story 0023: Commit-Scoped Evidence for Engineering Event Grounding
 
+## Status
+
+Completed
+
 ## Problem Statement
 
 The Engineering Event vertical slice (Story 0022) is architecturally complete but blocked from

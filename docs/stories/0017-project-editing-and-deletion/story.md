@@ -7,7 +7,7 @@
 Allow users to edit and permanently delete projects
 
 ## Status
-Draft
+Completed
 
 ## Priority
 High
