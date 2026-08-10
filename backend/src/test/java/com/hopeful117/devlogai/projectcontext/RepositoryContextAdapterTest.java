@@ -3,6 +3,8 @@ package com.hopeful117.devlogai.projectcontext;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
+import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
+import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
@@ -13,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -46,7 +49,38 @@ class RepositoryContextAdapterTest {
                         null, ProjectStatus.ACTIVE);
         return new ProjectContextSnapshot(
                 project, null, List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of());
+    }
+
+    private ProjectContextSnapshot snapshotWithKnowledge(UUID projectId) {
+        AnalysisContext.ProjectSnapshot project =
+                new AnalysisContext.ProjectSnapshot(
+                        projectId, "Test Project", "test-project",
+                        null, ProjectStatus.ACTIVE);
+
+        ProjectContextSnapshot.EngineeringEventSnapshot event =
+                new ProjectContextSnapshot.EngineeringEventSnapshot(
+                        UUID.randomUUID(), "FEATURE_INTRODUCTION", "Added auth",
+                        "Authentication module", UUID.randomUUID(),
+                        "abc123", "def456", Instant.now(), UUID.randomUUID());
+
+        ProjectContextSnapshot.ChallengeSnapshot challenge =
+                new ProjectContextSnapshot.ChallengeSnapshot(
+                        UUID.randomUUID(), "Performance", "Slow queries",
+                        "High", "OPEN", null, Instant.now());
+
+        ProjectContextSnapshot.KnowledgeRelationSnapshot relation =
+                new ProjectContextSnapshot.KnowledgeRelationSnapshot(
+                        UUID.randomUUID(), EntityType.CHALLENGE, UUID.randomUUID(),
+                        EntityType.DECISION, UUID.randomUUID(),
+                        KnowledgeRelationType.INFORMED_BY, "Performance informed decision",
+                        Instant.now());
+
+        return new ProjectContextSnapshot(
+                project, null, List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(),
+                List.of(event), List.of(challenge), List.of(relation));
     }
 
     @Test
@@ -148,5 +182,82 @@ class RepositoryContextAdapterTest {
         assertEquals("engineering-story-preparation", intent.id());
         assertEquals("v1", intent.version());
         assertEquals(List.of("engineering-story-v1"), intent.contextProfiles());
+    }
+
+    @Test
+    void shouldPropagateValidatedEngineeringEventsToAnalysisContext() {
+        UUID projectId = UUID.randomUUID();
+        RepositoryContext expected = mock(RepositoryContext.class);
+
+        when(projectContextProvider.build(projectId))
+                .thenReturn(snapshotWithKnowledge(projectId));
+        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(repositoryContextService.build(
+                any(), any(), any(), any())).thenReturn(expected);
+
+        adapter.buildRepositoryContext(projectId, "Test");
+
+        ArgumentCaptor<AnalysisContext> contextCaptor =
+                ArgumentCaptor.forClass(AnalysisContext.class);
+        verify(repositoryContextService).build(
+                contextCaptor.capture(), any(), any(), any());
+
+        AnalysisContext ctx = contextCaptor.getValue();
+        assertEquals(1, ctx.validatedEngineeringEvents().size());
+        assertEquals("FEATURE_INTRODUCTION",
+                ctx.validatedEngineeringEvents().getFirst().category());
+    }
+
+    @Test
+    void shouldPropagateOpenChallengesToAnalysisContext() {
+        UUID projectId = UUID.randomUUID();
+        RepositoryContext expected = mock(RepositoryContext.class);
+
+        when(projectContextProvider.build(projectId))
+                .thenReturn(snapshotWithKnowledge(projectId));
+        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(repositoryContextService.build(
+                any(), any(), any(), any())).thenReturn(expected);
+
+        adapter.buildRepositoryContext(projectId, "Test");
+
+        ArgumentCaptor<AnalysisContext> contextCaptor =
+                ArgumentCaptor.forClass(AnalysisContext.class);
+        verify(repositoryContextService).build(
+                contextCaptor.capture(), any(), any(), any());
+
+        AnalysisContext ctx = contextCaptor.getValue();
+        assertEquals(1, ctx.openChallenges().size());
+        assertEquals("Performance", ctx.openChallenges().getFirst().title());
+        assertEquals("OPEN", ctx.openChallenges().getFirst().status());
+    }
+
+    @Test
+    void shouldPropagateKnowledgeRelationsToAnalysisContext() {
+        UUID projectId = UUID.randomUUID();
+        RepositoryContext expected = mock(RepositoryContext.class);
+
+        when(projectContextProvider.build(projectId))
+                .thenReturn(snapshotWithKnowledge(projectId));
+        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(repositoryContextService.build(
+                any(), any(), any(), any())).thenReturn(expected);
+
+        adapter.buildRepositoryContext(projectId, "Test");
+
+        ArgumentCaptor<AnalysisContext> contextCaptor =
+                ArgumentCaptor.forClass(AnalysisContext.class);
+        verify(repositoryContextService).build(
+                contextCaptor.capture(), any(), any(), any());
+
+        AnalysisContext ctx = contextCaptor.getValue();
+        assertEquals(1, ctx.knowledgeRelations().size());
+        assertEquals(KnowledgeRelationType.INFORMED_BY,
+                ctx.knowledgeRelations().getFirst().relationType());
+        assertEquals(EntityType.CHALLENGE,
+                ctx.knowledgeRelations().getFirst().sourceEntityType());
     }
 }

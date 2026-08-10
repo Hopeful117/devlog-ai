@@ -91,7 +91,9 @@ public class AnalysisContextServiceImpl implements AnalysisContextService {
                 relatedDecisions,
                 recentMilestones,
                 projectContext.validatedProposals(), evolution,
-                projectContext.validatedEngineeringEvents()
+                projectContext.validatedEngineeringEvents(),
+                projectContext.openChallenges(),
+                projectContext.knowledgeRelations()
         );
     }
 

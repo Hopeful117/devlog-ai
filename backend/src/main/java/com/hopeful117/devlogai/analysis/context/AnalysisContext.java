@@ -31,7 +31,11 @@ public record AnalysisContext(
         List<ValidatedProposalSnapshot> validatedProposals,
         EvolutionContext evolutionContext,
         List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
-                validatedEngineeringEvents
+                validatedEngineeringEvents,
+        List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.ChallengeSnapshot>
+                openChallenges,
+        List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.KnowledgeRelationSnapshot>
+                knowledgeRelations
 ) {
     public AnalysisContext {
         facts = List.copyOf(facts);
@@ -43,6 +47,8 @@ public record AnalysisContext(
         recentMilestones = List.copyOf(recentMilestones);
         validatedProposals = List.copyOf(validatedProposals);
         validatedEngineeringEvents = List.copyOf(validatedEngineeringEvents);
+        openChallenges = List.copyOf(openChallenges);
+        knowledgeRelations = List.copyOf(knowledgeRelations);
     }
 
     public AnalysisContext(ProjectSnapshot project, AnalysisSnapshot analysis,
@@ -53,7 +59,7 @@ public record AnalysisContext(
             List<ValidatedProposalSnapshot> validatedProposals) {
         this(project, analysis, projectProfile, facts, observations, recentKnowledgeEvents,
                 relatedAnalyses, architectureArtifacts, relatedDecisions, recentMilestones,
-                validatedProposals, null, List.of());
+                validatedProposals, null, List.of(), List.of(), List.of());
     }
 
     public AnalysisContext(ProjectSnapshot project, AnalysisSnapshot analysis,
@@ -64,7 +70,7 @@ public record AnalysisContext(
             List<ValidatedProposalSnapshot> validatedProposals, EvolutionContext evolutionContext) {
         this(project, analysis, projectProfile, facts, observations, recentKnowledgeEvents,
                 relatedAnalyses, architectureArtifacts, relatedDecisions, recentMilestones,
-                validatedProposals, evolutionContext, List.of());
+                validatedProposals, evolutionContext, List.of(), List.of(), List.of());
     }
 
     public record EvolutionContext(String contextVersion, UUID projectId, UUID sourceId,
