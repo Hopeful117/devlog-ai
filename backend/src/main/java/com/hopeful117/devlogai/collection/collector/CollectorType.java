@@ -7,5 +7,6 @@ public enum CollectorType {
     SPRING,
     DOCKER,
     DOCUMENTATION,
-    TEST_STRUCTURE
+    TEST_STRUCTURE,
+    COMMIT_SCOPED
 }

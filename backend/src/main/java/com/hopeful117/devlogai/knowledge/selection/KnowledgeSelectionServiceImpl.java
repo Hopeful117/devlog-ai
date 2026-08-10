@@ -118,6 +118,9 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
 
     private int factScore(String intentId, AnalysisContext.FactSnapshot value) {
         String type = value.type().name();
+        if (intentId.equals("analyze-engineering-event"))
+            return containsAny(type, "COMMIT_DIFF_SUMMARY", "COMMIT_CHANGES_MODULE",
+                    "COMMIT_ADDS_FEATURE", "COMMIT_FIXES_BUG", "COMMIT_REFACTORS_CODE") ? 100 : 10;
         if (intentId.equals("architecture-overview"))
             return containsAny(type, "SPRING", DOCKER, "REST", BUILD, "MODULE") ? 100 : 10;
         if (intentId.equals("generate-readme"))

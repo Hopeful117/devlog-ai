@@ -2,6 +2,11 @@ package com.hopeful117.devlogai.fact.entity;
 
 public enum FactType {
     COMMIT,
+    COMMIT_DIFF_SUMMARY,
+    COMMIT_CHANGES_MODULE,
+    COMMIT_ADDS_FEATURE,
+    COMMIT_FIXES_BUG,
+    COMMIT_REFACTORS_CODE,
     FILE_CHANGE,
     DEPENDENCY_CHANGE,
     CODE_METRIC,
