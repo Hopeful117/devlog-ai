@@ -6,9 +6,13 @@ import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.artifact.entity.Artifact;
 import com.hopeful117.devlogai.artifact.entity.ArtifactType;
 import com.hopeful117.devlogai.artifact.repository.ArtifactRepository;
+import com.hopeful117.devlogai.challenge.entity.Challenge;
+import com.hopeful117.devlogai.challenge.repository.ChallengeRepository;
 import com.hopeful117.devlogai.decision.entity.Decision;
 import com.hopeful117.devlogai.decision.repository.DecisionRepository;
 import com.hopeful117.devlogai.knowledge.entity.KnowledgeEvent;
+import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelation;
+import com.hopeful117.devlogai.knowledge.relation.repository.KnowledgeRelationRepository;
 import com.hopeful117.devlogai.knowledge.repository.KnowledgeEventRepository;
 import com.hopeful117.devlogai.milestone.entity.Milestone;
 import com.hopeful117.devlogai.milestone.repository.MilestoneRepository;
@@ -39,6 +43,8 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     static final int MAX_RECENT_MILESTONES = 10;
     static final int MAX_RELATED_ANALYSES = 10;
     static final int MAX_VALIDATED_ENGINEERING_EVENTS = 10;
+    static final int MAX_OPEN_CHALLENGES = 20;
+    static final int MAX_KNOWLEDGE_RELATIONS = 50;
 
     private static final List<ArtifactType> ARCHITECTURE_ARTIFACT_TYPES = List.of(
             ArtifactType.API,
@@ -56,6 +62,8 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     private final MilestoneRepository milestoneRepository;
     private final AnalysisRepository analysisRepository;
     private final EngineeringEventRepository engineeringEventRepository;
+    private final ChallengeRepository challengeRepository;
+    private final KnowledgeRelationRepository knowledgeRelationRepository;
 
     @Override
     public ProjectContextSnapshot build(UUID projectId) {
@@ -106,10 +114,25 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                         .stream()
                         .map(this::toAnalysisSnapshot)
                         .toList();
+
         List<ProjectContextSnapshot.EngineeringEventSnapshot> engineeringEvents =
                 engineeringEventRepository.findRecentByProjectIdOrderByOccurredAtDescTargetCommitDescIdAsc(
                                 projectId, PageRequest.of(0, MAX_VALIDATED_ENGINEERING_EVENTS))
                         .stream().map(this::toEngineeringEvent).toList();
+
+        List<ProjectContextSnapshot.ChallengeSnapshot> openChallenges =
+                challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId)
+                        .stream()
+                        .limit(MAX_OPEN_CHALLENGES)
+                        .map(this::toChallengeSnapshot)
+                        .toList();
+
+        List<ProjectContextSnapshot.KnowledgeRelationSnapshot> knowledgeRelations =
+                knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId)
+                        .stream()
+                        .limit(MAX_KNOWLEDGE_RELATIONS)
+                        .map(this::toKnowledgeRelationSnapshot)
+                        .toList();
 
         return new ProjectContextSnapshot(
                 toProjectSnapshot(project),
@@ -120,7 +143,9 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                 relatedDecisions,
                 recentMilestones,
                 recentAnalyses,
-                engineeringEvents
+                engineeringEvents,
+                openChallenges,
+                knowledgeRelations
         );
     }
 
@@ -129,6 +154,24 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                 event.getCategory().name(), event.getTitle(), event.getSummary(),
                 event.getSource().getId(), event.getBaseCommit(), event.getTargetCommit(),
                 event.getOccurredAt(), event.getProposal().getId());
+    }
+
+    private ProjectContextSnapshot.ChallengeSnapshot toChallengeSnapshot(Challenge challenge) {
+        return new ProjectContextSnapshot.ChallengeSnapshot(
+                challenge.getId(), challenge.getTitle(), challenge.getDescription(),
+                challenge.getImpact(), challenge.getStatus().name(),
+                challenge.getResolution(), challenge.getCreatedAt()
+        );
+    }
+
+    private ProjectContextSnapshot.KnowledgeRelationSnapshot toKnowledgeRelationSnapshot(
+            KnowledgeRelation relation) {
+        return new ProjectContextSnapshot.KnowledgeRelationSnapshot(
+                relation.getId(), relation.getSourceEntityType(),
+                relation.getSourceEntityId(), relation.getTargetEntityType(),
+                relation.getTargetEntityId(), relation.getRelationType(),
+                relation.getDescription(), relation.getCreatedAt()
+        );
     }
 
     private AnalysisContext.ProjectSnapshot toProjectSnapshot(Project project) {

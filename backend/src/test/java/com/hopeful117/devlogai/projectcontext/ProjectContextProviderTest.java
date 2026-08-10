@@ -6,11 +6,18 @@ import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.artifact.entity.Artifact;
 import com.hopeful117.devlogai.artifact.entity.ArtifactType;
 import com.hopeful117.devlogai.artifact.repository.ArtifactRepository;
+import com.hopeful117.devlogai.challenge.entity.Challenge;
+import com.hopeful117.devlogai.challenge.entity.ChallengeStatus;
+import com.hopeful117.devlogai.challenge.repository.ChallengeRepository;
 import com.hopeful117.devlogai.decision.entity.Decision;
 import com.hopeful117.devlogai.decision.repository.DecisionRepository;
 import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
 import com.hopeful117.devlogai.knowledge.entity.KnowledgeEvent;
 import com.hopeful117.devlogai.knowledge.entity.KnowledgeEventType;
+import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
+import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelation;
+import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
+import com.hopeful117.devlogai.knowledge.relation.repository.KnowledgeRelationRepository;
 import com.hopeful117.devlogai.knowledge.repository.KnowledgeEventRepository;
 import com.hopeful117.devlogai.milestone.entity.Milestone;
 import com.hopeful117.devlogai.milestone.entity.MilestoneStatus;
@@ -53,6 +60,8 @@ class ProjectContextProviderTest {
     @Mock MilestoneRepository milestoneRepository;
     @Mock AnalysisRepository analysisRepository;
     @Mock EngineeringEventRepository engineeringEventRepository;
+    @Mock ChallengeRepository challengeRepository;
+    @Mock KnowledgeRelationRepository knowledgeRelationRepository;
 
     @InjectMocks ProjectContextProviderImpl provider;
 
@@ -91,6 +100,18 @@ class ProjectContextProviderTest {
                 .status(ProposalStatus.ACCEPTED)
                 .payload(Map.of("summary", "accepted"))
                 .createdAt(Instant.parse("2026-07-16T10:00:00Z")).build();
+        Challenge challenge = Challenge.builder()
+                .id(UUID.randomUUID()).project(project)
+                .title("Performance issue").description("Slow queries")
+                .impact("High").status(ChallengeStatus.OPEN)
+                .createdAt(Instant.parse("2026-07-15T10:00:00Z")).build();
+        KnowledgeRelation relation = KnowledgeRelation.builder()
+                .id(UUID.randomUUID()).project(project)
+                .sourceEntityType(EntityType.CHALLENGE).sourceEntityId(challenge.getId())
+                .targetEntityType(EntityType.DECISION).targetEntityId(decision.getId())
+                .relationType(KnowledgeRelationType.ADDRESSES)
+                .description("Challenge addressed by decision")
+                .createdAt(Instant.parse("2026-07-14T10:00:00Z")).build();
 
         ProjectProfileResponse profile = mock(ProjectProfileResponse.class);
 
@@ -112,6 +133,10 @@ class ProjectContextProviderTest {
                 .thenReturn(List.of(milestone));
         when(analysisRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of(analysis));
+        when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of(challenge));
+        when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of(relation));
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
 
@@ -130,6 +155,10 @@ class ProjectContextProviderTest {
         assertEquals(milestone.getId(), snapshot.recentMilestones().getFirst().id());
         assertEquals(1, snapshot.recentAnalyses().size());
         assertEquals(analysis.getId(), snapshot.recentAnalyses().getFirst().id());
+        assertEquals(1, snapshot.openChallenges().size());
+        assertEquals(challenge.getId(), snapshot.openChallenges().getFirst().id());
+        assertEquals(1, snapshot.knowledgeRelations().size());
+        assertEquals(relation.getId(), snapshot.knowledgeRelations().getFirst().id());
     }
 
     @Test
@@ -156,6 +185,10 @@ class ProjectContextProviderTest {
                 .thenReturn(List.of());
         when(analysisRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
+        when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
 
@@ -167,6 +200,8 @@ class ProjectContextProviderTest {
         assertTrue(snapshot.relatedDecisions().isEmpty());
         assertTrue(snapshot.recentMilestones().isEmpty());
         assertTrue(snapshot.recentAnalyses().isEmpty());
+        assertTrue(snapshot.openChallenges().isEmpty());
+        assertTrue(snapshot.knowledgeRelations().isEmpty());
     }
 
     @Test
@@ -192,6 +227,10 @@ class ProjectContextProviderTest {
                 eq(projectId), any(Pageable.class)))
                 .thenReturn(List.of());
         when(analysisRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
@@ -222,6 +261,10 @@ class ProjectContextProviderTest {
                 eq(projectId), any(Pageable.class)))
                 .thenReturn(List.of());
         when(analysisRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
 
         provider.build(projectId);
@@ -267,6 +310,10 @@ class ProjectContextProviderTest {
                 .thenReturn(List.of());
         when(analysisRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
+        when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
 
@@ -288,6 +335,12 @@ class ProjectContextProviderTest {
         var recentAnalyses = snapshot.recentAnalyses();
         assertThrows(UnsupportedOperationException.class,
                 () -> recentAnalyses.add(null));
+        var openChallenges = snapshot.openChallenges();
+        assertThrows(UnsupportedOperationException.class,
+                () -> openChallenges.add(null));
+        var knowledgeRelations = snapshot.knowledgeRelations();
+        assertThrows(UnsupportedOperationException.class,
+                () -> knowledgeRelations.add(null));
     }
 
     @Test
@@ -323,12 +376,117 @@ class ProjectContextProviderTest {
                 .thenReturn(List.of());
         when(analysisRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of(analysis1, analysis2));
+        when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
 
         assertEquals(2, snapshot.recentAnalyses().size());
         assertEquals(analysis1.getId(), snapshot.recentAnalyses().getFirst().id());
         assertEquals(analysis2.getId(), snapshot.recentAnalyses().getLast().id());
+    }
+
+    @Test
+    void shouldIncludeOpenChallengesInSnapshot() {
+        UUID projectId = UUID.randomUUID();
+        Project project = Project.builder()
+                .id(projectId).name("Test Project").slug("test").build();
+
+        Challenge challenge1 = Challenge.builder()
+                .id(UUID.randomUUID()).project(project)
+                .title("Performance issue").description("Slow queries")
+                .impact("High").status(ChallengeStatus.OPEN)
+                .createdAt(Instant.parse("2026-07-21T10:00:00Z")).build();
+        Challenge challenge2 = Challenge.builder()
+                .id(UUID.randomUUID()).project(project)
+                .title("Memory leak").description("Heap growing")
+                .impact("Critical").status(ChallengeStatus.OPEN)
+                .createdAt(Instant.parse("2026-07-20T10:00:00Z")).build();
+
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(projectProfileService.getLatestByProject(projectId)).thenReturn(null);
+        when(knowledgeEventRepository.findByProjectIdOrderByCreatedAtDescIdDesc(
+                eq(projectId), any(Pageable.class))).thenReturn(List.of());
+        when(proposalRepository.findByProjectIdAndStatusOrderByCreatedAtDescIdDesc(
+                eq(projectId), eq(ProposalStatus.ACCEPTED), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(artifactRepository.findByProjectIdAndTypeInOrderByCreatedAtDescIdDesc(
+                eq(projectId), anyList(), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(decisionRepository.findByProjectIdOrderByCreatedAtDescIdDesc(
+                eq(projectId), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(milestoneRepository.findByProjectIdOrderByStartedAtDescIdDesc(
+                eq(projectId), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(analysisRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of(challenge1, challenge2));
+        when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+
+        ProjectContextSnapshot snapshot = provider.build(projectId);
+
+        assertEquals(2, snapshot.openChallenges().size());
+        assertEquals(challenge1.getId(), snapshot.openChallenges().getFirst().id());
+        assertEquals(challenge2.getId(), snapshot.openChallenges().getLast().id());
+        assertEquals("Performance issue", snapshot.openChallenges().getFirst().title());
+        assertEquals("OPEN", snapshot.openChallenges().getFirst().status());
+    }
+
+    @Test
+    void shouldIncludeKnowledgeRelationsInSnapshot() {
+        UUID projectId = UUID.randomUUID();
+        Project project = Project.builder()
+                .id(projectId).name("Test Project").slug("test").build();
+
+        UUID sourceId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+
+        KnowledgeRelation relation = KnowledgeRelation.builder()
+                .id(UUID.randomUUID()).project(project)
+                .sourceEntityType(EntityType.CHALLENGE).sourceEntityId(sourceId)
+                .targetEntityType(EntityType.DECISION).targetEntityId(targetId)
+                .relationType(KnowledgeRelationType.ADDRESSES)
+                .description("Challenge addressed by decision")
+                .createdAt(Instant.parse("2026-07-21T10:00:00Z")).build();
+
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(projectProfileService.getLatestByProject(projectId)).thenReturn(null);
+        when(knowledgeEventRepository.findByProjectIdOrderByCreatedAtDescIdDesc(
+                eq(projectId), any(Pageable.class))).thenReturn(List.of());
+        when(proposalRepository.findByProjectIdAndStatusOrderByCreatedAtDescIdDesc(
+                eq(projectId), eq(ProposalStatus.ACCEPTED), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(artifactRepository.findByProjectIdAndTypeInOrderByCreatedAtDescIdDesc(
+                eq(projectId), anyList(), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(decisionRepository.findByProjectIdOrderByCreatedAtDescIdDesc(
+                eq(projectId), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(milestoneRepository.findByProjectIdOrderByStartedAtDescIdDesc(
+                eq(projectId), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(analysisRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of(relation));
+
+        ProjectContextSnapshot snapshot = provider.build(projectId);
+
+        assertEquals(1, snapshot.knowledgeRelations().size());
+        assertEquals(relation.getId(), snapshot.knowledgeRelations().getFirst().id());
+        assertEquals(EntityType.CHALLENGE, snapshot.knowledgeRelations().getFirst().sourceEntityType());
+        assertEquals(sourceId, snapshot.knowledgeRelations().getFirst().sourceEntityId());
+        assertEquals(EntityType.DECISION, snapshot.knowledgeRelations().getFirst().targetEntityType());
+        assertEquals(targetId, snapshot.knowledgeRelations().getFirst().targetEntityId());
+        assertEquals(KnowledgeRelationType.ADDRESSES, snapshot.knowledgeRelations().getFirst().relationType());
+        assertEquals("Challenge addressed by decision", snapshot.knowledgeRelations().getFirst().description());
     }
 
     @Test
