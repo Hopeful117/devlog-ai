@@ -62,6 +62,7 @@ class ProjectContextProviderTest {
     @Mock EngineeringEventRepository engineeringEventRepository;
     @Mock ChallengeRepository challengeRepository;
     @Mock KnowledgeRelationRepository knowledgeRelationRepository;
+    @Mock com.hopeful117.devlogai.story.repository.EngineeringStoryRepository engineeringStoryRepository;
 
     @InjectMocks ProjectContextProviderImpl provider;
 
@@ -137,6 +138,8 @@ class ProjectContextProviderTest {
                 .thenReturn(List.of(challenge));
         when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of(relation));
+        when(engineeringStoryRepository.findByProject_IdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
 
@@ -189,6 +192,8 @@ class ProjectContextProviderTest {
                 .thenReturn(List.of());
         when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
+        when(engineeringStoryRepository.findByProject_IdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
 
@@ -232,6 +237,8 @@ class ProjectContextProviderTest {
                 .thenReturn(List.of());
         when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
+        when(engineeringStoryRepository.findByProject_IdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
 
@@ -265,6 +272,8 @@ class ProjectContextProviderTest {
         when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
         when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(engineeringStoryRepository.findByProject_IdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
 
         provider.build(projectId);
@@ -313,6 +322,8 @@ class ProjectContextProviderTest {
         when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
         when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(engineeringStoryRepository.findByProject_IdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
@@ -380,6 +391,8 @@ class ProjectContextProviderTest {
                 .thenReturn(List.of());
         when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
+        when(engineeringStoryRepository.findByProject_IdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
 
         ProjectContextSnapshot snapshot = provider.build(projectId);
 
@@ -426,6 +439,8 @@ class ProjectContextProviderTest {
         when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of(challenge1, challenge2));
         when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(engineeringStoryRepository.findByProject_IdOrderByCreatedAtDesc(projectId))
                 .thenReturn(List.of());
 
         ProjectContextSnapshot snapshot = provider.build(projectId);

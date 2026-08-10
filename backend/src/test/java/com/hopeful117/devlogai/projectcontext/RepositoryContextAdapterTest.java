@@ -50,7 +50,7 @@ class RepositoryContextAdapterTest {
         return new ProjectContextSnapshot(
                 project, null, List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of());
     }
 
     private ProjectContextSnapshot snapshotWithKnowledge(UUID projectId) {
@@ -80,7 +80,7 @@ class RepositoryContextAdapterTest {
         return new ProjectContextSnapshot(
                 project, null, List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(),
-                List.of(event), List.of(challenge), List.of(relation));
+                List.of(event), List.of(challenge), List.of(relation), List.of());
     }
 
     @Test

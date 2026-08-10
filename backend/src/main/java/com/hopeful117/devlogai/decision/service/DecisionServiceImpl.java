@@ -18,6 +18,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Service
 public class DecisionServiceImpl implements  DecisionService{
+
+    private static final String DECISION = "Decision";
+
     private final DecisionRepository decisionRepository;
 
     private final ProjectRepository projectRepository;
@@ -55,7 +58,7 @@ public class DecisionServiceImpl implements  DecisionService{
         Decision decision = decisionRepository.findById(id)
                 .orElseThrow(() ->
                         new EntityNotFoundException(
-                                "Decision",
+                                DECISION,
                                 id
                         )
                 );
@@ -75,7 +78,7 @@ public class DecisionServiceImpl implements  DecisionService{
         Decision decision = decisionRepository.findById(id)
                 .orElseThrow(() ->
                         new EntityNotFoundException(
-                                "Decision",
+                                DECISION,
                                 id
                         )
                 );
@@ -99,7 +102,7 @@ public class DecisionServiceImpl implements  DecisionService{
         Decision decision = decisionRepository.findById(id)
                 .orElseThrow(() ->
                         new EntityNotFoundException(
-                                "Decision",
+                                DECISION,
                                 id
                         )
                 );

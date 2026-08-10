@@ -106,7 +106,8 @@ public class RepositoryContextAdapter {
                 null,
                 snapshot.validatedEngineeringEvents(),
                 snapshot.openChallenges(),
-                snapshot.knowledgeRelations());
+                snapshot.knowledgeRelations(),
+                snapshot.engineeringStories());
     }
 
     private IntentDefinition createIntentDefinition(String storyDescription) {

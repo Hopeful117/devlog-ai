@@ -20,7 +20,8 @@ public record ProjectContextSnapshot(
         List<AnalysisContext.AnalysisSnapshot> recentAnalyses,
         List<EngineeringEventSnapshot> validatedEngineeringEvents,
         List<ChallengeSnapshot> openChallenges,
-        List<KnowledgeRelationSnapshot> knowledgeRelations
+        List<KnowledgeRelationSnapshot> knowledgeRelations,
+        List<EngineeringStorySnapshot> engineeringStories
 ) {
     public ProjectContextSnapshot {
         recentKnowledgeEvents = List.copyOf(recentKnowledgeEvents);
@@ -32,6 +33,7 @@ public record ProjectContextSnapshot(
         validatedEngineeringEvents = List.copyOf(validatedEngineeringEvents);
         openChallenges = List.copyOf(openChallenges);
         knowledgeRelations = List.copyOf(knowledgeRelations);
+        engineeringStories = List.copyOf(engineeringStories);
     }
 
     public ProjectContextSnapshot(AnalysisContext.ProjectSnapshot project,
@@ -44,7 +46,7 @@ public record ProjectContextSnapshot(
             List<AnalysisContext.AnalysisSnapshot> recentAnalyses) {
         this(project, latestProjectProfile, recentKnowledgeEvents, validatedProposals,
                 architectureArtifacts, relatedDecisions, recentMilestones, recentAnalyses,
-                List.of(), List.of(), List.of());
+                List.of(), List.of(), List.of(), List.of());
     }
 
     public record EngineeringEventSnapshot(UUID id, String category, String title,
@@ -57,4 +59,8 @@ public record ProjectContextSnapshot(
     public record KnowledgeRelationSnapshot(UUID id, EntityType sourceEntityType,
             UUID sourceEntityId, EntityType targetEntityType, UUID targetEntityId,
             KnowledgeRelationType relationType, String description, Instant createdAt) { }
+
+    public record EngineeringStorySnapshot(UUID id, UUID projectId, Integer storyNumber,
+            String title, String status, String storyPath, String baseCommit, String targetCommit,
+            Instant createdAt, Instant completedAt) { }
 }

@@ -25,6 +25,8 @@ import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.engineeringevent.EngineeringEvent;
 import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
+import com.hopeful117.devlogai.story.entity.EngineeringStory;
+import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,7 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     static final int MAX_VALIDATED_ENGINEERING_EVENTS = 10;
     static final int MAX_OPEN_CHALLENGES = 20;
     static final int MAX_KNOWLEDGE_RELATIONS = 50;
+    static final int MAX_ENGINEERING_STORIES = 20;
 
     private static final List<ArtifactType> ARCHITECTURE_ARTIFACT_TYPES = List.of(
             ArtifactType.API,
@@ -64,6 +67,7 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     private final EngineeringEventRepository engineeringEventRepository;
     private final ChallengeRepository challengeRepository;
     private final KnowledgeRelationRepository knowledgeRelationRepository;
+    private final EngineeringStoryRepository engineeringStoryRepository;
 
     @Override
     public ProjectContextSnapshot build(UUID projectId) {
@@ -134,6 +138,13 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                         .map(this::toKnowledgeRelationSnapshot)
                         .toList();
 
+        List<ProjectContextSnapshot.EngineeringStorySnapshot> engineeringStories =
+                engineeringStoryRepository.findByProject_IdOrderByCreatedAtDesc(projectId)
+                        .stream()
+                        .limit(MAX_ENGINEERING_STORIES)
+                        .map(this::toEngineeringStorySnapshot)
+                        .toList();
+
         return new ProjectContextSnapshot(
                 toProjectSnapshot(project),
                 latestProfile,
@@ -145,7 +156,8 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                 recentAnalyses,
                 engineeringEvents,
                 openChallenges,
-                knowledgeRelations
+                knowledgeRelations,
+                engineeringStories
         );
     }
 
@@ -171,6 +183,16 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                 relation.getSourceEntityId(), relation.getTargetEntityType(),
                 relation.getTargetEntityId(), relation.getRelationType(),
                 relation.getDescription(), relation.getCreatedAt()
+        );
+    }
+
+    private ProjectContextSnapshot.EngineeringStorySnapshot toEngineeringStorySnapshot(
+            EngineeringStory story) {
+        return new ProjectContextSnapshot.EngineeringStorySnapshot(
+                story.getId(), story.getProject().getId(), story.getStoryNumber(),
+                story.getTitle(), story.getStatus().name(), story.getStoryPath(),
+                story.getBaseCommit(), story.getTargetCommit(),
+                story.getCreatedAt(), story.getCompletedAt()
         );
     }
 
