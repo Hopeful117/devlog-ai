@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.decision.controller;
 
 import com.hopeful117.devlogai.decision.dto.request.CreateDecisionRequest;
+import com.hopeful117.devlogai.decision.dto.request.UpdateDecisionRequest;
 import com.hopeful117.devlogai.decision.dto.response.DecisionResponse;
 import com.hopeful117.devlogai.decision.service.DecisionService;
 import jakarta.validation.Valid;
@@ -17,6 +18,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DecisionController {
     private final DecisionService decisionService;
+
     @PostMapping
     public ResponseEntity<DecisionResponse> create(
             @Valid @RequestBody CreateDecisionRequest request) {
@@ -24,17 +26,14 @@ public class DecisionController {
         DecisionResponse response =
                 decisionService.create(request);
 
-
         URI location = URI.create(
                 "/api/v1/decisions/" + response.id()
         );
-
 
         return ResponseEntity
                 .created(location)
                 .body(response);
     }
-
 
     @GetMapping("/{id}")
     public ResponseEntity<DecisionResponse> getById(
@@ -45,7 +44,6 @@ public class DecisionController {
         );
     }
 
-
     @GetMapping("/project/{projectId}")
     public ResponseEntity<List<DecisionResponse>> getByProject(
             @PathVariable UUID projectId) {
@@ -53,5 +51,23 @@ public class DecisionController {
         return ResponseEntity.ok(
                 decisionService.getByProject(projectId)
         );
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<DecisionResponse> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateDecisionRequest request) {
+
+        return ResponseEntity.ok(
+                decisionService.update(id, request)
+        );
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+
+        decisionService.delete(id);
+
+        return ResponseEntity.noContent().build();
     }
 }

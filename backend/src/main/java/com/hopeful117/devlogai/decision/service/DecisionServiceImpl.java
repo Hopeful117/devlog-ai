@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.decision.service;
 
 import com.hopeful117.devlogai.decision.dto.request.CreateDecisionRequest;
+import com.hopeful117.devlogai.decision.dto.request.UpdateDecisionRequest;
 import com.hopeful117.devlogai.decision.dto.response.DecisionResponse;
 import com.hopeful117.devlogai.decision.entity.Decision;
 import com.hopeful117.devlogai.decision.mapper.DecisionMapper;
@@ -47,6 +48,39 @@ public class DecisionServiceImpl implements  DecisionService{
 
 
         return decisionMapper.toResponse(savedDecision);
+    }
+
+    @Override
+    public DecisionResponse update(UUID id, UpdateDecisionRequest request) {
+        Decision decision = decisionRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException(
+                                "Decision",
+                                id
+                        )
+                );
+
+        decision.setTitle(request.getTitle());
+        decision.setContext(request.getContext());
+        decision.setChoice(request.getChoice());
+        decision.setRationale(request.getRationale());
+        decision.setConsequences(request.getConsequences());
+
+        Decision savedDecision = decisionRepository.save(decision);
+        return decisionMapper.toResponse(savedDecision);
+    }
+
+    @Override
+    public void delete(UUID id) {
+        Decision decision = decisionRepository.findById(id)
+                .orElseThrow(() ->
+                        new EntityNotFoundException(
+                                "Decision",
+                                id
+                        )
+                );
+
+        decisionRepository.delete(decision);
     }
 
     @Override

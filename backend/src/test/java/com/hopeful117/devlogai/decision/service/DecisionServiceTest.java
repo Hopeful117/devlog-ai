@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.decision.service;
 
 import com.hopeful117.devlogai.decision.dto.request.CreateDecisionRequest;
+import com.hopeful117.devlogai.decision.dto.request.UpdateDecisionRequest;
 import com.hopeful117.devlogai.decision.dto.response.DecisionResponse;
 import com.hopeful117.devlogai.decision.entity.Decision;
 import com.hopeful117.devlogai.decision.mapper.DecisionMapper;
@@ -231,5 +232,133 @@ class DecisionServiceTest {
 
         verify(decisionMapper, never())
                 .toResponse(any());
+    }
+
+
+    @Test
+    void shouldUpdateDecisionSuccessfully() {
+
+        UUID id = UUID.randomUUID();
+
+        Decision decision = new Decision();
+        decision.setTitle("Old Title");
+        decision.setContext("Old Context");
+        decision.setChoice("Old Choice");
+        decision.setRationale("Old Rationale");
+
+        UpdateDecisionRequest request = new UpdateDecisionRequest();
+        request.setTitle("New Title");
+        request.setContext("New Context");
+        request.setChoice("New Choice");
+        request.setRationale("New Rationale");
+        request.setConsequences("New Consequences");
+
+        Decision savedDecision = new Decision();
+
+        DecisionResponse response =
+                new DecisionResponse(
+                        id,
+                        UUID.randomUUID(),
+                        "New Title",
+                        "New Context",
+                        "New Choice",
+                        "New Rationale",
+                        "New Consequences",
+                        null,
+                        null
+                );
+
+
+        when(decisionRepository.findById(id))
+                .thenReturn(Optional.of(decision));
+        when(decisionRepository.save(decision))
+                .thenReturn(savedDecision);
+        when(decisionMapper.toResponse(savedDecision))
+                .thenReturn(response);
+
+
+        DecisionResponse result =
+                decisionService.update(id, request);
+
+
+        assertEquals(response, result);
+        assertEquals("New Title", decision.getTitle());
+        assertEquals("New Context", decision.getContext());
+        assertEquals("New Choice", decision.getChoice());
+        assertEquals("New Rationale", decision.getRationale());
+        assertEquals("New Consequences", decision.getConsequences());
+
+
+        verify(decisionRepository).findById(id);
+        verify(decisionRepository).save(decision);
+        verify(decisionMapper).toResponse(savedDecision);
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenUpdatingNonExistentDecision() {
+
+        UUID id = UUID.randomUUID();
+
+        UpdateDecisionRequest request = new UpdateDecisionRequest();
+        request.setTitle("Title");
+        request.setContext("Context");
+        request.setChoice("Choice");
+        request.setRationale("Rationale");
+
+
+        when(decisionRepository.findById(id))
+                .thenReturn(Optional.empty());
+
+
+        assertThrows(
+                EntityNotFoundException.class,
+                () -> decisionService.update(id, request)
+        );
+
+
+        verify(decisionRepository).findById(id);
+        verify(decisionRepository, never()).save(any());
+    }
+
+
+    @Test
+    void shouldDeleteDecisionSuccessfully() {
+
+        UUID id = UUID.randomUUID();
+
+        Decision decision = new Decision();
+
+
+        when(decisionRepository.findById(id))
+                .thenReturn(Optional.of(decision));
+
+
+        decisionService.delete(id);
+
+
+        verify(decisionRepository).findById(id);
+        verify(decisionRepository).delete(decision);
+    }
+
+
+    @Test
+    void shouldThrowExceptionWhenDeletingNonExistentDecision() {
+
+        UUID id = UUID.randomUUID();
+
+
+        when(decisionRepository.findById(id))
+                .thenReturn(Optional.empty());
+
+
+        assertThrows(
+                EntityNotFoundException.class,
+                () -> decisionService.delete(id)
+        );
+
+
+        verify(decisionRepository).findById(id);
+        verify(decisionRepository, never()).delete(any());
     }
 }
