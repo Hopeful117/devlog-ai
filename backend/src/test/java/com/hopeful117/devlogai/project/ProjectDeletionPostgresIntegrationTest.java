@@ -75,7 +75,7 @@ class ProjectDeletionPostgresIntegrationTest {
         assertEquals(1, count("sources", retainedSource));
         assertEquals(1, count("project_commits", retainedCommit));
         assertEquals(1, count("commit_changed_files", retainedCommit, "project_commit_id"));
-        assertEquals("33", jdbc.queryForObject(
+        assertEquals("34", jdbc.queryForObject(
                 "select version from flyway_schema_history where success order by installed_rank desc limit 1",
                 String.class));
     }
