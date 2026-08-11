@@ -104,7 +104,7 @@ public class SecureRepositoryContentReader {
             }
         });
         try {
-            return read.get(limits.getCollectorTimeout().toMillis(), TimeUnit.MILLISECONDS);
+            return read.get(limits.getCollectorTimeout().toNanos(), TimeUnit.NANOSECONDS);
         } catch (ExecutionException exception) {
             Throwable cause = exception.getCause();
             if (cause instanceof IOException ioException) throw ioException;
