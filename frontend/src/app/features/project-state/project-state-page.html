@@ -1,0 +1,206 @@
+<section class="overview" aria-labelledby="overview-title">
+  @if (viewModel$ | async; as viewModel) {
+    @switch (viewModel.state) {
+      @case ('loading') {
+        <p role="status">Loading project state…</p>
+      }
+      @case ('not-found') {
+        <div role="alert" class="state state--error">
+          <h1 id="overview-title">Project not found</h1>
+          <p>No project matches this address.</p>
+        </div>
+      }
+      @case ('error') {
+        <div role="alert" class="state state--error">
+          <h1 id="overview-title">Project state unavailable</h1>
+          <p>{{ viewModel.error.message }}</p>
+        </div>
+      }
+      @case ('loaded') {
+        <header class="overview-header">
+          <div>
+            <p class="eyebrow">Project overview</p>
+            <h1 id="overview-title">{{ viewModel.project.name }}</h1>
+            <p>{{ viewModel.project.description || 'Deterministic project state projection.' }}</p>
+          </div>
+        </header>
+
+        <!-- Section 1: What are we trying to achieve? -->
+        <section class="overview-section panel" aria-labelledby="section-objective">
+          <h2 id="section-objective">What are we trying to achieve?</h2>
+          @if (viewModel.state.objective.description) {
+            <p class="section-description">{{ viewModel.state.objective.description }}</p>
+          }
+          @if (viewModel.state.objective.currentMilestone) {
+            <div class="section-item">
+              <span class="eyebrow">Current milestone</span>
+              <strong>{{ viewModel.state.objective.currentMilestone.name }}</strong>
+              <span class="status-badge">{{ viewModel.state.objective.currentMilestone.status }}</span>
+            </div>
+          }
+          @if (viewModel.state.objective.activeStory) {
+            <div class="section-item">
+              <span class="eyebrow">Active story</span>
+              <strong>#{{ viewModel.state.objective.activeStory.number }} — {{ viewModel.state.objective.activeStory.title }}</strong>
+            </div>
+          }
+          @if (viewModel.state.objective.openChallenges.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Open challenges</span>
+              <ul>
+                @for (challenge of viewModel.state.objective.openChallenges; track challenge.id) {
+                  <li><strong>{{ challenge.title }}</strong> — {{ challenge.impact || 'No impact defined' }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (!viewModel.state.objective.description && !viewModel.state.objective.currentMilestone && !viewModel.state.objective.activeStory && viewModel.state.objective.openChallenges.length === 0) {
+            <p class="empty-state">No objective data available.</p>
+          }
+        </section>
+
+        <!-- Section 2: What is being developed? -->
+        <section class="overview-section panel" aria-labelledby="section-active">
+          <h2 id="section-active">What is being developed?</h2>
+          @if (viewModel.state.activeWork.inProgressStories.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">In-progress stories</span>
+              <ul>
+                @for (story of viewModel.state.activeWork.inProgressStories; track story.id) {
+                  <li><strong>#{{ story.number }} — {{ story.title }}</strong></li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.activeWork.openChallenges.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Open challenges</span>
+              <ul>
+                @for (challenge of viewModel.state.activeWork.openChallenges; track challenge.id) {
+                  <li><strong>{{ challenge.title }}</strong> — {{ challenge.impact || 'No impact defined' }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.activeWork.proposedProposals.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Proposed proposals</span>
+              <ul>
+                @for (proposal of viewModel.state.activeWork.proposedProposals; track proposal.id) {
+                  <li><strong>{{ proposal.type }}</strong> — {{ proposal.confidence ? (proposal.confidence | number:'1.0-0') + '% confidence' : 'No confidence' }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.activeWork.inProgressStories.length === 0 && viewModel.state.activeWork.openChallenges.length === 0 && viewModel.state.activeWork.proposedProposals.length === 0) {
+            <p class="empty-state">No active work.</p>
+          }
+        </section>
+
+        <!-- Section 3: What just changed? -->
+        <section class="overview-section panel" aria-labelledby="section-changes">
+          <h2 id="section-changes">What just changed?</h2>
+          @if (viewModel.state.recentChanges.completedStories.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Recently completed stories</span>
+              <ul>
+                @for (story of viewModel.state.recentChanges.completedStories; track story.id) {
+                  <li><strong>#{{ story.number }} — {{ story.title }}</strong></li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.recentChanges.recentDecisions.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Recent decisions</span>
+              <ul>
+                @for (decision of viewModel.state.recentChanges.recentDecisions; track decision.id) {
+                  <li><strong>{{ decision.title }}</strong> — {{ decision.choice }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.recentChanges.recentCommits.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Recent commits</span>
+              <ul>
+                @for (commit of viewModel.state.recentChanges.recentCommits; track commit.id) {
+                  <li><strong>{{ commit.commitHash.substring(0, 7) }}</strong> — {{ commit.subject }} ({{ commit.filesChanged }} files)</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.recentChanges.completedStories.length === 0 && viewModel.state.recentChanges.recentDecisions.length === 0 && viewModel.state.recentChanges.recentCommits.length === 0) {
+            <p class="empty-state">No recent changes.</p>
+          }
+        </section>
+
+        <!-- Section 4: What comes next? -->
+        <section class="overview-section panel" aria-labelledby="section-roadmap">
+          <h2 id="section-roadmap">What comes next?</h2>
+          @if (viewModel.state.roadmapProgress.plannedMilestones.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Planned milestones</span>
+              <ul>
+                @for (milestone of viewModel.state.roadmapProgress.plannedMilestones; track milestone.id) {
+                  <li><strong>{{ milestone.name }}</strong> — {{ milestone.status }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.roadmapProgress.registeredStories.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Registered stories</span>
+              <ul>
+                @for (story of viewModel.state.roadmapProgress.registeredStories; track story.id) {
+                  <li><strong>#{{ story.number }} — {{ story.title }}</strong></li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.roadmapProgress.plannedMilestones.length === 0 && viewModel.state.roadmapProgress.registeredStories.length === 0) {
+            <p class="empty-state">No roadmap data.</p>
+          }
+        </section>
+
+        <!-- Section 5: What needs my action? -->
+        <section class="overview-section panel" aria-labelledby="section-actions">
+          <h2 id="section-actions">What needs my action?</h2>
+          @if (viewModel.state.pendingActions.proposedProposals.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Proposed proposals</span>
+              <ul>
+                @for (proposal of viewModel.state.pendingActions.proposedProposals; track proposal.id) {
+                  <li><strong>{{ proposal.type }}</strong> — {{ proposal.confidence ? (proposal.confidence | number:'1.0-0') + '% confidence' : 'No confidence' }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.pendingActions.openChallenges.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Open challenges</span>
+              <ul>
+                @for (challenge of viewModel.state.pendingActions.openChallenges; track challenge.id) {
+                  <li><strong>{{ challenge.title }}</strong> — {{ challenge.impact || 'No impact defined' }}</li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.pendingActions.unstartedStories.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Unstarted stories</span>
+              <ul>
+                @for (story of viewModel.state.pendingActions.unstartedStories; track story.id) {
+                  <li><strong>#{{ story.number }} — {{ story.title }}</strong></li>
+                }
+              </ul>
+            </div>
+          }
+          @if (viewModel.state.pendingActions.proposedProposals.length === 0 && viewModel.state.pendingActions.openChallenges.length === 0 && viewModel.state.pendingActions.unstartedStories.length === 0) {
+            <p class="empty-state">No pending actions.</p>
+          }
+        </section>
+      }
+    }
+  }
+</section>

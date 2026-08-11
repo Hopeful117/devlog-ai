@@ -26,6 +26,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'overview',
+        loadComponent: () =>
+          import('./features/project-state/project-state-page').then(
+            (module) => module.ProjectStatePage,
+          ),
+      },
+      {
         path: 'events',
         loadComponent: () =>
           import('./features/engineering-events/engineering-events-page').then(

@@ -13,4 +13,9 @@ public interface EngineeringStoryRepository extends JpaRepository<EngineeringSto
     List<EngineeringStory> findByProject_Id(UUID projectId);
 
     List<EngineeringStory> findByProject_IdOrderByCreatedAtDesc(UUID projectId);
+
+    List<EngineeringStory> findByProject_IdAndStatusOrderByCreatedAtDesc(
+            UUID projectId,
+            com.hopeful117.devlogai.story.entity.StoryStatus status
+    );
 }
