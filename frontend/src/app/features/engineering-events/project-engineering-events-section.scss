@@ -1,7 +1,39 @@
-.event-section { margin: 2rem 0; padding: 1.5rem; border: 1px solid var(--border); border-radius: 1rem; }
-.heading { display: flex; justify-content: space-between; gap: 1rem; align-items: start; }
-form { display: grid; gap: .65rem; max-width: 48rem; margin: 1rem 0; }
-input, select { padding: .7rem; }
-ul { padding-left: 1.25rem; } li { margin: .65rem 0; } small { display: block; }
-.error { color: var(--danger); }
-@media (max-width: 40rem) { .heading { display: block; } }
+.event-section {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+.heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+}
+form {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 48rem;
+  margin: 1rem 0;
+}
+input,
+select {
+  padding: 0.7rem;
+}
+ul {
+  padding-left: 1.25rem;
+}
+li {
+  margin: 0.65rem 0;
+}
+small {
+  display: block;
+}
+.error {
+  color: var(--danger);
+}
+@media (max-width: 40rem) {
+  .heading {
+    display: block;
+  }
+}

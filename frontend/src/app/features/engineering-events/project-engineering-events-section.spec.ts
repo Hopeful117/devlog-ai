@@ -54,7 +54,16 @@ describe('ProjectEngineeringEventsSection', () => {
 
   it('loads and renders the latest validated events', async () => {
     byProject.mockReturnValue(
-      of(page([{ id: 'e1', title: 'Introduced caching', category: 'TECHNOLOGY_CHANGE', occurredAt: '2026-08-01T10:00:00Z' }])),
+      of(
+        page([
+          {
+            id: 'e1',
+            title: 'Introduced caching',
+            category: 'TECHNOLOGY_CHANGE',
+            occurredAt: '2026-08-01T10:00:00Z',
+          },
+        ]),
+      ),
     );
     const fixture = await render();
 

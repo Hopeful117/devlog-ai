@@ -28,19 +28,27 @@ export class ProjectEngineeringEventsSection implements OnChanges {
   });
   readonly events$ = this.reload.pipe(
     startWith(undefined),
-    switchMap(() => this.service.byProject(this.projectId, 0, 5).pipe(
-      map((page) => ({ state: 'loaded' as const, page })),
-      catchError((error) => of({ state: 'error' as const, error: toRequestError(error, 'analysis') })),
-      startWith({ state: 'loading' as const }),
-    )),
+    switchMap(() =>
+      this.service.byProject(this.projectId, 0, 5).pipe(
+        map((page) => ({ state: 'loaded' as const, page })),
+        catchError((error) =>
+          of({ state: 'error' as const, error: toRequestError(error, 'analysis') }),
+        ),
+        startWith({ state: 'loading' as const }),
+      ),
+    ),
     shareReplay({ bufferSize: 1, refCount: true }),
   );
   readonly execution$ = this.executions.pipe(
-    exhaustMap((request) => this.service.execute(this.projectId, request.sourceId, request.targetCommit).pipe(
-      map((result) => ({ state: 'success' as const, result })),
-      catchError((error) => of({ state: 'error' as const, error: toRequestError(error, 'analysis') })),
-      startWith({ state: 'pending' as const }),
-    )),
+    exhaustMap((request) =>
+      this.service.execute(this.projectId, request.sourceId, request.targetCommit).pipe(
+        map((result) => ({ state: 'success' as const, result })),
+        catchError((error) =>
+          of({ state: 'error' as const, error: toRequestError(error, 'analysis') }),
+        ),
+        startWith({ state: 'pending' as const }),
+      ),
+    ),
     startWith({ state: 'idle' as const }),
     shareReplay({ bufferSize: 1, refCount: true }),
   );

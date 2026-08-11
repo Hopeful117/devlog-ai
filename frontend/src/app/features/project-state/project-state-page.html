@@ -35,26 +35,42 @@
             <div class="section-item">
               <span class="eyebrow">Current milestone</span>
               <strong>{{ viewModel.projectState.objective.currentMilestone.name }}</strong>
-              <span class="status-badge">{{ viewModel.projectState.objective.currentMilestone.status }}</span>
+              <span class="status-badge">{{
+                viewModel.projectState.objective.currentMilestone.status
+              }}</span>
             </div>
           }
           @if (viewModel.projectState.objective.activeStory) {
             <div class="section-item">
               <span class="eyebrow">Active story</span>
-              <strong>#{{ viewModel.projectState.objective.activeStory.number }} — {{ viewModel.projectState.objective.activeStory.title }}</strong>
+              <strong
+                >#{{ viewModel.projectState.objective.activeStory.number }} —
+                {{ viewModel.projectState.objective.activeStory.title }}</strong
+              >
             </div>
           }
           @if (viewModel.projectState.objective.openChallenges.length > 0) {
             <div class="section-item">
               <span class="eyebrow">Open challenges</span>
               <ul>
-                @for (challenge of viewModel.projectState.objective.openChallenges; track challenge.id) {
-                  <li><strong>{{ challenge.title }}</strong> — {{ challenge.impact || 'No impact defined' }}</li>
+                @for (
+                  challenge of viewModel.projectState.objective.openChallenges;
+                  track challenge.id
+                ) {
+                  <li>
+                    <strong>{{ challenge.title }}</strong> —
+                    {{ challenge.impact || 'No impact defined' }}
+                  </li>
                 }
               </ul>
             </div>
           }
-          @if (!viewModel.projectState.objective.description && !viewModel.projectState.objective.currentMilestone && !viewModel.projectState.objective.activeStory && viewModel.projectState.objective.openChallenges.length === 0) {
+          @if (
+            !viewModel.projectState.objective.description &&
+            !viewModel.projectState.objective.currentMilestone &&
+            !viewModel.projectState.objective.activeStory &&
+            viewModel.projectState.objective.openChallenges.length === 0
+          ) {
             <p class="empty-state">No objective data available.</p>
           }
         </section>
@@ -66,8 +82,13 @@
             <div class="section-item">
               <span class="eyebrow">In-progress stories</span>
               <ul>
-                @for (story of viewModel.projectState.activeWork.inProgressStories; track story.id) {
-                  <li><strong>#{{ story.number }} — {{ story.title }}</strong></li>
+                @for (
+                  story of viewModel.projectState.activeWork.inProgressStories;
+                  track story.id
+                ) {
+                  <li>
+                    <strong>#{{ story.number }} — {{ story.title }}</strong>
+                  </li>
                 }
               </ul>
             </div>
@@ -76,8 +97,14 @@
             <div class="section-item">
               <span class="eyebrow">Open challenges</span>
               <ul>
-                @for (challenge of viewModel.projectState.activeWork.openChallenges; track challenge.id) {
-                  <li><strong>{{ challenge.title }}</strong> — {{ challenge.impact || 'No impact defined' }}</li>
+                @for (
+                  challenge of viewModel.projectState.activeWork.openChallenges;
+                  track challenge.id
+                ) {
+                  <li>
+                    <strong>{{ challenge.title }}</strong> —
+                    {{ challenge.impact || 'No impact defined' }}
+                  </li>
                 }
               </ul>
             </div>
@@ -86,13 +113,27 @@
             <div class="section-item">
               <span class="eyebrow">Proposed proposals</span>
               <ul>
-                @for (proposal of viewModel.projectState.activeWork.proposedProposals; track proposal.id) {
-                  <li><strong>{{ proposal.type }}</strong> — {{ proposal.confidence ? (proposal.confidence | number:'1.0-0') + '% confidence' : 'No confidence' }}</li>
+                @for (
+                  proposal of viewModel.projectState.activeWork.proposedProposals;
+                  track proposal.id
+                ) {
+                  <li>
+                    <strong>{{ proposal.type }}</strong> —
+                    {{
+                      proposal.confidence
+                        ? (proposal.confidence | number: '1.0-0') + '% confidence'
+                        : 'No confidence'
+                    }}
+                  </li>
                 }
               </ul>
             </div>
           }
-          @if (viewModel.projectState.activeWork.inProgressStories.length === 0 && viewModel.projectState.activeWork.openChallenges.length === 0 && viewModel.projectState.activeWork.proposedProposals.length === 0) {
+          @if (
+            viewModel.projectState.activeWork.inProgressStories.length === 0 &&
+            viewModel.projectState.activeWork.openChallenges.length === 0 &&
+            viewModel.projectState.activeWork.proposedProposals.length === 0
+          ) {
             <p class="empty-state">No active work.</p>
           }
         </section>
@@ -104,8 +145,13 @@
             <div class="section-item">
               <span class="eyebrow">Recently completed stories</span>
               <ul>
-                @for (story of viewModel.projectState.recentChanges.completedStories; track story.id) {
-                  <li><strong>#{{ story.number }} — {{ story.title }}</strong></li>
+                @for (
+                  story of viewModel.projectState.recentChanges.completedStories;
+                  track story.id
+                ) {
+                  <li>
+                    <strong>#{{ story.number }} — {{ story.title }}</strong>
+                  </li>
                 }
               </ul>
             </div>
@@ -114,8 +160,13 @@
             <div class="section-item">
               <span class="eyebrow">Recent decisions</span>
               <ul>
-                @for (decision of viewModel.projectState.recentChanges.recentDecisions; track decision.id) {
-                  <li><strong>{{ decision.title }}</strong> — {{ decision.choice }}</li>
+                @for (
+                  decision of viewModel.projectState.recentChanges.recentDecisions;
+                  track decision.id
+                ) {
+                  <li>
+                    <strong>{{ decision.title }}</strong> — {{ decision.choice }}
+                  </li>
                 }
               </ul>
             </div>
@@ -124,13 +175,23 @@
             <div class="section-item">
               <span class="eyebrow">Recent commits</span>
               <ul>
-                @for (commit of viewModel.projectState.recentChanges.recentCommits; track commit.id) {
-                  <li><strong>{{ commit.commitHash.substring(0, 7) }}</strong> — {{ commit.subject }} ({{ commit.filesChanged }} files)</li>
+                @for (
+                  commit of viewModel.projectState.recentChanges.recentCommits;
+                  track commit.id
+                ) {
+                  <li>
+                    <strong>{{ commit.commitHash.substring(0, 7) }}</strong> —
+                    {{ commit.subject }} ({{ commit.filesChanged }} files)
+                  </li>
                 }
               </ul>
             </div>
           }
-          @if (viewModel.projectState.recentChanges.completedStories.length === 0 && viewModel.projectState.recentChanges.recentDecisions.length === 0 && viewModel.projectState.recentChanges.recentCommits.length === 0) {
+          @if (
+            viewModel.projectState.recentChanges.completedStories.length === 0 &&
+            viewModel.projectState.recentChanges.recentDecisions.length === 0 &&
+            viewModel.projectState.recentChanges.recentCommits.length === 0
+          ) {
             <p class="empty-state">No recent changes.</p>
           }
         </section>
@@ -142,8 +203,13 @@
             <div class="section-item">
               <span class="eyebrow">Planned milestones</span>
               <ul>
-                @for (milestone of viewModel.projectState.roadmapProgress.plannedMilestones; track milestone.id) {
-                  <li><strong>{{ milestone.name }}</strong> — {{ milestone.status }}</li>
+                @for (
+                  milestone of viewModel.projectState.roadmapProgress.plannedMilestones;
+                  track milestone.id
+                ) {
+                  <li>
+                    <strong>{{ milestone.name }}</strong> — {{ milestone.status }}
+                  </li>
                 }
               </ul>
             </div>
@@ -152,13 +218,21 @@
             <div class="section-item">
               <span class="eyebrow">Registered stories</span>
               <ul>
-                @for (story of viewModel.projectState.roadmapProgress.registeredStories; track story.id) {
-                  <li><strong>#{{ story.number }} — {{ story.title }}</strong></li>
+                @for (
+                  story of viewModel.projectState.roadmapProgress.registeredStories;
+                  track story.id
+                ) {
+                  <li>
+                    <strong>#{{ story.number }} — {{ story.title }}</strong>
+                  </li>
                 }
               </ul>
             </div>
           }
-          @if (viewModel.projectState.roadmapProgress.plannedMilestones.length === 0 && viewModel.projectState.roadmapProgress.registeredStories.length === 0) {
+          @if (
+            viewModel.projectState.roadmapProgress.plannedMilestones.length === 0 &&
+            viewModel.projectState.roadmapProgress.registeredStories.length === 0
+          ) {
             <p class="empty-state">No roadmap data.</p>
           }
         </section>
@@ -170,8 +244,18 @@
             <div class="section-item">
               <span class="eyebrow">Proposed proposals</span>
               <ul>
-                @for (proposal of viewModel.projectState.pendingActions.proposedProposals; track proposal.id) {
-                  <li><strong>{{ proposal.type }}</strong> — {{ proposal.confidence ? (proposal.confidence | number:'1.0-0') + '% confidence' : 'No confidence' }}</li>
+                @for (
+                  proposal of viewModel.projectState.pendingActions.proposedProposals;
+                  track proposal.id
+                ) {
+                  <li>
+                    <strong>{{ proposal.type }}</strong> —
+                    {{
+                      proposal.confidence
+                        ? (proposal.confidence | number: '1.0-0') + '% confidence'
+                        : 'No confidence'
+                    }}
+                  </li>
                 }
               </ul>
             </div>
@@ -180,8 +264,14 @@
             <div class="section-item">
               <span class="eyebrow">Open challenges</span>
               <ul>
-                @for (challenge of viewModel.projectState.pendingActions.openChallenges; track challenge.id) {
-                  <li><strong>{{ challenge.title }}</strong> — {{ challenge.impact || 'No impact defined' }}</li>
+                @for (
+                  challenge of viewModel.projectState.pendingActions.openChallenges;
+                  track challenge.id
+                ) {
+                  <li>
+                    <strong>{{ challenge.title }}</strong> —
+                    {{ challenge.impact || 'No impact defined' }}
+                  </li>
                 }
               </ul>
             </div>
@@ -190,13 +280,22 @@
             <div class="section-item">
               <span class="eyebrow">Unstarted stories</span>
               <ul>
-                @for (story of viewModel.projectState.pendingActions.unstartedStories; track story.id) {
-                  <li><strong>#{{ story.number }} — {{ story.title }}</strong></li>
+                @for (
+                  story of viewModel.projectState.pendingActions.unstartedStories;
+                  track story.id
+                ) {
+                  <li>
+                    <strong>#{{ story.number }} — {{ story.title }}</strong>
+                  </li>
                 }
               </ul>
             </div>
           }
-          @if (viewModel.projectState.pendingActions.proposedProposals.length === 0 && viewModel.projectState.pendingActions.openChallenges.length === 0 && viewModel.projectState.pendingActions.unstartedStories.length === 0) {
+          @if (
+            viewModel.projectState.pendingActions.proposedProposals.length === 0 &&
+            viewModel.projectState.pendingActions.openChallenges.length === 0 &&
+            viewModel.projectState.pendingActions.unstartedStories.length === 0
+          ) {
             <p class="empty-state">No pending actions.</p>
           }
         </section>

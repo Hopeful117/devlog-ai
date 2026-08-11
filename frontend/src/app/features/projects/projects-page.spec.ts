@@ -104,9 +104,11 @@ describe('ProjectsPage', () => {
   });
 
   it('surfaces a creation error and stays idle', async () => {
-    const createProject = vi.fn().mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 500, statusText: 'Server Error' })),
-    );
+    const createProject = vi
+      .fn()
+      .mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 500, statusText: 'Server Error' })),
+      );
     await render(of([]), createProject);
     const fixture = TestBed.createComponent(ProjectsPage);
     const router = TestBed.inject(Router);

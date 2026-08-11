@@ -40,9 +40,7 @@ describe('ProjectStateService', () => {
 
     service.getProjectState(projectId).subscribe((value) => (result = value));
 
-    const request = http.expectOne(
-      `http://core.test/api/v1/projects/${projectId}/state`,
-    );
+    const request = http.expectOne(`http://core.test/api/v1/projects/${projectId}/state`);
     expect(request.request.method).toBe('GET');
     request.flush(state);
     expect(result).toEqual(state);

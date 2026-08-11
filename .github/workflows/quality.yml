@@ -80,6 +80,14 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Format check
+        working-directory: frontend
+        run: npm run format:check
+
       - name: Run unit tests with coverage (headless)
         working-directory: frontend
         run: npx ng test --coverage --watch=false
@@ -94,10 +102,10 @@ jobs:
         run: |
           echo "=== Frontend Coverage ==="
           python3 -c "
-          import json, glob
+          import json, glob, sys
           paths = glob.glob('coverage/**/coverage-final.json')
           if not paths:
-              print('❌ No coverage JSON found'); exit(1)
+              print('❌ No coverage JSON found'); sys.exit(1)
           with open(paths[0]) as f:
               report = json.load(f)
           st_total = st_hit = fn_total = fn_hit = br_total = br_hit = 0
@@ -127,6 +135,11 @@ jobs:
                               ('Branches', br_hit, br_total),
                               ('Lines', line_covered, line_total)]:
               print(f'  {label}: {h}/{t} ({pc(h, t)})')
+          line_pc = line_covered / line_total if line_total else 0
+          if line_pc < 0.75:
+              print(f'❌ FAIL: Lines coverage {line_pc:.1%} < 75% required')
+              sys.exit(1)
+          print(f'✅ PASS: Lines coverage {line_pc:.1%} >= 75%')
           "
 
       - name: Upload frontend coverage report

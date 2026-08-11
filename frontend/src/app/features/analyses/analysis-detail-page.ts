@@ -16,14 +16,7 @@ import {
 } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../core/config/app-environment';
 import { RequestError, toRequestError } from '../../core/http/request-error';
-import {
-  AnalysisDetail,
-  AnalysisDiagnostics,
-  AiTaskDetail,
-  CollectionWarning,
-  JsonValue,
-  ProjectProfile,
-} from './analysis.models';
+import { AnalysisDetail, AnalysisDiagnostics, AiTaskDetail } from './analysis.models';
 import { AnalysisService } from './analysis.service';
 import { AnalysisInsightsSection } from '../insights/analysis-insights-section';
 import { LoadingIndicator } from '../../shared/components/loading-indicator';

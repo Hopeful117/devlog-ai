@@ -69,11 +69,10 @@ export interface ProposalReviewEvidence {
   readonly content: string | null;
   readonly provenance: string | null;
 }
-export interface ProposalReviewItem
-  extends Omit<
-    ProposalFields,
-    'insight' | 'supportingFactIds' | 'supportingObservationIds'
-  > {
+export interface ProposalReviewItem extends Omit<
+  ProposalFields,
+  'insight' | 'supportingFactIds' | 'supportingObservationIds'
+> {
   readonly sourceIndex: number | null;
   readonly facts: readonly ProposalReviewEvidence[];
   readonly observations: readonly ProposalReviewEvidence[];

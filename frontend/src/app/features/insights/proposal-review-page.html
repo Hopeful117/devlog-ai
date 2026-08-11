@@ -42,13 +42,17 @@
                 {{ item.payload['title'] || item.type.replaceAll('_', ' ') + ' proposal' }}
               </h2>
               <app-status-badge [value]="item.status" />
-              <p><strong>{{ item.type.replaceAll('_', ' ') }}</strong></p>
+              <p>
+                <strong>{{ item.type.replaceAll('_', ' ') }}</strong>
+              </p>
               <p>{{ item.payload['summary'] }}</p>
               @if (item.type === 'ENGINEERING_EVENT') {
-                <h3>Significance</h3><p>{{ item.payload['significance'] }}</p>
+                <h3>Significance</h3>
+                <p>{{ item.payload['significance'] }}</p>
                 <p><strong>Category:</strong> {{ item.payload['category'] }}</p>
               } @else {
-                <h3>Rationale</h3><p>{{ item.payload['rationale'] || 'Not provided' }}</p>
+                <h3>Rationale</h3>
+                <p>{{ item.payload['rationale'] || 'Not provided' }}</p>
               }
               <h3>Facts</h3>
               <ul>
@@ -128,8 +132,13 @@
                   <a [routerLink]="['/insights', item.insight.id]">{{ item.insight.title }}</a>
                 }
                 @if (item.engineeringEvent) {
-                  <a [routerLink]="['/engineering-events', item.engineeringEvent.id]">{{ item.engineeringEvent.title }}</a>
-                  <p><code>{{ item.engineeringEvent.baseCommit.slice(0, 8) }}</code> → <code>{{ item.engineeringEvent.targetCommit.slice(0, 8) }}</code></p>
+                  <a [routerLink]="['/engineering-events', item.engineeringEvent.id]">{{
+                    item.engineeringEvent.title
+                  }}</a>
+                  <p>
+                    <code>{{ item.engineeringEvent.baseCommit.slice(0, 8) }}</code> →
+                    <code>{{ item.engineeringEvent.targetCommit.slice(0, 8) }}</code>
+                  </p>
                 }
               }
             </aside>

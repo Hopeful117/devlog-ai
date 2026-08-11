@@ -11,7 +11,11 @@ type OverviewViewState =
   | { readonly state: 'loading' }
   | {
       readonly state: 'loaded';
-      readonly project: { readonly id: string; readonly name: string; readonly description: string | null };
+      readonly project: {
+        readonly id: string;
+        readonly name: string;
+        readonly description: string | null;
+      };
       readonly projectState: import('./project-state.models').ProjectState;
     }
   | { readonly state: 'not-found' }

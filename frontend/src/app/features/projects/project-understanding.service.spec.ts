@@ -15,10 +15,7 @@ describe('ProjectUnderstandingService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [
-        ProjectUnderstandingService,
-        { provide: APP_ENVIRONMENT, useValue: mockEnv },
-      ],
+      providers: [ProjectUnderstandingService, { provide: APP_ENVIRONMENT, useValue: mockEnv }],
     });
     service = TestBed.inject(ProjectUnderstandingService);
     httpMock = TestBed.inject(HttpTestingController);

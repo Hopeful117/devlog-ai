@@ -56,8 +56,20 @@ describe('EngineeringEventsPage', () => {
     byProject.mockReturnValue(
       of(
         page([
-          { id: 'e1', title: 'Introduced caching', summary: 'Redis cache', category: 'TECHNOLOGY_CHANGE', occurredAt: '2026-08-01T10:00:00Z' },
-          { id: 'e2', title: 'Fixed login', summary: 'Auth fix', category: 'BUG_RESOLUTION', occurredAt: '2026-08-02T10:00:00Z' },
+          {
+            id: 'e1',
+            title: 'Introduced caching',
+            summary: 'Redis cache',
+            category: 'TECHNOLOGY_CHANGE',
+            occurredAt: '2026-08-01T10:00:00Z',
+          },
+          {
+            id: 'e2',
+            title: 'Fixed login',
+            summary: 'Auth fix',
+            category: 'BUG_RESOLUTION',
+            occurredAt: '2026-08-02T10:00:00Z',
+          },
         ]),
       ),
     );
@@ -80,9 +92,7 @@ describe('EngineeringEventsPage', () => {
 
   it('renders an error state when the event fetch fails', async () => {
     getProject.mockReturnValue(of(project));
-    byProject.mockReturnValue(
-      throwError(() => new Error('boom')),
-    );
+    byProject.mockReturnValue(throwError(() => new Error('boom')));
     const element = await render();
 
     expect(element.querySelector('[role="alert"]')).toBeTruthy();
