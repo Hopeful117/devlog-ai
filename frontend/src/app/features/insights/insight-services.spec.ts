@@ -85,4 +85,18 @@ describe('Insight review services', () => {
       request.flush([]);
     }
   });
+  it('builds every Insight project filter suffix combination', () => {
+    insights.getInsightsByProject('p', 'ARCHITECTURAL').subscribe();
+    insights.getInsightsByProject('p', undefined, 'CRITICAL').subscribe();
+    insights.getInsightsByProject('p').subscribe();
+    for (const url of [
+      '/api/v1/insights/project/p/type/ARCHITECTURAL',
+      '/api/v1/insights/project/p/severity/CRITICAL',
+      '/api/v1/insights/project/p',
+    ]) {
+      const request = http.expectOne(url);
+      expect(request.request.method).toBe('GET');
+      request.flush([]);
+    }
+  });
 });

@@ -94,4 +94,78 @@ describe('ProposalReviewPage', () => {
     expect(accept).toHaveBeenCalledTimes(1);
     expect(getReview).toHaveBeenCalledTimes(2);
   });
+  it('submits an acceptance with the reviewer identity and resets the form', () => {
+    const fixture = render();
+    const component = fixture.componentInstance;
+    component.form.controls.validatedBy.setValue(reviewer);
+    component.form.controls.comment.setValue('  looks good  ');
+    component.confirmation = 'ACCEPTED';
+    component.decide(item);
+    expect(accept).toHaveBeenCalledWith('proposal-id', {
+      validatedBy: reviewer,
+      comment: 'looks good',
+      insightSeverity: 'INFO',
+    });
+    expect(component.confirmation).toBeNull();
+    expect(component.form.controls.comment.value).toBe('');
+  });
+  it('rejects a proposal with the reviewer identity', () => {
+    const fixture = render();
+    const component = fixture.componentInstance;
+    component.form.controls.validatedBy.setValue(reviewer);
+    component.confirmation = 'REJECTED';
+    component.decide(item);
+    expect(reject).toHaveBeenCalledWith('proposal-id', {
+      validatedBy: reviewer,
+      comment: null,
+    });
+    expect(reject).toHaveBeenCalledTimes(1);
+  });
+  it('marks the form touched instead of submitting when invalid', () => {
+    const fixture = render();
+    const component = fixture.componentInstance;
+    component.form.controls.validatedBy.setValue('');
+    component.form.controls.validatedBy.markAsUntouched();
+    component.confirmation = 'ACCEPTED';
+    component.decide(item);
+    expect(accept).not.toHaveBeenCalled();
+    expect(component.form.controls.validatedBy.touched).toBe(true);
+  });
+  it('surfaces an error when the review fails to load', () => {
+    getReview.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    const fixture = render();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeTruthy();
+  });
+  it('select and current expose the active proposal', () => {
+    const fixture = render();
+    const component = fixture.componentInstance;
+    const other = { ...item, id: 'other-id' };
+    component.select(other);
+    expect(component.current([other, item])).toBe(other);
+  });
+  it('pages forward and backward', () => {
+    const fixture = render();
+    const component = fixture.componentInstance;
+    component.next();
+    fixture.detectChanges();
+    expect(getReview).toHaveBeenLastCalledWith('analysis-id', 1, 10);
+    component.previous();
+    fixture.detectChanges();
+    expect(getReview).toHaveBeenLastCalledWith('analysis-id', 0, 10);
+  });
+  it('does not page before the first page', () => {
+    const fixture = render();
+    const component = fixture.componentInstance;
+    component.previous();
+    fixture.detectChanges();
+    expect(getReview).toHaveBeenCalledTimes(1);
+  });
+  it('clears the reviewer session', () => {
+    const fixture = render();
+    const component = fixture.componentInstance;
+    component.form.controls.validatedBy.setValue(reviewer);
+    component.clearReviewer();
+    expect(component.form.controls.validatedBy.value).toBe('');
+  });
 });

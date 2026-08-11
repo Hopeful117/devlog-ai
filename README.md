@@ -615,9 +615,21 @@ pytest
 
 ```bash
 cd frontend
-npm test
+npm test          # unit tests (Vitest via @angular/build:unit-test)
 npm run build
 ```
+
+Frontend end-to-end tests (Playwright, target the running Docker stack at
+`http://localhost:18083`):
+
+```bash
+cd frontend
+npx playwright install chromium   # once, downloads the browser binary
+npm run e2e                       # run e2e tests
+npm run e2e:report                # open the HTML report
+```
+
+Frontend unit tests can be run headless/non-watching for CI with `npx ng test --watch=false`.
 
 ### Backend coverage and local SonarQube
 

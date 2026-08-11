@@ -99,6 +99,7 @@ public interface ProjectStateMapper {
         );
     }
 
+    @Mapping(target = "number", source = "storyNumber")
     StorySummary toStorySummary(EngineeringStory story);
 
     default List<StorySummary> toStorySummaries(List<EngineeringStory> stories) {

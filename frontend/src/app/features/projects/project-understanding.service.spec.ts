@@ -1,42 +1,93 @@
-import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-
-import { APP_ENVIRONMENT } from '../../core/config/app-environment';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { ProjectUnderstandingService } from './project-understanding.service';
+import { APP_ENVIRONMENT } from '../../core/config/app-environment';
 
 describe('ProjectUnderstandingService', () => {
-  it('launches understanding through one typed Core request', () => {
+  let service: ProjectUnderstandingService;
+  let httpMock: HttpTestingController;
+
+  const mockEnv = {
+    backendBaseUrl: 'http://localhost:18080',
+    analysisPollingIntervalMs: 2000,
+  };
+
+  beforeEach(() => {
     TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
       providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: APP_ENVIRONMENT, useValue: { backendBaseUrl: 'http://core.test' } },
+        ProjectUnderstandingService,
+        { provide: APP_ENVIRONMENT, useValue: mockEnv },
       ],
     });
-    const service = TestBed.inject(ProjectUnderstandingService);
-    const http = TestBed.inject(HttpTestingController);
-    const requestBody = { sourceId: 'source-1', targetRevision: 'main' };
-    let outcome: string | undefined;
+    service = TestBed.inject(ProjectUnderstandingService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
 
-    service.execute('project/1', requestBody).subscribe((response) => (outcome = response.outcome));
+  afterEach(() => {
+    httpMock.verify();
+  });
 
-    const request = http.expectOne(
-      'http://core.test/api/v1/projects/project%2F1/understanding-executions',
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+
+  it('should call the correct endpoint with projectId and request', () => {
+    const projectId = 'test-project-id';
+    const request = {
+      sourceId: 'source-1',
+      targetRevision: 'main',
+    };
+
+    service.execute(projectId, request).subscribe((response) => {
+      expect(response).toEqual({
+        analysisId: 'analysis-1',
+        status: 'IN_PROGRESS',
+        sourceId: 'source-1',
+        targetRevision: 'main',
+        intentId: 'describe-project',
+        intentVersion: 'v1',
+        outcome: 'CREATED',
+        sourceSnapshot: {},
+      });
+    });
+
+    const req = httpMock.expectOne(
+      `${mockEnv.backendBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/understanding-executions`,
     );
-    expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual(requestBody);
-    request.flush({
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual(request);
+    req.flush({
       analysisId: 'analysis-1',
       status: 'IN_PROGRESS',
       sourceId: 'source-1',
       targetRevision: 'main',
       intentId: 'describe-project',
       intentVersion: 'v1',
-      outcome: 'REUSED',
+      outcome: 'CREATED',
       sourceSnapshot: {},
     });
-    expect(outcome).toBe('REUSED');
-    http.verify();
+  });
+
+  it('should encode special characters in projectId', () => {
+    const projectId = 'project-with/special%chars';
+    const request = { sourceId: 'source-1' };
+
+    service.execute(projectId, request).subscribe();
+
+    const req = httpMock.expectOne(
+      `${mockEnv.backendBaseUrl}/api/v1/projects/${encodeURIComponent(projectId)}/understanding-executions`,
+    );
+    expect(req.request.url).toContain(encodeURIComponent(projectId));
+    req.flush({
+      analysisId: 'analysis-1',
+      status: 'IN_PROGRESS',
+      sourceId: 'source-1',
+      targetRevision: null,
+      intentId: 'describe-project',
+      intentVersion: 'v1',
+      outcome: 'CREATED',
+      sourceSnapshot: {},
+    });
   });
 });

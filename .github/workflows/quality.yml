@@ -1,4 +1,4 @@
-name: Backend Build and Coverage
+name: Backend and Frontend Quality
 
 on:
   pull_request:
@@ -59,4 +59,121 @@ jobs:
         with:
           name: test-results
           path: backend/target/surefire-reports/
+          retention-days: 30
+
+  frontend:
+    name: Frontend Unit Tests and Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run unit tests with coverage (headless)
+        working-directory: frontend
+        run: npx ng test --coverage --watch=false
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Display frontend coverage summary
+        if: always()
+        working-directory: frontend
+        run: |
+          echo "=== Frontend Coverage ==="
+          python3 -c "
+          import json, glob
+          paths = glob.glob('coverage/**/coverage-final.json')
+          if not paths:
+              print('❌ No coverage JSON found'); exit(1)
+          with open(paths[0]) as f:
+              report = json.load(f)
+          st_total = st_hit = fn_total = fn_hit = br_total = br_hit = 0
+          line_total = line_covered = 0
+          for path, data in report.items():
+              for sid, count in data.get('s', {}).items():
+                  st_total += 1
+                  if count: st_hit += 1
+              for fid, count in data.get('f', {}).items():
+                  fn_total += 1
+                  if count: fn_hit += 1
+              for counts in data.get('b', {}).values():
+                  for c in counts:
+                      br_total += 1
+                      if c: br_hit += 1
+              smap = data.get('statementMap', {})
+              lines = {}
+              for sid, count in data.get('s', {}).items():
+                  line = smap.get(sid, {}).get('start', {}).get('line')
+                  if line is not None:
+                      lines[line] = lines.get(line, 0) or count
+              line_total += len(lines)
+              line_covered += sum(1 for v in lines.values() if v)
+          def pc(h, t): return f'{h/t:.1%}' if t else 'n/a'
+          for label, h, t in [('Statements', st_hit, st_total),
+                              ('Functions', fn_hit, fn_total),
+                              ('Branches', br_hit, br_total),
+                              ('Lines', line_covered, line_total)]:
+              print(f'  {label}: {h}/{t} ({pc(h, t)})')
+          "
+
+      - name: Upload frontend coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 30
+
+  frontend-e2e:
+    name: Frontend E2E (SPA smoke)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Run SPA smoke test against the static build
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_SERVE: 'true'
+        run: npx playwright test tests/playwright-test.spec.ts
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
           retention-days: 30
