@@ -1,4 +1,4 @@
-# Implementation Report — Story 0030 (Project State Projection)
+# Engineering Report — Story 0030 (Project State Projection)
 
 ## Summary
 
@@ -68,6 +68,14 @@ Implemented deterministic project state projection for DevLog AI: a backend endp
 - JaCoCo coverage check skipped (jacoco.skip=true) due to pre-existing coverage threshold issue
 - Previous coverage was 79%, below 80% threshold
 - This is a pre-existing issue, not introduced by Story 0030
+
+## Architectural Decisions
+
+1. **Deterministic projection, not entity**: ProjectState is computed on demand, not persisted. No new tables, no migrations.
+2. **8 queries, no N+1**: Each section uses one repository query. Total: ~8 queries per request.
+3. **5 sections answering 5 questions**: objective, activeWork, recentChanges, roadmapProgress, pendingActions.
+4. **Fused story**: Backend + frontend merged because projection without UI has no user value.
+5. **Reuses existing patterns**: Controller → Service → Repository → Mapper → DTO, standalone Angular components, RxJS patterns.
 
 ## Acceptance Criteria Coverage
 
