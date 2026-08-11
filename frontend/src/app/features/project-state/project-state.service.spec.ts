@@ -14,6 +14,8 @@ const state: ProjectState = {
   recentChanges: { completedStories: [], recentDecisions: [], recentCommits: [] },
   roadmapProgress: { plannedMilestones: [], registeredStories: [] },
   pendingActions: { proposedProposals: [], openChallenges: [], unstartedStories: [] },
+  recentKnowledge: { recentKnowledge: [] },
+  recentEvolution: { recentEvolution: [] },
 };
 
 describe('ProjectStateService', () => {

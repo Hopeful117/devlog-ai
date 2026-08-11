@@ -40,6 +40,51 @@ export interface CommitSummary {
   readonly filesChanged: number;
 }
 
+export type KnowledgeEventType =
+  | 'FEATURE'
+  | 'BUG'
+  | 'REFACTORING'
+  | 'ARCHITECTURE'
+  | 'DOCUMENTATION'
+  | 'DEPENDENCY'
+  | 'SECURITY'
+  | 'PERFORMANCE'
+  | 'TEST'
+  | 'DEPLOYMENT'
+  | 'OTHER';
+
+export type EngineeringEventCategory =
+  | 'FEATURE_INTRODUCTION'
+  | 'BUG_RESOLUTION'
+  | 'ARCHITECTURE_CHANGE'
+  | 'TECHNOLOGY_CHANGE'
+  | 'ENGINEERING_IMPROVEMENT'
+  | 'INFRASTRUCTURE_CHANGE';
+
+export interface KnowledgeSummary {
+  readonly id: string;
+  readonly type: KnowledgeEventType;
+  readonly title: string;
+  readonly createdAt: string | null;
+}
+
+export interface EvolutionSummary {
+  readonly id: string;
+  readonly category: EngineeringEventCategory;
+  readonly title: string;
+  readonly baseCommit: string;
+  readonly targetCommit: string;
+  readonly occurredAt: string;
+}
+
+export interface RecentKnowledgeSection {
+  readonly recentKnowledge: readonly KnowledgeSummary[];
+}
+
+export interface RecentEvolutionSection {
+  readonly recentEvolution: readonly EvolutionSummary[];
+}
+
 export interface ObjectiveSection {
   readonly description: string | null;
   readonly currentMilestone: MilestoneSummary | null;
@@ -78,4 +123,6 @@ export interface ProjectState {
   readonly recentChanges: RecentChangesSection;
   readonly roadmapProgress: RoadmapProgressSection;
   readonly pendingActions: PendingActionsSection;
+  readonly recentKnowledge: RecentKnowledgeSection;
+  readonly recentEvolution: RecentEvolutionSection;
 }

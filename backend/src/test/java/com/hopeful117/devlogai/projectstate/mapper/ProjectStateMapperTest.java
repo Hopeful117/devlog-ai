@@ -1,9 +1,18 @@
 package com.hopeful117.devlogai.projectstate.mapper;
 
+import com.hopeful117.devlogai.engineeringevent.EngineeringEvent;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEventCategory;
+import com.hopeful117.devlogai.knowledge.entity.KnowledgeEvent;
+import com.hopeful117.devlogai.knowledge.entity.KnowledgeEventType;
+import com.hopeful117.devlogai.projectstate.dto.inner.EvolutionSummary;
+import com.hopeful117.devlogai.projectstate.dto.inner.KnowledgeSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.StorySummary;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.entity.StoryStatus;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -29,5 +38,57 @@ class ProjectStateMapperTest {
     @Test
     void mapsEmptyStoryListToEmptySummaryList() {
         assertEquals(0, mapper.toStorySummaries(java.util.List.of()).size());
+    }
+
+    @Test
+    void mapsKnowledgeEventToKnowledgeSummary() {
+        Instant createdAt = Instant.now();
+        KnowledgeEvent event = KnowledgeEvent.builder()
+                .id(UUID.randomUUID())
+                .type(KnowledgeEventType.ARCHITECTURE)
+                .title("Adopted hexagonal layout")
+                .createdAt(createdAt)
+                .build();
+
+        KnowledgeSummary summary = mapper.toKnowledgeSummary(event);
+
+        assertEquals(event.getId(), summary.id());
+        assertEquals(KnowledgeEventType.ARCHITECTURE, summary.type());
+        assertEquals("Adopted hexagonal layout", summary.title());
+        assertEquals(createdAt, summary.createdAt());
+    }
+
+    @Test
+    void mapsEmptyKnowledgeEventsToEmptyList() {
+        assertEquals(0, mapper.toKnowledgeSummaries(java.util.List.of()).size());
+        assertEquals(0, mapper.toRecentKnowledgeSection(java.util.List.of()).recentKnowledge().size());
+    }
+
+    @Test
+    void mapsEngineeringEventToEvolutionSummary() {
+        Instant occurredAt = Instant.now();
+        EngineeringEvent event = EngineeringEvent.builder()
+                .id(UUID.randomUUID())
+                .category(EngineeringEventCategory.BUG_RESOLUTION)
+                .title("Fixed N+1 in projection")
+                .baseCommit("92d3f1e")
+                .targetCommit("7ac09b2")
+                .occurredAt(occurredAt)
+                .build();
+
+        EvolutionSummary summary = mapper.toEvolutionSummary(event);
+
+        assertEquals(event.getId(), summary.id());
+        assertEquals(EngineeringEventCategory.BUG_RESOLUTION, summary.category());
+        assertEquals("Fixed N+1 in projection", summary.title());
+        assertEquals("92d3f1e", summary.baseCommit());
+        assertEquals("7ac09b2", summary.targetCommit());
+        assertEquals(occurredAt, summary.occurredAt());
+    }
+
+    @Test
+    void mapsEmptyEngineeringEventsToEmptyList() {
+        assertEquals(0, mapper.toEvolutionSummaries(java.util.List.of()).size());
+        assertEquals(0, mapper.toRecentEvolutionSection(java.util.List.of()).recentEvolution().size());
     }
 }

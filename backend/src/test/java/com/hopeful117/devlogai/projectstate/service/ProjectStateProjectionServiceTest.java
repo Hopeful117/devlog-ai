@@ -5,8 +5,12 @@ import com.hopeful117.devlogai.challenge.entity.ChallengeStatus;
 import com.hopeful117.devlogai.challenge.repository.ChallengeRepository;
 import com.hopeful117.devlogai.decision.entity.Decision;
 import com.hopeful117.devlogai.decision.repository.DecisionRepository;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEvent;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
 import com.hopeful117.devlogai.history.entity.ProjectCommit;
 import com.hopeful117.devlogai.history.repository.ProjectCommitRepository;
+import com.hopeful117.devlogai.knowledge.entity.KnowledgeEvent;
+import com.hopeful117.devlogai.knowledge.repository.KnowledgeEventRepository;
 import com.hopeful117.devlogai.milestone.entity.Milestone;
 import com.hopeful117.devlogai.milestone.entity.MilestoneStatus;
 import com.hopeful117.devlogai.milestone.repository.MilestoneRepository;
@@ -18,6 +22,8 @@ import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
 import com.hopeful117.devlogai.projectstate.dto.response.PendingActionsSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ProjectStateResponse;
 import com.hopeful117.devlogai.projectstate.dto.response.RecentChangesSection;
+import com.hopeful117.devlogai.projectstate.dto.response.RecentEvolutionSection;
+import com.hopeful117.devlogai.projectstate.dto.response.RecentKnowledgeSection;
 import com.hopeful117.devlogai.projectstate.dto.response.RoadmapProgressSection;
 import com.hopeful117.devlogai.projectstate.mapper.ProjectStateMapper;
 import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
@@ -62,6 +68,10 @@ class ProjectStateProjectionServiceTest {
     @Mock
     private ProjectCommitRepository commitRepository;
     @Mock
+    private KnowledgeEventRepository knowledgeEventRepository;
+    @Mock
+    private EngineeringEventRepository engineeringEventRepository;
+    @Mock
     private ProjectStateMapper mapper;
 
     @InjectMocks
@@ -98,6 +108,13 @@ class ProjectStateProjectionServiceTest {
         when(commitRepository.findByProjectIdOrderByCommittedAtDescCommitHashDesc(eq(projectId), any(PageRequest.class)))
                 .thenReturn(List.of(new ProjectCommit()));
 
+        // Recent knowledge section
+        when(knowledgeEventRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of(new KnowledgeEvent()));
+        // Recent evolution section
+        when(engineeringEventRepository.findRecentByProjectIdOrderByOccurredAtDescTargetCommitDescIdAsc(eq(projectId), any()))
+                .thenReturn(List.of(new EngineeringEvent()));
+
         // Roadmap progress section
         when(milestoneRepository.findByProjectIdAndStatusOrderByStartedAtDesc(projectId, MilestoneStatus.PLANNED))
                 .thenReturn(List.of(new Milestone()));
@@ -113,6 +130,10 @@ class ProjectStateProjectionServiceTest {
                 .thenReturn(new RoadmapProgressSection(Collections.emptyList(), Collections.emptyList()));
         when(mapper.toPendingActionsSection(any(), any(), any()))
                 .thenReturn(new PendingActionsSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
+        when(mapper.toRecentKnowledgeSection(any()))
+                .thenReturn(new RecentKnowledgeSection(Collections.emptyList()));
+        when(mapper.toRecentEvolutionSection(any()))
+                .thenReturn(new RecentEvolutionSection(Collections.emptyList()));
 
         ProjectStateResponse expectedResponse = new ProjectStateResponse(
                 projectId,
@@ -121,9 +142,11 @@ class ProjectStateProjectionServiceTest {
                 new ActiveWorkSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RecentChangesSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RoadmapProgressSection(Collections.emptyList(), Collections.emptyList()),
-                new PendingActionsSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList())
+                new PendingActionsSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
+                new RecentKnowledgeSection(Collections.emptyList()),
+                new RecentEvolutionSection(Collections.emptyList())
         );
-        when(mapper.toResponse(any(), any(), any(), any(), any(), any()))
+        when(mapper.toResponse(any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(expectedResponse);
 
         ProjectStateResponse response = service.getProjectState(projectId);
@@ -132,6 +155,8 @@ class ProjectStateProjectionServiceTest {
         assertEquals(projectId, response.projectId());
         assertEquals("Test Project", response.projectName());
         verify(projectRepository).findById(projectId);
+        verify(mapper).toRecentKnowledgeSection(any());
+        verify(mapper).toRecentEvolutionSection(any());
     }
 
     @Test
@@ -159,6 +184,10 @@ class ProjectStateProjectionServiceTest {
                 .thenReturn(Collections.emptyList());
         when(commitRepository.findByProjectIdOrderByCommittedAtDescCommitHashDesc(any(), any()))
                 .thenReturn(Collections.emptyList());
+        when(knowledgeEventRepository.findByProjectIdOrderByCreatedAtDesc(any()))
+                .thenReturn(Collections.emptyList());
+        when(engineeringEventRepository.findRecentByProjectIdOrderByOccurredAtDescTargetCommitDescIdAsc(any(), any()))
+                .thenReturn(Collections.emptyList());
 
         when(mapper.toObjectiveSection(any(), any(), any(), any()))
                 .thenReturn(new ObjectiveSection(null, null, null, Collections.emptyList()));
@@ -170,6 +199,10 @@ class ProjectStateProjectionServiceTest {
                 .thenReturn(new RoadmapProgressSection(Collections.emptyList(), Collections.emptyList()));
         when(mapper.toPendingActionsSection(any(), any(), any()))
                 .thenReturn(new PendingActionsSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
+        when(mapper.toRecentKnowledgeSection(any()))
+                .thenReturn(new RecentKnowledgeSection(Collections.emptyList()));
+        when(mapper.toRecentEvolutionSection(any()))
+                .thenReturn(new RecentEvolutionSection(Collections.emptyList()));
 
         ProjectStateResponse expectedResponse = new ProjectStateResponse(
                 projectId,
@@ -178,9 +211,11 @@ class ProjectStateProjectionServiceTest {
                 new ActiveWorkSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RecentChangesSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RoadmapProgressSection(Collections.emptyList(), Collections.emptyList()),
-                new PendingActionsSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList())
+                new PendingActionsSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
+                new RecentKnowledgeSection(Collections.emptyList()),
+                new RecentEvolutionSection(Collections.emptyList())
         );
-        when(mapper.toResponse(any(), any(), any(), any(), any(), any()))
+        when(mapper.toResponse(any(), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(expectedResponse);
 
         ProjectStateResponse response = service.getProjectState(projectId);

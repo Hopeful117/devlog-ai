@@ -299,6 +299,44 @@
             <p class="empty-state">No pending actions.</p>
           }
         </section>
+
+        <!-- Section 6: What have we learned recently? -->
+        <section class="overview-section panel" aria-labelledby="section-knowledge">
+          <h2 id="section-knowledge">What have we learned recently?</h2>
+          @if (viewModel.projectState.recentKnowledge.recentKnowledge.length > 0) {
+            <ul>
+              @for (item of viewModel.projectState.recentKnowledge.recentKnowledge; track item.id) {
+                <li>
+                  <span class="status-badge">{{ item.type }}</span>
+                  <strong>{{ item.title }}</strong>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="empty-state">No recent knowledge.</p>
+          }
+        </section>
+
+        <!-- Section 7: What recently changed? -->
+        <section class="overview-section panel" aria-labelledby="section-evolution">
+          <h2 id="section-evolution">What recently changed?</h2>
+          @if (viewModel.projectState.recentEvolution.recentEvolution.length > 0) {
+            <ul>
+              @for (item of viewModel.projectState.recentEvolution.recentEvolution; track item.id) {
+                <li>
+                  <span class="status-badge">{{ item.category }}</span>
+                  <strong>{{ item.title }}</strong>
+                  <span class="commit-range"
+                    >{{ item.baseCommit.substring(0, 7) }} →
+                    {{ item.targetCommit.substring(0, 7) }}</span
+                  >
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="empty-state">No recent evolution.</p>
+          }
+        </section>
       }
     }
   }

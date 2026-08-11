@@ -16,6 +16,8 @@ const emptyState: ProjectState = {
   recentChanges: { completedStories: [], recentDecisions: [], recentCommits: [] },
   roadmapProgress: { plannedMilestones: [], registeredStories: [] },
   pendingActions: { proposedProposals: [], openChallenges: [], unstartedStories: [] },
+  recentKnowledge: { recentKnowledge: [] },
+  recentEvolution: { recentEvolution: [] },
 };
 
 const project = { id: 'p1', name: 'DevLog AI', description: 'Docs platform' };
@@ -102,6 +104,64 @@ describe('ProjectStatePage', () => {
     const element = await render();
 
     expect(element.textContent).toContain('Project state unavailable');
+  });
+
+  it('renders the recent knowledge section', async () => {
+    const state: ProjectState = {
+      ...emptyState,
+      recentKnowledge: {
+        recentKnowledge: [
+          { id: 'k1', type: 'ARCHITECTURE', title: 'Adopted hexagonal layout', createdAt: null },
+        ],
+      },
+    };
+    getProject.mockReturnValue(of(project));
+    getProjectState.mockReturnValue(of(state));
+    const element = await render();
+
+    const section = element.querySelector('#section-knowledge')?.parentElement;
+    expect(section?.textContent).toContain('What have we learned recently?');
+    expect(section?.textContent).toContain('ARCHITECTURE');
+    expect(section?.textContent).toContain('Adopted hexagonal layout');
+  });
+
+  it('renders the recent evolution section with commit range', async () => {
+    const state: ProjectState = {
+      ...emptyState,
+      recentEvolution: {
+        recentEvolution: [
+          {
+            id: 'e1',
+            category: 'BUG_RESOLUTION',
+            title: 'Fixed N+1 in projection',
+            baseCommit: '92d3f1eabcd123456789',
+            targetCommit: '7ac09b2cdef987654321',
+            occurredAt: '2026-08-11T12:00:00Z',
+          },
+        ],
+      },
+    };
+    getProject.mockReturnValue(of(project));
+    getProjectState.mockReturnValue(of(state));
+    const element = await render();
+
+    const section = element.querySelector('#section-evolution')?.parentElement;
+    expect(section?.textContent).toContain('What recently changed?');
+    expect(section?.textContent).toContain('BUG_RESOLUTION');
+    expect(section?.textContent).toContain('Fixed N+1 in projection');
+    expect(section?.textContent).toContain('92d3f1e');
+    expect(section?.textContent).toContain('7ac09b2');
+  });
+
+  it('renders empty states for the new sections when empty', async () => {
+    getProject.mockReturnValue(of(project));
+    getProjectState.mockReturnValue(of(emptyState));
+    const element = await render();
+
+    const knowledge = element.querySelector('#section-knowledge')?.parentElement;
+    const evolution = element.querySelector('#section-evolution')?.parentElement;
+    expect(knowledge?.textContent).toContain('No recent knowledge.');
+    expect(evolution?.textContent).toContain('No recent evolution.');
   });
 
   it('does not implement an imperative subscription', () => {

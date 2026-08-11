@@ -2,12 +2,16 @@ package com.hopeful117.devlogai.projectstate.mapper;
 
 import com.hopeful117.devlogai.challenge.entity.Challenge;
 import com.hopeful117.devlogai.decision.entity.Decision;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEvent;
 import com.hopeful117.devlogai.history.entity.ProjectCommit;
+import com.hopeful117.devlogai.knowledge.entity.KnowledgeEvent;
 import com.hopeful117.devlogai.milestone.entity.Milestone;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.projectstate.dto.inner.ChallengeSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.CommitSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.DecisionSummary;
+import com.hopeful117.devlogai.projectstate.dto.inner.EvolutionSummary;
+import com.hopeful117.devlogai.projectstate.dto.inner.KnowledgeSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.MilestoneSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.ProposalSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.StorySummary;
@@ -16,6 +20,8 @@ import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
 import com.hopeful117.devlogai.projectstate.dto.response.PendingActionsSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ProjectStateResponse;
 import com.hopeful117.devlogai.projectstate.dto.response.RecentChangesSection;
+import com.hopeful117.devlogai.projectstate.dto.response.RecentEvolutionSection;
+import com.hopeful117.devlogai.projectstate.dto.response.RecentKnowledgeSection;
 import com.hopeful117.devlogai.projectstate.dto.response.RoadmapProgressSection;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
@@ -30,13 +36,17 @@ public interface ProjectStateMapper {
 
     @Mapping(target = "projectId", source = "project.id")
     @Mapping(target = "projectName", source = "project.name")
+    @Mapping(target = "recentKnowledge", source = "recentKnowledgeSection")
+    @Mapping(target = "recentEvolution", source = "recentEvolutionSection")
     ProjectStateResponse toResponse(
             Project project,
             ObjectiveSection objective,
             ActiveWorkSection activeWork,
             RecentChangesSection recentChanges,
             RoadmapProgressSection roadmapProgress,
-            PendingActionsSection pendingActions
+            PendingActionsSection pendingActions,
+            RecentKnowledgeSection recentKnowledgeSection,
+            RecentEvolutionSection recentEvolutionSection
     );
 
     default ObjectiveSection toObjectiveSection(
@@ -152,5 +162,31 @@ public interface ProjectStateMapper {
             return Collections.emptyList();
         }
         return commits.stream().map(this::toCommitSummary).toList();
+    }
+
+    KnowledgeSummary toKnowledgeSummary(KnowledgeEvent event);
+
+    default List<KnowledgeSummary> toKnowledgeSummaries(List<KnowledgeEvent> events) {
+        if (events == null || events.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return events.stream().map(this::toKnowledgeSummary).toList();
+    }
+
+    default RecentKnowledgeSection toRecentKnowledgeSection(List<KnowledgeEvent> events) {
+        return new RecentKnowledgeSection(toKnowledgeSummaries(events));
+    }
+
+    EvolutionSummary toEvolutionSummary(EngineeringEvent event);
+
+    default List<EvolutionSummary> toEvolutionSummaries(List<EngineeringEvent> events) {
+        if (events == null || events.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return events.stream().map(this::toEvolutionSummary).toList();
+    }
+
+    default RecentEvolutionSection toRecentEvolutionSection(List<EngineeringEvent> events) {
+        return new RecentEvolutionSection(toEvolutionSummaries(events));
     }
 }

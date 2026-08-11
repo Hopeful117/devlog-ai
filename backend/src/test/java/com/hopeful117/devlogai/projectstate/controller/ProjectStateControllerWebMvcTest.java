@@ -5,6 +5,8 @@ import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
 import com.hopeful117.devlogai.projectstate.dto.response.PendingActionsSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ProjectStateResponse;
 import com.hopeful117.devlogai.projectstate.dto.response.RecentChangesSection;
+import com.hopeful117.devlogai.projectstate.dto.response.RecentEvolutionSection;
+import com.hopeful117.devlogai.projectstate.dto.response.RecentKnowledgeSection;
 import com.hopeful117.devlogai.projectstate.dto.response.RoadmapProgressSection;
 import com.hopeful117.devlogai.projectstate.service.ProjectStateProjectionService;
 import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
@@ -36,7 +38,9 @@ class ProjectStateControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 new ActiveWorkSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RecentChangesSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RoadmapProgressSection(Collections.emptyList(), Collections.emptyList()),
-                new PendingActionsSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList())
+                new PendingActionsSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
+                new RecentKnowledgeSection(Collections.emptyList()),
+                new RecentEvolutionSection(Collections.emptyList())
         );
 
         when(service.getProjectState(projectId)).thenReturn(response);
@@ -45,7 +49,9 @@ class ProjectStateControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.projectId").value(projectId.toString()))
                 .andExpect(jsonPath("$.projectName").value("Test Project"))
-                .andExpect(jsonPath("$.objective.description").value("description"));
+                .andExpect(jsonPath("$.objective.description").value("description"))
+                .andExpect(jsonPath("$.recentKnowledge.recentKnowledge").isArray())
+                .andExpect(jsonPath("$.recentEvolution.recentEvolution").isArray());
     }
 
     @Test

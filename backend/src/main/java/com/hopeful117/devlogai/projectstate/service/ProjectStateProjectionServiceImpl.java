@@ -3,7 +3,9 @@ package com.hopeful117.devlogai.projectstate.service;
 import com.hopeful117.devlogai.challenge.entity.ChallengeStatus;
 import com.hopeful117.devlogai.challenge.repository.ChallengeRepository;
 import com.hopeful117.devlogai.decision.repository.DecisionRepository;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
 import com.hopeful117.devlogai.history.repository.ProjectCommitRepository;
+import com.hopeful117.devlogai.knowledge.repository.KnowledgeEventRepository;
 import com.hopeful117.devlogai.milestone.entity.MilestoneStatus;
 import com.hopeful117.devlogai.milestone.repository.MilestoneRepository;
 import com.hopeful117.devlogai.project.entity.Project;
@@ -13,6 +15,8 @@ import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
 import com.hopeful117.devlogai.projectstate.dto.response.PendingActionsSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ProjectStateResponse;
 import com.hopeful117.devlogai.projectstate.dto.response.RecentChangesSection;
+import com.hopeful117.devlogai.projectstate.dto.response.RecentEvolutionSection;
+import com.hopeful117.devlogai.projectstate.dto.response.RecentKnowledgeSection;
 import com.hopeful117.devlogai.projectstate.dto.response.RoadmapProgressSection;
 import com.hopeful117.devlogai.projectstate.mapper.ProjectStateMapper;
 import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
@@ -37,6 +41,8 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
     private final DecisionRepository decisionRepository;
     private final MilestoneRepository milestoneRepository;
     private final ProjectCommitRepository commitRepository;
+    private final KnowledgeEventRepository knowledgeEventRepository;
+    private final EngineeringEventRepository engineeringEventRepository;
     private final ProjectStateMapper mapper;
 
     @Override
@@ -49,6 +55,8 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
         RecentChangesSection recentChanges = buildRecentChanges(projectId);
         RoadmapProgressSection roadmapProgress = buildRoadmapProgress(projectId);
         PendingActionsSection pendingActions = buildPendingActions(projectId);
+        RecentKnowledgeSection recentKnowledge = buildRecentKnowledge(projectId);
+        RecentEvolutionSection recentEvolution = buildRecentEvolution(projectId);
 
         return mapper.toResponse(
                 project,
@@ -56,7 +64,9 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
                 activeWork,
                 recentChanges,
                 roadmapProgress,
-                pendingActions
+                pendingActions,
+                recentKnowledge,
+                recentEvolution
         );
     }
 
@@ -129,5 +139,21 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
                 .toList();
 
         return mapper.toPendingActionsSection(proposedProposals, openChallenges, unstartedStories);
+    }
+
+    private RecentKnowledgeSection buildRecentKnowledge(UUID projectId) {
+        var recentKnowledge = knowledgeEventRepository
+                .findByProjectIdOrderByCreatedAtDesc(projectId);
+        var limitedKnowledge = recentKnowledge.size() > 5
+                ? recentKnowledge.subList(0, 5)
+                : recentKnowledge;
+        return mapper.toRecentKnowledgeSection(limitedKnowledge);
+    }
+
+    private RecentEvolutionSection buildRecentEvolution(UUID projectId) {
+        var recentEvolution = engineeringEventRepository
+                .findRecentByProjectIdOrderByOccurredAtDescTargetCommitDescIdAsc(
+                        projectId, PageRequest.of(0, 5));
+        return mapper.toRecentEvolutionSection(recentEvolution);
     }
 }

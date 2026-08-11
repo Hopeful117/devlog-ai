@@ -9,6 +9,8 @@ public record ProjectStateResponse(
         ActiveWorkSection activeWork,
         RecentChangesSection recentChanges,
         RoadmapProgressSection roadmapProgress,
-        PendingActionsSection pendingActions
+        PendingActionsSection pendingActions,
+        RecentKnowledgeSection recentKnowledge,
+        RecentEvolutionSection recentEvolution
 ) {
 }
