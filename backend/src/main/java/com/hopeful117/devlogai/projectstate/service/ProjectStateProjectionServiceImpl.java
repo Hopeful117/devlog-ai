@@ -10,6 +10,7 @@ import com.hopeful117.devlogai.milestone.entity.MilestoneStatus;
 import com.hopeful117.devlogai.milestone.repository.MilestoneRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.projectstate.dto.ProjectStateSections;
 import com.hopeful117.devlogai.projectstate.dto.response.ActiveWorkSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
 import com.hopeful117.devlogai.projectstate.dto.response.PendingActionsSection;
@@ -60,13 +61,15 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
 
         return mapper.toResponse(
                 project,
-                objective,
-                activeWork,
-                recentChanges,
-                roadmapProgress,
-                pendingActions,
-                recentKnowledge,
-                recentEvolution
+                new ProjectStateSections(
+                        objective,
+                        activeWork,
+                        recentChanges,
+                        roadmapProgress,
+                        pendingActions,
+                        recentKnowledge,
+                        recentEvolution
+                )
         );
     }
 

@@ -1,0 +1,49 @@
+<section class="timeline" aria-labelledby="timeline-title">
+  @if (viewModel$ | async; as viewModel) {
+    @switch (viewModel.state) {
+      @case ('loading') {
+        <p role="status">Loading timeline…</p>
+      }
+      @case ('not-found') {
+        <div role="alert" class="state state--error">
+          <h1 id="timeline-title">Project not found</h1>
+          <p>No project matches this address.</p>
+        </div>
+      }
+      @case ('error') {
+        <div role="alert" class="state state--error">
+          <h1 id="timeline-title">Project timeline unavailable</h1>
+          <p>{{ viewModel.error.message }}</p>
+        </div>
+      }
+      @case ('loaded') {
+        <header class="timeline-header">
+          <p class="eyebrow">Project timeline</p>
+          <h1 id="timeline-title">{{ viewModel.projectName }}</h1>
+          <p>Deterministic chronological projection of significant project evolutions.</p>
+        </header>
+
+        @if (viewModel.entries.length > 0) {
+          <ol class="timeline-list">
+            @for (entry of viewModel.entries; track entry.id) {
+              <li class="timeline-entry panel">
+                <span class="timeline-entry__badge">{{ entry.type }}</span>
+                <div class="timeline-entry__body">
+                  <strong>{{ entry.title }}</strong>
+                  @if (entry.detail) {
+                    <span class="timeline-entry__detail">{{ entry.detail }}</span>
+                  }
+                </div>
+                <time class="timeline-entry__timestamp" [attr.datetime]="entry.timestamp">{{
+                  entry.timestamp
+                }}</time>
+              </li>
+            }
+          </ol>
+        } @else {
+          <p class="empty-state">No timeline entries yet.</p>
+        }
+      }
+    }
+  }
+</section>

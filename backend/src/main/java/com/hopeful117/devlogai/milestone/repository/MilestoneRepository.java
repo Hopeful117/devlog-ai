@@ -23,4 +23,10 @@ public interface MilestoneRepository extends JpaRepository<Milestone, UUID> {
             UUID projectId,
             Pageable pageable
     );
+
+    List<Milestone> findByProjectIdAndStatusOrderByCompletedAtDescIdDesc(
+            UUID projectId,
+            MilestoneStatus status,
+            Pageable pageable
+    );
 }

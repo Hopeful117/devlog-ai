@@ -1,0 +1,92 @@
+.timeline {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.timeline-header {
+  margin-bottom: 2rem;
+
+  .eyebrow {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+  }
+
+  h1 {
+    font-size: 1.75rem;
+    margin: 0.25rem 0;
+    color: var(--text-primary);
+  }
+
+  p {
+    color: var(--text-secondary);
+    margin: 0;
+  }
+}
+
+.timeline-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.timeline-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+
+  &__badge {
+    flex-shrink: 0;
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
+    background: rgb(77 141 255 / 0.16);
+    color: var(--accent-hover);
+  }
+
+  &__body {
+    flex: 1;
+
+    strong {
+      display: block;
+      color: var(--text-primary);
+    }
+  }
+
+  &__detail {
+    display: inline-block;
+    margin-left: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+  }
+
+  &__timestamp {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+.state {
+  padding: 2rem;
+  text-align: center;
+
+  &--error {
+    color: var(--danger);
+  }
+}

@@ -146,7 +146,7 @@ class ProjectStateProjectionServiceTest {
                 new RecentKnowledgeSection(Collections.emptyList()),
                 new RecentEvolutionSection(Collections.emptyList())
         );
-        when(mapper.toResponse(any(), any(), any(), any(), any(), any(), any(), any()))
+        when(mapper.toResponse(any(), any()))
                 .thenReturn(expectedResponse);
 
         ProjectStateResponse response = service.getProjectState(projectId);
@@ -215,7 +215,7 @@ class ProjectStateProjectionServiceTest {
                 new RecentKnowledgeSection(Collections.emptyList()),
                 new RecentEvolutionSection(Collections.emptyList())
         );
-        when(mapper.toResponse(any(), any(), any(), any(), any(), any(), any(), any()))
+        when(mapper.toResponse(any(), any()))
                 .thenReturn(expectedResponse);
 
         ProjectStateResponse response = service.getProjectState(projectId);

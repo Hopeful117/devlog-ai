@@ -15,6 +15,7 @@ import com.hopeful117.devlogai.projectstate.dto.inner.KnowledgeSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.MilestoneSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.ProposalSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.StorySummary;
+import com.hopeful117.devlogai.projectstate.dto.ProjectStateSections;
 import com.hopeful117.devlogai.projectstate.dto.response.ActiveWorkSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
 import com.hopeful117.devlogai.projectstate.dto.response.PendingActionsSection;
@@ -36,17 +37,11 @@ public interface ProjectStateMapper {
 
     @Mapping(target = "projectId", source = "project.id")
     @Mapping(target = "projectName", source = "project.name")
-    @Mapping(target = "recentKnowledge", source = "recentKnowledgeSection")
-    @Mapping(target = "recentEvolution", source = "recentEvolutionSection")
+    @Mapping(target = "recentKnowledge", source = "sections.recentKnowledge")
+    @Mapping(target = "recentEvolution", source = "sections.recentEvolution")
     ProjectStateResponse toResponse(
             Project project,
-            ObjectiveSection objective,
-            ActiveWorkSection activeWork,
-            RecentChangesSection recentChanges,
-            RoadmapProgressSection roadmapProgress,
-            PendingActionsSection pendingActions,
-            RecentKnowledgeSection recentKnowledgeSection,
-            RecentEvolutionSection recentEvolutionSection
+            ProjectStateSections sections
     );
 
     default ObjectiveSection toObjectiveSection(

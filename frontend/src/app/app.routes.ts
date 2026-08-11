@@ -33,6 +33,11 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'timeline',
+        loadComponent: () =>
+          import('./features/timeline/timeline-page').then((module) => module.TimelinePage),
+      },
+      {
         path: 'events',
         loadComponent: () =>
           import('./features/engineering-events/engineering-events-page').then(
