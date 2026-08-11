@@ -28,7 +28,8 @@ class InsightControllerWebMvcTest extends ControllerWebMvcTestSupport {
         UUID analysisId = UUID.randomUUID();
         InsightResponse response = new InsightResponse(id, projectId, analysisId,
                 UUID.randomUUID(), UUID.randomUUID(), InsightType.ARCHITECTURAL,
-                InsightSeverity.CRITICAL, "Boundary", "content", null, null);
+                InsightSeverity.CRITICAL, "Boundary", "content", "rationale",
+                null, List.of(), "ARCHITECTURE_DESCRIPTION", null, null);
         List<InsightResponse> responses = List.of(response);
         when(service.getById(id)).thenReturn(response);
         when(service.getByProject(projectId)).thenReturn(responses);

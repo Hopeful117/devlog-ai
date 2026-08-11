@@ -100,6 +100,9 @@ class ValidationServiceTest {
         assertThat(proposal.getStatus())
                 .isEqualTo(ProposalStatus.ACCEPTED);
 
+        assertThat(proposal.getDecidedAt())
+                .isNotNull();
+
         assertThat(validation.getProposal())
                 .isSameAs(proposal);
 

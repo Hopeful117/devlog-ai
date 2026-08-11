@@ -15,6 +15,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,8 +38,11 @@ class InsightPromotionServiceTest {
                 .payload(Map.of(
                         "insightType", "ARCHITECTURE_DESCRIPTION",
                         "title", "Modular architecture",
-                        "summary", "The application is split into bounded modules."
+                        "summary", "The application is split into bounded modules.",
+                        "rationale", "Boundaries keep modules independently deployable."
                 ))
+                .confidence(new BigDecimal("0.9200"))
+                .evidenceReferences(List.of("src/main/java/com/example/App.java"))
                 .build();
 
         new InsightPromotionService(repository).promote(proposal, validation, InsightSeverity.WARNING);
@@ -53,7 +58,11 @@ class InsightPromotionServiceTest {
                 () -> assertEquals(InsightType.ARCHITECTURAL, insight.getType()),
                 () -> assertEquals(InsightSeverity.WARNING, insight.getSeverity()),
                 () -> assertEquals("Modular architecture", insight.getTitle()),
-                () -> assertEquals("The application is split into bounded modules.", insight.getContent())
+                () -> assertEquals("The application is split into bounded modules.", insight.getContent()),
+                () -> assertEquals("Boundaries keep modules independently deployable.", insight.getRationale()),
+                () -> assertEquals(new BigDecimal("0.9200"), insight.getConfidence()),
+                () -> assertEquals(List.of("src/main/java/com/example/App.java"), insight.getEvidenceReferences()),
+                () -> assertEquals("ARCHITECTURE_DESCRIPTION", insight.getSourceType())
         );
     }
 

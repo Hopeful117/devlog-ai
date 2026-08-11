@@ -34,6 +34,10 @@ public class InsightPromotionService {
                 .severity(severity)
                 .title(requiredText(payload, "title"))
                 .content(requiredText(payload, "summary"))
+                .rationale(optionalText(payload, "rationale"))
+                .confidence(proposal.getConfidence())
+                .evidenceReferences(proposal.getEvidenceReferences())
+                .sourceType(optionalText(payload, "insightType"))
                 .build();
         insightRepository.save(insight);
     }
@@ -44,6 +48,11 @@ public class InsightPromotionService {
             throw new IllegalArgumentException("Accepted insight proposal is missing payload field: " + field);
         }
         return text;
+    }
+
+    private String optionalText(Map<String, Object> payload, String field) {
+        Object value = payload == null ? null : payload.get(field);
+        return value instanceof String text && !text.isBlank() ? text : null;
     }
 
     private InsightType toDomainType(String proposalType) {

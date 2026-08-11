@@ -13,6 +13,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.UUID;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
@@ -63,6 +64,8 @@ public class ValidationServiceImpl implements ValidationService {
                         ? ProposalStatus.ACCEPTED
                         : ProposalStatus.REJECTED
         );
+
+        proposal.setDecidedAt(Instant.now());
 
 
         proposalRepository.save(proposal);
