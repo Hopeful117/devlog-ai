@@ -8,6 +8,33 @@ Completed
 
 The CI/CD pipeline systematically fails due to JaCoCo coverage threshold check. The current line coverage is 79.8%, which is below the 80% threshold configured in the Maven POM.
 
+## Root Cause
+
+MapStruct generates `*MapperImpl` classes at compile time. These auto-generated classes have very low test coverage (1-3%) and account for 763 lines of code, artificially deflating the coverage metric below the 80% threshold.
+
+## Solution
+
+Exclude `**/*MapperImpl.class` from the JaCoCo `check` goal via the `<excludes>` configuration parameter.
+
+## Acceptance Criteria
+
+- [x] JaCoCo check passes with BUILD SUCCESS
+- [x] All 533 tests pass
+- [x] Coverage excluding generated code ≥ 80%
+- [x] Docker backend container starts successfully
+
+## Artifacts
+
+- `repository-analysis.md`
+- `implementation-plan.md`
+- `implementation-report.md`
+- `code-review.md`
+- `engineering-report.md`
+
+## Commit
+
+`85de2c6`
+
 ### Impact
 
 - All builds fail even when code changes are correct

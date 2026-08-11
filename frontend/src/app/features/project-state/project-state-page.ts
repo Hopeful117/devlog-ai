@@ -1,7 +1,7 @@
-import { AsyncPipe, DatePipe } from '@angular/common';
+import { AsyncPipe, DecimalPipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
-import { catchError, forkJoin, map, of, shareReplay, startWith, switchMap } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
+import { catchError, map, of, shareReplay, startWith, switchMap } from 'rxjs';
 
 import { RequestError, toRequestError } from '../../core/http/request-error';
 import { ProjectService } from '../projects/project.service';
@@ -12,14 +12,14 @@ type OverviewViewState =
   | {
       readonly state: 'loaded';
       readonly project: { readonly id: string; readonly name: string; readonly description: string | null };
-      readonly state: import('./project-state.models').ProjectState;
+      readonly projectState: import('./project-state.models').ProjectState;
     }
   | { readonly state: 'not-found' }
   | { readonly state: 'error'; readonly error: RequestError };
 
 @Component({
   selector: 'app-project-state-page',
-  imports: [AsyncPipe, DatePipe, RouterLink],
+  imports: [AsyncPipe, DecimalPipe],
   templateUrl: './project-state-page.html',
   styleUrl: './project-state-page.scss',
 })
@@ -34,9 +34,9 @@ export class ProjectStatePage {
       this.projectService.getProject(identifier).pipe(
         switchMap((project) =>
           this.stateService.getProjectState(project.id).pipe(
-            map((state) => ({ state: 'loaded' as const, project, state })),
+            map((projectState) => ({ state: 'loaded' as const, project, projectState })),
             catchError((error: unknown) =>
-              of<OverviewViewState>({ state: 'error' as const, error: toRequestError(error, 'project-state') }),
+              of<OverviewViewState>({ state: 'error' as const, error: toRequestError(error) }),
             ),
           ),
         ),

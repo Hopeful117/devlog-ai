@@ -13,7 +13,6 @@ import com.hopeful117.devlogai.milestone.repository.MilestoneRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
-import com.hopeful117.devlogai.projectstate.dto.inner.StorySummary;
 import com.hopeful117.devlogai.projectstate.dto.response.ActiveWorkSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
 import com.hopeful117.devlogai.projectstate.dto.response.PendingActionsSection;

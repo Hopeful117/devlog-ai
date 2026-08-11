@@ -8,7 +8,6 @@ import com.hopeful117.devlogai.milestone.entity.MilestoneStatus;
 import com.hopeful117.devlogai.milestone.repository.MilestoneRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
-import com.hopeful117.devlogai.projectstate.dto.inner.StorySummary;
 import com.hopeful117.devlogai.projectstate.dto.response.ActiveWorkSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
 import com.hopeful117.devlogai.projectstate.dto.response.PendingActionsSection;
@@ -25,9 +24,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 @Service
@@ -115,7 +112,7 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
         var allStories = storyRepository.findByProject_IdOrderByCreatedAtDesc(projectId);
         var registeredStories = allStories.stream()
                 .filter(s -> s.getStatus() == StoryStatus.REGISTERED)
-                .collect(Collectors.toList());
+                .toList();
 
         return mapper.toRoadmapProgressSection(plannedMilestones, registeredStories);
     }
@@ -129,7 +126,7 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
         var unstartedStories = allStories.stream()
                 .filter(s -> s.getStatus() == StoryStatus.REGISTERED)
                 .limit(5)
-                .collect(Collectors.toList());
+                .toList();
 
         return mapper.toPendingActionsSection(proposedProposals, openChallenges, unstartedStories);
     }
