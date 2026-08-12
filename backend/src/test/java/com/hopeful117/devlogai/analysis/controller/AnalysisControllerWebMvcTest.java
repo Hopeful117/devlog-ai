@@ -14,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,6 +24,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.hopeful117.devlogai.analysis.diagnostics.service.AnalysisDiagnosticsService;
@@ -83,5 +85,27 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         mvc.perform(get("/api/v1/analyses/{id}/warnings", id)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/analyses/{id}/context", id))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.analysisId").value(id.toString()));
+    }
+
+    @Test
+    void shouldSerializeDiagnosticsContextSnapshotsContainingNullValues() throws Exception {
+        AnalysisService service = mock(AnalysisService.class);
+        AnalysisWorkflowService workflow = mock(AnalysisWorkflowService.class);
+        AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
+        MockMvc mvc = mockMvc(new AnalysisController(service, workflow, diagnostics));
+        UUID id = UUID.randomUUID();
+
+        LinkedHashMap<String, Object> context = new LinkedHashMap<>();
+        context.put("analysisId", id.toString());
+        context.put("nullableField", null);
+        context.put("nested", java.util.Map.of("kind", "context"));
+
+        when(diagnostics.getContext(id)).thenReturn(context);
+
+        mvc.perform(get("/api/v1/analyses/{id}/context", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.analysisId").value(id.toString()))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("\"nullableField\":null")))
+                .andExpect(jsonPath("$.nested.kind").value("context"));
     }
 }
