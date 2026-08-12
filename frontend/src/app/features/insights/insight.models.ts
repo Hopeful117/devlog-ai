@@ -120,6 +120,10 @@ interface InsightFields {
   readonly severity: InsightSeverity;
   readonly title: string;
   readonly content: string;
+  readonly rationale: string | null;
+  readonly confidence: ConfidenceValue;
+  readonly evidenceReferences: readonly string[];
+  readonly sourceType: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
 }

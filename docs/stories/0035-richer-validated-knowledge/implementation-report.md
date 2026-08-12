@@ -52,6 +52,38 @@ Implemented the first slice of ADR-049 (Semantic Preservation During Knowledge P
 - Frontend unchanged → lint & format:check clean.
 - SonarQube → analysis SUCCESS, **Quality gate OK**: `new_coverage` 80.4% (threshold 80), `new_violations` 0, `new_duplicated_lines_density` 0.0, `caycStatus` compliant. No issues on `InsightResponse`.
 
+## Frontend slice (Knowledge UI projection)
+
+### Changes
+
+1. **`insight.models.ts`** — extended `InsightFields` (inherited by `InsightSummary`/`InsightDetail`) with:
+   - `rationale?: string | null`
+   - `confidence?: ConfidenceValue`
+   - `evidenceReferences?: readonly string[]`
+   - `sourceType?: string | null`
+   Mirrors `InsightResponse` (backend record) field-for-field.
+
+2. **`insight-detail-page.ts`** — the Insight detail page now surfaces the preserved semantic richness:
+   - **Rationale** — rendered as a heading + paragraph when present.
+   - **Confidence** — `<dl>` entry when `confidence !== null`.
+   - **Evidence** — bulleted list of `evidenceReferences` when non-empty.
+   - **Source type** — inline `· source <sourceType>` next to the normalized `type`.
+   Every section is guarded by a presence/nullability check, so a bare Insight (all optional fields absent) renders unchanged.
+
+3. **`insight-detail-page.spec.ts`** (new) — 5 tests:
+   - full render shows rationale, confidence, evidence references and source type;
+   - bare Insight omits all semantic sections (nullable-safe);
+   - multiple evidence references render as a list;
+   - loading / error / not-found states;
+   - no manual `.subscribe(`.
+
+### Verification (frontend)
+
+- `npx ng test --coverage --watch=false` → all tests pass; lines coverage `81.55%` (threshold 75%).
+- `npx eslint .` → clean.
+- `npx prettier --check .` → clean.
+- `npx ng build` → production bundle succeeds.
+
 ## Acceptance Criteria Mapping
 
 | AC | Result |
@@ -66,8 +98,11 @@ Implemented the first slice of ADR-049 (Semantic Preservation During Knowledge P
 | AC-8 nullable-safe | ✅ nullable + empty-list default, mapper test |
 | AC-9 decidedAt populated | ✅ on accept & reject |
 | AC-10 gates green | ✅ backend, frontend, Sonar |
+| AC-11 InsightFields exposes 4 fields | ✅ `insight.models.ts` |
+| AC-12 detail page renders the 4 fields | ✅ `insight-detail-page.ts` + spec |
+| AC-13 detail page nullable-safe | ✅ bare-Insight spec test |
 
 ## Out of Scope Confirmed
 
-- No frontend projection change (ADR-049 §11).
 - No `KnowledgeEvent` redesign, `KnowledgeRelation` expansion, graph DB, diff persistence, raw payload blob, taxonomy change, or historical backfill.
+- The richer fields are projected on the **detail page only**; the insights list and analysis-section index views are left unchanged in this slice.
