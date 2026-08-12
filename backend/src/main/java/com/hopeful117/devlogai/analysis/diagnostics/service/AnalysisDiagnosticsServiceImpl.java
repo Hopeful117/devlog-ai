@@ -84,8 +84,29 @@ public class AnalysisDiagnosticsServiceImpl implements AnalysisDiagnosticsServic
         findAnalysis(analysisId);
         return aiTaskRepository.findFirstByAnalysisIdOrderByCreatedAtDescIdDesc(analysisId)
                 .map(AiTask::getContextSnapshot)
-                .map(Map::copyOf)
+                .map(this::defensiveContextCopy)
                 .orElseThrow(() -> new EntityNotFoundException("Analysis context snapshot", analysisId));
+    }
+
+    private Map<String, Object> defensiveContextCopy(Map<String, Object> snapshot) {
+        LinkedHashMap<String, Object> copy = new LinkedHashMap<>();
+        snapshot.forEach((key, value) -> copy.put(key, defensiveValueCopy(value)));
+        return Collections.unmodifiableMap(copy);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object defensiveValueCopy(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            LinkedHashMap<String, Object> copy = new LinkedHashMap<>();
+            map.forEach((key, nestedValue) -> copy.put(String.valueOf(key), defensiveValueCopy(nestedValue)));
+            return Collections.unmodifiableMap(copy);
+        }
+        if (value instanceof List<?> list) {
+            ArrayList<Object> copy = new ArrayList<>(list.size());
+            list.forEach(item -> copy.add(defensiveValueCopy(item)));
+            return Collections.unmodifiableList(copy);
+        }
+        return value;
     }
 
     private Analysis findAnalysis(UUID id) {

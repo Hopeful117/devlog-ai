@@ -295,12 +295,14 @@ class AnalysisDiagnosticsServiceTest {
     }
 
     @Test
-    void shouldExposeTheCurrentNullContainingContextFailureShape() {
+    void shouldReturnNullContainingContextSnapshots() {
         UUID analysisId = UUID.randomUUID();
         Analysis analysis = createAnalysis(analysisId, UUID.randomUUID());
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("key", "value");
         context.put("nullable", null);
+        context.put("nested", new LinkedHashMap<>(Map.of("kind", "context")));
+        context.put("items", Arrays.asList("a", null, Map.of("kind", "entry")));
 
         AiTask task = AiTask.builder()
                 .id(UUID.randomUUID()).analysis(analysis)
@@ -316,7 +318,16 @@ class AnalysisDiagnosticsServiceTest {
 
         AnalysisDiagnosticsServiceImpl service = createService();
 
-        assertThrows(NullPointerException.class, () -> service.getContext(analysisId));
+        Map<String, Object> result = service.getContext(analysisId);
+
+        assertEquals("value", result.get("key"));
+        assertTrue(result.containsKey("nullable"));
+        assertNull(result.get("nullable"));
+        assertEquals("context", ((Map<?, ?>) result.get("nested")).get("kind"));
+        assertEquals(
+                Arrays.asList("a", null, Map.of("kind", "entry")),
+                result.get("items")
+        );
     }
 
     @Test
