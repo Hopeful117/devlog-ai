@@ -295,6 +295,31 @@ class AnalysisDiagnosticsServiceTest {
     }
 
     @Test
+    void shouldExposeTheCurrentNullContainingContextFailureShape() {
+        UUID analysisId = UUID.randomUUID();
+        Analysis analysis = createAnalysis(analysisId, UUID.randomUUID());
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("key", "value");
+        context.put("nullable", null);
+
+        AiTask task = AiTask.builder()
+                .id(UUID.randomUUID()).analysis(analysis)
+                .correlationId(UUID.randomUUID())
+                .taskType(AiTaskType.INSIGHT_GENERATION)
+                .status(AiTaskStatus.COMPLETED)
+                .contextSnapshot(context)
+                .createdAt(Instant.now()).build();
+
+        when(analysisRepository.findById(analysisId)).thenReturn(Optional.of(analysis));
+        when(aiTaskRepository.findFirstByAnalysisIdOrderByCreatedAtDescIdDesc(analysisId))
+                .thenReturn(Optional.of(task));
+
+        AnalysisDiagnosticsServiceImpl service = createService();
+
+        assertThrows(NullPointerException.class, () -> service.getContext(analysisId));
+    }
+
+    @Test
     void shouldThrowWhenContextNotFound() {
         UUID analysisId = UUID.randomUUID();
         Analysis analysis = createAnalysis(analysisId, UUID.randomUUID());
