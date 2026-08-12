@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.projectcontext.projection.AgentContextProjectionService;
 import com.hopeful117.devlogai.projectcontext.projection.AgentEngineeringStoryContext;
 import com.hopeful117.devlogai.projectcontext.projection.AgentRepositoryContext;
+import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import org.junit.jupiter.api.Test;
@@ -113,5 +114,36 @@ class EngineeringStoryContextServiceTest {
         verify(projectContextProvider, times(1)).build(projectId);
         verify(repositoryContextAdapter).buildRepositoryContext(
                 projectId, description, snapshot);
+    }
+
+    @Test
+    void shouldBuildRepositoryContextWhenLatestProjectProfileIsNull() {
+        UUID projectId = UUID.randomUUID();
+        String description = "Context without profile";
+        ProjectContextSnapshot snapshot = new ProjectContextSnapshot(
+                new AnalysisContext.ProjectSnapshot(
+                        projectId, "Engineering-Skills", "engineering-skills",
+                        "Workflow repository", null),
+                null,
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of(),
+                java.util.List.of()
+        );
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+
+        when(projectContextProvider.build(projectId)).thenReturn(snapshot);
+        when(repositoryContextAdapter.buildRepositoryContext(
+                projectId, description, snapshot))
+                .thenReturn(repositoryContext);
+
+        EngineeringStoryContext context =
+                service.buildWithRepositoryContext(projectId, description);
+
+        assertNotNull(context);
+        assertNull(context.projectContext().latestProjectProfile());
+        assertEquals(repositoryContext, context.repositoryContext());
     }
 }
