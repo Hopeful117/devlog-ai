@@ -13,6 +13,7 @@ public interface EngineeringEventRepository extends JpaRepository<EngineeringEve
     @EntityGraph(attributePaths = {"project", "analysis", "proposal", "validation", "source"})
     Optional<EngineeringEvent> findDetailedById(UUID id);
     List<EngineeringEvent> findByProposalIdIn(Collection<UUID> proposalIds);
+    @EntityGraph(attributePaths = {"project", "analysis", "proposal", "validation", "source"})
     List<EngineeringEvent> findRecentByProjectIdOrderByOccurredAtDescTargetCommitDescIdAsc(
             UUID projectId, Pageable pageable);
 }

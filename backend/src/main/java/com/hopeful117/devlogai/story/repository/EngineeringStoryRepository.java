@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.story.repository;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.entity.StoryStatus;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -14,6 +15,7 @@ public interface EngineeringStoryRepository extends JpaRepository<EngineeringSto
 
     List<EngineeringStory> findByProject_Id(UUID projectId);
 
+    @EntityGraph(attributePaths = "project")
     List<EngineeringStory> findByProject_IdOrderByCreatedAtDesc(UUID projectId);
 
     List<EngineeringStory> findByProject_IdAndStatusOrderByCreatedAtDesc(

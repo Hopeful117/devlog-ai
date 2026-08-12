@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.fact.repository;
 import com.hopeful117.devlogai.fact.entity.Fact;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -16,6 +17,7 @@ public interface FactRepository extends JpaRepository<Fact, UUID> {
 
     List<Fact> findByAnalysisIdOrderByDetectedAtDesc(UUID analysisId);
 
+    @EntityGraph(attributePaths = "evidenceReferences")
     List<Fact> findByAnalysisIdOrderByDetectedAtDescIdDesc(
             UUID analysisId,
             Pageable pageable
