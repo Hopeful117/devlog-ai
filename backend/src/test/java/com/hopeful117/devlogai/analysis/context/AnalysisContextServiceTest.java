@@ -27,6 +27,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -126,6 +127,107 @@ class AnalysisContextServiceTest {
 
         verifyBoundedFactPage(AnalysisContextServiceImpl.MAX_FACTS);
         verify(projectContextProvider).build(projectId);
+    }
+
+    @Test
+    void shouldRetainSupportingFactsRequiredBySelectedObservationsEvenWhenOutsideRankedFactPage() {
+        UUID projectId = UUID.randomUUID();
+        UUID analysisId = UUID.randomUUID();
+        Project project = project(projectId);
+        Analysis analysis = analysis(analysisId, project, AnalysisType.ARCHITECTURE_REVIEW);
+
+        Fact requiredFact = Fact.builder()
+                .id(UUID.randomUUID()).analysis(analysis).type(FactType.OTHER)
+                .content("required support").source("required")
+                .evidenceReferences(Set.of("required.md"))
+                .detectedAt(Instant.parse("2026-07-20T11:00:00Z")).build();
+        Fact rankedFact = Fact.builder()
+                .id(UUID.randomUUID()).analysis(analysis).type(FactType.TECHNOLOGY)
+                .content("ranked fact").source("ranked")
+                .evidenceReferences(Set.of("ranked.md"))
+                .detectedAt(Instant.parse("2026-07-21T11:00:00Z")).build();
+        Observation observation = Observation.builder()
+                .id(UUID.randomUUID()).analysis(analysis)
+                .type(ObservationType.ARCHITECTURE_MODULARIZATION)
+                .content("Needs required fact")
+                .ruleId("ARCHITECTURE_MODULARIZATION").ruleVersion("1")
+                .supportingFacts(new LinkedHashSet<>(Set.of(requiredFact)))
+                .createdAt(Instant.parse("2026-07-21T12:00:00Z")).build();
+
+        when(analysisRepository.findById(analysisId)).thenReturn(Optional.of(analysis));
+        when(projectProfileService.getByAnalysis(analysisId)).thenReturn(mock(ProjectProfileResponse.class));
+        when(factRepository.findByAnalysisIdOrderByDetectedAtDescIdDesc(eq(analysisId), any(Pageable.class)))
+                .thenReturn(List.of(rankedFact));
+        when(factRepository.findByAnalysisIdAndIdIn(eq(analysisId), argThat(ids -> ids.contains(requiredFact.getId()))))
+                .thenReturn(List.of(requiredFact));
+        when(observationRepository.findByAnalysisIdOrderByCreatedAtDescIdDesc(eq(analysisId), any(Pageable.class)))
+                .thenReturn(List.of(observation));
+        when(projectContextProvider.build(projectId)).thenReturn(emptyProjectContext(project));
+
+        AnalysisContext context = service.build(analysisId);
+
+        assertTrue(context.facts().stream().anyMatch(fact -> fact.id().equals(requiredFact.getId())));
+        assertTrue(context.observations().stream()
+                .flatMap(value -> value.supportingFactIds().stream())
+                .allMatch(factId -> context.facts().stream().anyMatch(fact -> fact.id().equals(factId))));
+    }
+
+    @Test
+    void shouldReduceObservationsWhenRequiredSupportingFactsOverflowFactBudget() {
+        UUID projectId = UUID.randomUUID();
+        UUID analysisId = UUID.randomUUID();
+        Project project = project(projectId);
+        Analysis analysis = analysis(analysisId, project, AnalysisType.ARCHITECTURE_REVIEW);
+
+        List<Observation> observations = new LinkedList<>();
+        List<Fact> requiredFacts = new java.util.ArrayList<>();
+        for (int index = 0; index < AnalysisContextServiceImpl.MAX_OBSERVATIONS; index++) {
+            Fact factOne = Fact.builder()
+                    .id(UUID.randomUUID()).analysis(analysis).type(FactType.OTHER)
+                    .content("support-a-" + index).source("source")
+                    .evidenceReferences(Set.of("a-" + index)).detectedAt(Instant.now()).build();
+            Fact factTwo = Fact.builder()
+                    .id(UUID.randomUUID()).analysis(analysis).type(FactType.OTHER)
+                    .content("support-b-" + index).source("source")
+                    .evidenceReferences(Set.of("b-" + index)).detectedAt(Instant.now()).build();
+            Fact factThree = Fact.builder()
+                    .id(UUID.randomUUID()).analysis(analysis).type(FactType.OTHER)
+                    .content("support-c-" + index).source("source")
+                    .evidenceReferences(Set.of("c-" + index)).detectedAt(Instant.now()).build();
+            requiredFacts.add(factOne);
+            requiredFacts.add(factTwo);
+            requiredFacts.add(factThree);
+            observations.add(Observation.builder()
+                    .id(UUID.randomUUID()).analysis(analysis)
+                    .type(ObservationType.SPRING_BOOT_REST_APPLICATION)
+                    .content("obs-" + index)
+                    .ruleId("RULE").ruleVersion("1")
+                    .supportingFacts(new LinkedHashSet<>(Set.of(factOne, factTwo, factThree)))
+                    .createdAt(Instant.now().minusSeconds(index))
+                    .build());
+        }
+
+        when(analysisRepository.findById(analysisId)).thenReturn(Optional.of(analysis));
+        when(projectProfileService.getByAnalysis(analysisId)).thenReturn(mock(ProjectProfileResponse.class));
+        when(factRepository.findByAnalysisIdOrderByDetectedAtDescIdDesc(eq(analysisId), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(factRepository.findByAnalysisIdAndIdIn(eq(analysisId), anyCollection()))
+                .thenAnswer(invocation -> requiredFacts.stream()
+                        .filter(fact -> ((java.util.Collection<UUID>) invocation.getArgument(1)).contains(fact.getId()))
+                        .toList());
+        when(observationRepository.findByAnalysisIdOrderByCreatedAtDescIdDesc(eq(analysisId), any(Pageable.class)))
+                .thenReturn(observations);
+        when(projectContextProvider.build(projectId)).thenReturn(emptyProjectContext(project));
+
+        AnalysisContext context = service.build(analysisId);
+        Set<UUID> factIds = context.facts().stream().map(AnalysisContext.FactSnapshot::id)
+                .collect(java.util.stream.Collectors.toSet());
+
+        assertTrue(context.facts().size() <= AnalysisContextServiceImpl.MAX_FACTS);
+        assertTrue(context.observations().size() < observations.size());
+        assertTrue(context.observations().stream()
+                .flatMap(value -> value.supportingFactIds().stream())
+                .allMatch(factIds::contains));
     }
 
     @Test
@@ -293,6 +395,19 @@ class AnalysisContextServiceTest {
                 analysis.getId(), analysis.getType(),
                 analysis.getIntentId(), analysis.getIntentVersion(), analysis.getStatus(),
                 analysis.getStartedAt(), analysis.getCompletedAt(), analysis.getCreatedAt()
+        );
+    }
+
+    private ProjectContextSnapshot emptyProjectContext(Project project) {
+        return new ProjectContextSnapshot(
+                toProjectSnapshot(project),
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of()
         );
     }
 }
