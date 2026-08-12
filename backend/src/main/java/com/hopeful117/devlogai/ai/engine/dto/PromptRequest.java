@@ -1,10 +1,11 @@
 package com.hopeful117.devlogai.ai.engine.dto;
 
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
-import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -17,7 +18,7 @@ public record PromptRequest(
         AiTaskType taskType,
         IntentDefinition intent,
         UserGuidance userGuidance,
-        SelectedKnowledge selectedKnowledge,
+        Map<String, Object> selectedKnowledge,
         Map<String, Object> expectedOutputContract,
         Map<String, Object> metadata
 ) {
@@ -29,6 +30,9 @@ public record PromptRequest(
         Objects.requireNonNull(taskType, "taskType");
         Objects.requireNonNull(intent, "intent");
         Objects.requireNonNull(selectedKnowledge, "selectedKnowledge");
+        selectedKnowledge = Collections.unmodifiableMap(
+                new LinkedHashMap<>(selectedKnowledge)
+        );
         expectedOutputContract = Map.copyOf(expectedOutputContract);
         metadata = Map.copyOf(metadata);
     }

@@ -17,6 +17,7 @@ import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class AiTaskServiceImpl implements AiTaskService {
     private final AiTaskMapper aiTaskMapper;
     private final ObjectMapper objectMapper;
     private final IntentCatalog intentCatalog;
+    private final SelectedKnowledgePromptProjectionService promptProjectionService;
 
     @Override
     public AiTaskResponse create(CreateAiTaskRequest request) {
@@ -69,8 +71,7 @@ public class AiTaskServiceImpl implements AiTaskService {
         if (task.getSelectedKnowledgeSnapshot() != null) {
             throw new ConflictException("Selected knowledge is already attached to AI task " + id);
         }
-        @SuppressWarnings("unchecked")
-        Map<String, Object> snapshot = objectMapper.convertValue(selectedKnowledge, Map.class);
+        Map<String, Object> snapshot = promptProjectionService.toMap(selectedKnowledge);
         task.setSelectedKnowledgeSnapshot(snapshot);
         task.setSelectionVersion(selectedKnowledge.selectionMetadata().selectionVersion());
         task.setSelectionDigest(selectedKnowledge.selectionDigest());
@@ -88,9 +89,8 @@ public class AiTaskServiceImpl implements AiTaskService {
                 context,
                 Map.class
         );
-        @SuppressWarnings("unchecked")
         Map<String, Object> selectedKnowledgeSnapshot = selectedKnowledge == null ? null
-                : objectMapper.convertValue(selectedKnowledge, Map.class);
+                : promptProjectionService.toMap(selectedKnowledge);
 
         AiTask task = aiTaskMapper.toEntity(request);
         IntentDefinition intent = intentCatalog.resolve(analysis.getIntentId(), analysis.getIntentVersion());

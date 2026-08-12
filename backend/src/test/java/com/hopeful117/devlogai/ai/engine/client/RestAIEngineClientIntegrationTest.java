@@ -7,10 +7,12 @@ import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -66,6 +68,8 @@ class RestAIEngineClientIntegrationTest {
                     null, null, null, List.of(), List.of(),
                     new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0),
                     List.of(), null, null, null);
+            var projectedKnowledge =
+                    new SelectedKnowledgePromptProjectionService(new ObjectMapper()).toMap(knowledge);
 
             PromptRequest request = new PromptRequest(
                     UUID.randomUUID(),
@@ -75,7 +79,7 @@ class RestAIEngineClientIntegrationTest {
                     AiTaskType.DECISION_PROPOSAL_GENERATION,
                     intent,
                     guidance,
-                    knowledge,
+                    projectedKnowledge,
                     Map.of("type", "object"),
                     Map.of("source", "test")
             );

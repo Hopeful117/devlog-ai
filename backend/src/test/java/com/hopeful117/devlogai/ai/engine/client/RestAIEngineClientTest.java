@@ -10,6 +10,7 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
+import tools.jackson.databind.ObjectMapper;
 
 class RestAIEngineClientTest {
 
@@ -167,7 +169,10 @@ class RestAIEngineClientTest {
                 new SelectedKnowledge.SelectionMetadata("selection-v1", List.of(), 0, 0,
                         new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 5, 60), "COMPLETE"),
                 "a".repeat(64));
+        Map<String, Object> projectedKnowledge =
+                new SelectedKnowledgePromptProjectionService(new ObjectMapper()).toMap(selected);
         return new PromptRequest(correlationId, correlationId, analysisId, UUID.randomUUID(),
-                AiTaskType.INSIGHT_GENERATION, intent, null, selected, intent.outputSchema(), Map.of());
+                AiTaskType.INSIGHT_GENERATION, intent, null,
+                projectedKnowledge, intent.outputSchema(), Map.of());
     }
 }

@@ -24,6 +24,7 @@ import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import com.hopeful117.devlogai.profile.service.ProjectProfileService;
 import com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingOutcome;
 import com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingRequest;
@@ -44,6 +45,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
+import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
 class ProjectUnderstandingServiceTest {
@@ -136,6 +138,8 @@ class ProjectUnderstandingServiceTest {
         AiTaskService aiTaskService = mock(AiTaskService.class);
         AIEngineClient aiEngineClient = mock(AIEngineClient.class);
         KnowledgeSelectionService knowledgeSelectionService = mock(KnowledgeSelectionService.class);
+        SelectedKnowledgePromptProjectionService promptProjectionService =
+                new SelectedKnowledgePromptProjectionService(new ObjectMapper());
         SelectedKnowledge selectedKnowledge = mock(SelectedKnowledge.class);
         AnalysisAiTaskTypeResolver resolver = new AnalysisAiTaskTypeResolver();
 
@@ -149,7 +153,8 @@ class ProjectUnderstandingServiceTest {
                 aiTaskService,
                 aiEngineClient,
                 intentCatalog,
-                knowledgeSelectionService
+                knowledgeSelectionService,
+                promptProjectionService
         );
         ProjectUnderstandingService refreshService = new ProjectUnderstandingService(
                 preparation,

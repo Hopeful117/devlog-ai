@@ -25,6 +25,7 @@ import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTypeException;
 import org.junit.jupiter.api.Test;
@@ -79,6 +80,9 @@ class AnalysisWorkflowServiceTest {
     @Mock
     private SelectedKnowledge selectedKnowledge;
 
+    @Mock
+    private SelectedKnowledgePromptProjectionService promptProjectionService;
+
     @InjectMocks
     private AnalysisWorkflowServiceImpl workflowService;
 
@@ -87,6 +91,10 @@ class AnalysisWorkflowServiceTest {
         lenient().when(knowledgeSelectionService.select(any(), any(), any()))
                 .thenReturn(selectedKnowledge);
         lenient().when(intentCatalog.resolve(any(), any())).thenReturn(intent());
+        lenient().when(promptProjectionService.toMap(any())).thenReturn(java.util.Map.of(
+                "selectedFacts", java.util.List.of(),
+                "selectedObservations", java.util.List.of()
+        ));
     }
 
     @Test
