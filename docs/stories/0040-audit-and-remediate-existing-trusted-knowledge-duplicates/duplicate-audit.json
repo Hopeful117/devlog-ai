@@ -1,0 +1,211 @@
+{
+  "projectId": "f3d56247-aada-4a76-982b-e6802c0b309c",
+  "totalInsights": 17,
+  "clusterCount": 6,
+  "clusters": [
+    {
+      "clusterKey": "ARCHITECTURE_DESCRIPTION::architecture-boot-rest-spring",
+      "category": "LIKELY_RICHER_SUCCESSOR",
+      "recommendation": "KEEP_RICHEST_AS_CANONICAL",
+      "rationale": "Members share the same topic family, and one record is materially richer in provenance or detail.",
+      "members": [
+        {
+          "insightId": "6add7c20-6fac-4ef0-866e-ef35a836ad4e",
+          "proposalId": "e28e253c-3d6c-4254-b28d-776481005698",
+          "type": "ARCHITECTURAL",
+          "severity": "INFO",
+          "sourceType": "ARCHITECTURE_DESCRIPTION",
+          "title": "RESTful Spring Boot Application Architecture",
+          "content": "The project's architecture is centered around a RESTful application developed using the Spring Boot framework, which exposes REST API controllers for external interactions.",
+          "rationale": "The presence of Spring Boot and REST API controllers is explicitly confirmed by multiple observations and characteristics in the project analysis.",
+          "confidence": 1.0000,
+          "evidenceReferenceCount": 1,
+          "createdAt": "2026-08-12T00:32:11.200532Z"
+        },
+        {
+          "insightId": "5c33f6ae-47a7-41cc-a0b1-6e51977931b1",
+          "proposalId": "b9996e93-7615-4990-bd47-3c2caad31e80",
+          "type": "ARCHITECTURAL",
+          "severity": "INFO",
+          "sourceType": null,
+          "title": "REST Spring Boot Application Architecture",
+          "content": "The project architecture is centered around a RESTful application structured with Spring Boot framework.",
+          "rationale": null,
+          "confidence": null,
+          "evidenceReferenceCount": 0,
+          "createdAt": "2026-08-11T23:10:52.742991Z"
+        }
+      ]
+    },
+    {
+      "clusterKey": "ARCHITECTURE_DESCRIPTION::architecture-decision-record",
+      "category": "LIKELY_RICHER_SUCCESSOR",
+      "recommendation": "KEEP_RICHEST_AS_CANONICAL",
+      "rationale": "Members share the same topic family, and one record is materially richer in provenance or detail.",
+      "members": [
+        {
+          "insightId": "c8a6624a-ecc2-4e00-bd56-7516532afd66",
+          "proposalId": "2ba5760f-1bf4-4feb-b579-3e18d8689721",
+          "type": "ARCHITECTURAL",
+          "severity": "INFO",
+          "sourceType": "ARCHITECTURE_DESCRIPTION",
+          "title": "Use of Architecture Decision Records (ADR)",
+          "content": "The project documents its architectural decisions using Architecture Decision Records (ADRs), ensuring traceability and clarity of design choices.",
+          "rationale": "The presence of ADR documentation is confirmed through explicit observations and facts within the project evidence.",
+          "confidence": 1.0000,
+          "evidenceReferenceCount": 1,
+          "createdAt": "2026-08-12T00:32:20.714077Z"
+        },
+        {
+          "insightId": "8bb23baf-b78d-4fb9-b447-04e47377e914",
+          "proposalId": "b925ec77-4a0c-4b2d-bd7c-a68d276bcb9d",
+          "type": "ARCHITECTURAL",
+          "severity": "INFO",
+          "sourceType": null,
+          "title": "Architecture Decision Records (ADR) Documentation",
+          "content": "The project documents its architectural decisions using ADRs, ensuring traceability and clarity of design choices.",
+          "rationale": null,
+          "confidence": null,
+          "evidenceReferenceCount": 0,
+          "createdAt": "2026-08-11T23:11:14.188122Z"
+        }
+      ]
+    },
+    {
+      "clusterKey": "ARCHITECTURE_DESCRIPTION::containerized-deployment",
+      "category": "LIKELY_RICHER_SUCCESSOR",
+      "recommendation": "KEEP_RICHEST_AS_CANONICAL",
+      "rationale": "Members share the same topic family, and one record is materially richer in provenance or detail.",
+      "members": [
+        {
+          "insightId": "dc3749e5-82ee-44d9-b8a6-107d2dc44822",
+          "proposalId": "f41f93f9-b99e-4f71-8635-b04c92aaca60",
+          "type": "ARCHITECTURAL",
+          "severity": "INFO",
+          "sourceType": "ARCHITECTURE_DESCRIPTION",
+          "title": "Containerized Deployment Using Docker and Docker Compose",
+          "content": "The project is containerized with Docker and Docker Compose configurations, supporting packaged and orchestrated deployments.",
+          "rationale": "This is supported by explicit configuration files and project evidence indicating use of Docker technologies.",
+          "confidence": 1.0000,
+          "evidenceReferenceCount": 1,
+          "createdAt": "2026-08-12T00:32:31.070031Z"
+        },
+        {
+          "insightId": "d2b967c6-d679-46b4-b6b3-887895587958",
+          "proposalId": "89fd84ce-be4f-4d5c-8d18-5ab5a7d98f0f",
+          "type": "ARCHITECTURAL",
+          "severity": "INFO",
+          "sourceType": null,
+          "title": "Containerized Deployment Setup",
+          "content": "The project is containerized using Docker and Docker Compose, enabling packaged and orchestrated deployments.",
+          "rationale": null,
+          "confidence": null,
+          "evidenceReferenceCount": 0,
+          "createdAt": "2026-08-11T23:11:02.187865Z"
+        }
+      ]
+    },
+    {
+      "clusterKey": "PROJECT_PRESENTATION::documentation-structure",
+      "category": "LIKELY_RICHER_SUCCESSOR",
+      "recommendation": "KEEP_RICHEST_AS_CANONICAL",
+      "rationale": "Members share the same topic family, and one record is materially richer in provenance or detail.",
+      "members": [
+        {
+          "insightId": "312ef495-31d1-43d8-af96-164b9a0d086f",
+          "proposalId": "5acf1b46-034c-4a01-b512-f82f807ebed4",
+          "type": "DOCUMENTATION",
+          "severity": "INFO",
+          "sourceType": "PROJECT_PRESENTATION",
+          "title": "Project Documentation Structure",
+          "content": "The project maintains a dedicated documentation directory named 'docs' containing Markdown articles and reports related to engineering stories, implementation plans, and repository analyses.",
+          "rationale": "This is based on direct evidence about the documentation directory and contents as observed in the repository analysis.",
+          "confidence": 1.0000,
+          "evidenceReferenceCount": 1,
+          "createdAt": "2026-08-12T00:32:53.631514Z"
+        },
+        {
+          "insightId": "80394a01-448d-4a97-975e-f9661c9c38ea",
+          "proposalId": "b3aa9a71-4f1e-454b-8d06-7e27c661c169",
+          "type": "DOCUMENTATION",
+          "severity": "INFO",
+          "sourceType": null,
+          "title": "Project Documentation Structure",
+          "content": "The project includes a dedicated documentation directory named 'docs' which holds various Markdown articles and reports related to engineering stories, implementation plans, and repository analyses.",
+          "rationale": null,
+          "confidence": null,
+          "evidenceReferenceCount": 0,
+          "createdAt": "2026-08-11T23:11:42.209246Z"
+        }
+      ]
+    },
+    {
+      "clusterKey": "TECHNOLOGY_DESCRIPTION::automated-testing",
+      "category": "LIKELY_RICHER_SUCCESSOR",
+      "recommendation": "KEEP_RICHEST_AS_CANONICAL",
+      "rationale": "Members share the same topic family, and one record is materially richer in provenance or detail.",
+      "members": [
+        {
+          "insightId": "a8b89aeb-273d-43c3-985b-1b8d73b4d976",
+          "proposalId": "260618f5-57b1-41b1-af8f-11bea570f907",
+          "type": "TECHNOLOGY",
+          "severity": "INFO",
+          "sourceType": "TECHNOLOGY_DESCRIPTION",
+          "title": "Automated and Integration Testing Infrastructure",
+          "content": "The project includes an automated test suite as well as integration tests, facilitating continuous integration and quality control.",
+          "rationale": "Evidence includes presence of automated test files and integration tests as detected in the project repository.",
+          "confidence": 1.0000,
+          "evidenceReferenceCount": 1,
+          "createdAt": "2026-08-12T00:32:39.009464Z"
+        },
+        {
+          "insightId": "d06ceb03-d52d-4d9a-9081-092227e62244",
+          "proposalId": "fd015487-7513-4161-ad91-ef93411be033",
+          "type": "TECHNOLOGY",
+          "severity": "INFO",
+          "sourceType": null,
+          "title": "Automated Testing Structure",
+          "content": "The project contains an automated test source tree and test files that support continuous integration and quality control.",
+          "rationale": null,
+          "confidence": null,
+          "evidenceReferenceCount": 0,
+          "createdAt": "2026-08-11T23:12:00.608455Z"
+        }
+      ]
+    },
+    {
+      "clusterKey": "TECHNOLOGY_DESCRIPTION::boot-rest-spring",
+      "category": "LIKELY_RICHER_SUCCESSOR",
+      "recommendation": "KEEP_RICHEST_AS_CANONICAL",
+      "rationale": "Members share the same topic family, and one record is materially richer in provenance or detail.",
+      "members": [
+        {
+          "insightId": "e214f008-d469-4bea-893c-848fe9f80077",
+          "proposalId": "deec7344-439e-4bd8-a919-5982d4200923",
+          "type": "TECHNOLOGY",
+          "severity": "INFO",
+          "sourceType": "TECHNOLOGY_DESCRIPTION",
+          "title": "Use of Spring Boot Framework for REST API Development",
+          "content": "Spring Boot is used to develop the REST API application exposing REST controllers.",
+          "rationale": "This is supported by specific observations and facts about Spring Boot usage and REST API exposure in the project.",
+          "confidence": 1.0000,
+          "evidenceReferenceCount": 1,
+          "createdAt": "2026-08-12T00:32:46.077803Z"
+        },
+        {
+          "insightId": "de30abf4-a858-4fd5-b3e2-aa742dfc79b6",
+          "proposalId": "24e6b46e-e65f-4c63-a3fd-5f4f9513bf82",
+          "type": "TECHNOLOGY",
+          "severity": "INFO",
+          "sourceType": null,
+          "title": "Use of Spring Boot for REST API",
+          "content": "The project uses Spring Boot to develop a REST API application that exposes REST controllers.",
+          "rationale": null,
+          "confidence": null,
+          "evidenceReferenceCount": 0,
+          "createdAt": "2026-08-11T23:10:40.220123Z"
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.insight.controller;
 
 import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.service.InsightService;
@@ -86,6 +87,15 @@ public class InsightController {
                         type,
                         severity
                 )
+        );
+    }
+
+    @GetMapping("/project/{projectId}/duplicate-audit")
+    public ResponseEntity<InsightDuplicateAuditResponse> getDuplicateAudit(
+            @PathVariable UUID projectId) {
+
+        return ResponseEntity.ok(
+                insightService.getDuplicateAudit(projectId)
         );
     }
 }

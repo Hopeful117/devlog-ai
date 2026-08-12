@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.insight.service;
 
 import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 
@@ -29,4 +30,6 @@ public interface InsightService {
             InsightType type,
             InsightSeverity severity
     );
+
+    InsightDuplicateAuditResponse getDuplicateAudit(UUID projectId);
 }
