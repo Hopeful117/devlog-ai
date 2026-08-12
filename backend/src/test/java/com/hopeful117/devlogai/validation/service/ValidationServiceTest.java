@@ -39,6 +39,9 @@ class ValidationServiceTest {
     @Mock
     ProposalPromotionService promotionService;
 
+    @Mock
+    TrustedKnowledgeDuplicateGuard trustedKnowledgeDuplicateGuard;
+
     @InjectMocks
     ValidationServiceImpl service;
 
@@ -112,6 +115,7 @@ class ValidationServiceTest {
         verify(validationRepository)
                 .save(validation);
 
+        verify(trustedKnowledgeDuplicateGuard).assertCanAccept(proposal);
         verify(promotionService).promote(proposal, savedValidation, InsightSeverity.WARNING);
     }
     @Test
@@ -302,6 +306,70 @@ class ValidationServiceTest {
 
         verifyNoInteractions(validationMapper);
     }
+    @Test
+    void shouldNotRunDuplicateGuardForRejectedProposal() {
+        UUID proposalId = UUID.randomUUID();
+        ValidatableProposal proposal = ValidatableProposal.builder()
+                .id(proposalId)
+                .status(ProposalStatus.PROPOSED)
+                .build();
+        CreateValidationRequest request = new CreateValidationRequest(
+                proposalId,
+                ValidationDecision.REJECTED,
+                "Rejected",
+                UUID.randomUUID()
+        );
+        Validation validation = Validation.builder().build();
+        Validation savedValidation = Validation.builder()
+                .id(UUID.randomUUID())
+                .proposal(proposal)
+                .decision(ValidationDecision.REJECTED)
+                .build();
+        ValidationResponse response = mock(ValidationResponse.class);
 
+        when(proposalRepository.findByIdForValidation(proposalId)).thenReturn(Optional.of(proposal));
+        when(validationRepository.existsByProposalId(proposalId)).thenReturn(false);
+        when(validationMapper.toEntity(request)).thenReturn(validation);
+        when(validationRepository.save(validation)).thenReturn(savedValidation);
+        when(validationMapper.toResponse(savedValidation)).thenReturn(response);
 
+        ValidationResponse result = service.validate(request);
+
+        assertThat(result).isSameAs(response);
+        verifyNoInteractions(trustedKnowledgeDuplicateGuard);
+        verify(promotionService, never()).promote(any(), any(), any());
+    }
+
+    @Test
+    void shouldRejectAcceptedProposalWhenTrustedDuplicateGuardFails() {
+        UUID proposalId = UUID.randomUUID();
+        ValidatableProposal proposal = ValidatableProposal.builder()
+                .id(proposalId)
+                .status(ProposalStatus.PROPOSED)
+                .build();
+        CreateValidationRequest request = new CreateValidationRequest(
+                proposalId,
+                ValidationDecision.ACCEPTED,
+                "Approved",
+                UUID.randomUUID(),
+                InsightSeverity.INFO
+        );
+        Validation validation = Validation.builder().build();
+
+        when(proposalRepository.findByIdForValidation(proposalId)).thenReturn(Optional.of(proposal));
+        when(validationRepository.existsByProposalId(proposalId)).thenReturn(false);
+        when(validationMapper.toEntity(request)).thenReturn(validation);
+        doThrow(new ConflictException("Accepted insight would create duplicate trusted knowledge"))
+                .when(trustedKnowledgeDuplicateGuard).assertCanAccept(proposal);
+
+        assertThatThrownBy(() -> service.validate(request))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Accepted insight would create duplicate trusted knowledge");
+
+        assertThat(proposal.getStatus()).isEqualTo(ProposalStatus.PROPOSED);
+        assertThat(proposal.getDecidedAt()).isNull();
+        verify(validationRepository, never()).save(any());
+        verify(proposalRepository, never()).save(any());
+        verifyNoInteractions(promotionService);
+    }
 }

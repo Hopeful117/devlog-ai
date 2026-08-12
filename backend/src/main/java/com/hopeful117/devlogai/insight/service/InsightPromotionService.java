@@ -36,37 +36,24 @@ public class InsightPromotionService {
                 .analysis(proposal.getAnalysis())
                 .proposal(proposal)
                 .validation(validation)
-                .type(toDomainType(requiredText(payload, "insightType")))
+                .type(InsightPayloadSupport.toDomainType(InsightPayloadSupport.requiredText(payload, "insightType")))
                 .severity(severity)
-                .title(requiredText(payload, "title"))
-                .content(requiredText(payload, "summary"))
-                .rationale(optionalText(payload, "rationale"))
+                .title(InsightPayloadSupport.requiredText(payload, "title"))
+                .content(InsightPayloadSupport.requiredText(payload, "summary"))
+                .rationale(InsightPayloadSupport.optionalText(payload, "rationale"))
                 .confidence(proposal.getConfidence())
                 .evidenceReferences(proposal.getEvidenceReferences())
-                .sourceType(optionalText(payload, "insightType"))
+                .sourceType(InsightPayloadSupport.optionalText(payload, "insightType"))
                 .build();
         Insight savedInsight = insightRepository.save(insight);
         createEnrichmentRelationIfNeeded(proposal, savedInsight);
     }
 
-    private String requiredText(Map<String, Object> payload, String field) {
-        Object value = payload == null ? null : payload.get(field);
-        if (!(value instanceof String text) || text.isBlank()) {
-            throw new IllegalArgumentException("Accepted insight proposal is missing payload field: " + field);
-        }
-        return text;
-    }
-
-    private String optionalText(Map<String, Object> payload, String field) {
-        Object value = payload == null ? null : payload.get(field);
-        return value instanceof String text && !text.isBlank() ? text : null;
-    }
-
     private void createEnrichmentRelationIfNeeded(ValidatableProposal proposal, Insight savedInsight) {
-        if (!"ENRICHES".equals(optionalText(proposal.getPayload(), "deltaType"))) {
+        if (!"ENRICHES".equals(InsightPayloadSupport.optionalText(proposal.getPayload(), "deltaType"))) {
             return;
         }
-        UUID targetInsightId = requiredUuid(proposal.getPayload(), "targetInsightId");
+        UUID targetInsightId = InsightPayloadSupport.requiredUuid(proposal.getPayload(), "targetInsightId");
         Insight target = insightRepository.findById(targetInsightId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Accepted insight enrichment target does not exist: " + targetInsightId));
@@ -83,27 +70,5 @@ public class InsightPromotionService {
                 .relationType(KnowledgeRelationType.DERIVED_FROM)
                 .description("Incremental architecture enrichment accepted from trusted knowledge")
                 .build());
-    }
-
-    private UUID requiredUuid(Map<String, Object> payload, String field) {
-        Object value = payload == null ? null : payload.get(field);
-        if (!(value instanceof String text) || text.isBlank()) {
-            throw new IllegalArgumentException("Accepted insight proposal is missing payload field: " + field);
-        }
-        try {
-            return UUID.fromString(text);
-        } catch (IllegalArgumentException invalid) {
-            throw new IllegalArgumentException("Accepted insight proposal has invalid UUID field: " + field);
-        }
-    }
-
-    private InsightType toDomainType(String proposalType) {
-        return switch (proposalType) {
-            case "ARCHITECTURE_DESCRIPTION", "INFRASTRUCTURE_DESCRIPTION" -> InsightType.ARCHITECTURAL;
-            case "TECHNOLOGY_DESCRIPTION" -> InsightType.TECHNOLOGY;
-            case "PROJECT_PRESENTATION", "INSTALLATION", "USAGE", "REQUIREMENTS", "API_DESCRIPTION" ->
-                    InsightType.DOCUMENTATION;
-            default -> throw new IllegalArgumentException("Unsupported insight proposal type: " + proposalType);
-        };
     }
 }

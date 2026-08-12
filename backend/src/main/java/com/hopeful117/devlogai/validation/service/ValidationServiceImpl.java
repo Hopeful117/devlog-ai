@@ -28,6 +28,7 @@ public class ValidationServiceImpl implements ValidationService {
 
     private final ValidationMapper validationMapper;
     private final ProposalPromotionService promotionService;
+    private final TrustedKnowledgeDuplicateGuard trustedKnowledgeDuplicateGuard;
 
     @Override
     @Transactional
@@ -58,6 +59,10 @@ public class ValidationServiceImpl implements ValidationService {
                 validationMapper.toEntity(request);
 
         validation.setProposal(proposal);
+
+        if (request.decision() == ValidationDecision.ACCEPTED) {
+            trustedKnowledgeDuplicateGuard.assertCanAccept(proposal);
+        }
 
         proposal.setStatus(
                 request.decision() == ValidationDecision.ACCEPTED
