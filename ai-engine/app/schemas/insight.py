@@ -1,7 +1,13 @@
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from app.models.intent import InsightType
+from enum import Enum
+
+
+class KnowledgeDeltaType(str, Enum):
+    NEW = "NEW"
+    ENRICHES = "ENRICHES"
 
 
 class InsightOutputModel(BaseModel):
@@ -17,6 +23,10 @@ class InsightProposalOutput(InsightOutputModel):
     title: str = Field(min_length=1, max_length=255)
     summary: str = Field(min_length=1, max_length=5000)
     rationale: str = Field(min_length=1, max_length=5000)
+    delta_type: KnowledgeDeltaType = Field(
+        default=KnowledgeDeltaType.NEW, alias="deltaType"
+    )
+    target_insight_id: UUID | None = Field(default=None, alias="targetInsightId")
     confidence: float = Field(ge=0.0, le=1.0)
     supporting_fact_ids: list[UUID] = Field(alias="supportingFactIds")
     supporting_observation_ids: list[UUID] = Field(
@@ -30,6 +40,14 @@ class InsightProposalOutput(InsightOutputModel):
         if any(not value.strip() for value in values):
             raise ValueError("evidence references must not be blank")
         return values
+
+    @model_validator(mode="after")
+    def validate_delta_target(self) -> "InsightProposalOutput":
+        if self.delta_type == KnowledgeDeltaType.ENRICHES and self.target_insight_id is None:
+            raise ValueError("targetInsightId is required when deltaType is ENRICHES")
+        if self.delta_type == KnowledgeDeltaType.NEW and self.target_insight_id is not None:
+            raise ValueError("targetInsightId must be omitted when deltaType is NEW")
+        return self
 
 
 class InsightGenerationOutput(InsightOutputModel):

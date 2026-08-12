@@ -3,7 +3,11 @@ import hashlib
 
 from app.prompts.insight import InsightPromptBuilder, UnsupportedPromptTemplateError
 from app.schemas.ai_task import UserGuidance
-from tests.intent_fixtures import prompt_request, selected_knowledge
+from tests.intent_fixtures import (
+    architecture_overview_intent,
+    prompt_request,
+    selected_knowledge,
+)
 
 
 def test_prompt_is_deterministic_versioned_traceable_and_digest_stable() -> None:
@@ -147,3 +151,25 @@ def test_any_semantic_rendered_content_change_changes_digest() -> None:
     changed = builder.corrective_retry(original, ValueError("grounding reference missing"))
     assert changed.prompt_version == original.prompt_version
     assert changed.content_digest != original.content_digest
+
+
+def test_architecture_prompt_includes_existing_trusted_architecture_knowledge() -> None:
+    request = prompt_request(
+        intent=architecture_overview_intent(),
+        knowledge=selected_knowledge(
+            existing_architecture_knowledge=[
+                {
+                    "insightId": "9b913083-b318-43ba-a420-c67adcd1cf72",
+                    "title": "Existing architecture",
+                    "content": "The system is modular",
+                    "sourceType": "ARCHITECTURE_DESCRIPTION",
+                }
+            ]
+        ),
+    )
+
+    prompt = InsightPromptBuilder().build(request)
+
+    assert "BEGIN EXISTING TRUSTED ARCHITECTURE KNOWLEDGE" in prompt.user_message
+    assert '"sourceType":"ARCHITECTURE_DESCRIPTION"' in prompt.user_message
+    assert 'deltaType "ENRICHES"' in prompt.user_message

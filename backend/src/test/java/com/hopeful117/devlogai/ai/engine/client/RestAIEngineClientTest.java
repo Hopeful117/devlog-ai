@@ -165,7 +165,7 @@ class RestAIEngineClientTest {
                         new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                         0, 0, 0, false, List.of(), List.of(), "b".repeat(64)),
                 new SelectedKnowledge.SelectionMetadata("selection-v1", List.of(), 0, 0,
-                        new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 60), "COMPLETE"),
+                        new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 5, 60), "COMPLETE"),
                 "a".repeat(64));
         return new PromptRequest(correlationId, correlationId, analysisId, UUID.randomUUID(),
                 AiTaskType.INSIGHT_GENERATION, intent, null, selected, intent.outputSchema(), Map.of());

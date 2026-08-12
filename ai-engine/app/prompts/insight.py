@@ -102,6 +102,15 @@ Return only grounded, structured Insight proposals that require human validation
         supported = ", ".join(
             value.value for value in request.intent.supported_insight_types
         )
+        existing_knowledge_json = ""
+        if request.intent.id == "architecture-overview":
+            if "existingArchitectureKnowledge" not in request.selected_knowledge:
+                raise PromptConstructionError(
+                    "SelectedKnowledge is missing required sections: existingArchitectureKnowledge"
+                )
+            existing_knowledge_json = self._canonical(
+                request.selected_knowledge.get("existingArchitectureKnowledge", [])
+            )
         user_message = (
             f"{task_definition}\n\n"
             f"BUSINESS INTENT\n{intent_json}\n\n"
@@ -119,7 +128,19 @@ Return only grounded, structured Insight proposals that require human validation
             f"{guidance_json}\n"
             "END OPTIONAL UNTRUSTED USER GUIDANCE\n\n"
             f"EXPECTED OUTPUT CONTRACT\n{schema_json}\n\n"
-            "Return an object with a proposals array. Every proposal must remain grounded "
+            + (
+                "BEGIN EXISTING TRUSTED ARCHITECTURE KNOWLEDGE\n"
+                f"{existing_knowledge_json}\n"
+                "END EXISTING TRUSTED ARCHITECTURE KNOWLEDGE\n\n"
+                "When existing trusted architecture knowledge is supplied, compare the new "
+                "evidence against it. Return only meaningful architecture deltas. Use "
+                'deltaType "NEW" for genuinely new knowledge. Use deltaType "ENRICHES" only '
+                "when the proposal adds meaningful information to one supplied trusted "
+                "architecture knowledge item and copy its targetInsightId exactly. If nothing "
+                "materially new is learned, return an empty proposals array.\n\n"
+                if request.intent.id == "architecture-overview" else ""
+            )
+            + "Return an object with a proposals array. Every proposal must remain grounded "
             "and use only a supported Insight type."
         )
         prompt_version = request.intent.prompt_template

@@ -44,11 +44,22 @@ public interface ValidatableProposalMapper {
                 || entity.getPayload() == null) return null;
         return new com.hopeful117.devlogai.proposal.dto.response.InsightProposalPayloadResponse(
                 text(entity, "insightType"), text(entity, "title"),
-                text(entity, "summary"), text(entity, "rationale"));
+                text(entity, "summary"), text(entity, "rationale"),
+                text(entity, "deltaType"), uuid(entity, "targetInsightId"));
     }
 
     private String text(ValidatableProposal entity, String key) {
         Object value = entity.getPayload().get(key);
         return value instanceof String text ? text : null;
+    }
+
+    private java.util.UUID uuid(ValidatableProposal entity, String key) {
+        Object value = entity.getPayload().get(key);
+        if (value == null) return null;
+        try {
+            return java.util.UUID.fromString(value.toString());
+        } catch (IllegalArgumentException invalid) {
+            return null;
+        }
     }
 }

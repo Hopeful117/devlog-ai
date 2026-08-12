@@ -96,6 +96,7 @@ class KnowledgeSelectionServiceTest {
         assertEquals(repositoryContext, first.repositoryContext());
         assertTrue(first.selectionMetadata().appliedRules()
                 .contains("REPOSITORY_FIRST_LAYERING"));
+        assertEquals(List.of(), first.existingArchitectureKnowledge());
     }
 
     private AnalysisContext.FactSnapshot fact(FactType type, String content) {

@@ -7,6 +7,9 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.fact.entity.FactType;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
+import com.hopeful117.devlogai.insight.entity.Insight;
+import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.observation.entity.ObservationType;
@@ -139,6 +142,47 @@ class KnowledgeSelectionServiceAdditionalTest {
         SelectedKnowledge result = service.select(context, architectureIntent(), null);
 
         assertEquals(1, result.selectedFacts().size());
+    }
+
+    @Test
+    void shouldSelectBoundedExistingArchitectureKnowledgeForArchitectureIntent() throws Exception {
+        var service = createService();
+        var context = createMinimalContext(testAnalysis());
+
+        AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
+                .analysisId(context.analysis().id())
+                .collectionComplete(true).truncated(false)
+                .warningCount(0).errorCount(0)
+                .build();
+        when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.of(diagnostic));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        RepositoryContext repoContext = new RepositoryContext(
+                "v1", null, List.of(), "v1", List.of(), List.of(),
+                Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
+                0, 0, 0, false, List.of(), List.of(), "digest");
+        when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+
+        List<Insight> insights = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            insights.add(Insight.builder()
+                    .id(UUID.randomUUID())
+                    .analysis(com.hopeful117.devlogai.analysis.entity.Analysis.builder().id(UUID.randomUUID()).build())
+                    .proposal(com.hopeful117.devlogai.proposal.entity.ValidatableProposal.builder().id(UUID.randomUUID()).build())
+                    .type(InsightType.ARCHITECTURAL)
+                    .severity(InsightSeverity.INFO)
+                    .title("Architecture " + i)
+                    .content("Content " + i)
+                    .sourceType("ARCHITECTURE_DESCRIPTION")
+                    .createdAt(Instant.now().minusSeconds(i))
+                    .build());
+        }
+        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(context.project().id())).thenReturn(insights);
+
+        SelectedKnowledge result = service.select(context, architectureIntent(), null);
+
+        assertEquals(5, result.existingArchitectureKnowledge().size());
+        assertEquals("ARCHITECTURE_DESCRIPTION",
+                result.existingArchitectureKnowledge().getFirst().sourceType());
     }
 
     @Test

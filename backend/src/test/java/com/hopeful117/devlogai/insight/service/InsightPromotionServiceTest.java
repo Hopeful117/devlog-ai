@@ -5,6 +5,9 @@ import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
+import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelation;
+import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
+import com.hopeful117.devlogai.knowledge.relation.repository.KnowledgeRelationRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.proposal.entity.ProposalType;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
@@ -18,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,6 +29,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class InsightPromotionServiceTest {
     @Mock InsightRepository repository;
+    @Mock KnowledgeRelationRepository relations;
 
     @Test
     void shouldPromoteAcceptedInsightProposalWithCompleteProvenance() {
@@ -44,8 +49,9 @@ class InsightPromotionServiceTest {
                 .confidence(new BigDecimal("0.9200"))
                 .evidenceReferences(List.of("src/main/java/com/example/App.java"))
                 .build();
+        when(repository.save(any(Insight.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        new InsightPromotionService(repository).promote(proposal, validation, InsightSeverity.WARNING);
+        new InsightPromotionService(repository, relations).promote(proposal, validation, InsightSeverity.WARNING);
 
         ArgumentCaptor<Insight> captor = ArgumentCaptor.forClass(Insight.class);
         verify(repository).save(captor.capture());
@@ -64,6 +70,7 @@ class InsightPromotionServiceTest {
                 () -> assertEquals(List.of("src/main/java/com/example/App.java"), insight.getEvidenceReferences()),
                 () -> assertEquals("ARCHITECTURE_DESCRIPTION", insight.getSourceType())
         );
+        verifyNoInteractions(relations);
     }
 
     @Test
@@ -71,8 +78,8 @@ class InsightPromotionServiceTest {
         ValidatableProposal proposal = ValidatableProposal.builder()
                 .type(ProposalType.DOCUMENTATION)
                 .build();
-        new InsightPromotionService(repository).promote(proposal, new Validation(), null);
-        verifyNoInteractions(repository);
+        new InsightPromotionService(repository, relations).promote(proposal, new Validation(), null);
+        verifyNoInteractions(repository, relations);
     }
 
     @Test
@@ -81,12 +88,12 @@ class InsightPromotionServiceTest {
                 .type(ProposalType.INSIGHT)
                 .payload(Map.of("insightType", "TECHNOLOGY_DESCRIPTION", "title", "Stack"))
                 .build();
-        InsightPromotionService service = new InsightPromotionService(repository);
+        InsightPromotionService service = new InsightPromotionService(repository, relations);
         Validation validation = new Validation();
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> service.promote(proposal, validation, InsightSeverity.INFO));
         assertEquals("Accepted insight proposal is missing payload field: summary", error.getMessage());
-        verifyNoInteractions(repository);
+        verifyNoInteractions(repository, relations);
     }
 
     @Test
@@ -99,11 +106,45 @@ class InsightPromotionServiceTest {
                         "summary", "The project uses Spring Boot."
                 ))
                 .build();
-        InsightPromotionService service = new InsightPromotionService(repository);
+        InsightPromotionService service = new InsightPromotionService(repository, relations);
         Validation validation = new Validation();
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> service.promote(proposal, validation, null));
         assertEquals("Severity is required when accepting an insight proposal", error.getMessage());
-        verifyNoInteractions(repository);
+        verifyNoInteractions(repository, relations);
+    }
+
+    @Test
+    void shouldCreateKnowledgeRelationForAcceptedEnrichment() {
+        UUID targetInsightId = java.util.UUID.randomUUID();
+        Project project = Project.builder().id(java.util.UUID.randomUUID()).build();
+        Analysis analysis = new Analysis();
+        Validation validation = new Validation();
+        ValidatableProposal proposal = ValidatableProposal.builder()
+                .project(project)
+                .analysis(analysis)
+                .type(ProposalType.INSIGHT)
+                .payload(Map.of(
+                        "insightType", "ARCHITECTURE_DESCRIPTION",
+                        "title", "Architecture refinement",
+                        "summary", "A module boundary also isolates deployment cadence.",
+                        "rationale", "New repository evidence shows deploy independence.",
+                        "deltaType", "ENRICHES",
+                        "targetInsightId", targetInsightId.toString()
+                ))
+                .build();
+        Insight savedInsight = Insight.builder().id(java.util.UUID.randomUUID()).project(project).build();
+        Insight targetInsight = Insight.builder().id(targetInsightId).project(project).build();
+        when(repository.save(any(Insight.class))).thenReturn(savedInsight);
+        when(repository.findById(targetInsightId)).thenReturn(java.util.Optional.of(targetInsight));
+
+        new InsightPromotionService(repository, relations).promote(proposal, validation, InsightSeverity.INFO);
+
+        ArgumentCaptor<KnowledgeRelation> relationCaptor = ArgumentCaptor.forClass(KnowledgeRelation.class);
+        verify(relations).save(relationCaptor.capture());
+        KnowledgeRelation relation = relationCaptor.getValue();
+        assertEquals(savedInsight.getId(), relation.getSourceEntityId());
+        assertEquals(targetInsightId, relation.getTargetEntityId());
+        assertEquals(KnowledgeRelationType.DERIVED_FROM, relation.getRelationType());
     }
 }

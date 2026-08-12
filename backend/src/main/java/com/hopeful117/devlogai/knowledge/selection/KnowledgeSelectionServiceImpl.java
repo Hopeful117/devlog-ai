@@ -25,8 +25,11 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
     private static final String BUILD = "BUILD";
     private static final String CONTAINER = "CONTAINER";
     private static final String DOCKER = "DOCKER";
+    private static final Set<String> ARCHITECTURE_SOURCE_TYPES = Set.of(
+            "ARCHITECTURE_DESCRIPTION", "TECHNOLOGY_DESCRIPTION",
+            "INFRASTRUCTURE_DESCRIPTION", "API_DESCRIPTION");
     static final SelectedKnowledge.KnowledgeBudget BUDGET =
-            new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 60);
+            new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 5, 60);
 
     private final AnalysisExecutionDiagnosticRepository diagnosticRepository;
     private final InsightRepository insightRepository;
@@ -66,6 +69,8 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 .toList();
         List<SelectedKnowledge.InsightSnapshot> insights = insightCandidates.stream()
                 .limit(BUDGET.maximumInsights()).map(this::toInsight).toList();
+        List<SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot> existingArchitectureKnowledge =
+                selectExistingArchitectureKnowledge(intent, insightCandidates);
         var engineeringEvents = context.validatedEngineeringEvents().stream().limit(10).toList();
         RepositoryContext repositoryContext = repositoryContextService.build(
                 context, intent, guidance, insightCandidates);
@@ -79,6 +84,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 + insightCandidates.size() + context.validatedEngineeringEvents().size()
                 + repositoryContext.candidateCount();
         int selected = 1 + observations.size() + facts.size() + insights.size()
+                + existingArchitectureKnowledge.size()
                 + engineeringEvents.size() + repositoryContext.evidence().size() + 1
                 + (context.evolutionContext() == null ? 0 : 1);
         var metadata = new SelectedKnowledge.SelectionMetadata(
@@ -90,10 +96,10 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 selected, Math.max(0, candidates + 2 - selected), BUDGET,
                 diagnostic.isCollectionComplete() ? "COMPLETE" : "PARTIAL");
         String digest = digest(context, new DigestComponents(observations, facts, diagnostics,
-                insights, engineeringEvents, repositoryContext, metadata));
+                insights, existingArchitectureKnowledge, engineeringEvents, repositoryContext, metadata));
         return new SelectedKnowledge(context.project(), context.analysis(), context.projectProfile(),
-                observations, facts, diagnostics, insights, engineeringEvents, repositoryContext,
-                context.evolutionContext(), metadata, digest);
+                observations, facts, diagnostics, insights, existingArchitectureKnowledge,
+                engineeringEvents, repositoryContext, context.evolutionContext(), metadata, digest);
     }
 
     private void requireMandatoryKnowledge(AnalysisContext context, IntentDefinition intent) {
@@ -156,14 +162,56 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 insight.getType(), insight.getSeverity(), insight.getTitle(), insight.getContent());
     }
 
+    private List<SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot> selectExistingArchitectureKnowledge(
+            IntentDefinition intent,
+            List<Insight> insightCandidates
+    ) {
+        if (!"architecture-overview".equals(intent.id())) {
+            return List.of();
+        }
+        return insightCandidates.stream()
+                .filter(this::isArchitectureRelevantInsight)
+                .limit(BUDGET.maximumArchitectureKnowledge())
+                .map(this::toExistingArchitectureKnowledge)
+                .toList();
+    }
+
+    private boolean isArchitectureRelevantInsight(Insight insight) {
+        if (ARCHITECTURE_SOURCE_TYPES.contains(insight.getSourceType())) {
+            return true;
+        }
+        return insight.getSourceType() == null
+                && (insight.getType() == com.hopeful117.devlogai.insight.entity.InsightType.ARCHITECTURAL
+                || insight.getType() == com.hopeful117.devlogai.insight.entity.InsightType.TECHNOLOGY);
+    }
+
+    private SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot toExistingArchitectureKnowledge(
+            Insight insight
+    ) {
+        return new SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot(
+                insight.getId(),
+                insight.getProposal().getId(),
+                insight.getType(),
+                insight.getSeverity(),
+                insight.getSourceType(),
+                insight.getTitle(),
+                insight.getContent(),
+                insight.getRationale(),
+                insight.getEvidenceReferences(),
+                insight.getCreatedAt()
+        );
+    }
+
     private String digest(AnalysisContext context, DigestComponents selected) {
         record DigestInput(Object project, Object analysis, Object profile, Object selectedObservations,
                            Object selectedFacts, Object diagnostic, Object selectedInsights,
+                           Object existingArchitectureKnowledge,
                            Object selectedEngineeringEvents,
                            Object repositoryContext, Object evolutionContext, Object selectionMetadata) { }
         byte[] serialized = objectMapper.writeValueAsString(new DigestInput(
                 context.project(), context.analysis(), context.projectProfile(), selected.observations(),
-                selected.facts(), selected.diagnostics(), selected.insights(), selected.engineeringEvents(),
+                selected.facts(), selected.diagnostics(), selected.insights(),
+                selected.existingArchitectureKnowledge(), selected.engineeringEvents(),
                 selected.repositoryContext(), context.evolutionContext(), selected.metadata()))
                 .getBytes(StandardCharsets.UTF_8);
         try {
@@ -178,6 +226,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
             List<AnalysisContext.FactSnapshot> facts,
             SelectedKnowledge.DiagnosticSnapshot diagnostics,
             List<SelectedKnowledge.InsightSnapshot> insights,
+            List<SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot> existingArchitectureKnowledge,
             List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
                     engineeringEvents,
             RepositoryContext repositoryContext,

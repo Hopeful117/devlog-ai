@@ -6,6 +6,7 @@ import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,6 +18,7 @@ public record SelectedKnowledge(
         List<AnalysisContext.FactSnapshot> selectedFacts,
         DiagnosticSnapshot diagnostics,
         List<InsightSnapshot> selectedInsights,
+        List<ExistingArchitectureKnowledgeSnapshot> existingArchitectureKnowledge,
         List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
                 selectedEngineeringEvents,
         RepositoryContext repositoryContext,
@@ -28,6 +30,7 @@ public record SelectedKnowledge(
         selectedObservations = List.copyOf(selectedObservations);
         selectedFacts = List.copyOf(selectedFacts);
         selectedInsights = List.copyOf(selectedInsights);
+        existingArchitectureKnowledge = List.copyOf(existingArchitectureKnowledge);
         selectedEngineeringEvents = List.copyOf(selectedEngineeringEvents);
     }
 
@@ -38,7 +41,8 @@ public record SelectedKnowledge(
             List<InsightSnapshot> selectedInsights, RepositoryContext repositoryContext,
             SelectionMetadata selectionMetadata, String selectionDigest) {
         this(project, analysis, projectProfile, selectedObservations, selectedFacts, diagnostics,
-                selectedInsights, List.of(), repositoryContext, null, selectionMetadata, selectionDigest);
+                selectedInsights, List.of(), List.of(), repositoryContext, null,
+                selectionMetadata, selectionDigest);
     }
 
     public record DiagnosticSnapshot(boolean collectionComplete, boolean truncated,
@@ -47,6 +51,23 @@ public record SelectedKnowledge(
     public record InsightSnapshot(UUID id, UUID analysisId, InsightType type,
                                   InsightSeverity severity, String title, String content) { }
 
+    public record ExistingArchitectureKnowledgeSnapshot(
+            UUID insightId,
+            UUID proposalId,
+            InsightType normalizedType,
+            InsightSeverity severity,
+            String sourceType,
+            String title,
+            String content,
+            String rationale,
+            List<String> evidenceReferences,
+            Instant createdAt
+    ) {
+        public ExistingArchitectureKnowledgeSnapshot {
+            evidenceReferences = List.copyOf(evidenceReferences);
+        }
+    }
+
     public record SelectionMetadata(String selectionVersion, List<String> appliedRules,
                                     int selectedKnowledgeCount, int discardedKnowledgeCount,
                                     KnowledgeBudget knowledgeBudget, String completeness) {
@@ -54,5 +75,6 @@ public record SelectedKnowledge(
     }
 
     public record KnowledgeBudget(int maximumFacts, int maximumObservations,
-                                  int maximumInsights, int maximumRepositoryEvidence) { }
+                                  int maximumInsights, int maximumArchitectureKnowledge,
+                                  int maximumRepositoryEvidence) { }
 }

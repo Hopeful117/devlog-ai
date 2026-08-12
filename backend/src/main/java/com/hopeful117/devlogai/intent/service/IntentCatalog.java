@@ -83,8 +83,10 @@ public class IntentCatalog {
                 "minimumProposalCount", 0,
                 "maximumProposalCount", 10,
                 "allowedInsightTypes", types.stream().map(Enum::name).toList(),
+                "allowedDeltaTypes", List.of("NEW", "ENRICHES"),
                 "requiredProposalFields", List.of(
                         "insightType", "title", "summary", "rationale", "confidence",
+                        "deltaType",
                         "supportingFactIds", "supportingObservationIds", "evidenceReferences"));
     }
 
