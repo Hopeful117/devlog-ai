@@ -22,6 +22,7 @@ import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,7 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
     private final AIEngineClient aiEngineClient;
     private final IntentCatalog intentCatalog;
     private final KnowledgeSelectionService knowledgeSelectionService;
+    private final SelectedKnowledgePromptProjectionService promptProjectionService;
 
     @Override
     public AnalysisWorkflowResult start(UUID analysisId) {
@@ -76,7 +78,7 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
                             createdTask.taskType(),
                             intent,
                             guidance,
-                            selectedKnowledge,
+                            promptProjectionService.toMap(selectedKnowledge),
                             intent.outputSchema(),
                             java.util.Map.of(
                                     "source", "devlog-ai-core",

@@ -18,6 +18,7 @@ import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -53,6 +54,9 @@ class AiTaskServiceTest {
 
     @Mock
     private IntentCatalog intentCatalog;
+
+    @Mock
+    private SelectedKnowledgePromptProjectionService promptProjectionService;
 
     @InjectMocks
     private AiTaskServiceImpl aiTaskService;
