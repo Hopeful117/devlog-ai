@@ -25,6 +25,7 @@ import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.engineeringevent.EngineeringEvent;
 import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import lombok.RequiredArgsConstructor;
@@ -74,7 +75,7 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new com.hopeful117.devlogai.shared.exception.EntityNotFoundException("Project", projectId));
 
-        ProjectProfileResponse latestProfile = projectProfileService.getLatestByProject(projectId);
+        ProjectProfileResponse latestProfile = latestProfileOrNull(projectId);
 
         List<AnalysisContext.KnowledgeEventSnapshot> recentKnowledgeEvents =
                 knowledgeEventRepository.findByProjectIdOrderByCreatedAtDescIdDesc(
@@ -159,6 +160,18 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                 knowledgeRelations,
                 engineeringStories
         );
+    }
+
+    private ProjectProfileResponse latestProfileOrNull(UUID projectId) {
+        try {
+            return projectProfileService.getLatestByProject(projectId);
+        } catch (EntityNotFoundException error) {
+            String expected = "Project profile not found with identifier: %s".formatted(projectId);
+            if (expected.equals(error.getMessage())) {
+                return null;
+            }
+            throw error;
+        }
     }
 
     private ProjectContextSnapshot.EngineeringEventSnapshot toEngineeringEvent(EngineeringEvent event) {

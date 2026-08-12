@@ -246,6 +246,44 @@ class ProjectContextProviderTest {
     }
 
     @Test
+    void shouldHandleMissingProfileExceptionGracefully() {
+        UUID projectId = UUID.randomUUID();
+        Project project = Project.builder()
+                .id(projectId).name("Test Project").slug("test").build();
+
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(projectProfileService.getLatestByProject(projectId))
+                .thenThrow(new EntityNotFoundException("Project profile", projectId));
+        when(knowledgeEventRepository.findByProjectIdOrderByCreatedAtDescIdDesc(
+                eq(projectId), any(Pageable.class))).thenReturn(List.of());
+        when(proposalRepository.findByProjectIdAndStatusOrderByCreatedAtDescIdDesc(
+                eq(projectId), eq(ProposalStatus.ACCEPTED), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(artifactRepository.findByProjectIdAndTypeInOrderByCreatedAtDescIdDesc(
+                eq(projectId), anyList(), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(decisionRepository.findByProjectIdOrderByCreatedAtDescIdDesc(
+                eq(projectId), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(milestoneRepository.findByProjectIdOrderByStartedAtDescIdDesc(
+                eq(projectId), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(analysisRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(knowledgeRelationRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+        when(engineeringStoryRepository.findByProject_IdOrderByCreatedAtDesc(projectId))
+                .thenReturn(List.of());
+
+        ProjectContextSnapshot snapshot = provider.build(projectId);
+
+        assertEquals(projectId, snapshot.project().id());
+        assertNull(snapshot.latestProjectProfile());
+    }
+
+    @Test
     void shouldApplyPaginationLimits() {
         UUID projectId = UUID.randomUUID();
         Project project = Project.builder()
