@@ -90,12 +90,14 @@ class KnowledgeSelectionServiceTest {
                 .filter(value -> value.content().equals("duplicate")).count());
         assertEquals(ObservationType.ARCHITECTURE_MODULARIZATION,
                 first.selectedObservations().getFirst().type());
-        assertEquals("knowledge-selection-v3", first.selectionMetadata().selectionVersion());
+        assertEquals("knowledge-selection-v4", first.selectionMetadata().selectionVersion());
         assertTrue(first.selectionMetadata().discardedKnowledgeCount() > 0);
         assertTrue(first.selectionDigest().matches("[0-9a-f]{64}"));
         assertEquals(repositoryContext, first.repositoryContext());
         assertTrue(first.selectionMetadata().appliedRules()
                 .contains("REPOSITORY_FIRST_LAYERING"));
+        assertTrue(first.selectionMetadata().appliedRules()
+                .contains("OBSERVATION_FACT_CLOSURE"));
         assertEquals(List.of(), first.existingArchitectureKnowledge());
     }
 
@@ -182,5 +184,67 @@ class KnowledgeSelectionServiceTest {
         }
         assertTrue(allCommitFirst,
                 "Commit-scoped facts should rank before non-commit facts. Got: " + selectedTypes);
+    }
+
+    @Test
+    void shouldRetainSupportingFactsRequiredBySelectedObservations() {
+        var diagnostics = mock(AnalysisExecutionDiagnosticRepository.class);
+        var insights = mock(InsightRepository.class);
+        var mapper = mock(ObjectMapper.class);
+        var repositoryContexts = mock(RepositoryContextService.class);
+        UUID projectId = UUID.randomUUID();
+        UUID analysisId = UUID.randomUUID();
+        AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
+                .analysisId(analysisId).collectionComplete(true).warningCount(0).build();
+        when(diagnostics.findById(analysisId)).thenReturn(Optional.of(diagnostic));
+        when(insights.findByProjectIdOrderByCreatedAtDesc(projectId)).thenReturn(List.of());
+        when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
+
+        AnalysisContext.FactSnapshot requiredFact = fact(FactType.OTHER, "required-support");
+        List<AnalysisContext.FactSnapshot> facts = new ArrayList<>();
+        for (int index = 0; index < 45; index++) {
+            facts.add(fact(FactType.DOCKERFILE_PRESENT, "docker-" + index));
+        }
+        facts.add(requiredFact);
+        var observations = List.of(new AnalysisContext.ObservationSnapshot(
+                UUID.randomUUID(),
+                ObservationType.ARCHITECTURE_MODULARIZATION,
+                "architecture depends on low-ranked support",
+                "rule",
+                "v1",
+                List.of(requiredFact.id()),
+                Instant.EPOCH));
+        AnalysisContext context = new AnalysisContext(
+                new AnalysisContext.ProjectSnapshot(projectId, "Project", "project", null,
+                        ProjectStatus.ACTIVE),
+                new AnalysisContext.AnalysisSnapshot(analysisId, AnalysisType.ARCHITECTURE_REVIEW,
+                        "architecture-overview", "v1", AnalysisStatus.IN_PROGRESS,
+                        Instant.EPOCH, null, Instant.EPOCH),
+                mock(ProjectProfileResponse.class), facts, observations,
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        IntentDefinition intent = new IntentDefinition("architecture-overview", "v1", "Architecture",
+                List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
+                Map.of("type", "object"), "architecture-overview-prompt-v1");
+        RepositoryContext repositoryContext = new RepositoryContext(
+                "repository-context-engine-v1", ContextProfile.ARCHITECTURE_REVIEW,
+                List.of("architecture-v1", "history-v1"),
+                "context-intelligence-v1", List.of("test"),
+                List.of(), Map.of(),
+                new RepositoryContext.ContextBudget(60, 500, 20, 6000),
+                0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList()))
+                .thenReturn(repositoryContext);
+        var service = new KnowledgeSelectionServiceImpl(
+                diagnostics, insights, mapper, repositoryContexts);
+
+        SelectedKnowledge result = service.select(context, intent, null);
+
+        assertEquals(40, result.selectedFacts().size());
+        assertTrue(result.selectedFacts().stream()
+                .anyMatch(fact -> fact.id().equals(requiredFact.id())));
+        assertTrue(result.selectedObservations().stream()
+                .flatMap(observation -> observation.supportingFactIds().stream())
+                .allMatch(factId -> result.selectedFacts().stream()
+                        .anyMatch(fact -> fact.id().equals(factId))));
     }
 }
