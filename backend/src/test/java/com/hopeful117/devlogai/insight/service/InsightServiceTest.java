@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.insight.service;
 
 import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
@@ -24,6 +25,7 @@ import static org.mockito.Mockito.*;
 class InsightServiceTest {
     @Mock InsightRepository repository;
     @Mock InsightMapper mapper;
+    @Mock TrustedKnowledgeDuplicateAuditService duplicateAuditService;
     @InjectMocks InsightServiceImpl service;
 
     @Test
@@ -62,5 +64,14 @@ class InsightServiceTest {
         assertEquals(List.of(response), service.getByProjectAndSeverity(projectId, InsightSeverity.CRITICAL));
         assertEquals(List.of(response), service.getByProjectAndTypeAndSeverity(
                 projectId, InsightType.ARCHITECTURAL, InsightSeverity.CRITICAL));
+    }
+
+    @Test
+    void shouldReturnDuplicateAudit() {
+        UUID projectId = UUID.randomUUID();
+        InsightDuplicateAuditResponse response = new InsightDuplicateAuditResponse(projectId, 0, 0, List.of());
+        when(duplicateAuditService.audit(projectId)).thenReturn(response);
+
+        assertSame(response, service.getDuplicateAudit(projectId));
     }
 }

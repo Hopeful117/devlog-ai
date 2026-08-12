@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.insight.controller;
 
 import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.service.InsightService;
@@ -30,6 +31,7 @@ class InsightControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 UUID.randomUUID(), UUID.randomUUID(), InsightType.ARCHITECTURAL,
                 InsightSeverity.CRITICAL, "Boundary", "content", "rationale",
                 null, List.of(), "ARCHITECTURE_DESCRIPTION", null, null);
+        InsightDuplicateAuditResponse auditResponse = new InsightDuplicateAuditResponse(projectId, 1, 0, List.of());
         List<InsightResponse> responses = List.of(response);
         when(service.getById(id)).thenReturn(response);
         when(service.getByProject(projectId)).thenReturn(responses);
@@ -38,12 +40,16 @@ class InsightControllerWebMvcTest extends ControllerWebMvcTestSupport {
         when(service.getByProjectAndSeverity(projectId, InsightSeverity.CRITICAL)).thenReturn(responses);
         when(service.getByProjectAndTypeAndSeverity(projectId, InsightType.ARCHITECTURAL, InsightSeverity.CRITICAL))
                 .thenReturn(responses);
+        when(service.getDuplicateAudit(projectId)).thenReturn(auditResponse);
 
         mvc.perform(get("/api/v1/insights/{id}", id)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/insights/project/{id}", projectId)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/insights/analysis/{id}", analysisId)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/insights/project/{id}/type/ARCHITECTURAL", projectId)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/insights/project/{id}/severity/CRITICAL", projectId)).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/insights/project/{id}/duplicate-audit", projectId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectId").value(projectId.toString()));
         mvc.perform(get("/api/v1/insights/project/{id}/type/ARCHITECTURAL/severity/CRITICAL", projectId))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].severity").value("CRITICAL"));
     }

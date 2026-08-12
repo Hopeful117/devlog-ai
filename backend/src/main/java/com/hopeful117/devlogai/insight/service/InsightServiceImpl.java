@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.insight.service;
 
 import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
@@ -20,6 +21,7 @@ public class InsightServiceImpl implements InsightService{
     private final InsightRepository insightRepository;
 
     private final InsightMapper insightMapper;
+    private final TrustedKnowledgeDuplicateAuditService trustedKnowledgeDuplicateAuditService;
 
 
     @Override
@@ -109,6 +111,11 @@ public class InsightServiceImpl implements InsightService{
                 .stream()
                 .map(insightMapper::toResponse)
                 .toList();
+    }
+
+    @Override
+    public InsightDuplicateAuditResponse getDuplicateAudit(UUID projectId) {
+        return trustedKnowledgeDuplicateAuditService.audit(projectId);
     }
 
 }
