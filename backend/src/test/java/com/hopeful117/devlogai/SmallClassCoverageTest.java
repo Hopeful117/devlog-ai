@@ -123,7 +123,7 @@ class SmallClassCoverageTest {
     @Test
     void insightProposalPayloadResponse() {
         InsightProposalPayloadResponse r = new InsightProposalPayloadResponse(
-                "type", "title", "summary", "rationale");
+                "type", "title", "summary", "rationale", "NEW", null);
         assertEquals("title", r.title());
         assertEquals("summary", r.summary());
     }

@@ -8,7 +8,11 @@ from app.prompts.insight import InsightPromptBuilder
 from app.providers.mock import MockLlmProvider
 from app.schemas.ai_task import AiTaskSubmissionRequest
 from app.services.insight_generation_service import InsightGenerationService
-from tests.intent_fixtures import describe_project_intent, selected_knowledge
+from tests.intent_fixtures import (
+    architecture_overview_intent,
+    describe_project_intent,
+    selected_knowledge,
+)
 
 
 class RecordingCallbackClient:
@@ -64,6 +68,48 @@ def valid_output(fact_id: str, observation_id: str, evidence: str) -> dict:
             }
         ]
     }
+
+
+def architecture_submission() -> tuple[AiTaskSubmissionRequest, str, str, str, str]:
+    fact_id = str(uuid4())
+    observation_id = str(uuid4())
+    evidence = "src/architecture.md:10"
+    target_insight_id = str(uuid4())
+    request = AiTaskSubmissionRequest(
+        request_id=uuid4(),
+        correlation_id=uuid4(),
+        task_type=AiTaskType.INSIGHT_GENERATION,
+        analysis_id=uuid4(),
+        ai_task_id=uuid4(),
+        intent=architecture_overview_intent(),
+        selected_knowledge=selected_knowledge(
+            facts=[
+                {
+                    "id": fact_id,
+                    "content": "Modules were separated",
+                    "evidenceReferences": [evidence],
+                }
+            ],
+            observations=[
+                {"id": observation_id, "content": "Architecture is modular"}
+            ],
+            existing_architecture_knowledge=[
+                {
+                    "insightId": target_insight_id,
+                    "title": "Existing modular architecture",
+                    "content": "The system is modular.",
+                    "sourceType": "ARCHITECTURE_DESCRIPTION",
+                }
+            ],
+        ),
+        expected_output_contract={
+            "type": "object",
+            "root": "proposals",
+            "allowedDeltaTypes": ["NEW", "ENRICHES"],
+        },
+        metadata={"source": "test"},
+    )
+    return request, fact_id, observation_id, evidence, target_insight_id
 
 
 @pytest.mark.asyncio
@@ -208,3 +254,48 @@ async def test_provider_failure_sends_failed_callback_without_corrective_retry()
     result = callback.results[0]
     assert result.status == AiTaskResultStatus.FAILED  # type: ignore[attr-defined]
     assert result.error.code == "LLM_PROVIDER_ERROR"  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_architecture_enrichment_payload_copies_delta_metadata() -> None:
+    request, fact_id, observation_id, evidence, target_insight_id = architecture_submission()
+    provider = MockLlmProvider([
+        {
+            "proposals": [
+                {
+                    "insightType": "ARCHITECTURE_DESCRIPTION",
+                    "title": "Richer modular architecture",
+                    "summary": "Modules also isolate deployment cadence.",
+                    "rationale": "New evidence proves deployment independence.",
+                    "deltaType": "ENRICHES",
+                    "targetInsightId": target_insight_id,
+                    "confidence": 0.9,
+                    "supportingFactIds": [fact_id],
+                    "supportingObservationIds": [observation_id],
+                    "evidenceReferences": [evidence],
+                }
+            ]
+        }
+    ])
+    callback = RecordingCallbackClient()
+    service = InsightGenerationService(provider, InsightPromptBuilder(), callback)  # type: ignore[arg-type]
+
+    await service.process(request, uuid4())
+
+    proposal = callback.results[0].proposals[0]  # type: ignore[attr-defined]
+    assert proposal.payload["deltaType"] == "ENRICHES"
+    assert proposal.payload["targetInsightId"] == target_insight_id
+
+
+@pytest.mark.asyncio
+async def test_architecture_generation_accepts_empty_proposals_for_no_significant_delta() -> None:
+    request, _, _, _, _ = architecture_submission()
+    provider = MockLlmProvider([{"proposals": []}])
+    callback = RecordingCallbackClient()
+    service = InsightGenerationService(provider, InsightPromptBuilder(), callback)  # type: ignore[arg-type]
+
+    await service.process(request, uuid4())
+
+    result = callback.results[0]
+    assert result.status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
+    assert result.proposals == []  # type: ignore[attr-defined]

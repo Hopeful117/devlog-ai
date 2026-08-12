@@ -95,12 +95,7 @@ class InsightGenerationService:
         proposals = [
             AiProposalResult(
                 type=ProposalType.INSIGHT,
-                payload={
-                    "insightType": proposal.insight_type.value,
-                    "title": proposal.title,
-                    "summary": proposal.summary,
-                    "rationale": proposal.rationale,
-                },
+                payload=self._payload(submission, proposal),
                 confidence=proposal.confidence,
                 supporting_fact_ids=proposal.supporting_fact_ids,
                 supporting_observation_ids=proposal.supporting_observation_ids,
@@ -204,6 +199,17 @@ class InsightGenerationService:
                 evidence_references,
                 "evidenceReferences",
             )
+            if proposal.delta_type.value == "ENRICHES":
+                existing = context.get("existingArchitectureKnowledge", [])
+                allowed_targets = {
+                    UUID(str(item["insightId"]))
+                    for item in existing
+                    if isinstance(item, dict) and "insightId" in item
+                } if isinstance(existing, list) else set()
+                if proposal.target_insight_id not in allowed_targets:
+                    raise InsightOutputValidationError(
+                        "targetInsightId must exist in existingArchitectureKnowledge"
+                    )
 
     def _collect_ids(self, items: list[object]) -> set[UUID]:
         identifiers: set[UUID] = set()
@@ -217,6 +223,19 @@ class InsightGenerationService:
                     "AnalysisContext contains an invalid identifier"
                 ) from error
         return identifiers
+
+    def _payload(self, submission: AiTaskSubmissionRequest, proposal: object) -> dict[str, object]:
+        payload = {
+            "insightType": proposal.insight_type.value,
+            "title": proposal.title,
+            "summary": proposal.summary,
+            "rationale": proposal.rationale,
+        }
+        if submission.intent.id == "architecture-overview":
+            payload["deltaType"] = proposal.delta_type.value
+            if proposal.target_insight_id is not None:
+                payload["targetInsightId"] = str(proposal.target_insight_id)
+        return payload
 
     def _require_subset(
         self,

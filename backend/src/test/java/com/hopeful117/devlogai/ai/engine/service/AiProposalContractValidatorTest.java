@@ -80,6 +80,52 @@ class AiProposalContractValidatorTest {
                 () -> validator.validate(task, ungroundedOutput));
     }
 
+    @Test
+    void validatesArchitectureInsightDeltaAgainstSelectedExistingKnowledge() {
+        UUID factId = UUID.randomUUID();
+        UUID observationId = UUID.randomUUID();
+        UUID targetInsightId = UUID.randomUUID();
+        String reference = "src/main/java/App.java:42";
+        AiTask task = AiTask.builder()
+                .intentId("architecture-overview")
+                .intentVersion("v1")
+                .selectedKnowledgeSnapshot(Map.of(
+                        "selectedFacts", List.of(Map.of("id", factId.toString(),
+                                "evidenceReferences", List.of(reference))),
+                        "selectedObservations", List.of(Map.of("id", observationId.toString())),
+                        "existingArchitectureKnowledge", List.of(Map.of(
+                                "insightId", targetInsightId.toString()
+                        ))))
+                .build();
+        AiProposalResult enriches = new AiProposalResult(ProposalType.INSIGHT,
+                Map.of("insightType", "ARCHITECTURE_DESCRIPTION",
+                        "title", "Boundary enrichment",
+                        "summary", "Modules also isolate deployment cadence.",
+                        "rationale", "New evidence shows teams deploy independently.",
+                        "deltaType", "ENRICHES",
+                        "targetInsightId", targetInsightId.toString()),
+                new BigDecimal("0.9500"), List.of(factId), List.of(observationId), List.of(reference));
+        AiProposalResult invalidTarget = new AiProposalResult(ProposalType.INSIGHT,
+                Map.of("insightType", "ARCHITECTURE_DESCRIPTION",
+                        "title", "Boundary enrichment",
+                        "summary", "Modules also isolate deployment cadence.",
+                        "rationale", "New evidence shows teams deploy independently.",
+                        "deltaType", "ENRICHES",
+                        "targetInsightId", UUID.randomUUID().toString()),
+                new BigDecimal("0.9500"), List.of(factId), List.of(observationId), List.of(reference));
+        AiProposalResult newInsight = new AiProposalResult(ProposalType.INSIGHT,
+                Map.of("insightType", "TECHNOLOGY_DESCRIPTION",
+                        "title", "Deployment stack",
+                        "summary", "The project uses containerized delivery.",
+                        "rationale", "Container evidence is newly grounded.",
+                        "deltaType", "NEW"),
+                new BigDecimal("0.9100"), List.of(factId), List.of(observationId), List.of(reference));
+
+        assertDoesNotThrow(() -> validator.validate(task, List.of(enriches, newInsight)));
+        assertThrows(InvalidAiTaskResultException.class,
+                () -> validator.validate(task, List.of(invalidTarget)));
+    }
+
     private AiProposalResult eventProposal(String category, String title, String reference) {
         return new AiProposalResult(ProposalType.ENGINEERING_EVENT,
                 Map.of("schemaVersion", "engineering-event-proposal-v1", "category", category,
