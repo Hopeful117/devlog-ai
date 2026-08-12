@@ -19,11 +19,34 @@ import { InsightService } from './insight.service';
         <article>
           <h1>{{ vm.data.title }}</h1>
           <p>{{ vm.data.content }}</p>
+          @if (vm.data.rationale; as rationale) {
+            <h2>Rationale</h2>
+            <p>{{ rationale }}</p>
+          }
           <dl>
             <dt>Type</dt>
-            <dd>{{ vm.data.type }}</dd>
+            <dd>
+              {{ vm.data.type }}
+              @if (vm.data.sourceType; as sourceType) {
+                <span>· source {{ sourceType }}</span>
+              }
+            </dd>
             <dt>Severity</dt>
             <dd>{{ vm.data.severity }}</dd>
+            @if (vm.data.confidence !== null) {
+              <dt>Confidence</dt>
+              <dd>{{ vm.data.confidence }}</dd>
+            }
+            @if (vm.data.evidenceReferences.length > 0) {
+              <dt>Evidence</dt>
+              <dd>
+                <ul>
+                  @for (ref of vm.data.evidenceReferences; track ref) {
+                    <li>{{ ref }}</li>
+                  }
+                </ul>
+              </dd>
+            }
             <dt>Accepted</dt>
             <dd>{{ vm.data.createdAt | date: 'medium' }}</dd>
             <dt>Project</dt>

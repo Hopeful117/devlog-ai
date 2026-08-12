@@ -61,15 +61,24 @@ This story proves, end-to-end through the read API, that **accepted knowledge ca
    - `InsightMapperTest` (new fields mapped).
    - `ValidationServiceImpl` test for `decidedAt` population.
 
+7. **Frontend — models**
+   - Extend `InsightFields` (and thus `InsightSummary`/`InsightDetail`) with `rationale`, `confidence`, `evidenceReferences`, `sourceType`.
+
+8. **Frontend — Knowledge UI projection**
+   - Surface the preserved semantic richness on the Insight detail page (`InsightDetailPage`): `rationale`, `confidence`, `evidenceReferences`, and `sourceType`, each rendered only when present (nullable-safe), so accepted knowledge is directly consumable by humans (ADR-049 §11).
+
+9. **Frontend — tests**
+   - New `InsightDetailPage` spec covering full and bare (nullable) renderings plus loading/error/not-found states.
+
 ### Out of Scope
 
-- **Frontend projection** — per ADR-049 §11, the responsibility is at the knowledge lifecycle layer; exposing the richer fields in the Knowledge UI is a later slice.
 - **`KnowledgeEvent` redesign** (ADR-049 §14) — explicitly deferred.
 - **`KnowledgeRelation` expansion / Knowledge Graph** (ADR-049 §15) — deferred and explicitly not required.
 - **Detailed git diff persistence** (ADR-049 §16) — out of scope.
 - **Raw AI payload replication** (ADR-049 §8, §9) — we add structured fields, not an opaque `Map<String,Object>` blob.
 - **Changing the `InsightType` taxonomy** — `toDomainType` normalization is retained; taxonomy changes are a separate decision.
 - **Historical data backfill** — existing insights remain unchanged.
+- **Insights list / analysis-section projection** — the richer fields are surfaced on the detail page only; listing them on index views is a later UI refinement.
 - No new ADR: ADR-049 already governs this slice.
 
 ## Constraints
@@ -87,9 +96,12 @@ This story proves, end-to-end through the read API, that **accepted knowledge ca
   - `Insight` entity, `InsightResponse`, `InsightMapper`, `InsightPromotionService`;
   - `ValidationServiceImpl` (set `decidedAt`);
   - test updates: `InsightPromotionServiceTest`, `InsightMapperTest`, `ValidationServiceImpl`-related.
-- **Frontend**: none in this slice.
-- **CI**: no change (covered by existing backend `quality` job).
-- **Tests**: backend +~8.
+- **Frontend** (this slice):
+  - `insight.models.ts` (`InsightFields` + rationale/confidence/evidenceReferences/sourceType);
+  - `insight-detail-page.ts` (renders the semantic richness, nullable-safe);
+  - new `insight-detail-page.spec.ts`.
+- **CI**: no change (covered by existing frontend `quality` job).
+- **Tests**: backend +~8, frontend +several.
 
 ## Acceptance Criteria
 
@@ -103,6 +115,9 @@ This story proves, end-to-end through the read API, that **accepted knowledge ca
 - AC-8: New fields are nullable-safe (absent optional data, non-null handling).
 - AC-9: `ValidatableProposal.decidedAt` is populated when a proposal is decided (accept or reject).
 - AC-10: Existing gates: backend `verify` (554+ tests, jacoco ≥0.80), frontend lint/build/test, SonarQube gate (`new_violations=0`, `new_coverage≥80`).
+- AC-11: `InsightFields` (frontend) exposes `rationale`, `confidence`, `evidenceReferences`, `sourceType`.
+- AC-12: The Insight detail page renders `rationale`, `confidence`, `evidenceReferences` (as a list) and `sourceType` when present.
+- AC-13: The detail page stays nullable-safe — a bare Insight renders without the semantic sections (no missing-field errors).
 
 ## Technical Context
 
@@ -135,7 +150,7 @@ An ADR is **not** proposed: this slice is the direct implementation of the alrea
 1. **Schema**: dedicated typed columns (`rationale`, `confidence`, `evidence_references`, `source_type`) rather than an opaque JSON blob. ✅ Approved
 2. **Normalization retained**: `type` stays normalized; `sourceType` preserves the original proposal classification. ✅ Approved
 3. **Decision metadata**: `decidedAt` populated on `ValidatableProposal` (addresses P2). ✅ Approved
-4. **No new ADR**; no frontend change in this slice. ✅ Approved
+4. **No new ADR**; the frontend projection (detail page) exposes the preserved fields but takes no ownership of knowledge semantics. ✅ Approved
 
 ## Artifacts
 
