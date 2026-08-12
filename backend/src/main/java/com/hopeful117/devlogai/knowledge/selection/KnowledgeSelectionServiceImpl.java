@@ -21,7 +21,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService {
-    static final String VERSION = "knowledge-selection-v3";
+    static final String VERSION = "knowledge-selection-v4";
     private static final String BUILD = "BUILD";
     private static final String CONTAINER = "CONTAINER";
     private static final String DOCKER = "DOCKER";
@@ -55,12 +55,15 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 .thenComparing(value -> value.type().name())
                 .thenComparing(value -> value.id().toString());
 
-        List<AnalysisContext.ObservationSnapshot> observations = context.observations().stream()
-                .sorted(observationOrder).distinct().limit(BUDGET.maximumObservations()).toList();
-        List<AnalysisContext.FactSnapshot> facts = context.facts().stream()
+        List<AnalysisContext.ObservationSnapshot> rankedObservations = context.observations().stream()
+                .sorted(observationOrder).distinct().toList();
+        List<AnalysisContext.FactSnapshot> rankedFacts = context.facts().stream()
                 .sorted(factOrder)
-                .filter(distinctByKey(value -> value.type() + "\u0000" + value.content()))
-                .limit(BUDGET.maximumFacts()).toList();
+                .toList();
+        SelectionSlice selectionSlice = selectGroundingConsistentKnowledge(
+                rankedObservations, rankedFacts, factOrder);
+        List<AnalysisContext.ObservationSnapshot> observations = selectionSlice.observations();
+        List<AnalysisContext.FactSnapshot> facts = selectionSlice.facts();
         List<Insight> insightCandidates = insightRepository
                 .findByProjectIdOrderByCreatedAtDesc(context.project().id()).stream()
                 .sorted(Comparator.comparing(Insight::getCreatedAt,
@@ -91,7 +94,8 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 VERSION,
                 List.of("REPOSITORY_FIRST_LAYERING", "INTENT_SPECIFIC_RANKING",
                         "USER_GUIDANCE_KEYWORD_BOOST", "STABLE_TYPE_AND_ID_ORDER",
-                        "DUPLICATE_FACT_CONTENT_ELIMINATION", "KNOWLEDGE_BUDGET",
+                        "DUPLICATE_FACT_CONTENT_ELIMINATION", "OBSERVATION_FACT_CLOSURE",
+                        "KNOWLEDGE_BUDGET",
                         "EVOLUTION_CONTEXT_REQUIRED"),
                 selected, Math.max(0, candidates + 2 - selected), BUDGET,
                 diagnostic.isCollectionComplete() ? "COMPLETE" : "PARTIAL");
@@ -155,6 +159,63 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
             java.util.function.Function<T, String> keyExtractor) {
         Set<String> seen = new HashSet<>();
         return value -> seen.add(keyExtractor.apply(value));
+    }
+
+    private SelectionSlice selectGroundingConsistentKnowledge(
+            List<AnalysisContext.ObservationSnapshot> rankedObservations,
+            List<AnalysisContext.FactSnapshot> rankedFacts,
+            Comparator<AnalysisContext.FactSnapshot> factOrder
+    ) {
+        Map<UUID, AnalysisContext.FactSnapshot> factsById = new LinkedHashMap<>();
+        for (AnalysisContext.FactSnapshot fact : rankedFacts) {
+            factsById.putIfAbsent(fact.id(), fact);
+        }
+
+        List<AnalysisContext.ObservationSnapshot> observations = new ArrayList<>(rankedObservations.stream()
+                .limit(BUDGET.maximumObservations())
+                .toList());
+        while (!observations.isEmpty()
+                && requiredFactIdsFor(observations, factsById.keySet()).size() > BUDGET.maximumFacts()) {
+            observations.removeLast();
+        }
+
+        LinkedHashSet<UUID> requiredFactIds = requiredFactIdsFor(observations, factsById.keySet());
+        List<AnalysisContext.FactSnapshot> requiredFacts = requiredFactIds.stream()
+                .map(factsById::get)
+                .filter(Objects::nonNull)
+                .sorted(factOrder)
+                .toList();
+
+        Set<String> usedFactContentKeys = new HashSet<>();
+        requiredFacts.forEach(fact -> usedFactContentKeys.add(factContentKey(fact)));
+        List<AnalysisContext.FactSnapshot> discretionaryFacts = rankedFacts.stream()
+                .filter(fact -> !requiredFactIds.contains(fact.id()))
+                .filter(distinctByKey(this::factContentKey))
+                .filter(fact -> usedFactContentKeys.add(factContentKey(fact)))
+                .limit(Math.max(0, BUDGET.maximumFacts() - requiredFacts.size()))
+                .toList();
+
+        List<AnalysisContext.FactSnapshot> facts = new ArrayList<>(requiredFacts.size() + discretionaryFacts.size());
+        facts.addAll(requiredFacts);
+        facts.addAll(discretionaryFacts);
+        return new SelectionSlice(List.copyOf(observations), List.copyOf(facts));
+    }
+
+    private LinkedHashSet<UUID> requiredFactIdsFor(
+            List<AnalysisContext.ObservationSnapshot> observations,
+            Set<UUID> availableFactIds
+    ) {
+        LinkedHashSet<UUID> requiredFactIds = new LinkedHashSet<>();
+        for (AnalysisContext.ObservationSnapshot observation : observations) {
+            observation.supportingFactIds().stream()
+                    .filter(availableFactIds::contains)
+                    .forEach(requiredFactIds::add);
+        }
+        return requiredFactIds;
+    }
+
+    private String factContentKey(AnalysisContext.FactSnapshot fact) {
+        return fact.type() + "\u0000" + fact.content();
     }
 
     private SelectedKnowledge.InsightSnapshot toInsight(Insight insight) {
@@ -231,4 +292,8 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                     engineeringEvents,
             RepositoryContext repositoryContext,
             SelectedKnowledge.SelectionMetadata metadata) { }
+
+    private record SelectionSlice(
+            List<AnalysisContext.ObservationSnapshot> observations,
+            List<AnalysisContext.FactSnapshot> facts) { }
 }

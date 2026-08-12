@@ -158,6 +158,36 @@ async def test_repository_context_evidence_reference_is_accepted() -> None:
 
 
 @pytest.mark.asyncio
+async def test_supporting_fact_visible_on_selected_observation_is_accepted_when_selected() -> None:
+    request, fact_id, observation_id, evidence = submission()
+    request = request.model_copy(update={
+        "selected_knowledge": selected_knowledge(
+            facts=[
+                {
+                    "id": fact_id,
+                    "content": "Modules were separated",
+                    "evidenceReferences": [evidence],
+                }
+            ],
+            observations=[
+                {
+                    "id": observation_id,
+                    "content": "Architecture is modular",
+                    "supportingFactIds": [fact_id],
+                }
+            ],
+        )
+    })
+    provider = MockLlmProvider([valid_output(fact_id, observation_id, evidence)])
+    callback = RecordingCallbackClient()
+    service = InsightGenerationService(provider, InsightPromptBuilder(), callback)  # type: ignore[arg-type]
+
+    await service.process(request, uuid4())
+
+    assert callback.results[0].status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
 async def test_unsupported_insight_type_gets_corrective_retry() -> None:
     request, fact_id, observation_id, evidence = submission()
     invalid = valid_output(fact_id, observation_id, evidence)

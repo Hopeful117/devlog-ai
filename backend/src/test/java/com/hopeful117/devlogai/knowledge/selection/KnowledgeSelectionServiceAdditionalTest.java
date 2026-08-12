@@ -201,6 +201,50 @@ class KnowledgeSelectionServiceAdditionalTest {
     }
 
     @Test
+    void shouldReduceSelectedObservationsWhenSupportingFactClosureWouldOverflowBudget() throws Exception {
+        var service = createService();
+        var analysis = testAnalysis();
+
+        List<AnalysisContext.FactSnapshot> facts = new ArrayList<>();
+        List<AnalysisContext.ObservationSnapshot> observations = new ArrayList<>();
+        for (int index = 0; index < 25; index++) {
+            AnalysisContext.FactSnapshot factOne = new AnalysisContext.FactSnapshot(
+                    UUID.randomUUID(), FactType.OTHER, "support-a-" + index,
+                    "source", List.of("README.md"), Instant.now());
+            AnalysisContext.FactSnapshot factTwo = new AnalysisContext.FactSnapshot(
+                    UUID.randomUUID(), FactType.OTHER, "support-b-" + index,
+                    "source", List.of("README.md"), Instant.now());
+            facts.add(factOne);
+            facts.add(factTwo);
+            observations.add(new AnalysisContext.ObservationSnapshot(
+                    UUID.randomUUID(),
+                    ObservationType.SPRING_BOOT_REST_APPLICATION,
+                    "obs" + index,
+                    "RULE",
+                    "1",
+                    List.of(factOne.id(), factTwo.id()),
+                    Instant.now()));
+        }
+        var context = new AnalysisContext(
+                new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "Test", "test", "desc", ProjectStatus.ACTIVE),
+                analysis, testProfile(),
+                facts, observations, List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+
+        mockRepositories(context);
+
+        SelectedKnowledge result = service.select(context, architectureIntent(), null);
+        Set<UUID> selectedFactIds = result.selectedFacts().stream()
+                .map(AnalysisContext.FactSnapshot::id)
+                .collect(java.util.stream.Collectors.toSet());
+
+        assertTrue(result.selectedFacts().size() <= KnowledgeSelectionServiceImpl.BUDGET.maximumFacts());
+        assertTrue(result.selectedObservations().size() < KnowledgeSelectionServiceImpl.BUDGET.maximumObservations());
+        assertTrue(result.selectedObservations().stream()
+                .flatMap(observation -> observation.supportingFactIds().stream())
+                .allMatch(selectedFactIds::contains));
+    }
+
+    @Test
     void shouldThrowWhenMandatoryKnowledgeUnavailable() {
         var service = createService();
         IntentDefinition intent = architectureIntent();
