@@ -11,6 +11,7 @@ import com.hopeful117.devlogai.projectstate.dto.inner.ChallengeSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.CommitSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.DecisionSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.EvolutionSummary;
+import com.hopeful117.devlogai.projectstate.dto.inner.HumanContextInputSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.KnowledgeSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.MilestoneSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.ProposalSummary;
@@ -25,6 +26,7 @@ import com.hopeful117.devlogai.projectstate.dto.response.RecentEvolutionSection;
 import com.hopeful117.devlogai.projectstate.dto.response.RecentKnowledgeSection;
 import com.hopeful117.devlogai.projectstate.dto.response.RoadmapProgressSection;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInput;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -48,13 +50,15 @@ public interface ProjectStateMapper {
             String description,
             Milestone currentMilestone,
             EngineeringStory activeStory,
-            List<Challenge> openChallenges
+            List<Challenge> openChallenges,
+            List<ProjectHumanContextInput> humanContextInputs
     ) {
         return new ObjectiveSection(
                 description,
                 currentMilestone != null ? toMilestoneSummary(currentMilestone) : null,
                 activeStory != null ? toStorySummary(activeStory) : null,
-                toChallengeSummaries(openChallenges)
+                toChallengeSummaries(openChallenges),
+                toHumanContextInputSummaries(humanContextInputs)
         );
     }
 
@@ -170,6 +174,17 @@ public interface ProjectStateMapper {
             return Collections.emptyList();
         }
         return commits.stream().map(this::toCommitSummary).toList();
+    }
+
+    HumanContextInputSummary toHumanContextInputSummary(ProjectHumanContextInput input);
+
+    default List<HumanContextInputSummary> toHumanContextInputSummaries(
+            List<ProjectHumanContextInput> inputs
+    ) {
+        if (inputs == null || inputs.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return inputs.stream().map(this::toHumanContextInputSummary).toList();
     }
 
     KnowledgeSummary toKnowledgeSummary(KnowledgeEvent event);

@@ -41,6 +41,7 @@ public class SelectedKnowledgePromptProjectionService {
                 selectedKnowledge.selectedInsights().stream().map(this::projectInsight).toList(),
                 selectedKnowledge.existingArchitectureKnowledge(),
                 selectedKnowledge.selectedEngineeringEvents(),
+                selectedKnowledge.selectedHumanContextInputs(),
                 projectRepositoryContext(selectedKnowledge.repositoryContext()),
                 selectedKnowledge.evolutionContext(),
                 selectedKnowledge.selectionMetadata(),
@@ -127,6 +128,8 @@ public class SelectedKnowledgePromptProjectionService {
             List<SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot> existingArchitectureKnowledge,
             List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
                     selectedEngineeringEvents,
+            List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.HumanContextInputSnapshot>
+                    selectedHumanContextInputs,
             PromptRepositoryContext repositoryContext,
             AnalysisContext.EvolutionContext evolutionContext,
             SelectedKnowledge.SelectionMetadata selectionMetadata,

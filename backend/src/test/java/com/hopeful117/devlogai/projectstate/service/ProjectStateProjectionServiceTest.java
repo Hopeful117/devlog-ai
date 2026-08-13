@@ -17,6 +17,9 @@ import com.hopeful117.devlogai.milestone.repository.MilestoneRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInput;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputStatus;
+import com.hopeful117.devlogai.projectcontextinput.repository.ProjectHumanContextInputRepository;
 import com.hopeful117.devlogai.projectstate.dto.response.ActiveWorkSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
 import com.hopeful117.devlogai.projectstate.dto.response.PendingActionsSection;
@@ -72,6 +75,8 @@ class ProjectStateProjectionServiceTest {
     @Mock
     private EngineeringEventRepository engineeringEventRepository;
     @Mock
+    private ProjectHumanContextInputRepository humanContextInputRepository;
+    @Mock
     private ProjectStateMapper mapper;
 
     @InjectMocks
@@ -95,6 +100,9 @@ class ProjectStateProjectionServiceTest {
                 .thenReturn(List.of(new EngineeringStory()));
         when(challengeRepository.findByProjectIdAndStatusOrderByCreatedAtDesc(projectId, ChallengeStatus.OPEN))
                 .thenReturn(List.of(new Challenge()));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE))
+                .thenReturn(List.of(ProjectHumanContextInput.builder().build()));
 
         // Active work section
         when(proposalRepository.findByProjectIdAndStatus(projectId, ProposalStatus.PROPOSED))
@@ -120,8 +128,9 @@ class ProjectStateProjectionServiceTest {
                 .thenReturn(List.of(new Milestone()));
 
         // Mock mapper responses for sections
-        when(mapper.toObjectiveSection(any(), any(), any(), any()))
-                .thenReturn(new ObjectiveSection("description", null, null, Collections.emptyList()));
+        when(mapper.toObjectiveSection(any(), any(), any(), any(), any()))
+                .thenReturn(new ObjectiveSection("description", null, null,
+                        Collections.emptyList(), Collections.emptyList()));
         when(mapper.toActiveWorkSection(any(), any(), any()))
                 .thenReturn(new ActiveWorkSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
         when(mapper.toRecentChangesSection(any(), any(), any()))
@@ -138,7 +147,8 @@ class ProjectStateProjectionServiceTest {
         ProjectStateResponse expectedResponse = new ProjectStateResponse(
                 projectId,
                 "Test Project",
-                new ObjectiveSection("description", null, null, Collections.emptyList()),
+                new ObjectiveSection("description", null, null,
+                        Collections.emptyList(), Collections.emptyList()),
                 new ActiveWorkSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RecentChangesSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RoadmapProgressSection(Collections.emptyList(), Collections.emptyList()),
@@ -176,6 +186,8 @@ class ProjectStateProjectionServiceTest {
                 .thenReturn(Collections.emptyList());
         when(challengeRepository.findByProjectIdAndStatusOrderByCreatedAtDesc(any(), any()))
                 .thenReturn(Collections.emptyList());
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(any(), any()))
+                .thenReturn(Collections.emptyList());
         when(proposalRepository.findByProjectIdAndStatus(any(), any()))
                 .thenReturn(Collections.emptyList());
         when(storyRepository.findByProject_IdOrderByCreatedAtDesc(any()))
@@ -189,8 +201,9 @@ class ProjectStateProjectionServiceTest {
         when(engineeringEventRepository.findRecentByProjectIdOrderByOccurredAtDescTargetCommitDescIdAsc(any(), any()))
                 .thenReturn(Collections.emptyList());
 
-        when(mapper.toObjectiveSection(any(), any(), any(), any()))
-                .thenReturn(new ObjectiveSection(null, null, null, Collections.emptyList()));
+        when(mapper.toObjectiveSection(any(), any(), any(), any(), any()))
+                .thenReturn(new ObjectiveSection(null, null, null,
+                        Collections.emptyList(), Collections.emptyList()));
         when(mapper.toActiveWorkSection(any(), any(), any()))
                 .thenReturn(new ActiveWorkSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
         when(mapper.toRecentChangesSection(any(), any(), any()))
@@ -207,7 +220,8 @@ class ProjectStateProjectionServiceTest {
         ProjectStateResponse expectedResponse = new ProjectStateResponse(
                 projectId,
                 "Empty Project",
-                new ObjectiveSection(null, null, null, Collections.emptyList()),
+                new ObjectiveSection(null, null, null, Collections.emptyList(),
+                        Collections.emptyList()),
                 new ActiveWorkSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RecentChangesSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RoadmapProgressSection(Collections.emptyList(), Collections.emptyList()),

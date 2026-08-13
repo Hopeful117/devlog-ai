@@ -28,11 +28,15 @@ import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInput;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputStatus;
+import com.hopeful117.devlogai.projectcontextinput.repository.ProjectHumanContextInputRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -49,6 +53,7 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     static final int MAX_OPEN_CHALLENGES = 20;
     static final int MAX_KNOWLEDGE_RELATIONS = 50;
     static final int MAX_ENGINEERING_STORIES = 20;
+    static final int MAX_HUMAN_CONTEXT_INPUTS = 10;
 
     private static final List<ArtifactType> ARCHITECTURE_ARTIFACT_TYPES = List.of(
             ArtifactType.API,
@@ -69,6 +74,7 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     private final ChallengeRepository challengeRepository;
     private final KnowledgeRelationRepository knowledgeRelationRepository;
     private final EngineeringStoryRepository engineeringStoryRepository;
+    private final ProjectHumanContextInputRepository humanContextInputRepository;
 
     @Override
     public ProjectContextSnapshot build(UUID projectId) {
@@ -146,6 +152,17 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                         .map(this::toEngineeringStorySnapshot)
                         .toList();
 
+        List<ProjectContextSnapshot.HumanContextInputSnapshot> humanContextInputs =
+                Objects.requireNonNullElse(
+                                humanContextInputRepository
+                        .findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                                projectId, ProjectHumanContextInputStatus.ACTIVE),
+                                List.<ProjectHumanContextInput>of())
+                        .stream()
+                        .limit(MAX_HUMAN_CONTEXT_INPUTS)
+                        .map(this::toHumanContextInputSnapshot)
+                        .toList();
+
         return new ProjectContextSnapshot(
                 toProjectSnapshot(project),
                 latestProfile,
@@ -158,7 +175,8 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                 engineeringEvents,
                 openChallenges,
                 knowledgeRelations,
-                engineeringStories
+                engineeringStories,
+                humanContextInputs
         );
     }
 
@@ -206,6 +224,19 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                 story.getTitle(), story.getStatus().name(), story.getStoryPath(),
                 story.getBaseCommit(), story.getTargetCommit(),
                 story.getCreatedAt(), story.getCompletedAt()
+        );
+    }
+
+    private ProjectContextSnapshot.HumanContextInputSnapshot toHumanContextInputSnapshot(
+            ProjectHumanContextInput input
+    ) {
+        return new ProjectContextSnapshot.HumanContextInputSnapshot(
+                input.getId(),
+                input.getType(),
+                input.getTitle(),
+                input.getContentMarkdown(),
+                input.getStatus().name(),
+                input.getUpdatedAt()
         );
     }
 

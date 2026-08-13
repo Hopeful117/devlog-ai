@@ -11,7 +11,13 @@ import { ProjectState } from './project-state.models';
 const emptyState: ProjectState = {
   projectId: 'p1',
   projectName: 'DevLog AI',
-  objective: { description: null, currentMilestone: null, activeStory: null, openChallenges: [] },
+  objective: {
+    description: null,
+    currentMilestone: null,
+    activeStory: null,
+    openChallenges: [],
+    humanContextInputs: [],
+  },
   activeWork: { inProgressStories: [], openChallenges: [], proposedProposals: [] },
   recentChanges: { completedStories: [], recentDecisions: [], recentCommits: [] },
   roadmapProgress: { plannedMilestones: [], registeredStories: [] },
@@ -123,6 +129,33 @@ describe('ProjectStatePage', () => {
     expect(section?.textContent).toContain('What have we learned recently?');
     expect(section?.textContent).toContain('ARCHITECTURE');
     expect(section?.textContent).toContain('Adopted hexagonal layout');
+  });
+
+  it('renders project notes in the objective section', async () => {
+    const state: ProjectState = {
+      ...emptyState,
+      objective: {
+        ...emptyState.objective,
+        humanContextInputs: [
+          {
+            id: 'n1',
+            type: 'GOAL',
+            title: 'Medium-term objective',
+            contentMarkdown: 'Improve semantic usefulness for humans and agents over time.',
+            status: 'ACTIVE',
+            updatedAt: '2026-08-13T12:00:00Z',
+          },
+        ],
+      },
+    };
+    getProject.mockReturnValue(of(project));
+    getProjectState.mockReturnValue(of(state));
+    const element = await render();
+
+    const section = element.querySelector('#section-objective')?.parentElement;
+    expect(section?.textContent).toContain('Project notes');
+    expect(section?.textContent).toContain('Medium-term objective');
+    expect(section?.textContent).toContain('Improve semantic usefulness');
   });
 
   it('renders the recent evolution section with commit range', async () => {

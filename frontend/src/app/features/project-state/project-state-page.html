@@ -65,11 +65,33 @@
               </ul>
             </div>
           }
+          @if (viewModel.projectState.objective.humanContextInputs.length > 0) {
+            <div class="section-item">
+              <span class="eyebrow">Project notes</span>
+              <div class="context-note-grid">
+                @for (note of viewModel.projectState.objective.humanContextInputs; track note.id) {
+                  <article class="context-note-card">
+                    <div class="context-note-card__header">
+                      <span class="context-note-card__type">{{
+                        note.type.replaceAll('_', ' ')
+                      }}</span>
+                      @if (note.updatedAt) {
+                        <small>Updated {{ note.updatedAt | date: 'mediumDate' }}</small>
+                      }
+                    </div>
+                    <h3>{{ note.title }}</h3>
+                    <p>{{ humanContextPreview(note.contentMarkdown) }}</p>
+                  </article>
+                }
+              </div>
+            </div>
+          }
           @if (
             !viewModel.projectState.objective.description &&
             !viewModel.projectState.objective.currentMilestone &&
             !viewModel.projectState.objective.activeStory &&
-            viewModel.projectState.objective.openChallenges.length === 0
+            viewModel.projectState.objective.openChallenges.length === 0 &&
+            viewModel.projectState.objective.humanContextInputs.length === 0
           ) {
             <p class="empty-state">No objective data available.</p>
           }

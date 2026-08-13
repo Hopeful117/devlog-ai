@@ -208,4 +208,48 @@ class SelectedKnowledgePromptProjectionServiceTest {
         assertFalse(projectedInsight.containsKey("id"));
         assertFalse(projectedInsight.containsKey("analysisId"));
     }
+
+    @Test
+    void shouldExposeHumanContextInputsAsDistinctPromptSection() {
+        SelectedKnowledge selectedKnowledge = new SelectedKnowledge(
+                new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "DevLog", "devlog-ai",
+                        "desc", com.hopeful117.devlogai.project.entity.ProjectStatus.ACTIVE),
+                null,
+                null,
+                List.of(),
+                List.of(),
+                new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.HumanContextInputSnapshot(
+                        UUID.randomUUID(),
+                        com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputType.GOAL,
+                        "Improve context quality",
+                        "Raise the quality of information for humans and agents.",
+                        "ACTIVE",
+                        Instant.parse("2026-08-13T10:00:00Z")
+                )),
+                null,
+                null,
+                new SelectedKnowledge.SelectionMetadata(
+                        "knowledge-selection-v4",
+                        List.of(),
+                        1,
+                        0,
+                        new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 5, 60),
+                        "COMPLETE"
+                ),
+                "a".repeat(64)
+        );
+
+        Map<String, Object> projected = service.toMap(selectedKnowledge);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectedInput =
+                ((List<Map<String, Object>>) projected.get("selectedHumanContextInputs")).getFirst();
+        assertEquals("GOAL", projectedInput.get("type"));
+        assertEquals("Improve context quality", projectedInput.get("title"));
+        assertEquals("ACTIVE", projectedInput.get("status"));
+    }
 }

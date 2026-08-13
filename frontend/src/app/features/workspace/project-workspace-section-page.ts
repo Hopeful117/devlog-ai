@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, map, of, startWith, switchMap } from 'rxjs';
 import { ProjectAnalysesSection } from '../analyses/project-analyses-section';
 import { ProjectDeliverablesSection } from '../deliverables/project-deliverables-section';
+import { ProjectContextInputsSection } from '../project-context-inputs/project-context-inputs-section';
 import { InsightService } from '../insights/insight.service';
 import { ProjectService } from '../projects/project.service';
 import { ProjectSourcesSection } from '../projects/project-sources-section';
@@ -18,6 +19,7 @@ type WorkspaceSection = 'activity' | 'knowledge' | 'documentation' | 'settings';
     RouterLink,
     ProjectAnalysesSection,
     ProjectDeliverablesSection,
+    ProjectContextInputsSection,
     ProjectSourcesSection,
   ],
   templateUrl: './project-workspace-section-page.html',

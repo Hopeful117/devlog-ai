@@ -99,6 +99,7 @@
               <dd>{{ view.project.createdAt | date: 'medium' }}</dd>
             </dl>
           </section>
+          <app-project-context-inputs-section [projectId]="view.project.id" />
           <app-project-sources-section [projectId]="view.project.id" />
         }
       }

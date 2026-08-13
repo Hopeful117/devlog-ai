@@ -10,6 +10,8 @@ import com.hopeful117.devlogai.milestone.entity.MilestoneStatus;
 import com.hopeful117.devlogai.milestone.repository.MilestoneRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputStatus;
+import com.hopeful117.devlogai.projectcontextinput.repository.ProjectHumanContextInputRepository;
 import com.hopeful117.devlogai.projectstate.dto.ProjectStateSections;
 import com.hopeful117.devlogai.projectstate.dto.response.ActiveWorkSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
@@ -44,6 +46,7 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
     private final ProjectCommitRepository commitRepository;
     private final KnowledgeEventRepository knowledgeEventRepository;
     private final EngineeringEventRepository engineeringEventRepository;
+    private final ProjectHumanContextInputRepository humanContextInputRepository;
     private final ProjectStateMapper mapper;
 
     @Override
@@ -84,8 +87,15 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
 
         var openChallenges = challengeRepository
                 .findByProjectIdAndStatusOrderByCreatedAtDesc(projectId, ChallengeStatus.OPEN);
+        var humanContextInputs = humanContextInputRepository
+                .findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                        projectId, ProjectHumanContextInputStatus.ACTIVE);
+        var limitedHumanContextInputs = humanContextInputs.size() > 3
+                ? humanContextInputs.subList(0, 3)
+                : humanContextInputs;
 
-        return mapper.toObjectiveSection(description, currentMilestone, activeStory, openChallenges);
+        return mapper.toObjectiveSection(description, currentMilestone, activeStory,
+                openChallenges, limitedHumanContextInputs);
     }
 
     private ActiveWorkSection buildActiveWork(UUID projectId) {

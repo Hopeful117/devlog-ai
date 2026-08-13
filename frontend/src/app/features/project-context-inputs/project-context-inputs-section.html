@@ -1,0 +1,108 @@
+<section class="context-inputs" aria-labelledby="context-inputs-title">
+  <h2 id="context-inputs-title">Project Notes</h2>
+  <p class="section-intro">
+    Persist human context that should enrich future analyses without becoming trusted knowledge
+    directly.
+  </p>
+
+  @if (mutationViewModel$ | async; as mutation) {
+    @if (mutation.state === 'pending') {
+      <p role="status">Saving Project Note…</p>
+    } @else if (mutation.state === 'success') {
+      <p role="status" class="feedback feedback--success">{{ mutation.message }}</p>
+    } @else if (mutation.state === 'error') {
+      <div role="alert" class="feedback feedback--error">
+        <strong>Project note change failed.</strong> {{ mutation.error.message }}
+      </div>
+    }
+
+    <div class="context-inputs-layout">
+      <div class="context-inputs-layout__content">
+        @if (inputsViewModel$ | async; as inputsViewModel) {
+          @switch (inputsViewModel.state) {
+            @case ('loading') {
+              <p role="status">Loading Project Notes…</p>
+            }
+            @case ('error') {
+              <div role="alert" class="feedback feedback--error">
+                <strong>Project notes could not be loaded.</strong>
+                {{ inputsViewModel.error.message }}
+              </div>
+            }
+            @case ('loaded') {
+              @if (inputsViewModel.inputs.length === 0) {
+                <p class="empty" data-testid="context-inputs-empty">
+                  No Project Note saved yet. Add goals, constraints, assumptions, or known gaps that
+                  future analyses should understand.
+                </p>
+              } @else {
+                <ul class="input-list">
+                  @for (input of inputsViewModel.inputs; track input.id) {
+                    <li [class.input--archived]="input.status === 'ARCHIVED'">
+                      <article class="input-card">
+                        <div class="input-heading">
+                          <div>
+                            <p class="type-badge">{{ humanizeType(input.type) }}</p>
+                            <h3>{{ input.title }}</h3>
+                          </div>
+                          <span
+                            class="status"
+                            [class.status--inactive]="input.status === 'ARCHIVED'"
+                          >
+                            {{ input.status === 'ACTIVE' ? 'Active' : 'Archived' }}
+                          </span>
+                        </div>
+                        <p class="input-content">{{ input.contentMarkdown }}</p>
+                        <div class="input-footer">
+                          <small>Updated {{ input.updatedAt | date: 'medium' }}</small>
+                          @if (input.status === 'ACTIVE') {
+                            <button
+                              type="button"
+                              class="ghost-button"
+                              [disabled]="mutation.state === 'pending'"
+                              (click)="archive(input)"
+                            >
+                              Archive
+                            </button>
+                          }
+                        </div>
+                      </article>
+                    </li>
+                  }
+                </ul>
+              }
+            }
+          }
+        }
+      </div>
+
+      <form class="input-form" [formGroup]="form" (ngSubmit)="submit()">
+        <div class="input-form__header">
+          <h3>Add Project Note</h3>
+          <p>Capture context the repository cannot explain on its own.</p>
+        </div>
+
+        <label>
+          Title
+          <input type="text" formControlName="title" maxlength="255" />
+        </label>
+
+        <label>
+          Type
+          <select formControlName="type">
+            @for (type of inputTypes; track type) {
+              <option [value]="type">{{ humanizeType(type) }}</option>
+            }
+          </select>
+        </label>
+
+        <label>
+          Markdown content
+          <textarea formControlName="contentMarkdown" rows="8" maxlength="20000"></textarea>
+        </label>
+
+        <button type="submit" [disabled]="mutation.state === 'pending'">Save Project Note</button>
+      </form>
+    </div>
+  }
+</section>
