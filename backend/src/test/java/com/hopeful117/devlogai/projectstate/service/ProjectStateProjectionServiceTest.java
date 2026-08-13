@@ -20,6 +20,7 @@ import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInput;
 import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputStatus;
 import com.hopeful117.devlogai.projectcontextinput.repository.ProjectHumanContextInputRepository;
+import com.hopeful117.devlogai.projectstate.ProjectStateProposalNoiseReducer;
 import com.hopeful117.devlogai.projectstate.dto.response.ActiveWorkSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
 import com.hopeful117.devlogai.projectstate.dto.response.PendingActionsSection;
@@ -77,6 +78,8 @@ class ProjectStateProjectionServiceTest {
     @Mock
     private ProjectHumanContextInputRepository humanContextInputRepository;
     @Mock
+    private ProjectStateProposalNoiseReducer proposalNoiseReducer;
+    @Mock
     private ProjectStateMapper mapper;
 
     @InjectMocks
@@ -107,6 +110,7 @@ class ProjectStateProjectionServiceTest {
         // Active work section
         when(proposalRepository.findByProjectIdAndStatus(projectId, ProposalStatus.PROPOSED))
                 .thenReturn(List.of(new ValidatableProposal()));
+        when(proposalNoiseReducer.reduce(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Recent changes section
         when(storyRepository.findByProject_IdOrderByCreatedAtDesc(projectId))
@@ -190,6 +194,7 @@ class ProjectStateProjectionServiceTest {
                 .thenReturn(Collections.emptyList());
         when(proposalRepository.findByProjectIdAndStatus(any(), any()))
                 .thenReturn(Collections.emptyList());
+        when(proposalNoiseReducer.reduce(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(storyRepository.findByProject_IdOrderByCreatedAtDesc(any()))
                 .thenReturn(Collections.emptyList());
         when(decisionRepository.findByProjectIdOrderByCreatedAtDesc(any()))
@@ -245,5 +250,71 @@ class ProjectStateProjectionServiceTest {
         when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
         assertThrows(EntityNotFoundException.class, () -> service.getProjectState(projectId));
+    }
+
+    @Test
+    void shouldUseReducedProposalListsForActiveAndPendingSections() {
+        UUID projectId = UUID.randomUUID();
+        Project project = new Project();
+        project.setId(projectId);
+        project.setName("Reduced Project");
+
+        var rawProposal = new ValidatableProposal();
+        var reducedProposal = new ValidatableProposal();
+
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(milestoneRepository.findByProjectIdAndStatusOrderByStartedAtDesc(any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(storyRepository.findByProject_IdAndStatusOrderByCreatedAtDesc(any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(challengeRepository.findByProjectIdAndStatusOrderByCreatedAtDesc(any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(proposalRepository.findByProjectIdAndStatus(projectId, ProposalStatus.PROPOSED))
+                .thenReturn(List.of(rawProposal));
+        when(proposalNoiseReducer.reduce(List.of(rawProposal))).thenReturn(List.of(reducedProposal));
+        when(storyRepository.findByProject_IdOrderByCreatedAtDesc(any()))
+                .thenReturn(Collections.emptyList());
+        when(decisionRepository.findByProjectIdOrderByCreatedAtDesc(any()))
+                .thenReturn(Collections.emptyList());
+        when(commitRepository.findByProjectIdOrderByCommittedAtDescCommitHashDesc(any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(knowledgeEventRepository.findByProjectIdOrderByCreatedAtDesc(any()))
+                .thenReturn(Collections.emptyList());
+        when(engineeringEventRepository.findRecentByProjectIdOrderByOccurredAtDescTargetCommitDescIdAsc(any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(mapper.toObjectiveSection(any(), any(), any(), any(), any()))
+                .thenReturn(new ObjectiveSection(null, null, null,
+                        Collections.emptyList(), Collections.emptyList()));
+        when(mapper.toActiveWorkSection(any(), any(), eq(List.of(reducedProposal))))
+                .thenReturn(new ActiveWorkSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
+        when(mapper.toRecentChangesSection(any(), any(), any()))
+                .thenReturn(new RecentChangesSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
+        when(mapper.toRoadmapProgressSection(any(), any()))
+                .thenReturn(new RoadmapProgressSection(Collections.emptyList(), Collections.emptyList()));
+        when(mapper.toPendingActionsSection(eq(List.of(reducedProposal)), any(), any()))
+                .thenReturn(new PendingActionsSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));
+        when(mapper.toRecentKnowledgeSection(any()))
+                .thenReturn(new RecentKnowledgeSection(Collections.emptyList()));
+        when(mapper.toRecentEvolutionSection(any()))
+                .thenReturn(new RecentEvolutionSection(Collections.emptyList()));
+        when(mapper.toResponse(any(), any())).thenReturn(new ProjectStateResponse(
+                projectId,
+                "Reduced Project",
+                new ObjectiveSection(null, null, null, Collections.emptyList(), Collections.emptyList()),
+                new ActiveWorkSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
+                new RecentChangesSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
+                new RoadmapProgressSection(Collections.emptyList(), Collections.emptyList()),
+                new PendingActionsSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
+                new RecentKnowledgeSection(Collections.emptyList()),
+                new RecentEvolutionSection(Collections.emptyList())
+        ));
+
+        service.getProjectState(projectId);
+
+        verify(proposalNoiseReducer, times(2)).reduce(List.of(rawProposal));
+        verify(mapper).toActiveWorkSection(any(), any(), eq(List.of(reducedProposal)));
+        verify(mapper).toPendingActionsSection(eq(List.of(reducedProposal)), any(), any());
     }
 }

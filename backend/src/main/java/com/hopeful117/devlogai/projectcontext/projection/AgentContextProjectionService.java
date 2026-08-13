@@ -35,6 +35,12 @@ public class AgentContextProjectionService {
             "AGENT_PROJECTION_CONTENT_REMOVED";
     private static final String EVIDENCE_REMOVED =
             "AGENT_PROJECTION_EVIDENCE_REMOVED";
+    private static final String SUMMARY_COMPACTED =
+            "AGENT_PROJECTION_SUMMARY_COMPACTED";
+    private static final String MINIMAL_EVIDENCE_COMPACTED =
+            "AGENT_PROJECTION_MINIMAL_EVIDENCE_COMPACTED";
+    private static final String ALL_EVIDENCE_REMOVED =
+            "AGENT_PROJECTION_ALL_EVIDENCE_REMOVED";
 
     private final ObjectMapper objectMapper;
     private final AgentContextProjectionPolicy policy;
@@ -114,6 +120,9 @@ public class AgentContextProjectionService {
         state = removeContent(state);
         if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
 
+        state = compactSummary(state);
+        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
+
         return removeTailEvidence(projectId, projectContext, repositoryContext, state, freshness);
     }
 
@@ -156,6 +165,22 @@ public class AgentContextProjectionService {
                 CONTENT_REMOVED, 0, 0, 0, contentPayloads);
     }
 
+    private ProjectionState compactSummary(ProjectionState state) {
+        int compacted = (int) state.evidence.stream()
+                .filter(value -> value.summary() != null && value.summary().length() > 160)
+                .count();
+        if (compacted == 0) return state;
+        return transform(state, value -> value.withSummary(compactSummary(value.summary())),
+                SUMMARY_COMPACTED, 0, 0, 0, 0);
+    }
+
+    private String compactSummary(String summary) {
+        if (summary == null) return null;
+        String normalized = summary.replaceAll("\\s+", " ").trim();
+        if (normalized.length() <= 160) return normalized;
+        return normalized.substring(0, 157).trim() + "...";
+    }
+
     private ProjectionState removeTailEvidence(
             UUID projectId, ProjectContextSnapshot projectContext,
             RepositoryContext repositoryContext, ProjectionState state,
@@ -176,6 +201,28 @@ public class AgentContextProjectionService {
                 return candidate;
             }
         }
+
+        ProjectionState singleEvidenceState = new ProjectionState(List.copyOf(remaining),
+                List.copyOf(warnings), state.removedRelatedReferences,
+                state.removedReasons, state.removedDeclarationPayloads,
+                state.removedContentPayloads, removed);
+
+        ProjectionState minimalCandidate = transform(singleEvidenceState,
+                AgentRepositoryContext.Evidence::minimal,
+                MINIMAL_EVIDENCE_COMPACTED, 0, 0, 0, 0);
+        if (fits(projectId, projectContext, repositoryContext, minimalCandidate, freshness)) {
+            return minimalCandidate;
+        }
+
+        ProjectionState emptyCandidate = new ProjectionState(List.of(),
+                appendWarning(minimalCandidate.warnings, ALL_EVIDENCE_REMOVED),
+                state.removedRelatedReferences, state.removedReasons,
+                state.removedDeclarationPayloads, state.removedContentPayloads,
+                state.evidence.size());
+        if (fits(projectId, projectContext, repositoryContext, emptyCandidate, freshness)) {
+            return emptyCandidate;
+        }
+
         throw new AgentContextProjectionException(
                 "Agent context cannot fit configured projection limits");
     }
@@ -189,13 +236,18 @@ public class AgentContextProjectionService {
             int declarations,
             int content
     ) {
-        List<String> warnings = new ArrayList<>(state.warnings);
-        if (!warnings.contains(warning)) warnings.add(warning);
+        List<String> warnings = appendWarning(state.warnings, warning);
         return new ProjectionState(state.evidence.stream().map(transformation).toList(),
                 List.copyOf(warnings), state.removedRelatedReferences + related,
                 state.removedReasons + reasons,
                 state.removedDeclarationPayloads + declarations,
                 state.removedContentPayloads + content, state.removedEvidenceItems);
+    }
+
+    private List<String> appendWarning(List<String> warnings, String warning) {
+        List<String> values = new ArrayList<>(warnings);
+        if (!values.contains(warning)) values.add(warning);
+        return List.copyOf(values);
     }
 
     private boolean fits(
