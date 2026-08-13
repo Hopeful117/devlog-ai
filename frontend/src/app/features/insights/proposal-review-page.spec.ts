@@ -7,26 +7,29 @@ import { InsightProposalService } from './insight-proposal.service';
 import { ProposalReviewerSessionService } from './proposal-reviewer-session.service';
 
 describe('ProposalReviewPage', () => {
+  const createItem = (overrides: Record<string, unknown> = {}) =>
+    ({
+      id: 'proposal-id',
+      projectId: 'project-id',
+      analysisId: 'analysis-id',
+      sourceIndex: 0,
+      type: 'INSIGHT',
+      status: 'PROPOSED',
+      payload: { title: 'Architecture', summary: 'Summary', rationale: 'Evidence' },
+      confidence: 0.8,
+      evidenceReferences: ['pom.xml'],
+      facts: [],
+      observations: [],
+      decision: null,
+      insight: null,
+      createdAt: '2026-08-09T10:00:00Z',
+      decidedAt: null,
+      ...overrides,
+    }) as const;
   const reviewer = '123e4567-e89b-42d3-a456-426614174000';
-  const item = {
-    id: 'proposal-id',
-    projectId: 'project-id',
-    analysisId: 'analysis-id',
-    sourceIndex: 0,
-    type: 'INSIGHT',
-    status: 'PROPOSED',
-    payload: { title: 'Architecture', summary: 'Summary', rationale: 'Evidence' },
-    confidence: 0.8,
-    evidenceReferences: ['pom.xml'],
-    facts: [],
-    observations: [],
-    decision: null,
-    insight: null,
-    createdAt: '2026-08-09T10:00:00Z',
-    decidedAt: null,
-  } as const;
+  const item = createItem();
   const review = {
-    version: 'proposal-review-v1',
+    version: 'proposal-review-v2',
     analysisId: 'analysis-id',
     projectId: 'project-id',
     counts: { total: 1, pending: 1, accepted: 0, rejected: 0 },
@@ -37,6 +40,7 @@ describe('ProposalReviewPage', () => {
   const accept = vi.fn();
   const reject = vi.fn();
   beforeEach(async () => {
+    sessionStorage.clear();
     getReview.mockReset().mockReturnValue(of(review));
     accept.mockReset().mockReturnValue(of({ id: 'v', proposalId: item.id, decision: 'ACCEPTED' }));
     reject.mockReset().mockReturnValue(of({ id: 'v', proposalId: item.id, decision: 'REJECTED' }));
@@ -65,8 +69,10 @@ describe('ProposalReviewPage', () => {
     fixture.detectChanges();
     return fixture;
   }
-  it('renders queue progress and requires explicit reviewer identity', () => {
+  it('renders a sequential current-proposal workflow', () => {
     const fixture = render();
+    expect(fixture.nativeElement.textContent).toContain('Sequential review');
+    expect(fixture.nativeElement.textContent).toContain('Current proposal');
     expect(fixture.nativeElement.textContent).toContain('1 pending');
     expect(fixture.nativeElement.textContent).toContain('Architecture');
     fixture.componentInstance.generateReviewer();
@@ -109,6 +115,78 @@ describe('ProposalReviewPage', () => {
     expect(component.confirmation).toBeNull();
     expect(component.form.controls.comment.value).toBe('');
   });
+  it('advances automatically to the next pending proposal on the same page', () => {
+    const decided = createItem({
+      id: 'proposal-1',
+      status: 'ACCEPTED',
+      decidedAt: '2026-08-09T10:10:00Z',
+    });
+    const nextPending = createItem({
+      id: 'proposal-2',
+      payload: { title: 'Security', summary: 'Summary', rationale: 'Evidence' },
+    });
+    getReview
+      .mockReturnValueOnce(
+        of({
+          ...review,
+          counts: { total: 2, pending: 2, accepted: 0, rejected: 0 },
+          items: [item, nextPending],
+        }),
+      )
+      .mockReturnValue(
+        of({
+          ...review,
+          counts: { total: 2, pending: 1, accepted: 1, rejected: 0 },
+          items: [decided, nextPending],
+        }),
+      );
+
+    const fixture = render();
+    const component = fixture.componentInstance;
+    component.form.controls.validatedBy.setValue(reviewer);
+    component.confirmation = 'ACCEPTED';
+    component.decide(item);
+    fixture.detectChanges();
+
+    expect(component.currentId).toBe('proposal-2');
+    expect(fixture.nativeElement.textContent).toContain('Security');
+  });
+  it('advances to the next page when pending proposals remain later in the queue', () => {
+    const decided = createItem({
+      id: 'proposal-1',
+      status: 'ACCEPTED',
+      decidedAt: '2026-08-09T10:10:00Z',
+    });
+    const nextPagePending = createItem({
+      id: 'proposal-2',
+      payload: { title: 'Performance', summary: 'Summary', rationale: 'Evidence' },
+    });
+    getReview
+      .mockReturnValueOnce(
+        of({
+          ...review,
+          counts: { total: 2, pending: 1, accepted: 1, rejected: 0 },
+          page: { number: 0, size: 10, totalPages: 2, hasPrevious: false, hasNext: true },
+          items: [decided],
+        }),
+      )
+      .mockReturnValueOnce(
+        of({
+          ...review,
+          counts: { total: 2, pending: 1, accepted: 1, rejected: 0 },
+          page: { number: 1, size: 10, totalPages: 2, hasPrevious: true, hasNext: false },
+          items: [nextPagePending],
+        }),
+      );
+
+    const fixture = render();
+    fixture.detectChanges();
+
+    expect(getReview).toHaveBeenNthCalledWith(1, 'analysis-id', 0, 10);
+    expect(getReview).toHaveBeenNthCalledWith(2, 'analysis-id', 1, 10);
+    expect(fixture.componentInstance.currentId).toBe('proposal-2');
+    expect(fixture.nativeElement.textContent).toContain('Performance');
+  });
   it('rejects a proposal with the reviewer identity', () => {
     const fixture = render();
     const component = fixture.componentInstance;
@@ -144,22 +222,17 @@ describe('ProposalReviewPage', () => {
     component.select(other);
     expect(component.current([other, item])).toBe(other);
   });
-  it('pages forward and backward', () => {
+  it('shows explicit completion when no pending proposals remain', () => {
+    getReview.mockReturnValue(
+      of({
+        ...review,
+        counts: { total: 1, pending: 0, accepted: 1, rejected: 0 },
+        items: [createItem({ status: 'ACCEPTED', decidedAt: '2026-08-09T10:10:00Z' })],
+      }),
+    );
     const fixture = render();
-    const component = fixture.componentInstance;
-    component.next();
     fixture.detectChanges();
-    expect(getReview).toHaveBeenLastCalledWith('analysis-id', 1, 10);
-    component.previous();
-    fixture.detectChanges();
-    expect(getReview).toHaveBeenLastCalledWith('analysis-id', 0, 10);
-  });
-  it('does not page before the first page', () => {
-    const fixture = render();
-    const component = fixture.componentInstance;
-    component.previous();
-    fixture.detectChanges();
-    expect(getReview).toHaveBeenCalledTimes(1);
+    expect(fixture.nativeElement.textContent).toContain('Review complete');
   });
   it('clears the reviewer session', () => {
     const fixture = render();

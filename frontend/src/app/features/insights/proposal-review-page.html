@@ -14,30 +14,28 @@
       } @else if (vm.state === 'error') {
         <p role="alert" class="error">{{ vm.error.message }}</p>
       } @else {
-        <p aria-live="polite">
-          {{ vm.data.counts.total }} total · {{ vm.data.counts.pending }} pending ·
-          {{ vm.data.counts.accepted }} accepted · {{ vm.data.counts.rejected }} rejected
-        </p>
+        <section class="panel progress-panel" aria-live="polite">
+          <p class="eyebrow">Sequential review</p>
+          <h2>Current proposal</h2>
+          <p>
+            {{ vm.data.counts.pending }} pending · {{ vm.data.counts.accepted }} accepted ·
+            {{ vm.data.counts.rejected }} rejected · {{ vm.data.counts.total }} total
+          </p>
+          <p class="section-note">
+            Review one proposal at a time. After each explicit decision, the workspace advances to
+            the next pending proposal automatically.
+          </p>
+        </section>
         @if (vm.data.counts.pending === 0) {
           <section class="panel">
             <h2>Review complete</h2>
             <p>Every proposal has an immutable human decision.</p>
           </section>
         }
-        <nav class="queue" aria-label="Proposal queue">
-          @for (item of vm.data.items; track item.id) {
-            <button
-              type="button"
-              (click)="select(item)"
-              [attr.aria-current]="item.id === currentId ? 'true' : null"
-            >
-              {{ item.payload['title'] || 'Untitled proposal' }} · {{ item.status }}
-            </button>
-          }
-        </nav>
         @if (current(vm.data.items); as item) {
           <article class="review-grid">
             <main class="panel">
+              <p class="eyebrow">Current proposal</p>
               <h2 #proposalTitle tabindex="-1">
                 {{ item.payload['title'] || item.type.replaceAll('_', ' ') + ' proposal' }}
               </h2>
@@ -80,6 +78,26 @@
                 <summary>Structured payload</summary>
                 <pre><code>{{ item.payload | json }}</code></pre>
               </details>
+              @if (hasSecondaryQueue(vm.data.items)) {
+                <details class="queue-panel">
+                  <summary>Current page queue</summary>
+                  <nav class="queue" aria-label="Proposal queue">
+                    @for (queueItem of vm.data.items; track queueItem.id) {
+                      <button
+                        type="button"
+                        (click)="select(queueItem)"
+                        [attr.aria-current]="queueItem.id === currentId ? 'true' : null"
+                      >
+                        {{
+                          queueItem.payload['title'] ||
+                            queueItem.type.replaceAll('_', ' ') + ' proposal'
+                        }}
+                        · {{ queueItem.status }}
+                      </button>
+                    }
+                  </nav>
+                </details>
+              }
               <a [routerLink]="['/proposals', item.id]">Open direct audit page</a>
             </main>
             <aside class="panel">
@@ -144,13 +162,6 @@
             </aside>
           </article>
         }
-        <div class="pagination">
-          <button type="button" (click)="previous()" [disabled]="!vm.data.page.hasPrevious">
-            Previous page</button
-          ><button type="button" (click)="next()" [disabled]="!vm.data.page.hasNext">
-            Next page
-          </button>
-        </div>
       }
     }
   }

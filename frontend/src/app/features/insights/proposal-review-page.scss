@@ -2,10 +2,24 @@
   display: grid;
   gap: 1rem;
 }
+.progress-panel {
+  display: grid;
+  gap: 0.35rem;
+}
 .queue {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+.queue-panel {
+  margin-top: 1rem;
+}
+.queue-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.queue-panel .queue {
+  margin-top: 0.75rem;
 }
 .queue button[aria-current='true'] {
   outline: 3px solid currentColor;

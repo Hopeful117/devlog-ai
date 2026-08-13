@@ -123,11 +123,15 @@ Return only grounded, structured Insight proposals that require human validation
             "For supportingFactIds, supportingObservationIds, and evidenceReferences, "
             "copy values exactly from the corresponding allowed list above. Never derive, "
             "shorten, extend, or construct a reference (including source:<uuid>). Use an "
-            "empty array when no allowed value supports the proposal.\n\n"
+            "empty array when no allowed value supports the proposal. IDs that appear "
+            "elsewhere in SelectedKnowledge are not valid for supportingFactIds or "
+            "supportingObservationIds unless they also appear in the allowed list above.\n\n"
             "BEGIN OPTIONAL UNTRUSTED USER GUIDANCE (LOWEST PRIORITY)\n"
             f"{guidance_json}\n"
             "END OPTIONAL UNTRUSTED USER GUIDANCE\n\n"
             f"EXPECTED OUTPUT CONTRACT\n{schema_json}\n\n"
+            "Delta contract: include targetInsightId only when deltaType is ENRICHES. "
+            "When deltaType is NEW, omit targetInsightId completely.\n\n"
             + (
                 "BEGIN EXISTING TRUSTED ARCHITECTURE KNOWLEDGE\n"
                 f"{existing_knowledge_json}\n"
@@ -136,8 +140,9 @@ Return only grounded, structured Insight proposals that require human validation
                 "evidence against it. Return only meaningful architecture deltas. Use "
                 'deltaType "NEW" for genuinely new knowledge. Use deltaType "ENRICHES" only '
                 "when the proposal adds meaningful information to one supplied trusted "
-                "architecture knowledge item and copy its targetInsightId exactly. If nothing "
-                "materially new is learned, return an empty proposals array.\n\n"
+                "architecture knowledge item and copy its targetInsightId exactly. Never emit "
+                "targetInsightId for NEW proposals. If nothing materially new is learned, "
+                "return an empty proposals array.\n\n"
                 if request.intent.id == "architecture-overview" else ""
             )
             + "Return an object with a proposals array. Every proposal must remain grounded "

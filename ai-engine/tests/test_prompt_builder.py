@@ -61,6 +61,7 @@ def test_prompt_lists_exact_allowed_grounding_values() -> None:
     )
     assert f'"allowedEvidenceReferences":["{evidence}"]' in prompt.user_message
     assert "Never derive, shorten, extend, or construct a reference" in prompt.user_message
+    assert "elsewhere in SelectedKnowledge are not valid" in prompt.user_message
 
 
 def test_repository_context_references_are_grounded_without_raw_diff() -> None:
@@ -173,3 +174,5 @@ def test_architecture_prompt_includes_existing_trusted_architecture_knowledge() 
     assert "BEGIN EXISTING TRUSTED ARCHITECTURE KNOWLEDGE" in prompt.user_message
     assert '"sourceType":"ARCHITECTURE_DESCRIPTION"' in prompt.user_message
     assert 'deltaType "ENRICHES"' in prompt.user_message
+    assert "omit targetInsightId completely" in prompt.user_message
+    assert "Never emit targetInsightId for NEW proposals" in prompt.user_message

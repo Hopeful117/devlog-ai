@@ -1,6 +1,8 @@
 package com.hopeful117.devlogai.knowledge.selection;
 
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
@@ -150,5 +152,60 @@ class SelectedKnowledgePromptProjectionServiceTest {
         assertFalse(projectedEvidence.containsKey("provenance"));
         assertFalse(projectedEvidence.containsKey("rankingReasons"));
         assertFalse(projectedEvidence.containsKey("extractionMetadata"));
+    }
+
+    @Test
+    void shouldOmitSelectedInsightIdentifiersFromPromptPayload() {
+        UUID insightId = UUID.randomUUID();
+        UUID sourceAnalysisId = UUID.randomUUID();
+        SelectedKnowledge selectedKnowledge = new SelectedKnowledge(
+                new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "DevLog", "devlog-ai",
+                        "desc", com.hopeful117.devlogai.project.entity.ProjectStatus.ACTIVE),
+                null,
+                new ProjectProfileResponse(
+                        UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                        "v1", "r1", Instant.now(), null, Map.of(),
+                        new ProjectProfileResponse.Completeness(
+                                com.hopeful117.devlogai.profile.model.ProfileCompletenessStatus.COMPLETE,
+                                true, false, 0, 0, 1, 0, 0
+                        ),
+                        List.of(), "summary", List.of(), 0
+                ),
+                List.of(),
+                List.of(),
+                new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0),
+                List.of(new SelectedKnowledge.InsightSnapshot(
+                        insightId,
+                        sourceAnalysisId,
+                        InsightType.ARCHITECTURAL,
+                        InsightSeverity.INFO,
+                        "Controllers",
+                        "The project exposes REST controllers."
+                )),
+                List.of(),
+                List.of(),
+                null,
+                null,
+                new SelectedKnowledge.SelectionMetadata(
+                        "knowledge-selection-v4",
+                        List.of(),
+                        1,
+                        0,
+                        new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 5, 60),
+                        "COMPLETE"
+                ),
+                "a".repeat(64)
+        );
+
+        Map<String, Object> projected = service.toMap(selectedKnowledge);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectedInsight =
+                ((List<Map<String, Object>>) projected.get("selectedInsights")).getFirst();
+        assertEquals("ARCHITECTURAL", projectedInsight.get("type"));
+        assertEquals("INFO", projectedInsight.get("severity"));
+        assertEquals("Controllers", projectedInsight.get("title"));
+        assertFalse(projectedInsight.containsKey("id"));
+        assertFalse(projectedInsight.containsKey("analysisId"));
     }
 }
