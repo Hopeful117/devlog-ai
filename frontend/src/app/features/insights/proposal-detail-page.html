@@ -109,29 +109,17 @@
             </dl>
             @if (vm.data.proposal.status === 'PROPOSED') {
               <form [formGroup]="form">
-                <label for="reviewer">Reviewer UUID</label>
-                <p id="reviewer-help" class="section-note">
-                  Required by Core for decision traceability. Authentication is not implemented in
-                  this local MVP.
+                <p class="section-note">
+                  This local MVP uses a session reviewer identity automatically. Core still records
+                  a deterministic reviewer ID for every decision.
                 </p>
-                <input
-                  id="reviewer"
-                  formControlName="validatedBy"
-                  autocomplete="off"
-                  aria-describedby="reviewer-help reviewer-error"
-                />
-                @if (form.controls.validatedBy.touched && form.controls.validatedBy.invalid) {
-                  <p id="reviewer-error" class="field-error" role="alert">
-                    Enter a valid UUID or generate a local test reviewer identifier.
-                  </p>
-                }
                 <button
                   class="secondary-button"
                   type="button"
-                  (click)="generateLocalReviewerId()"
+                  (click)="resetLocalReviewerId()"
                   [disabled]="action.state === 'pending'"
                 >
-                  Generate local test reviewer UUID
+                  Reset local reviewer session
                 </button>
                 <label for="comment">Decision note (optional)</label
                 ><textarea id="comment" formControlName="comment" maxlength="2000"></textarea>
@@ -175,17 +163,11 @@
                       type="button"
                       (click)="decide(vm.data.proposal.analysisId)"
                       [disabled]="form.invalid || action.state === 'pending'"
-                      [attr.aria-describedby]="form.invalid ? 'decision-disabled-help' : null"
                     >
                       Confirm decision</button
                     ><button class="secondary-button" type="button" (click)="confirmation = null">
                       Cancel
                     </button>
-                    @if (form.invalid) {
-                      <p id="decision-disabled-help" class="field-error">
-                        Complete the required reviewer identifier before confirming.
-                      </p>
-                    }
                   </div>
                 }
               </form>
