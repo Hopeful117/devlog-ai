@@ -39,11 +39,11 @@ class AiProposalContractValidator {
                 fail("Proposal type does not match Intent outputProposalType");
             if (!allowedReferences.containsAll(proposal.evidenceReferences()))
                 fail("Evidence references must exist in selected knowledge");
+            if (!allowedFactIds.containsAll(proposal.supportingFactIds()))
+                fail("Supporting Fact IDs must exist in selected knowledge");
+            if (!allowedObservationIds.containsAll(proposal.supportingObservationIds()))
+                fail("Supporting Observation IDs must exist in selected knowledge");
             if (proposal.type() == ProposalType.ENGINEERING_EVENT) {
-                if (!allowedFactIds.containsAll(proposal.supportingFactIds()))
-                    fail("Supporting Fact IDs must exist in selected knowledge");
-                if (!allowedObservationIds.containsAll(proposal.supportingObservationIds()))
-                    fail("Supporting Observation IDs must exist in selected knowledge");
                 validateEvent(proposal, duplicates);
             } else if (proposal.type() == ProposalType.INSIGHT) {
                 validateInsight(task, intent, proposal);

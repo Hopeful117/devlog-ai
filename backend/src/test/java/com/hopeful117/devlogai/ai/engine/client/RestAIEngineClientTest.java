@@ -8,6 +8,7 @@ import com.hopeful117.devlogai.ai.engine.dto.DeliverableGenerationResponse;
 import com.hopeful117.devlogai.deliverable.entity.DeliverableType;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
@@ -104,6 +105,36 @@ class RestAIEngineClientTest {
     }
 
     @Test
+    void shouldNotSerializeSelectedInsightIdentifiersInSubmissionPayload() {
+        UUID correlationId = UUID.randomUUID();
+        UUID analysisId = UUID.randomUUID();
+        Instant acceptedAt = Instant.parse("2026-07-21T18:00:00Z");
+        PromptRequest request = requestWithSelectedInsight(correlationId, analysisId);
+
+        server.expect(once(), requestTo("http://ai-engine.test/api/v1/ai/tasks"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.selectedKnowledge.selectedInsights[0].title").value("Controllers"))
+                .andExpect(jsonPath("$.selectedKnowledge.selectedInsights[0].id").doesNotExist())
+                .andExpect(jsonPath("$.selectedKnowledge.selectedInsights[0].analysisId").doesNotExist())
+                .andRespond(withStatus(HttpStatus.ACCEPTED)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {
+                                  "correlationId": "%s",
+                                  "accepted": true,
+                                  "externalJobId": "job-42",
+                                  "acceptedAt": "%s"
+                                }
+                                """.formatted(correlationId, acceptedAt)));
+
+        AiTaskSubmissionResponse response = client.submit(request);
+
+        assertTrue(response.accepted());
+        server.verify();
+    }
+
+    @Test
     void shouldRejectMismatchedCorrelationIdentifier() {
         PromptRequest request = request(
                 UUID.randomUUID(),
@@ -159,6 +190,41 @@ class RestAIEngineClientTest {
         SelectedKnowledge selected = new SelectedKnowledge(
                 null, null, null, List.of(), List.of(),
                 new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0), List.of(),
+                new RepositoryContext("repository-context-engine-v1",
+                        ContextProfile.PROJECT_STATE,
+                        List.of("project-state-v1", "history-v1"),
+                        "context-intelligence-v1", List.of("test"),
+                        List.of(), Map.of(),
+                        new RepositoryContext.ContextBudget(60, 500, 20, 6000),
+                        0, 0, 0, false, List.of(), List.of(), "b".repeat(64)),
+                new SelectedKnowledge.SelectionMetadata("selection-v1", List.of(), 0, 0,
+                        new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 5, 60), "COMPLETE"),
+                "a".repeat(64));
+        Map<String, Object> projectedKnowledge =
+                new SelectedKnowledgePromptProjectionService(new ObjectMapper()).toMap(selected);
+        return new PromptRequest(correlationId, correlationId, analysisId, UUID.randomUUID(),
+                AiTaskType.INSIGHT_GENERATION, intent, null,
+                projectedKnowledge, intent.outputSchema(), Map.of());
+    }
+
+    private PromptRequest requestWithSelectedInsight(
+            UUID correlationId,
+            UUID analysisId
+    ) {
+        IntentDefinition intent = new IntentDefinition("describe-project", "v1", "Describe",
+                List.of(InsightType.PROJECT_PRESENTATION), List.of("traceable"),
+                Map.of("type", "object"), "describe-project-prompt-v1");
+        SelectedKnowledge selected = new SelectedKnowledge(
+                null, null, null, List.of(), List.of(),
+                new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0),
+                List.of(new SelectedKnowledge.InsightSnapshot(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        com.hopeful117.devlogai.insight.entity.InsightType.ARCHITECTURAL,
+                        InsightSeverity.INFO,
+                        "Controllers",
+                        "The project exposes REST controllers."
+                )),
                 new RepositoryContext("repository-context-engine-v1",
                         ContextProfile.PROJECT_STATE,
                         List.of("project-state-v1", "history-v1"),

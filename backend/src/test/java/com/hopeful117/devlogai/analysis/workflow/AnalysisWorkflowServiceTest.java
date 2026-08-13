@@ -31,6 +31,7 @@ import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTy
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -39,6 +40,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.UUID;
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -176,6 +179,58 @@ class AnalysisWorkflowServiceTest {
                 new SubmitAiTaskRequest("engine-job-42")
         );
         verify(analysisService, never()).fail(any());
+    }
+
+    @Test
+    void shouldSubmitPromptRequestUsingProjectedSelectedKnowledgeContract() {
+        UUID analysisId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        UUID correlationId = UUID.randomUUID();
+        AiTaskType taskType = AiTaskType.INSIGHT_GENERATION;
+        AnalysisResponse analysis = analysisResponse(analysisId, AnalysisStatus.IN_PROGRESS);
+        AnalysisContext context = mock(AnalysisContext.class);
+        AiTaskResponse task = aiTaskResponse(taskId, analysisId, correlationId, AiTaskStatus.CREATED);
+        AiTaskResponse submittedTask = aiTaskResponse(taskId, analysisId, correlationId, AiTaskStatus.SUBMITTED);
+        AiTaskSubmissionResponse submission = new AiTaskSubmissionResponse(
+                correlationId, true, "engine-job-42", Instant.now());
+        Map<String, Object> projectedKnowledge = Map.of(
+                "selectedFacts", List.of(Map.of("id", UUID.randomUUID().toString())),
+                "selectedObservations", List.of(Map.of("id", UUID.randomUUID().toString())),
+                "selectedInsights", List.of(Map.of(
+                        "type", "ARCHITECTURAL",
+                        "severity", "INFO",
+                        "title", "Controllers",
+                        "content", "The project exposes REST controllers."
+                )),
+                "selectionDigest", "a".repeat(64)
+        );
+        when(analysisService.start(analysisId)).thenReturn(analysis);
+        when(intentCatalog.resolve("describe-project", "v1")).thenReturn(intent());
+        when(deterministicAnalysisService.analyze(analysisId))
+                .thenReturn(new DeterministicAnalysisResult(4, 2));
+        when(analysisContextService.build(analysisId)).thenReturn(context);
+        when(aiTaskService.create(new CreateAiTaskRequest(analysisId, taskType), context)).thenReturn(task);
+        when(aiTaskService.attachSelectedKnowledge(taskId, selectedKnowledge)).thenReturn(task);
+        when(promptProjectionService.toMap(selectedKnowledge)).thenReturn(projectedKnowledge);
+        when(aiEngineClient.submit(any(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class)))
+                .thenReturn(submission);
+        when(aiTaskService.submit(taskId, new SubmitAiTaskRequest("engine-job-42"))).thenReturn(submittedTask);
+
+        workflowService.start(analysisId);
+
+        ArgumentCaptor<com.hopeful117.devlogai.ai.engine.dto.PromptRequest> captor =
+                ArgumentCaptor.forClass(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class);
+        verify(aiEngineClient).submit(captor.capture());
+        com.hopeful117.devlogai.ai.engine.dto.PromptRequest request = captor.getValue();
+        assertEquals(projectedKnowledge, request.selectedKnowledge());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectedInsight =
+                ((List<Map<String, Object>>) request.selectedKnowledge().get("selectedInsights")).getFirst();
+        assertFalse(projectedInsight.containsKey("id"));
+        assertFalse(projectedInsight.containsKey("analysisId"));
+        assertEquals("devlog-ai-core", request.metadata().get("source"));
+        assertEquals(analysisId.toString(), request.metadata().get("analysisContextId"));
+        assertEquals(intent().outputSchema(), request.expectedOutputContract());
     }
 
     @Test

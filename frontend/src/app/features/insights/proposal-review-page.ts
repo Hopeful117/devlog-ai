@@ -7,6 +7,7 @@ import {
   exhaustMap,
   map,
   of,
+  Observable,
   shareReplay,
   startWith,
   Subject,
@@ -27,6 +28,7 @@ type Decision = 'ACCEPTED' | 'REJECTED';
   styleUrl: './proposal-review-page.scss',
 })
 export class ProposalReviewPage {
+  private readonly pageSize = 10;
   private readonly route = inject(ActivatedRoute);
   private readonly proposals = inject(InsightProposalService);
   private readonly reviewerSession = inject(ProposalReviewerSessionService);
@@ -54,12 +56,9 @@ export class ProposalReviewPage {
   readonly view$ = this.refresh.pipe(
     startWith(undefined),
     switchMap(() =>
-      this.proposals.getProposalReview(this.analysisId, this.page, 10).pipe(
+      this.loadSequentialReviewPage(this.page).pipe(
         tap((data) => {
-          const current = data.items.find((item) => item.id === this.currentId);
-          const next =
-            current ?? data.items.find((item) => item.status === 'PROPOSED') ?? data.items[0];
-          this.currentId = next?.id ?? null;
+          this.currentId = this.resolveCurrentId(data.items);
         }),
         map((data) => ({ state: 'loaded' as const, data })),
         catchError((error: unknown) =>
@@ -125,16 +124,33 @@ export class ProposalReviewPage {
     this.reviewerSession.clear();
     this.form.controls.validatedBy.reset('');
   }
-  previous(): void {
-    if (this.page > 0) {
-      this.page--;
-      this.currentId = null;
-      this.refresh.next();
-    }
+  hasSecondaryQueue(items: readonly ProposalReviewItem[]): boolean {
+    return items.length > 1;
   }
-  next(): void {
-    this.page++;
-    this.currentId = null;
-    this.refresh.next();
+
+  private loadSequentialReviewPage(page: number): Observable<ProposalReviewItemPage> {
+    return this.proposals.getProposalReview(this.analysisId, page, this.pageSize).pipe(
+      switchMap((data) => {
+        this.page = data.page.number;
+        if (this.findFirstPending(data.items) || data.counts.pending === 0 || !data.page.hasNext) {
+          return of(data);
+        }
+        return this.loadSequentialReviewPage(page + 1);
+      }),
+    );
+  }
+
+  private resolveCurrentId(items: readonly ProposalReviewItem[]): string | null {
+    const currentPending = items.find(
+      (item) => item.id === this.currentId && item.status === 'PROPOSED',
+    );
+    return currentPending?.id ?? this.findFirstPending(items)?.id ?? items[0]?.id ?? null;
+  }
+
+  private findFirstPending(items: readonly ProposalReviewItem[]): ProposalReviewItem | undefined {
+    return items.find((item) => item.status === 'PROPOSED');
   }
 }
+
+type ProposalReviewItemPage =
+  ReturnType<InsightProposalService['getProposalReview']> extends Observable<infer T> ? T : never;

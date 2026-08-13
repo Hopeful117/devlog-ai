@@ -126,6 +126,72 @@ class AiProposalContractValidatorTest {
                 () -> validator.validate(task, List.of(invalidTarget)));
     }
 
+    @Test
+    void rejectsSupportingFactIdWhenItMatchesSelectedInsightInsteadOfSelectedFact() {
+        UUID factId = UUID.randomUUID();
+        UUID observationId = UUID.randomUUID();
+        UUID strayInsightId = UUID.randomUUID();
+        String reference = "src/main/java/App.java:42";
+        AiTask task = AiTask.builder()
+                .intentId("describe-project")
+                .intentVersion("v1")
+                .selectedKnowledgeSnapshot(Map.of(
+                        "selectedFacts", List.of(Map.of("id", factId.toString(),
+                                "evidenceReferences", List.of(reference))),
+                        "selectedObservations", List.of(Map.of("id", observationId.toString())),
+                        "selectedInsights", List.of(Map.of(
+                                "id", strayInsightId.toString(),
+                                "title", "Controllers"
+                        ))))
+                .build();
+        AiProposalResult proposal = new AiProposalResult(ProposalType.INSIGHT,
+                Map.of("insightType", "PROJECT_PRESENTATION",
+                        "title", "Presentation",
+                        "summary", "The project exposes controllers.",
+                        "rationale", "Grounding is incorrect.",
+                        "deltaType", "NEW"),
+                new BigDecimal("0.9000"),
+                List.of(strayInsightId),
+                List.of(observationId),
+                List.of(reference));
+
+        assertThrows(InvalidAiTaskResultException.class,
+                () -> validator.validate(task, List.of(proposal)));
+    }
+
+    @Test
+    void rejectsSupportingObservationIdWhenItMatchesSelectedInsightInsteadOfSelectedObservation() {
+        UUID factId = UUID.randomUUID();
+        UUID observationId = UUID.randomUUID();
+        UUID strayInsightId = UUID.randomUUID();
+        String reference = "src/main/java/App.java:42";
+        AiTask task = AiTask.builder()
+                .intentId("describe-project")
+                .intentVersion("v1")
+                .selectedKnowledgeSnapshot(Map.of(
+                        "selectedFacts", List.of(Map.of("id", factId.toString(),
+                                "evidenceReferences", List.of(reference))),
+                        "selectedObservations", List.of(Map.of("id", observationId.toString())),
+                        "selectedInsights", List.of(Map.of(
+                                "id", strayInsightId.toString(),
+                                "title", "Controllers"
+                        ))))
+                .build();
+        AiProposalResult proposal = new AiProposalResult(ProposalType.INSIGHT,
+                Map.of("insightType", "PROJECT_PRESENTATION",
+                        "title", "Presentation",
+                        "summary", "The project exposes controllers.",
+                        "rationale", "Grounding is incorrect.",
+                        "deltaType", "NEW"),
+                new BigDecimal("0.9000"),
+                List.of(factId),
+                List.of(strayInsightId),
+                List.of(reference));
+
+        assertThrows(InvalidAiTaskResultException.class,
+                () -> validator.validate(task, List.of(proposal)));
+    }
+
     private AiProposalResult eventProposal(String category, String title, String reference) {
         return new AiProposalResult(ProposalType.ENGINEERING_EVENT,
                 Map.of("schemaVersion", "engineering-event-proposal-v1", "category", category,

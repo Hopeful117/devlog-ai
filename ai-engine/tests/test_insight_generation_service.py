@@ -241,6 +241,119 @@ async def test_reference_outside_context_gets_corrective_retry() -> None:
 
 
 @pytest.mark.asyncio
+async def test_selected_insight_id_reused_as_supporting_fact_gets_corrective_retry() -> None:
+    request, fact_id, observation_id, evidence = submission()
+    stray_insight_id = str(uuid4())
+    request = request.model_copy(update={
+        "selected_knowledge": {
+            **request.selected_knowledge,
+            "selectedInsights": [
+                {
+                    "id": stray_insight_id,
+                    "analysisId": str(uuid4()),
+                    "type": "ARCHITECTURAL",
+                    "severity": "INFO",
+                    "title": "Controllers",
+                    "content": "The project exposes REST controllers.",
+                }
+            ],
+        }
+    })
+    invalid = valid_output(stray_insight_id, observation_id, evidence)
+    provider = MockLlmProvider(
+        [invalid, valid_output(fact_id, observation_id, evidence)]
+    )
+    callback = RecordingCallbackClient()
+    service = InsightGenerationService(provider, InsightPromptBuilder(), callback)  # type: ignore[arg-type]
+
+    await service.process(request, uuid4())
+
+    assert len(provider.requests) == 2
+    assert stray_insight_id in provider.requests[1].user_message
+    assert "supportingFactIds contains references absent from AnalysisContext" in provider.requests[1].user_message
+    assert callback.results[0].status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_selected_insight_id_reused_as_supporting_observation_gets_corrective_retry() -> None:
+    request, fact_id, observation_id, evidence = submission()
+    stray_insight_id = str(uuid4())
+    request = request.model_copy(update={
+        "selected_knowledge": {
+            **request.selected_knowledge,
+            "selectedInsights": [
+                {
+                    "id": stray_insight_id,
+                    "analysisId": str(uuid4()),
+                    "type": "ARCHITECTURAL",
+                    "severity": "INFO",
+                    "title": "Controllers",
+                    "content": "The project exposes REST controllers.",
+                }
+            ],
+        }
+    })
+    invalid = valid_output(fact_id, stray_insight_id, evidence)
+    provider = MockLlmProvider(
+        [invalid, valid_output(fact_id, observation_id, evidence)]
+    )
+    callback = RecordingCallbackClient()
+    service = InsightGenerationService(provider, InsightPromptBuilder(), callback)  # type: ignore[arg-type]
+
+    await service.process(request, uuid4())
+
+    assert len(provider.requests) == 2
+    assert stray_insight_id in provider.requests[1].user_message
+    assert "supportingObservationIds contains references absent from AnalysisContext" in provider.requests[1].user_message
+    assert callback.results[0].status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_target_insight_id_with_new_delta_gets_corrective_retry() -> None:
+    request, fact_id, observation_id, evidence, target_insight_id = architecture_submission()
+    invalid = {
+        "proposals": [
+            {
+                "insightType": "ARCHITECTURE_DESCRIPTION",
+                "title": "Fresh architecture view",
+                "summary": "This should be a new insight.",
+                "rationale": "New evidence was found.",
+                "deltaType": "NEW",
+                "targetInsightId": target_insight_id,
+                "confidence": 0.9,
+                "supportingFactIds": [fact_id],
+                "supportingObservationIds": [observation_id],
+                "evidenceReferences": [evidence],
+            }
+        ]
+    }
+    valid = {
+        "proposals": [
+            {
+                "insightType": "ARCHITECTURE_DESCRIPTION",
+                "title": "Fresh architecture view",
+                "summary": "This is a genuinely new insight.",
+                "rationale": "New evidence was found.",
+                "deltaType": "NEW",
+                "confidence": 0.9,
+                "supportingFactIds": [fact_id],
+                "supportingObservationIds": [observation_id],
+                "evidenceReferences": [evidence],
+            }
+        ]
+    }
+    provider = MockLlmProvider([invalid, valid])
+    callback = RecordingCallbackClient()
+    service = InsightGenerationService(provider, InsightPromptBuilder(), callback)  # type: ignore[arg-type]
+
+    await service.process(request, uuid4())
+
+    assert len(provider.requests) == 2
+    assert "targetInsightId must be omitted when deltaType is NEW" in provider.requests[1].user_message
+    assert callback.results[0].status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
 async def test_failed_corrective_retry_sends_failed_callback() -> None:
     request, _, _, _ = submission()
     provider = MockLlmProvider(

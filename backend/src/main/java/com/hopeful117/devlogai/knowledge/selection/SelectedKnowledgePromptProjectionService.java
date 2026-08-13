@@ -38,13 +38,22 @@ public class SelectedKnowledgePromptProjectionService {
                 selectedKnowledge.selectedFacts(),
                 selectedKnowledge.selectedObservations(),
                 selectedKnowledge.diagnostics(),
-                selectedKnowledge.selectedInsights(),
+                selectedKnowledge.selectedInsights().stream().map(this::projectInsight).toList(),
                 selectedKnowledge.existingArchitectureKnowledge(),
                 selectedKnowledge.selectedEngineeringEvents(),
                 projectRepositoryContext(selectedKnowledge.repositoryContext()),
                 selectedKnowledge.evolutionContext(),
                 selectedKnowledge.selectionMetadata(),
                 selectedKnowledge.selectionDigest()
+        );
+    }
+
+    private PromptInsightSnapshot projectInsight(SelectedKnowledge.InsightSnapshot insight) {
+        return new PromptInsightSnapshot(
+                insight.type(),
+                insight.severity(),
+                insight.title(),
+                insight.content()
         );
     }
 
@@ -114,7 +123,7 @@ public class SelectedKnowledgePromptProjectionService {
             List<AnalysisContext.FactSnapshot> selectedFacts,
             List<AnalysisContext.ObservationSnapshot> selectedObservations,
             SelectedKnowledge.DiagnosticSnapshot diagnostics,
-            List<SelectedKnowledge.InsightSnapshot> selectedInsights,
+            List<PromptInsightSnapshot> selectedInsights,
             List<SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot> existingArchitectureKnowledge,
             List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
                     selectedEngineeringEvents,
@@ -122,6 +131,13 @@ public class SelectedKnowledgePromptProjectionService {
             AnalysisContext.EvolutionContext evolutionContext,
             SelectedKnowledge.SelectionMetadata selectionMetadata,
             String selectionDigest
+    ) { }
+
+    record PromptInsightSnapshot(
+            Object type,
+            Object severity,
+            String title,
+            String content
     ) { }
 
     record PromptRepositoryContext(
