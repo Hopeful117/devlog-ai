@@ -109,21 +109,30 @@
               </ul>
             </div>
           }
-          @if (viewModel.projectState.activeWork.proposedProposals.length > 0) {
+          @if (
+            displayableProposals(viewModel.projectState.activeWork.proposedProposals).length > 0
+          ) {
             <div class="section-item">
               <span class="eyebrow">Proposed proposals</span>
               <ul>
                 @for (
-                  proposal of viewModel.projectState.activeWork.proposedProposals;
+                  proposal of displayableProposals(
+                    viewModel.projectState.activeWork.proposedProposals
+                  );
                   track proposal.id
                 ) {
-                  <li>
-                    <strong>{{ proposal.type }}</strong> —
-                    {{
-                      proposal.confidence
-                        ? (proposal.confidence | number: '1.0-0') + '% confidence'
-                        : 'No confidence'
-                    }}
+                  <li class="proposal-summary-row">
+                    <div class="proposal-summary-row__main">
+                      @if (proposalPrimaryLabel(proposal); as label) {
+                        <strong>{{ label }}</strong>
+                      }
+                      @if (proposalSecondaryLabel(proposal); as detail) {
+                        <span class="proposal-summary-row__detail">{{ detail }}</span>
+                      }
+                    </div>
+                    @if (proposalConfidenceLabel(proposal); as confidence) {
+                      <span class="proposal-summary-row__meta">{{ confidence }}</span>
+                    }
                   </li>
                 }
               </ul>
@@ -132,7 +141,7 @@
           @if (
             viewModel.projectState.activeWork.inProgressStories.length === 0 &&
             viewModel.projectState.activeWork.openChallenges.length === 0 &&
-            viewModel.projectState.activeWork.proposedProposals.length === 0
+            displayableProposals(viewModel.projectState.activeWork.proposedProposals).length === 0
           ) {
             <p class="empty-state">No active work.</p>
           }
@@ -240,21 +249,30 @@
         <!-- Section 5: What needs my action? -->
         <section class="overview-section panel" aria-labelledby="section-actions">
           <h2 id="section-actions">What needs my action?</h2>
-          @if (viewModel.projectState.pendingActions.proposedProposals.length > 0) {
+          @if (
+            displayableProposals(viewModel.projectState.pendingActions.proposedProposals).length > 0
+          ) {
             <div class="section-item">
               <span class="eyebrow">Proposed proposals</span>
               <ul>
                 @for (
-                  proposal of viewModel.projectState.pendingActions.proposedProposals;
+                  proposal of displayableProposals(
+                    viewModel.projectState.pendingActions.proposedProposals
+                  );
                   track proposal.id
                 ) {
-                  <li>
-                    <strong>{{ proposal.type }}</strong> —
-                    {{
-                      proposal.confidence
-                        ? (proposal.confidence | number: '1.0-0') + '% confidence'
-                        : 'No confidence'
-                    }}
+                  <li class="proposal-summary-row">
+                    <div class="proposal-summary-row__main">
+                      @if (proposalPrimaryLabel(proposal); as label) {
+                        <strong>{{ label }}</strong>
+                      }
+                      @if (proposalSecondaryLabel(proposal); as detail) {
+                        <span class="proposal-summary-row__detail">{{ detail }}</span>
+                      }
+                    </div>
+                    @if (proposalConfidenceLabel(proposal); as confidence) {
+                      <span class="proposal-summary-row__meta">{{ confidence }}</span>
+                    }
                   </li>
                 }
               </ul>
@@ -292,7 +310,8 @@
             </div>
           }
           @if (
-            viewModel.projectState.pendingActions.proposedProposals.length === 0 &&
+            displayableProposals(viewModel.projectState.pendingActions.proposedProposals).length ===
+              0 &&
             viewModel.projectState.pendingActions.openChallenges.length === 0 &&
             viewModel.projectState.pendingActions.unstartedStories.length === 0
           ) {

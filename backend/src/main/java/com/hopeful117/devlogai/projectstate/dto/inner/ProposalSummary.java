@@ -8,6 +8,9 @@ import java.util.UUID;
 public record ProposalSummary(
         UUID id,
         String type,
+        String insightType,
+        String title,
+        String summary,
         ProposalStatus status,
         BigDecimal confidence
 ) {

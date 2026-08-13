@@ -6,12 +6,18 @@ import com.hopeful117.devlogai.knowledge.entity.KnowledgeEvent;
 import com.hopeful117.devlogai.knowledge.entity.KnowledgeEventType;
 import com.hopeful117.devlogai.projectstate.dto.inner.EvolutionSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.KnowledgeSummary;
+import com.hopeful117.devlogai.projectstate.dto.inner.ProposalSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.StorySummary;
+import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
+import com.hopeful117.devlogai.proposal.entity.ProposalType;
+import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.entity.StoryStatus;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -90,5 +96,30 @@ class ProjectStateMapperTest {
     void mapsEmptyEngineeringEventsToEmptyList() {
         assertEquals(0, mapper.toEvolutionSummaries(java.util.List.of()).size());
         assertEquals(0, mapper.toRecentEvolutionSection(java.util.List.of()).recentEvolution().size());
+    }
+
+    @Test
+    void mapsInsightProposalPayloadIntoProposalSummary() {
+        UUID id = UUID.randomUUID();
+        ValidatableProposal proposal = ValidatableProposal.builder()
+                .id(id)
+                .type(ProposalType.INSIGHT)
+                .status(ProposalStatus.PROPOSED)
+                .confidence(new BigDecimal("0.9500"))
+                .payload(Map.of(
+                        "insightType", "PROJECT_PRESENTATION",
+                        "title", "Project Overview of devlog-ai",
+                        "summary", "devlog-ai is an AI-powered documentation assistant."
+                ))
+                .build();
+
+        ProposalSummary summary = mapper.toProposalSummary(proposal);
+
+        assertEquals(id, summary.id());
+        assertEquals("INSIGHT", summary.type());
+        assertEquals("PROJECT_PRESENTATION", summary.insightType());
+        assertEquals("Project Overview of devlog-ai", summary.title());
+        assertEquals("devlog-ai is an AI-powered documentation assistant.", summary.summary());
+        assertEquals(new BigDecimal("0.9500"), summary.confidence());
     }
 }
