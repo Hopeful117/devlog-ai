@@ -72,11 +72,13 @@ describe('ProposalReviewPage', () => {
   it('renders a sequential current-proposal workflow', () => {
     const fixture = render();
     expect(fixture.nativeElement.textContent).toContain('Sequential review');
-    expect(fixture.nativeElement.textContent).toContain('Current proposal');
+    expect(fixture.nativeElement.textContent).toContain('Current queue state');
     expect(fixture.nativeElement.textContent).toContain('1 pending');
     expect(fixture.nativeElement.textContent).toContain('Architecture');
-    fixture.componentInstance.generateReviewer();
     expect(fixture.componentInstance.form.controls.validatedBy.valid).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain(
+      'A local review session was created automatically',
+    );
   });
   it('prevents duplicate acceptance while pending', () => {
     const pending = new Subject();
@@ -114,6 +116,18 @@ describe('ProposalReviewPage', () => {
     });
     expect(component.confirmation).toBeNull();
     expect(component.form.controls.comment.value).toBe('');
+  });
+  it('surfaces explicit success feedback after a decision', () => {
+    const fixture = render();
+    const component = fixture.componentInstance;
+    component.form.controls.validatedBy.setValue(reviewer);
+    component.confirmation = 'ACCEPTED';
+    component.decide(item);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'Proposal accepted. The review queue has been refreshed.',
+    );
   });
   it('advances automatically to the next pending proposal on the same page', () => {
     const decided = createItem({
@@ -233,12 +247,21 @@ describe('ProposalReviewPage', () => {
     const fixture = render();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Review complete');
+    expect(fixture.nativeElement.textContent).toContain('no remaining pending review work');
   });
-  it('clears the reviewer session', () => {
+  it('starts a fresh local reviewer session', () => {
     const fixture = render();
     const component = fixture.componentInstance;
-    component.form.controls.validatedBy.setValue(reviewer);
+    const first = component.form.controls.validatedBy.value;
     component.clearReviewer();
-    expect(component.form.controls.validatedBy.value).toBe('');
+    expect(component.form.controls.validatedBy.value).not.toBe(first);
+    expect(component.reviewerSessionState).toBe('reset');
+  });
+  it('marks the session as resumed when a reviewer already exists', () => {
+    sessionStorage.setItem('devlog.proposal-review.reviewer.v1', reviewer);
+    const fixture = render();
+
+    expect(fixture.componentInstance.reviewerSessionState).toBe('resumed');
+    expect(fixture.nativeElement.textContent).toContain('Review session resumed on this device');
   });
 });

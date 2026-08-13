@@ -1,49 +1,119 @@
 <section class="review-page">
-  <a [routerLink]="['/analyses', analysisId]">← Back to Analysis</a>
-  <h1>Proposal review</h1>
+  <a class="back-link" [routerLink]="['/analyses', analysisId]">← Back to Analysis</a>
+  <header class="review-page__header">
+    <div>
+      <p class="eyebrow">Human validation workspace</p>
+      <h1>Proposal review</h1>
+      <p class="review-page__intro">
+        Review one proposal at a time, keep explicit human decisions, and resume the queue
+        predictably on the same device.
+      </p>
+    </div>
+  </header>
   @if (action$ | async; as action) {
-    @if (action.state === 'pending') {
-      <p role="status">Recording human decision…</p>
-    }
-    @if (action.state === 'error') {
-      <p role="alert" class="error">{{ action.error.message }}</p>
-    }
+    <div aria-live="polite" class="review-feedback">
+      @if (action.state === 'pending') {
+        <p role="status" class="inline-message review-feedback__message">
+          Recording {{ action.decision === 'ACCEPTED' ? 'acceptance' : 'rejection' }} and loading
+          the next queue state…
+        </p>
+      }
+      @if (action.state === 'success') {
+        <p
+          role="status"
+          class="inline-message review-feedback__message review-feedback__message--success"
+        >
+          Proposal {{ action.decision === 'ACCEPTED' ? 'accepted' : 'rejected' }}. The review queue
+          has been refreshed.
+        </p>
+      }
+      @if (action.state === 'error') {
+        <p role="alert" class="inline-message inline-message--error review-feedback__message">
+          {{ action.error.message }}
+        </p>
+      }
+    </div>
     @if (view$ | async; as vm) {
       @if (vm.state === 'loading') {
-        <p role="status">Loading review queue…</p>
+        <p role="status" class="inline-message review-feedback__message">Loading review queue…</p>
       } @else if (vm.state === 'error') {
         <p role="alert" class="error">{{ vm.error.message }}</p>
       } @else {
         <section class="panel progress-panel" aria-live="polite">
-          <p class="eyebrow">Sequential review</p>
-          <h2>Current proposal</h2>
-          <p>
-            {{ vm.data.counts.pending }} pending · {{ vm.data.counts.accepted }} accepted ·
-            {{ vm.data.counts.rejected }} rejected · {{ vm.data.counts.total }} total
-          </p>
+          <div class="progress-panel__summary">
+            <div>
+              <p class="eyebrow">Sequential review</p>
+              <h2>Current queue state</h2>
+              <p class="progress-panel__counts">
+                {{ reviewedCount(vm.data.counts) }} reviewed · {{ vm.data.counts.pending }} pending
+                · {{ vm.data.counts.total }} total
+              </p>
+            </div>
+            <div class="progress-panel__meter" aria-label="Review progress">
+              <strong>{{ progressPercent(vm.data.counts) }}%</strong>
+              <span>complete</span>
+            </div>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <div
+              class="progress-track__value"
+              [style.width.%]="progressPercent(vm.data.counts)"
+            ></div>
+          </div>
+          <div class="progress-panel__stats">
+            <span class="badge badge--warning">{{ vm.data.counts.pending }} pending</span>
+            <span class="badge badge--success">{{ vm.data.counts.accepted }} accepted</span>
+            <span class="badge badge--danger">{{ vm.data.counts.rejected }} rejected</span>
+          </div>
           <p class="section-note">
-            Review one proposal at a time. After each explicit decision, the workspace advances to
-            the next pending proposal automatically.
+            After each explicit decision, the workspace refreshes and advances to the next pending
+            proposal automatically when one remains.
           </p>
         </section>
+        <section class="panel session-panel">
+          <div>
+            <p class="eyebrow">Local review session</p>
+            <h2>Reviewer continuity</h2>
+            <p>{{ reviewerSessionMessage() }}</p>
+          </div>
+          <div class="session-panel__actions">
+            <span class="badge badge--info">Session-local reviewer identity</span>
+            <button
+              class="secondary-button"
+              type="button"
+              (click)="startFreshReviewerSession()"
+              [disabled]="action.state === 'pending'"
+            >
+              Start a fresh local session
+            </button>
+          </div>
+        </section>
         @if (vm.data.counts.pending === 0) {
-          <section class="panel">
+          <section class="panel completion-panel">
             <h2>Review complete</h2>
-            <p>Every proposal has an immutable human decision.</p>
+            <p>Every proposal now has an immutable human decision.</p>
+            <p class="section-note">
+              You can still open any proposal directly for audit, but there is no remaining pending
+              review work in this queue.
+            </p>
           </section>
         }
         @if (current(vm.data.items); as item) {
           <article class="review-grid">
-            <main class="panel">
-              <p class="eyebrow">Current proposal</p>
-              <h2 #proposalTitle tabindex="-1">
-                {{ item.payload['title'] || item.type.replaceAll('_', ' ') + ' proposal' }}
-              </h2>
-              <app-status-badge [value]="item.status" />
-              <p>
-                <strong>{{ item.type.replaceAll('_', ' ') }}</strong>
-              </p>
-              <p>{{ item.payload['summary'] }}</p>
+            <main class="panel proposal-panel">
+              <div class="proposal-panel__header">
+                <div>
+                  <p class="eyebrow">Current proposal</p>
+                  <h2 #proposalTitle tabindex="-1">
+                    {{ item.payload['title'] || item.type.replaceAll('_', ' ') + ' proposal' }}
+                  </h2>
+                  <p class="proposal-panel__summary">{{ item.payload['summary'] }}</p>
+                </div>
+                <div class="proposal-panel__meta">
+                  <app-status-badge [value]="item.status" />
+                  <span class="badge badge--info">{{ item.type.replaceAll('_', ' ') }}</span>
+                </div>
+              </div>
               @if (item.type === 'ENGINEERING_EVENT') {
                 <h3>Significance</h3>
                 <p>{{ item.payload['significance'] }}</p>
@@ -81,34 +151,40 @@
               @if (hasSecondaryQueue(vm.data.items)) {
                 <details class="queue-panel">
                   <summary>Current page queue</summary>
+                  <p class="section-note">
+                    Use this only when you need to inspect nearby items directly. The main workflow
+                    still advances sequentially.
+                  </p>
                   <nav class="queue" aria-label="Proposal queue">
                     @for (queueItem of vm.data.items; track queueItem.id) {
                       <button
+                        class="queue-item"
                         type="button"
                         (click)="select(queueItem)"
                         [attr.aria-current]="queueItem.id === currentId ? 'true' : null"
                       >
-                        {{
+                        <strong>{{
                           queueItem.payload['title'] ||
                             queueItem.type.replaceAll('_', ' ') + ' proposal'
-                        }}
-                        · {{ queueItem.status }}
+                        }}</strong>
+                        <span>{{ queueItem.status }}</span>
                       </button>
                     }
                   </nav>
                 </details>
               }
-              <a [routerLink]="['/proposals', item.id]">Open direct audit page</a>
+              <a class="audit-link" [routerLink]="['/proposals', item.id]"
+                >Open direct audit page</a
+              >
             </main>
-            <aside class="panel">
+            <aside class="panel decision-panel">
               @if (item.status === 'PROPOSED') {
                 <form [formGroup]="form">
                   <h2>Human decision</h2>
-                  <label for="reviewer">Local reviewer UUID</label>
-                  <p>This is a session-local MVP identifier, not an authenticated identity.</p>
-                  <input id="reviewer" formControlName="validatedBy" />
-                  <button type="button" (click)="generateReviewer()">Generate local UUID</button>
-                  <button type="button" (click)="clearReviewer()">Clear</button>
+                  <p class="section-note">
+                    This queue uses the active local review session automatically. Core still
+                    records a deterministic reviewer identifier for every immutable decision.
+                  </p>
                   <label for="comment">Decision note</label
                   ><textarea id="comment" formControlName="comment"></textarea>
                   @if (item.type === 'INSIGHT') {
@@ -130,7 +206,7 @@
                     </button>
                   </div>
                   @if (confirmation) {
-                    <div role="group" aria-label="Confirm immutable decision">
+                    <div class="confirm-panel" role="group" aria-label="Confirm immutable decision">
                       <p>Confirm {{ confirmation.toLowerCase() }}. This cannot be reversed.</p>
                       <button
                         type="button"
@@ -144,7 +220,9 @@
                 </form>
               } @else {
                 <h2>Final decision</h2>
-                <p>{{ item.decision?.decision }} by {{ item.decision?.validatedBy }}</p>
+                <p class="decision-panel__final">
+                  {{ item.decision?.decision }} by {{ item.decision?.validatedBy }}
+                </p>
                 <p>{{ item.decision?.comment || 'No decision note.' }}</p>
                 @if (item.insight) {
                   <a [routerLink]="['/insights', item.insight.id]">{{ item.insight.title }}</a>
@@ -161,6 +239,11 @@
               }
             </aside>
           </article>
+        } @else {
+          <section class="panel completion-panel">
+            <h2>No proposal available on this page</h2>
+            <p>The review queue does not currently expose a current proposal for this view.</p>
+          </section>
         }
       }
     }

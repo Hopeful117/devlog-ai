@@ -21,6 +21,7 @@ import { InsightSeverity } from './insight.models';
 import { ProposalReviewerSessionService } from './proposal-reviewer-session.service';
 import { StatusBadge } from '../../shared/components/status-badge';
 type Action = 'ACCEPTED' | 'REJECTED';
+type ReviewerSessionState = 'created' | 'resumed' | 'reset';
 interface DecisionAction {
   readonly decision: Action;
   readonly analysisId: string;
@@ -40,6 +41,7 @@ export class ProposalDetailPage {
   private readonly refresh = new Subject<void>();
   private readonly actions = new Subject<DecisionAction>();
   confirmation: Action | null = null;
+  reviewerSessionState: ReviewerSessionState = 'created';
   readonly severities: readonly InsightSeverity[] = ['INFO', 'WARNING', 'CRITICAL'];
   readonly form = new FormGroup({
     validatedBy: new FormControl(this.ensureReviewerId(), {
@@ -112,13 +114,13 @@ export class ProposalDetailPage {
                 fragment: 'insight-proposals',
               });
             }),
-            map(() => ({ state: 'success' as const })),
+            map(() => ({ state: 'success' as const, decision })),
             catchError((error: unknown) => {
               const mapped = toRequestError(error, 'proposal');
               if (mapped.kind === 'conflict') this.refresh.next();
-              return of({ state: 'error' as const, error: mapped });
+              return of({ state: 'error' as const, error: mapped, decision });
             }),
-            startWith({ state: 'pending' as const }),
+            startWith({ state: 'pending' as const, decision }),
           );
         }),
       ),
@@ -134,12 +136,24 @@ export class ProposalDetailPage {
 
   resetLocalReviewerId(): void {
     this.reviewerSession.clear();
-    this.ensureReviewerId();
+    this.reviewerSessionState = 'reset';
+    this.ensureReviewerId(true);
+  }
+  reviewerSessionMessage(): string {
+    switch (this.reviewerSessionState) {
+      case 'resumed':
+        return 'This review resumed an existing local reviewer session on this device.';
+      case 'reset':
+        return 'A fresh local reviewer session is now active for this proposal review.';
+      default:
+        return 'A local reviewer session was created automatically for this device.';
+    }
   }
 
-  private ensureReviewerId(): string {
-    const existing = this.reviewerSession.get();
+  private ensureReviewerId(forceNew = false): string {
+    const existing = forceNew ? null : this.reviewerSession.get();
     if (existing) {
+      this.reviewerSessionState = this.reviewerSessionState === 'reset' ? 'reset' : 'resumed';
       this.form?.controls.validatedBy.setValue(existing);
       return existing;
     }
@@ -147,6 +161,7 @@ export class ProposalDetailPage {
     const generated = crypto.randomUUID();
     this.reviewerSession.set(generated);
     this.form?.controls.validatedBy.setValue(generated);
+    if (!forceNew) this.reviewerSessionState = 'created';
     return generated;
   }
 }

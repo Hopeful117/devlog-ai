@@ -21,6 +21,7 @@ import { InsightSeverity, ProposalReviewItem } from './insight.models';
 import { ProposalReviewerSessionService } from './proposal-reviewer-session.service';
 
 type Decision = 'ACCEPTED' | 'REJECTED';
+type ReviewerSessionState = 'created' | 'resumed' | 'reset';
 @Component({
   selector: 'app-proposal-review-page',
   imports: [AsyncPipe, JsonPipe, ReactiveFormsModule, RouterLink, StatusBadge],
@@ -37,10 +38,11 @@ export class ProposalReviewPage {
   private page = 0;
   currentId: string | null = null;
   confirmation: Decision | null = null;
+  reviewerSessionState: ReviewerSessionState = 'created';
   readonly severities: readonly InsightSeverity[] = ['INFO', 'WARNING', 'CRITICAL'];
   @ViewChild('proposalTitle') proposalTitle?: ElementRef<HTMLElement>;
   readonly form = new FormGroup({
-    validatedBy: new FormControl(this.reviewerSession.get() ?? '', {
+    validatedBy: new FormControl(this.ensureReviewerId(), {
       nonNullable: true,
       validators: [
         Validators.required,
@@ -90,13 +92,13 @@ export class ProposalReviewPage {
           this.form.controls.severity.reset('INFO');
           this.refresh.next();
         }),
-        map(() => ({ state: 'success' as const })),
+        map(() => ({ state: 'success' as const, decision })),
         catchError((error: unknown) => {
           const mapped = toRequestError(error, 'proposal');
           if (mapped.kind === 'conflict') this.refresh.next();
-          return of({ state: 'error' as const, error: mapped });
+          return of({ state: 'error' as const, error: mapped, decision });
         }),
-        startWith({ state: 'pending' as const }),
+        startWith({ state: 'pending' as const, decision }),
       );
     }),
     startWith({ state: 'idle' as const }),
@@ -114,18 +116,36 @@ export class ProposalReviewPage {
       this.decisions.next({ item, decision: this.confirmation });
     else this.form.markAllAsTouched();
   }
-  generateReviewer(): void {
-    const value = crypto.randomUUID();
-    this.reviewerSession.set(value);
-    this.form.controls.validatedBy.setValue(value);
-    this.form.controls.validatedBy.markAsTouched();
+  startFreshReviewerSession(): void {
+    this.reviewerSession.clear();
+    this.reviewerSessionState = 'reset';
+    this.ensureReviewerId(true);
   }
   clearReviewer(): void {
-    this.reviewerSession.clear();
-    this.form.controls.validatedBy.reset('');
+    this.startFreshReviewerSession();
   }
   hasSecondaryQueue(items: readonly ProposalReviewItem[]): boolean {
     return items.length > 1;
+  }
+  reviewedCount(counts: { readonly accepted: number; readonly rejected: number }): number {
+    return counts.accepted + counts.rejected;
+  }
+  progressPercent(counts: {
+    readonly total: number;
+    readonly accepted: number;
+    readonly rejected: number;
+  }): number {
+    return counts.total === 0 ? 0 : Math.round((this.reviewedCount(counts) / counts.total) * 100);
+  }
+  reviewerSessionMessage(): string {
+    switch (this.reviewerSessionState) {
+      case 'resumed':
+        return 'Review session resumed on this device. New decisions will keep the same local reviewer identity until you reset it.';
+      case 'reset':
+        return 'A fresh local review session is now active on this device.';
+      default:
+        return 'A local review session was created automatically for this device. You can reset it if you want a fresh local reviewer identity.';
+    }
   }
 
   private loadSequentialReviewPage(page: number): Observable<ProposalReviewItemPage> {
@@ -149,6 +169,21 @@ export class ProposalReviewPage {
 
   private findFirstPending(items: readonly ProposalReviewItem[]): ProposalReviewItem | undefined {
     return items.find((item) => item.status === 'PROPOSED');
+  }
+
+  private ensureReviewerId(forceNew = false): string {
+    const existing = forceNew ? null : this.reviewerSession.get();
+    if (existing) {
+      this.reviewerSessionState = this.reviewerSessionState === 'reset' ? 'reset' : 'resumed';
+      this.form?.controls.validatedBy.setValue(existing);
+      return existing;
+    }
+
+    const generated = crypto.randomUUID();
+    this.reviewerSession.set(generated);
+    this.form?.controls.validatedBy.setValue(generated);
+    if (!forceNew) this.reviewerSessionState = 'created';
+    return generated;
   }
 }
 
