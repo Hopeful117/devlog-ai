@@ -18,6 +18,7 @@ import { toRequestError } from '../../core/http/request-error';
 import { InsightProposalService } from './insight-proposal.service';
 import { InsightService } from './insight.service';
 import { InsightSeverity } from './insight.models';
+import { ProposalReviewerSessionService } from './proposal-reviewer-session.service';
 import { StatusBadge } from '../../shared/components/status-badge';
 type Action = 'ACCEPTED' | 'REJECTED';
 interface DecisionAction {
@@ -35,12 +36,13 @@ export class ProposalDetailPage {
   private readonly router = inject(Router);
   private readonly proposals = inject(InsightProposalService);
   private readonly insights = inject(InsightService);
+  private readonly reviewerSession = inject(ProposalReviewerSessionService);
   private readonly refresh = new Subject<void>();
   private readonly actions = new Subject<DecisionAction>();
   confirmation: Action | null = null;
   readonly severities: readonly InsightSeverity[] = ['INFO', 'WARNING', 'CRITICAL'];
   readonly form = new FormGroup({
-    validatedBy: new FormControl('', {
+    validatedBy: new FormControl(this.ensureReviewerId(), {
       nonNullable: true,
       validators: [
         Validators.required,
@@ -93,7 +95,7 @@ export class ProposalDetailPage {
       this.actions.pipe(
         exhaustMap(({ decision, analysisId }) => {
           const comment = this.form.controls.comment.value.trim() || null;
-          const reviewer = this.form.controls.validatedBy.value;
+          const reviewer = this.ensureReviewerId();
           const request$ =
             decision === 'ACCEPTED'
               ? this.proposals.acceptProposal(id, {
@@ -130,8 +132,21 @@ export class ProposalDetailPage {
     else this.form.markAllAsTouched();
   }
 
-  generateLocalReviewerId(): void {
-    this.form.controls.validatedBy.setValue(crypto.randomUUID());
-    this.form.controls.validatedBy.markAsTouched();
+  resetLocalReviewerId(): void {
+    this.reviewerSession.clear();
+    this.ensureReviewerId();
+  }
+
+  private ensureReviewerId(): string {
+    const existing = this.reviewerSession.get();
+    if (existing) {
+      this.form?.controls.validatedBy.setValue(existing);
+      return existing;
+    }
+
+    const generated = crypto.randomUUID();
+    this.reviewerSession.set(generated);
+    this.form?.controls.validatedBy.setValue(generated);
+    return generated;
   }
 }

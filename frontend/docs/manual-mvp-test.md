@@ -6,7 +6,8 @@
 - The Docker-served Angular application is available at `http://localhost:18083` with its `/api`
   proxy. The standalone `npm start` workflow on `4200` remains optional.
 - At least one Project has an active Git Source reachable by the Java Core process.
-- Keep a reviewer UUID available for the unauthenticated MVP decision form.
+- The unauthenticated MVP now creates a session-local reviewer identity automatically on the direct
+  proposal detail page.
 
 Start the platform from the repository root:
 
@@ -62,7 +63,8 @@ from that AnalysisContext. No Insight exists until a reviewer accepts a proposal
    to compare results without modifying templates.
 4. Under **Insight Proposals**, open a `PROPOSED` proposal.
 5. Inspect its rationale, confidence, Fact IDs, Observation IDs, evidence references, and structured payload.
-6. Enter the reviewer UUID, choose a severity, optionally add a note, select **Accept proposal**, and confirm.
+6. Confirm the session-local reviewer identity message, choose a severity, optionally add a note,
+   select **Accept proposal**, and confirm.
 7. Expect the Proposal to reload as `ACCEPTED`, decision controls to disappear, and the Core-created validated Insight to appear.
 8. Open another `PROPOSED` proposal, select **Reject proposal**, and confirm.
 9. Expect it to remain visible as immutable `REJECTED` history and never appear under Validated Insights.
@@ -76,7 +78,7 @@ refresh to the actual immutable state without retrying.
 
 - Only accepted `INSIGHT` proposals create Insights.
 - Fact and Observation identifiers are displayed but are not links because Core has no detail REST endpoints.
-- Reviewer identity is entered manually until authentication supplies it.
+- Reviewer attribution is session-local until authentication supplies a real user identity.
 - The browser never calls the Python AI Engine directly.
 
 ## AI execution troubleshooting

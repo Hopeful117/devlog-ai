@@ -5,6 +5,7 @@ import { of, Subject, throwError } from 'rxjs';
 import { ProposalDetailPage } from './proposal-detail-page';
 import { InsightProposalService } from './insight-proposal.service';
 import { InsightService } from './insight.service';
+import { ProposalReviewerSessionService } from './proposal-reviewer-session.service';
 const reviewer = '123e4567-e89b-42d3-a456-426614174000';
 const proposed = {
   id: 'proposal-id',
@@ -43,6 +44,7 @@ describe('ProposalDetailPage', () => {
   const getDecision = vi.fn();
   const getInsightsByAnalysis = vi.fn();
   beforeEach(async () => {
+    sessionStorage.clear();
     getProposal.mockReset().mockReturnValue(of(proposed));
     acceptProposal.mockReset().mockReturnValue(of(validation));
     rejectProposal.mockReset().mockReturnValue(of({ ...validation, decision: 'REJECTED' }));
@@ -70,7 +72,6 @@ describe('ProposalDetailPage', () => {
     return fixture;
   }
   function prepare(component: ProposalDetailPage, decision: 'ACCEPTED' | 'REJECTED') {
-    component.form.controls.validatedBy.setValue(reviewer);
     component.form.controls.comment.setValue('review');
     component.confirmation = decision;
   }
@@ -87,23 +88,33 @@ describe('ProposalDetailPage', () => {
     expect(
       fixture.nativeElement.querySelector('[data-testid="reject-proposal"]')?.textContent,
     ).toContain('Reject proposal');
-    expect(fixture.nativeElement.querySelector('label[for="reviewer"]')).toBeTruthy();
     expect(fixture.nativeElement.querySelector('label[for="comment"]')).toBeTruthy();
+    expect(fixture.nativeElement.textContent).toContain('session reviewer identity automatically');
   });
-  it('explains the disabled decision and can generate a valid local reviewer UUID', () => {
+  it('creates and reuses a valid local reviewer UUID automatically', () => {
     const fixture = render();
-    (
-      fixture.nativeElement.querySelector('[data-testid="accept-proposal"]') as HTMLButtonElement
-    ).click();
-    fixture.detectChanges();
-    const confirm = fixture.nativeElement.querySelector('.confirm button') as HTMLButtonElement;
-    expect(confirm.disabled).toBe(true);
-    expect(fixture.nativeElement.textContent).toContain('required reviewer identifier');
-
-    fixture.componentInstance.generateLocalReviewerId();
-    fixture.detectChanges();
     expect(fixture.componentInstance.form.controls.validatedBy.valid).toBe(true);
-    expect(confirm.disabled).toBe(false);
+    const generated = fixture.componentInstance.form.controls.validatedBy.value;
+    expect(generated).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    expect(TestBed.inject(ProposalReviewerSessionService).get()).toBe(generated);
+
+    const second = render();
+    expect(second.componentInstance.form.controls.validatedBy.value).toBe(generated);
+  });
+  it('can reset the local reviewer session', () => {
+    const fixture = render();
+    const first = fixture.componentInstance.form.controls.validatedBy.value;
+
+    fixture.componentInstance.resetLocalReviewerId();
+    fixture.detectChanges();
+
+    const second = fixture.componentInstance.form.controls.validatedBy.value;
+    expect(second).not.toBe(first);
+    expect(second).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
   });
   it('accepts then returns to the source Analysis proposal list', () => {
     getProposal.mockReturnValueOnce(of(proposed)).mockReturnValue(of(accepted));
@@ -113,10 +124,11 @@ describe('ProposalDetailPage', () => {
     const fixture = render();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     prepare(fixture.componentInstance, 'ACCEPTED');
+    const generated = fixture.componentInstance.form.controls.validatedBy.value;
     fixture.componentInstance.decide(proposed.analysisId);
     fixture.detectChanges();
     expect(acceptProposal).toHaveBeenCalledWith(proposed.id, {
-      validatedBy: reviewer,
+      validatedBy: generated,
       comment: 'review',
       insightSeverity: 'INFO',
     });
@@ -129,9 +141,13 @@ describe('ProposalDetailPage', () => {
     const fixture = render();
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     prepare(fixture.componentInstance, 'REJECTED');
+    const generated = fixture.componentInstance.form.controls.validatedBy.value;
     fixture.componentInstance.decide(proposed.analysisId);
     fixture.detectChanges();
-    expect(rejectProposal).toHaveBeenCalled();
+    expect(rejectProposal).toHaveBeenCalledWith(proposed.id, {
+      validatedBy: generated,
+      comment: 'review',
+    });
     expect(navigate).toHaveBeenCalledWith(['/analyses', proposed.analysisId], {
       fragment: 'insight-proposals',
     });
