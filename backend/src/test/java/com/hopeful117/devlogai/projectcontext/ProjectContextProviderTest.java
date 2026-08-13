@@ -24,6 +24,7 @@ import com.hopeful117.devlogai.milestone.entity.MilestoneStatus;
 import com.hopeful117.devlogai.milestone.repository.MilestoneRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.projectcontextinput.repository.ProjectHumanContextInputRepository;
 import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
 import com.hopeful117.devlogai.proposal.entity.ProposalType;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
@@ -63,6 +64,7 @@ class ProjectContextProviderTest {
     @Mock ChallengeRepository challengeRepository;
     @Mock KnowledgeRelationRepository knowledgeRelationRepository;
     @Mock com.hopeful117.devlogai.story.repository.EngineeringStoryRepository engineeringStoryRepository;
+    @Mock ProjectHumanContextInputRepository humanContextInputRepository;
 
     @InjectMocks ProjectContextProviderImpl provider;
 

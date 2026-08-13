@@ -4,13 +4,16 @@ import com.hopeful117.devlogai.project.service.ProjectService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -75,7 +78,7 @@ class ProjectDeletionPostgresIntegrationTest {
         assertEquals(1, count("sources", retainedSource));
         assertEquals(1, count("project_commits", retainedCommit));
         assertEquals(1, count("commit_changed_files", retainedCommit, "project_commit_id"));
-        assertEquals("37", jdbc.queryForObject(
+        assertEquals(latestMigrationVersion(), jdbc.queryForObject(
                 "select version from flyway_schema_history where success order by installed_rank desc limit 1",
                 String.class));
     }
@@ -200,5 +203,19 @@ class ProjectDeletionPostgresIntegrationTest {
         return jdbc.queryForObject(
                 "select count(*) from " + table + " where " + column + " = ?",
                 Integer.class, id);
+    }
+
+    private String latestMigrationVersion() {
+        try {
+            return java.util.Arrays.stream(new PathMatchingResourcePatternResolver()
+                            .getResources("classpath:db/migration/V*__*.sql"))
+                    .map(resource -> resource.getFilename())
+                    .filter(filename -> filename != null)
+                    .map(filename -> filename.substring(1, filename.indexOf("__")))
+                    .max(Comparator.comparingInt(Integer::parseInt))
+                    .orElseThrow();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to determine latest migration version", exception);
+        }
     }
 }

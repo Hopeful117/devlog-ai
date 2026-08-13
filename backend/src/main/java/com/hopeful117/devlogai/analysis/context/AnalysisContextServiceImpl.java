@@ -101,7 +101,8 @@ public class AnalysisContextServiceImpl implements AnalysisContextService {
                 projectContext.validatedEngineeringEvents(),
                 projectContext.openChallenges(),
                 projectContext.knowledgeRelations(),
-                projectContext.engineeringStories()
+                projectContext.engineeringStories(),
+                projectContext.humanContextInputs()
         );
     }
 

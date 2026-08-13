@@ -1,4 +1,4 @@
-import { AsyncPipe } from '@angular/common';
+import { AsyncPipe, DatePipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { catchError, map, of, shareReplay, startWith, switchMap } from 'rxjs';
@@ -24,7 +24,7 @@ type OverviewViewState =
 
 @Component({
   selector: 'app-project-state-page',
-  imports: [AsyncPipe],
+  imports: [AsyncPipe, DatePipe],
   templateUrl: './project-state-page.html',
   styleUrl: './project-state-page.scss',
 })
@@ -89,6 +89,12 @@ export class ProjectStatePage {
     if (proposal.confidence === null) return null;
     const normalized = proposal.confidence <= 1 ? proposal.confidence * 100 : proposal.confidence;
     return `${Math.round(normalized)}% confidence`;
+  }
+
+  humanContextPreview(contentMarkdown: string): string {
+    const normalized = contentMarkdown.replaceAll(/\s+/g, ' ').trim();
+    if (normalized.length <= 180) return normalized;
+    return `${normalized.slice(0, 177).trimEnd()}...`;
   }
 
   private humanizeToken(value: string): string {

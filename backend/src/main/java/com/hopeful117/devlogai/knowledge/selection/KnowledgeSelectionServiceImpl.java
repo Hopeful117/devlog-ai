@@ -75,6 +75,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
         List<SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot> existingArchitectureKnowledge =
                 selectExistingArchitectureKnowledge(intent, insightCandidates);
         var engineeringEvents = context.validatedEngineeringEvents().stream().limit(10).toList();
+        var humanContextInputs = context.humanContextInputs().stream().limit(5).toList();
         RepositoryContext repositoryContext = repositoryContextService.build(
                 context, intent, guidance, insightCandidates);
         AnalysisExecutionDiagnostic diagnostic = diagnosticRepository.findById(context.analysis().id())
@@ -88,7 +89,8 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 + repositoryContext.candidateCount();
         int selected = 1 + observations.size() + facts.size() + insights.size()
                 + existingArchitectureKnowledge.size()
-                + engineeringEvents.size() + repositoryContext.evidence().size() + 1
+                + engineeringEvents.size() + humanContextInputs.size()
+                + repositoryContext.evidence().size() + 1
                 + (context.evolutionContext() == null ? 0 : 1);
         var metadata = new SelectedKnowledge.SelectionMetadata(
                 VERSION,
@@ -103,7 +105,8 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 insights, existingArchitectureKnowledge, engineeringEvents, repositoryContext, metadata));
         return new SelectedKnowledge(context.project(), context.analysis(), context.projectProfile(),
                 observations, facts, diagnostics, insights, existingArchitectureKnowledge,
-                engineeringEvents, repositoryContext, context.evolutionContext(), metadata, digest);
+                engineeringEvents, humanContextInputs, repositoryContext,
+                context.evolutionContext(), metadata, digest);
     }
 
     private void requireMandatoryKnowledge(AnalysisContext context, IntentDefinition intent) {

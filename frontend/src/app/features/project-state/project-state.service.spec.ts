@@ -9,7 +9,13 @@ import { ProjectStateService } from './project-state.service';
 const state: ProjectState = {
   projectId: 'a1ee6d55-e034-491a-a6e6-cdad70573b24',
   projectName: 'devlog-ai',
-  objective: { description: null, currentMilestone: null, activeStory: null, openChallenges: [] },
+  objective: {
+    description: null,
+    currentMilestone: null,
+    activeStory: null,
+    openChallenges: [],
+    humanContextInputs: [],
+  },
   activeWork: { inProgressStories: [], openChallenges: [], proposedProposals: [] },
   recentChanges: { completedStories: [], recentDecisions: [], recentCommits: [] },
   roadmapProgress: { plannedMilestones: [], registeredStories: [] },

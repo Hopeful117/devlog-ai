@@ -34,7 +34,8 @@ class ProjectStateControllerWebMvcTest extends ControllerWebMvcTestSupport {
         ProjectStateResponse response = new ProjectStateResponse(
                 projectId,
                 "Test Project",
-                new ObjectiveSection("description", null, null, Collections.emptyList()),
+                new ObjectiveSection("description", null, null, Collections.emptyList(),
+                        Collections.emptyList()),
                 new ActiveWorkSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RecentChangesSection(Collections.emptyList(), Collections.emptyList(), Collections.emptyList()),
                 new RoadmapProgressSection(Collections.emptyList(), Collections.emptyList()),

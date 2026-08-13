@@ -12,6 +12,15 @@ export interface ChallengeSummary {
   readonly impact: string | null;
 }
 
+export interface HumanContextInputSummary {
+  readonly id: string;
+  readonly type: 'GOAL' | 'CONSTRAINT' | 'ASSUMPTION' | 'KNOWN_GAP' | 'DOMAIN_CONTEXT';
+  readonly title: string;
+  readonly contentMarkdown: string;
+  readonly status: 'ACTIVE' | 'ARCHIVED';
+  readonly updatedAt: string | null;
+}
+
 export interface ProposalSummary {
   readonly id: string;
   readonly type: string;
@@ -93,6 +102,7 @@ export interface ObjectiveSection {
   readonly currentMilestone: MilestoneSummary | null;
   readonly activeStory: StorySummary | null;
   readonly openChallenges: readonly ChallengeSummary[];
+  readonly humanContextInputs: readonly HumanContextInputSummary[];
 }
 
 export interface ActiveWorkSection {

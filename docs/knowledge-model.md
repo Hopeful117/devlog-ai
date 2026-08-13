@@ -46,6 +46,14 @@ Human input allows developers to document:
 - decisions,
 - challenges encountered.
 
+For the first internal DevLog slice, this human context may be persisted inside
+DevLog itself as project-owned context inputs rather than only being inferred
+from repository artifacts.
+
+These inputs enrich future analysis context but remain distinct from validated
+trusted knowledge until they contribute to proposals accepted through the normal
+validation lifecycle.
+
 ### Future Knowledge Sources
 
 The architecture should support additional sources of knowledge in future versions, including:

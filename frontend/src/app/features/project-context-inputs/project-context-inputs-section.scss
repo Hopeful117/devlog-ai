@@ -1,0 +1,150 @@
+.context-inputs {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.section-intro {
+  max-width: 44rem;
+  color: var(--text-muted);
+}
+
+.context-inputs-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.95fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.context-inputs-layout__content {
+  min-width: 0;
+}
+
+.input-list {
+  display: grid;
+  gap: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.input-list article,
+.empty,
+.feedback,
+.input-form {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.input-card {
+  background: linear-gradient(180deg, rgb(77 141 255 / 0.08), transparent 42%), var(--panel-bg);
+}
+
+.input-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.type-badge {
+  margin: 0 0 0.3rem;
+  color: var(--accent-hover);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.input-heading h3 {
+  margin: 0;
+}
+
+.input-content {
+  margin: 0.7rem 0 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+}
+
+.input--archived {
+  opacity: 0.74;
+}
+
+.input-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.status {
+  padding: 0.2rem 0.5rem;
+  border-radius: 1rem;
+  color: var(--success);
+  background: rgb(79 198 138 / 0.1);
+  white-space: nowrap;
+}
+
+.status--inactive {
+  color: var(--text-muted);
+  background: rgb(132 145 167 / 0.1);
+}
+
+.feedback--success {
+  border-color: var(--success);
+}
+
+.feedback--error {
+  border-color: var(--danger);
+}
+
+.input-form {
+  display: grid;
+  gap: 0.8rem;
+  position: sticky;
+  top: 1rem;
+  background:
+    radial-gradient(circle at top right, rgb(77 141 255 / 0.12), transparent 38%), var(--panel-bg);
+}
+
+.input-form__header h3 {
+  margin: 0 0 0.2rem;
+}
+
+.input-form__header p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.input-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.input-form input,
+.input-form select,
+.input-form textarea {
+  width: 100%;
+}
+
+.input-form textarea {
+  resize: vertical;
+}
+
+.ghost-button {
+  padding: 0.35rem 0.7rem;
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 52rem) {
+  .context-inputs-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .input-form {
+    position: static;
+  }
+}

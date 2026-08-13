@@ -5,9 +5,13 @@ import com.hopeful117.devlogai.engineeringevent.EngineeringEventCategory;
 import com.hopeful117.devlogai.knowledge.entity.KnowledgeEvent;
 import com.hopeful117.devlogai.knowledge.entity.KnowledgeEventType;
 import com.hopeful117.devlogai.projectstate.dto.inner.EvolutionSummary;
+import com.hopeful117.devlogai.projectstate.dto.inner.HumanContextInputSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.KnowledgeSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.ProposalSummary;
 import com.hopeful117.devlogai.projectstate.dto.inner.StorySummary;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInput;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputStatus;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputType;
 import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
 import com.hopeful117.devlogai.proposal.entity.ProposalType;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
@@ -21,6 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProjectStateMapperTest {
 
@@ -121,5 +126,30 @@ class ProjectStateMapperTest {
         assertEquals("Project Overview of devlog-ai", summary.title());
         assertEquals("devlog-ai is an AI-powered documentation assistant.", summary.summary());
         assertEquals(new BigDecimal("0.9500"), summary.confidence());
+    }
+
+    @Test
+    void mapsHumanContextInputToSummary() {
+        Instant updatedAt = Instant.now();
+        ProjectHumanContextInput input = ProjectHumanContextInput.builder()
+                .id(UUID.randomUUID())
+                .title("Medium-term objective")
+                .contentMarkdown("Improve context quality for humans and agents.")
+                .type(ProjectHumanContextInputType.GOAL)
+                .status(ProjectHumanContextInputStatus.ACTIVE)
+                .updatedAt(updatedAt)
+                .build();
+
+        HumanContextInputSummary summary = mapper.toHumanContextInputSummary(input);
+
+        assertEquals(input.getId(), summary.id());
+        assertEquals(ProjectHumanContextInputType.GOAL, summary.type());
+        assertEquals("Medium-term objective", summary.title());
+        assertEquals(updatedAt, summary.updatedAt());
+    }
+
+    @Test
+    void mapsEmptyHumanContextInputListToEmptySummaryList() {
+        assertTrue(mapper.toHumanContextInputSummaries(java.util.List.of()).isEmpty());
     }
 }
