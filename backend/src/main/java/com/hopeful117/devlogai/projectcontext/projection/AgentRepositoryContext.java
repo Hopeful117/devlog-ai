@@ -76,6 +76,12 @@ public record AgentRepositoryContext(
                     content, symbols);
         }
 
+        public Evidence withSummary(String value) {
+            return new Evidence(layer, kind, reference, value, occurredAt,
+                    relevanceScore, reasons, relatedReferences, provenance, extraction,
+                    content, symbols);
+        }
+
         public Evidence withoutDeclarations() {
             return symbols == null ? this : new Evidence(layer, kind, reference,
                     summary, occurredAt, relevanceScore, reasons, relatedReferences,
@@ -86,6 +92,11 @@ public record AgentRepositoryContext(
             return content == null ? this : new Evidence(layer, kind, reference,
                     summary, occurredAt, relevanceScore, reasons, relatedReferences,
                     provenance, extraction, content.withoutText(), symbols);
+        }
+
+        public Evidence minimal() {
+            return new Evidence(layer, kind, reference, summary, null,
+                    relevanceScore, List.of(), List.of(), null, null, null, null);
         }
     }
 

@@ -12,6 +12,7 @@ import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputStatus;
 import com.hopeful117.devlogai.projectcontextinput.repository.ProjectHumanContextInputRepository;
+import com.hopeful117.devlogai.projectstate.ProjectStateProposalNoiseReducer;
 import com.hopeful117.devlogai.projectstate.dto.ProjectStateSections;
 import com.hopeful117.devlogai.projectstate.dto.response.ActiveWorkSection;
 import com.hopeful117.devlogai.projectstate.dto.response.ObjectiveSection;
@@ -47,6 +48,7 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
     private final KnowledgeEventRepository knowledgeEventRepository;
     private final EngineeringEventRepository engineeringEventRepository;
     private final ProjectHumanContextInputRepository humanContextInputRepository;
+    private final ProjectStateProposalNoiseReducer proposalNoiseReducer;
     private final ProjectStateMapper mapper;
 
     @Override
@@ -103,8 +105,8 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
                 .findByProject_IdAndStatusOrderByCreatedAtDesc(projectId, StoryStatus.IN_PROGRESS);
         var openChallenges = challengeRepository
                 .findByProjectIdAndStatusOrderByCreatedAtDesc(projectId, ChallengeStatus.OPEN);
-        var proposedProposals = proposalRepository
-                .findByProjectIdAndStatus(projectId, ProposalStatus.PROPOSED);
+        var proposedProposals = proposalNoiseReducer.reduce(proposalRepository
+                .findByProjectIdAndStatus(projectId, ProposalStatus.PROPOSED));
 
         return mapper.toActiveWorkSection(inProgressStories, openChallenges, proposedProposals);
     }
@@ -141,8 +143,8 @@ public class ProjectStateProjectionServiceImpl implements ProjectStateProjection
     }
 
     private PendingActionsSection buildPendingActions(UUID projectId) {
-        var proposedProposals = proposalRepository
-                .findByProjectIdAndStatus(projectId, ProposalStatus.PROPOSED);
+        var proposedProposals = proposalNoiseReducer.reduce(proposalRepository
+                .findByProjectIdAndStatus(projectId, ProposalStatus.PROPOSED));
         var openChallenges = challengeRepository
                 .findByProjectIdAndStatusOrderByCreatedAtDesc(projectId, ChallengeStatus.OPEN);
         var allStories = storyRepository.findByProject_IdOrderByCreatedAtDesc(projectId);

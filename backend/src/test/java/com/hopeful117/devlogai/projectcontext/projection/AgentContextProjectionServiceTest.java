@@ -98,6 +98,38 @@ class AgentContextProjectionServiceTest {
     }
 
     @Test
+    void shouldCompactLongSummaryWhenProjectionNeedsAdditionalReduction() {
+        RepositoryEvidence oversizedSummary = oversizedSummaryEvidence("git:oversized");
+
+        AgentRepositoryContext projected = service(1_600, 400).project(
+                PROJECT_ID, projectContext(), context(List.of(oversizedSummary)), GENERATED_AT)
+                .repositoryContext();
+
+        assertEquals(1, projected.evidence().size());
+        assertTrue(projected.evidence().getFirst().summary().length() <= 160);
+        assertTrue(projected.warnings().contains("AGENT_PROJECTION_SUMMARY_COMPACTED"));
+    }
+
+    @Test
+    void shouldFallbackToMinimalOrEmptyEvidenceWhenCompactionGetsTight() {
+        RepositoryEvidence first = evidence(
+                RepositoryContextLayer.RELATED_SOURCE_CODE, "SOURCE_FILE",
+                "file:src/HugeOne.java", "x".repeat(12_000));
+        RepositoryEvidence second = evidence(
+                RepositoryContextLayer.RELATED_SOURCE_CODE, "SOURCE_FILE",
+                "file:src/HugeTwo.java", "y".repeat(12_000));
+
+        AgentRepositoryContext projected = service(1_600, 400).project(
+                PROJECT_ID, projectContext(), context(List.of(first, second)), GENERATED_AT)
+                .repositoryContext();
+
+        assertTrue(projected.warnings().contains("AGENT_PROJECTION_MINIMAL_EVIDENCE_COMPACTED"));
+        assertTrue(projected.accounting().canonicalBytes() <= 1_600);
+        assertTrue(projected.accounting().estimatedTokens() <= 400);
+        assertTrue(projected.evidence().size() <= 1);
+    }
+
+    @Test
     void shouldRemoveOnlyTheExistingTailAsLastResort() {
         List<RepositoryEvidence> evidence = java.util.stream.IntStream.range(0, 8)
                 .mapToObj(index -> evidence(RepositoryContextLayer.COMMIT_DIFF,
@@ -213,5 +245,27 @@ class AgentContextProjectionServiceTest {
                         "resolvedRevision", "resolved-abc"), 20,
                 List.of("SEMANTIC_RELEVANCE=70@15", "SEMANTIC_TERMS:app",
                         "SEMANTIC_TERMS:app"), content, symbols);
+    }
+
+    private RepositoryEvidence oversizedSummaryEvidence(String reference) {
+        return new RepositoryEvidence(
+                RepositoryContextLayer.GIT_HISTORY,
+                "COMMIT",
+                reference,
+                "Summary " + "x".repeat(500),
+                Instant.EPOCH,
+                new EvidenceScore("multi-criteria-v2", Map.of(), Map.of(), 49,
+                        List.of("SEMANTIC_TERMS:app"),
+                        new EvidenceScore.MatchStrength(7, 3)),
+                List.of(),
+                new RepositoryEvidence.EvidenceProvenance(
+                        "GIT_HISTORY", "source-id", null, reference),
+                Map.of("collectorId", "git-history", "collectorVersion", "v1",
+                        "resolvedRevision", "resolved-abc"),
+                20,
+                List.of("SEMANTIC_TERMS:app"),
+                null,
+                null
+        );
     }
 }
