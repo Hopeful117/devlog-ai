@@ -164,6 +164,90 @@ describe('ProjectStatePage', () => {
     expect(evolution?.textContent).toContain('No recent evolution.');
   });
 
+  it('omits sparse proposed proposals that have no meaningful display content', async () => {
+    const state: ProjectState = {
+      ...emptyState,
+      activeWork: {
+        ...emptyState.activeWork,
+        proposedProposals: [
+          {
+            id: 'p1',
+            type: 'INSIGHT',
+            insightType: null,
+            title: null,
+            summary: null,
+            status: 'PROPOSED',
+            confidence: 1,
+          },
+        ],
+      },
+    };
+    getProject.mockReturnValue(of(project));
+    getProjectState.mockReturnValue(of(state));
+    const element = await render();
+
+    const section = element.querySelector('#section-active')?.parentElement;
+    expect(section?.textContent).toContain('No active work.');
+    expect(section?.textContent).not.toContain('Proposed proposals');
+    expect(section?.textContent).not.toContain('1% confidence');
+  });
+
+  it('keeps useful proposal confidence when proposal detail is usable', async () => {
+    const state: ProjectState = {
+      ...emptyState,
+      pendingActions: {
+        ...emptyState.pendingActions,
+        proposedProposals: [
+          {
+            id: 'p1',
+            type: 'INSIGHT',
+            insightType: 'ARCHITECTURE_CHANGE',
+            title: 'Normalize project state proposal summaries',
+            summary: 'Use proposal titles in the overview.',
+            status: 'PROPOSED',
+            confidence: 0.72,
+          },
+        ],
+      },
+    };
+    getProject.mockReturnValue(of(project));
+    getProjectState.mockReturnValue(of(state));
+    const element = await render();
+
+    const section = element.querySelector('#section-actions')?.parentElement;
+    expect(section?.textContent).toContain('Normalize project state proposal summaries');
+    expect(section?.textContent).toContain('ARCHITECTURE CHANGE');
+    expect(section?.textContent).toContain('72% confidence');
+  });
+
+  it('shows pending actions empty state when only sparse proposals are returned', async () => {
+    const state: ProjectState = {
+      ...emptyState,
+      pendingActions: {
+        ...emptyState.pendingActions,
+        proposedProposals: [
+          {
+            id: 'p1',
+            type: 'INSIGHT',
+            insightType: '   ',
+            title: '   ',
+            summary: null,
+            status: 'PROPOSED',
+            confidence: 0.24,
+          },
+        ],
+      },
+    };
+    getProject.mockReturnValue(of(project));
+    getProjectState.mockReturnValue(of(state));
+    const element = await render();
+
+    const section = element.querySelector('#section-actions')?.parentElement;
+    expect(section?.textContent).toContain('No pending actions.');
+    expect(section?.textContent).not.toContain('Proposed proposals');
+    expect(section?.textContent).not.toContain('24% confidence');
+  });
+
   it('does not implement an imperative subscription', () => {
     expect(ProjectStatePage.toString()).not.toContain('.subscribe(');
   });

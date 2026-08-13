@@ -15,6 +15,9 @@ export interface ChallengeSummary {
 export interface ProposalSummary {
   readonly id: string;
   readonly type: string;
+  readonly insightType: string | null;
+  readonly title: string | null;
+  readonly summary: string | null;
   readonly status: 'PROPOSED' | 'ACCEPTED' | 'REJECTED';
   readonly confidence: number | null;
 }

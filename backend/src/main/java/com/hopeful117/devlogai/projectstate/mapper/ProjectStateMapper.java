@@ -123,7 +123,20 @@ public interface ProjectStateMapper {
         return challenges.stream().map(this::toChallengeSummary).toList();
     }
 
-    ProposalSummary toProposalSummary(ValidatableProposal proposal);
+    default ProposalSummary toProposalSummary(ValidatableProposal proposal) {
+        if (proposal == null) {
+            return null;
+        }
+        return new ProposalSummary(
+                proposal.getId(),
+                proposal.getType().name(),
+                text(proposal, "insightType"),
+                text(proposal, "title"),
+                text(proposal, "summary"),
+                proposal.getStatus(),
+                proposal.getConfidence()
+        );
+    }
 
     default List<ProposalSummary> toProposalSummaries(List<ValidatableProposal> proposals) {
         if (proposals == null || proposals.isEmpty()) {
@@ -183,5 +196,13 @@ public interface ProjectStateMapper {
 
     default RecentEvolutionSection toRecentEvolutionSection(List<EngineeringEvent> events) {
         return new RecentEvolutionSection(toEvolutionSummaries(events));
+    }
+
+    private String text(ValidatableProposal proposal, String key) {
+        if (proposal.getPayload() == null) {
+            return null;
+        }
+        Object value = proposal.getPayload().get(key);
+        return value instanceof String text ? text : null;
     }
 }

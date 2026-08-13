@@ -1,10 +1,11 @@
-import { AsyncPipe, DecimalPipe } from '@angular/common';
+import { AsyncPipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { catchError, map, of, shareReplay, startWith, switchMap } from 'rxjs';
 
 import { RequestError, toRequestError } from '../../core/http/request-error';
 import { ProjectService } from '../projects/project.service';
+import { ProposalSummary } from './project-state.models';
 import { ProjectStateService } from './project-state.service';
 
 type OverviewViewState =
@@ -23,7 +24,7 @@ type OverviewViewState =
 
 @Component({
   selector: 'app-project-state-page',
-  imports: [AsyncPipe, DecimalPipe],
+  imports: [AsyncPipe],
   templateUrl: './project-state-page.html',
   styleUrl: './project-state-page.scss',
 })
@@ -55,4 +56,42 @@ export class ProjectStatePage {
     ),
     shareReplay({ bufferSize: 1, refCount: true }),
   );
+
+  proposalPrimaryLabel(proposal: ProposalSummary): string | null {
+    const title = proposal.title?.trim();
+    if (title) return title;
+
+    const insightType = proposal.insightType?.trim();
+    if (insightType) return this.humanizeToken(insightType);
+
+    const type = proposal.type.trim();
+    if (type && type !== 'INSIGHT') return this.humanizeToken(type);
+
+    return null;
+  }
+
+  proposalHasMeaningfulDetail(proposal: ProposalSummary): boolean {
+    return this.proposalPrimaryLabel(proposal) !== null;
+  }
+
+  displayableProposals(proposals: readonly ProposalSummary[]): readonly ProposalSummary[] {
+    return proposals.filter((proposal) => this.proposalHasMeaningfulDetail(proposal));
+  }
+
+  proposalSecondaryLabel(proposal: ProposalSummary): string | null {
+    const title = proposal.title?.trim();
+    const insightType = proposal.insightType?.trim();
+    if (!title || !insightType) return null;
+    return this.humanizeToken(insightType);
+  }
+
+  proposalConfidenceLabel(proposal: ProposalSummary): string | null {
+    if (proposal.confidence === null) return null;
+    const normalized = proposal.confidence <= 1 ? proposal.confidence * 100 : proposal.confidence;
+    return `${Math.round(normalized)}% confidence`;
+  }
+
+  private humanizeToken(value: string): string {
+    return value.replaceAll('_', ' ');
+  }
 }
