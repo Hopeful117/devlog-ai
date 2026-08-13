@@ -89,7 +89,9 @@ describe('ProposalDetailPage', () => {
       fixture.nativeElement.querySelector('[data-testid="reject-proposal"]')?.textContent,
     ).toContain('Reject proposal');
     expect(fixture.nativeElement.querySelector('label[for="comment"]')).toBeTruthy();
-    expect(fixture.nativeElement.textContent).toContain('session reviewer identity automatically');
+    expect(fixture.nativeElement.textContent).toContain(
+      'A local reviewer session was created automatically',
+    );
   });
   it('creates and reuses a valid local reviewer UUID automatically', () => {
     const fixture = render();
@@ -102,6 +104,7 @@ describe('ProposalDetailPage', () => {
 
     const second = render();
     expect(second.componentInstance.form.controls.validatedBy.value).toBe(generated);
+    expect(second.componentInstance.reviewerSessionState).toBe('resumed');
   });
   it('can reset the local reviewer session', () => {
     const fixture = render();
@@ -112,6 +115,7 @@ describe('ProposalDetailPage', () => {
 
     const second = fixture.componentInstance.form.controls.validatedBy.value;
     expect(second).not.toBe(first);
+    expect(fixture.componentInstance.reviewerSessionState).toBe('reset');
     expect(second).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     );
@@ -135,6 +139,9 @@ describe('ProposalDetailPage', () => {
     expect(navigate).toHaveBeenCalledWith(['/analyses', proposed.analysisId], {
       fragment: 'insight-proposals',
     });
+    expect(fixture.nativeElement.textContent).toContain(
+      'Proposal accepted. Returning to the source Analysis queue.',
+    );
   });
   it('rejects then returns to the source Analysis proposal list', () => {
     getProposal.mockReturnValueOnce(of(proposed)).mockReturnValue(of(rejected));

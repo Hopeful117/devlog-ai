@@ -1,9 +1,16 @@
 <section class="proposal">
-  <a routerLink="/projects">← Back to Projects</a>
+  <a class="back-link" routerLink="/projects">← Back to Projects</a>
   @if (action$ | async; as action) {
     <div aria-live="polite">
       @if (action.state === 'pending') {
-        <p role="status" class="inline-message">Recording human decision…</p>
+        <p role="status" class="inline-message">
+          Recording {{ action.decision === 'ACCEPTED' ? 'acceptance' : 'rejection' }}…
+        </p>
+      } @else if (action.state === 'success') {
+        <p role="status" class="inline-message inline-message--success">
+          Proposal {{ action.decision === 'ACCEPTED' ? 'accepted' : 'rejected' }}. Returning to the
+          source Analysis queue.
+        </p>
       } @else if (action.state === 'error') {
         <p role="alert" class="inline-message inline-message--error">{{ action.error.message }}</p>
       }
@@ -88,7 +95,13 @@
           </main>
 
           <aside class="panel decision-panel" aria-labelledby="decision-title">
-            <h2 id="decision-title">Human review</h2>
+            <div class="decision-panel__header">
+              <div>
+                <p class="eyebrow">Human validation</p>
+                <h2 id="decision-title">Review this proposal</h2>
+              </div>
+              <span class="badge badge--info">Direct review</span>
+            </div>
             <dl class="metadata-list">
               <dt>Confidence</dt>
               <dd>{{ vm.data.proposal.confidence ?? 'Not provided' }}</dd>
@@ -109,18 +122,24 @@
             </dl>
             @if (vm.data.proposal.status === 'PROPOSED') {
               <form [formGroup]="form">
-                <p class="section-note">
-                  This local MVP uses a session reviewer identity automatically. Core still records
-                  a deterministic reviewer ID for every decision.
-                </p>
-                <button
-                  class="secondary-button"
-                  type="button"
-                  (click)="resetLocalReviewerId()"
-                  [disabled]="action.state === 'pending'"
-                >
-                  Reset local reviewer session
-                </button>
+                <section class="session-callout">
+                  <div>
+                    <h3>Local review session</h3>
+                    <p class="section-note">{{ reviewerSessionMessage() }}</p>
+                    <p class="section-note">
+                      Core still records a deterministic reviewer identifier for every immutable
+                      decision.
+                    </p>
+                  </div>
+                  <button
+                    class="secondary-button"
+                    type="button"
+                    (click)="resetLocalReviewerId()"
+                    [disabled]="action.state === 'pending'"
+                  >
+                    Start a fresh local session
+                  </button>
+                </section>
                 <label for="comment">Decision note (optional)</label
                 ><textarea id="comment" formControlName="comment" maxlength="2000"></textarea>
                 @if (form.controls.comment.touched && form.controls.comment.invalid) {
