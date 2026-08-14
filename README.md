@@ -309,6 +309,11 @@ The current evaluation slice is intentionally narrow. It can:
 * create `MISSING_PROJECTION_REFRESH` when active Sources exist without any
   persisted freshness check, meaning the freshness projection itself is missing
   for part of the Project.
+* create trusted-knowledge duplicate-debt findings from the existing duplicate
+  audit for:
+  * exact duplicates;
+  * bounded semantic duplicate candidates;
+  * review-oriented overlap such as richer-successor cases.
 
 The evaluation response returns:
 
@@ -339,6 +344,8 @@ This first policy is intentionally bounded:
 
 * it reuses persisted freshness results rather than reclassifying repository
   state inside context maintenance;
+* it reuses the trusted duplicate audit rather than introducing a second
+  duplicate matcher in context maintenance;
 * it does not mutate trusted knowledge;
 * it does not claim a universal context-health score;
 * it treats missing freshness checks as a projection gap on the freshness
