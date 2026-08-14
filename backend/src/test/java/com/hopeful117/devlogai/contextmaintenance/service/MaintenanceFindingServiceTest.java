@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.contextmaintenance.service;
 
+import com.hopeful117.devlogai.contextmaintenance.dto.request.MaintenanceFindingActionRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceFindingRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
 import com.hopeful117.devlogai.contextmaintenance.entity.*;
@@ -59,7 +60,7 @@ class MaintenanceFindingServiceTest {
         MaintenanceFindingResponse response = new MaintenanceFindingResponse(
                 saved.getId(), projectId, saved.getContextSurface(), saved.getIssueType(),
                 saved.getSeverity(), saved.getStatus(), saved.getSuggestedAction(),
-                saved.isHumanReviewRequired(), saved.getSummary(), saved.getDetails(), null, null
+                saved.isHumanReviewRequired(), saved.getSummary(), saved.getDetails(), List.of(), null, null
         );
 
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
@@ -114,7 +115,7 @@ class MaintenanceFindingServiceTest {
         when(mapper.toResponse(saved)).thenReturn(new MaintenanceFindingResponse(
                 saved.getId(), projectId, saved.getContextSurface(), saved.getIssueType(),
                 saved.getSeverity(), saved.getStatus(), saved.getSuggestedAction(),
-                saved.isHumanReviewRequired(), saved.getSummary(), saved.getDetails(), null, null
+                saved.isHumanReviewRequired(), saved.getSummary(), saved.getDetails(), List.of(), null, null
         ));
 
         service.create(projectId, request);
@@ -134,7 +135,7 @@ class MaintenanceFindingServiceTest {
                 findingId, projectId, MaintenanceContextSurface.PROJECT_PROJECTION,
                 MaintenanceFindingIssueType.PROJECTION_REFRESH_GAP,
                 MaintenanceFindingSeverity.MEDIUM, MaintenanceFindingStatus.RESOLVED,
-                MaintenanceSuggestedActionCategory.REFRESH, false, "Gap", "Body", null, null
+                MaintenanceSuggestedActionCategory.REFRESH, false, "Gap", "Body", List.of(), null, null
         );
 
         when(projectRepository.existsById(projectId)).thenReturn(true);
@@ -161,7 +162,7 @@ class MaintenanceFindingServiceTest {
                 finding.getId(), projectId, MaintenanceContextSurface.PROJECT_PROJECTION,
                 MaintenanceFindingIssueType.PROJECTION_REFRESH_GAP,
                 MaintenanceFindingSeverity.LOW, MaintenanceFindingStatus.OPEN,
-                MaintenanceSuggestedActionCategory.MONITOR, false, "Gap", null, null, null
+                MaintenanceSuggestedActionCategory.MONITOR, false, "Gap", null, List.of(), null, null
         );
 
         when(projectRepository.existsById(projectId)).thenReturn(true);
@@ -180,5 +181,90 @@ class MaintenanceFindingServiceTest {
         when(projectRepository.existsById(projectId)).thenReturn(false);
 
         assertThrows(EntityNotFoundException.class, () -> service.getByProject(projectId));
+    }
+
+    @Test
+    void shouldAcknowledgeSupportedDuplicateFindingWithAuditTrail() {
+        UUID projectId = UUID.randomUUID();
+        UUID findingId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).build();
+        MaintenanceFinding finding = MaintenanceFinding.builder()
+                .id(findingId)
+                .project(project)
+                .issueType(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_EXACT_DUPLICATE)
+                .contextSurface(MaintenanceContextSurface.PROJECT_UNDERSTANDING)
+                .severity(MaintenanceFindingSeverity.HIGH)
+                .status(MaintenanceFindingStatus.OPEN)
+                .suggestedAction(MaintenanceSuggestedActionCategory.REVIEW)
+                .summary("Duplicate debt")
+                .actions(new java.util.ArrayList<>())
+                .build();
+        MaintenanceFindingActionRequest request = new MaintenanceFindingActionRequest(
+                UUID.fromString("00000000-0000-0000-0000-000000000123"),
+                "Reviewed and acknowledged"
+        );
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(repository.findByIdAndProject_Id(findingId, projectId)).thenReturn(Optional.of(finding));
+        when(repository.save(finding)).thenReturn(finding);
+        when(mapper.toResponse(finding)).thenAnswer(invocation -> {
+            MaintenanceFinding saved = invocation.getArgument(0);
+            return new MaintenanceFindingResponse(
+                    saved.getId(), projectId, saved.getContextSurface(), saved.getIssueType(),
+                    saved.getSeverity(), saved.getStatus(), saved.getSuggestedAction(), true,
+                    saved.getSummary(), saved.getDetails(), List.of(), null, null
+            );
+        });
+
+        MaintenanceFindingResponse result = service.acknowledge(projectId, findingId, request);
+
+        assertEquals(MaintenanceFindingStatus.ACKNOWLEDGED, finding.getStatus());
+        assertEquals(MaintenanceFindingStatus.ACKNOWLEDGED, result.status());
+        assertEquals(1, finding.getActions().size());
+        assertEquals(MaintenanceFindingActionType.ACKNOWLEDGE, finding.getActions().getFirst().getActionType());
+    }
+
+    @Test
+    void shouldRequireCommentToDismissFinding() {
+        UUID projectId = UUID.randomUUID();
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFinding finding = MaintenanceFinding.builder()
+                .id(findingId)
+                .issueType(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE)
+                .status(MaintenanceFindingStatus.OPEN)
+                .actions(new java.util.ArrayList<>())
+                .build();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(repository.findByIdAndProject_Id(findingId, projectId)).thenReturn(Optional.of(finding));
+
+        var error = assertThrows(
+                com.hopeful117.devlogai.shared.exception.ConflictException.class,
+                () -> service.dismiss(projectId, findingId,
+                        new MaintenanceFindingActionRequest(UUID.randomUUID(), "   "))
+        );
+
+        assertEquals("A rationale comment is required for this maintenance action.", error.getMessage());
+    }
+
+    @Test
+    void shouldRejectRemediationForUnsupportedFindingFamily() {
+        UUID projectId = UUID.randomUUID();
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFinding finding = MaintenanceFinding.builder()
+                .id(findingId)
+                .issueType(MaintenanceFindingIssueType.STALE_PROJECT_UNDERSTANDING)
+                .status(MaintenanceFindingStatus.OPEN)
+                .actions(new java.util.ArrayList<>())
+                .build();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(repository.findByIdAndProject_Id(findingId, projectId)).thenReturn(Optional.of(finding));
+
+        var error = assertThrows(
+                com.hopeful117.devlogai.shared.exception.ConflictException.class,
+                () -> service.resolve(projectId, findingId,
+                        new MaintenanceFindingActionRequest(UUID.randomUUID(), "Handled elsewhere"))
+        );
+
+        assertEquals("This maintenance finding family does not yet support remediation actions.",
+                error.getMessage());
     }
 }

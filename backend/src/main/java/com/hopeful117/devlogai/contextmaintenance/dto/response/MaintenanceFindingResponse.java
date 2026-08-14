@@ -7,6 +7,7 @@ import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingStatu
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceSuggestedActionCategory;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public record MaintenanceFindingResponse(
@@ -20,7 +21,11 @@ public record MaintenanceFindingResponse(
         boolean humanReviewRequired,
         String summary,
         String details,
+        List<MaintenanceFindingActionResponse> actionHistory,
         Instant createdAt,
         Instant updatedAt
 ) {
+    public MaintenanceFindingResponse {
+        actionHistory = actionHistory == null ? List.of() : List.copyOf(actionHistory);
+    }
 }

@@ -305,6 +305,7 @@ class MaintenanceEvaluationServiceTest {
                 request.humanReviewRequired(),
                 request.summary(),
                 request.details(),
+                List.of(),
                 Instant.now(),
                 Instant.now()
         );

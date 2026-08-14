@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.contextmaintenance.service;
 
+import com.hopeful117.devlogai.contextmaintenance.dto.request.MaintenanceFindingActionRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceFindingRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingStatus;
@@ -14,4 +15,10 @@ public interface MaintenanceFindingService {
     List<MaintenanceFindingResponse> getByProject(UUID projectId);
 
     MaintenanceFindingResponse updateStatus(UUID projectId, UUID findingId, MaintenanceFindingStatus status);
+
+    MaintenanceFindingResponse acknowledge(UUID projectId, UUID findingId, MaintenanceFindingActionRequest request);
+
+    MaintenanceFindingResponse dismiss(UUID projectId, UUID findingId, MaintenanceFindingActionRequest request);
+
+    MaintenanceFindingResponse resolve(UUID projectId, UUID findingId, MaintenanceFindingActionRequest request);
 }

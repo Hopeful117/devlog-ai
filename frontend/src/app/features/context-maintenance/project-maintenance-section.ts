@@ -1,5 +1,6 @@
 import { AsyncPipe, DatePipe } from '@angular/common';
 import { Component, inject, Input, OnChanges } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import {
   catchError,
   map,
@@ -14,6 +15,7 @@ import {
 import { RequestError, toRequestError } from '../../core/http/request-error';
 import { DashboardCard } from '../../shared/components/dashboard-card';
 import {
+  MaintenanceFindingActionRequest,
   MaintenanceContextSurface,
   MaintenanceFinding,
   MaintenanceFindingSeverity,
@@ -29,7 +31,7 @@ type MaintenanceViewState =
 
 @Component({
   selector: 'app-project-maintenance-section',
-  imports: [AsyncPipe, DatePipe, DashboardCard],
+  imports: [AsyncPipe, DatePipe, DashboardCard, FormsModule],
   templateUrl: './project-maintenance-section.html',
   styleUrl: './project-maintenance-section.scss',
 })
@@ -38,6 +40,10 @@ export class ProjectMaintenanceSection implements OnChanges {
 
   private readonly service = inject(MaintenanceFindingService);
   private readonly projectIds = new ReplaySubject<string>(1);
+  private readonly reviewerId = '00000000-0000-0000-0000-000000000001';
+  readonly comments: Record<string, string> = {};
+  readonly pendingActions: Record<string, boolean> = {};
+  readonly actionErrors: Record<string, string> = {};
 
   readonly view$: Observable<MaintenanceViewState> = this.projectIds.pipe(
     switchMap((projectId) =>
@@ -79,6 +85,81 @@ export class ProjectMaintenanceSection implements OnChanges {
   }
 
   requiresReview(finding: MaintenanceFinding): boolean {
-    return finding.humanReviewRequired && finding.status === 'OPEN';
+    return finding.humanReviewRequired && (finding.status === 'OPEN' || finding.status === 'ACKNOWLEDGED');
+  }
+
+  supportsWorkflow(finding: MaintenanceFinding): boolean {
+    return (
+      finding.issueType === 'TRUSTED_KNOWLEDGE_EXACT_DUPLICATE' ||
+      finding.issueType === 'TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE' ||
+      finding.issueType === 'TRUSTED_KNOWLEDGE_OVERLAP_REVIEW'
+    );
+  }
+
+  canAcknowledge(finding: MaintenanceFinding): boolean {
+    return this.supportsWorkflow(finding) && finding.status === 'OPEN';
+  }
+
+  canDismissOrResolve(finding: MaintenanceFinding): boolean {
+    return this.supportsWorkflow(finding) && (finding.status === 'OPEN' || finding.status === 'ACKNOWLEDGED');
+  }
+
+  requiresComment(finding: MaintenanceFinding): boolean {
+    return this.canDismissOrResolve(finding);
+  }
+
+  commentValue(findingId: string): string {
+    return this.comments[findingId] ?? '';
+  }
+
+  setComment(findingId: string, value: string): void {
+    this.comments[findingId] = value;
+  }
+
+  latestActionSummary(finding: MaintenanceFinding): string | null {
+    const latest = finding.actionHistory[0];
+    if (!latest) return null;
+    return `${this.humanize(latest.actionType)} by ${latest.actedBy}`;
+  }
+
+  latestActionComment(finding: MaintenanceFinding): string | null {
+    return finding.actionHistory[0]?.comment ?? null;
+  }
+
+  acknowledge(finding: MaintenanceFinding): void {
+    this.runAction(finding, (request) => this.service.acknowledge(this.projectId, finding.id, request));
+  }
+
+  dismiss(finding: MaintenanceFinding): void {
+    this.runAction(finding, (request) => this.service.dismiss(this.projectId, finding.id, request), true);
+  }
+
+  resolve(finding: MaintenanceFinding): void {
+    this.runAction(finding, (request) => this.service.resolve(this.projectId, finding.id, request), true);
+  }
+
+  private runAction(
+    finding: MaintenanceFinding,
+    invoke: (request: MaintenanceFindingActionRequest) => Observable<MaintenanceFinding>,
+    requireComment = false,
+  ): void {
+    const comment = this.commentValue(finding.id).trim();
+    if (requireComment && comment.length === 0) {
+      this.actionErrors[finding.id] = 'A rationale is required for this action.';
+      return;
+    }
+    this.pendingActions[finding.id] = true;
+    this.actionErrors[finding.id] = '';
+    invoke({ actedBy: this.reviewerId, comment }).subscribe({
+      next: () => {
+        this.comments[finding.id] = '';
+        this.pendingActions[finding.id] = false;
+        this.projectIds.next(this.projectId);
+      },
+      error: (error: unknown) => {
+        this.pendingActions[finding.id] = false;
+        this.actionErrors[finding.id] = toRequestError(error, 'project').message;
+      },
+    });
   }
 }
