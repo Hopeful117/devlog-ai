@@ -1,19 +1,13 @@
 export type MaintenanceContextSurface = 'PROJECT_UNDERSTANDING' | 'PROJECT_PROJECTION';
 
 export type MaintenanceFindingIssueType =
-  | 'STALE_PROJECT_UNDERSTANDING'
-  | 'PROJECTION_REFRESH_GAP'
-  | 'MISSING_PROJECTION_REFRESH';
+  'STALE_PROJECT_UNDERSTANDING' | 'PROJECTION_REFRESH_GAP' | 'MISSING_PROJECTION_REFRESH';
 
 export type MaintenanceFindingSeverity = 'LOW' | 'MEDIUM' | 'HIGH';
 
 export type MaintenanceFindingStatus = 'OPEN' | 'RESOLVED' | 'DISMISSED';
 
-export type MaintenanceSuggestedActionCategory =
-  | 'MONITOR'
-  | 'REFRESH'
-  | 'INVESTIGATE'
-  | 'REVIEW';
+export type MaintenanceSuggestedActionCategory = 'MONITOR' | 'REFRESH' | 'INVESTIGATE' | 'REVIEW';
 
 export interface MaintenanceFinding {
   readonly id: string;

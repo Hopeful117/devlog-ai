@@ -27,11 +27,7 @@
               <p class="maintenance-summary">{{ finding.summary }}</p>
               <p class="maintenance-meta">
                 Action: {{ actionLabel(finding.suggestedAction) }} ·
-                {{
-                  requiresReview(finding)
-                    ? 'Human review required'
-                    : 'Informational guidance'
-                }}
+                {{ requiresReview(finding) ? 'Human review required' : 'Informational guidance' }}
               </p>
               @if (finding.details) {
                 <p class="maintenance-details">{{ finding.details }}</p>
