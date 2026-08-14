@@ -57,6 +57,14 @@ export interface MaintenanceFindingActionRequest {
   readonly comment: string;
 }
 
+export interface MaintenanceEvaluationResponse {
+  readonly version: string;
+  readonly projectId: string;
+  readonly createdCount: number;
+  readonly skippedCount: number;
+  readonly createdFindings: readonly MaintenanceFinding[];
+}
+
 export interface MaintenanceFinding {
   readonly id: string;
   readonly projectId: string;

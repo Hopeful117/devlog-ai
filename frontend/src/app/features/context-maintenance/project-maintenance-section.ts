@@ -47,6 +47,9 @@ export class ProjectMaintenanceSection implements OnChanges {
   readonly comments: Record<string, string> = {};
   readonly pendingActions: Record<string, boolean> = {};
   readonly actionErrors: Record<string, string> = {};
+  evaluating = false;
+  evaluationError = '';
+  lastEvaluationTime: string | null = null;
 
   readonly view$: Observable<MaintenanceViewState> = this.projectIds.pipe(
     switchMap((projectId) =>
@@ -162,6 +165,23 @@ export class ProjectMaintenanceSection implements OnChanges {
 
   assessmentActionLabel(action: MaintenanceAssessmentRecommendedAction): string {
     return this.humanize(action);
+  }
+
+  evaluate(): void {
+    if (this.evaluating) return;
+    this.evaluating = true;
+    this.evaluationError = '';
+    this.service.evaluate(this.projectId).subscribe({
+      next: () => {
+        this.evaluating = false;
+        this.lastEvaluationTime = new Date().toISOString();
+        this.projectIds.next(this.projectId);
+      },
+      error: (error: unknown) => {
+        this.evaluating = false;
+        this.evaluationError = toRequestError(error, 'project').message;
+      },
+    });
   }
 
   acknowledge(finding: MaintenanceFinding): void {
