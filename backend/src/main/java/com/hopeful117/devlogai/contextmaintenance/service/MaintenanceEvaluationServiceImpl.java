@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.contextmaintenance.service;
 
+import com.hopeful117.devlogai.contextmaintenance.agent.CrossSurfacePatternDetectionAgent;
 import com.hopeful117.devlogai.contextmaintenance.agent.DuplicateAmbiguityResolutionAgent;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceAssessmentRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceFindingRequest;
@@ -36,6 +37,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.UUID;
@@ -55,6 +57,7 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
     private final MaintenanceFindingService findingService;
     private final MaintenanceAssessmentService assessmentService;
     private final DuplicateAmbiguityResolutionAgent duplicateAgent;
+    private final CrossSurfacePatternDetectionAgent crossSurfaceAgent;
 
     public MaintenanceEvaluationServiceImpl(
             ProjectRepository projectRepository,
@@ -64,7 +67,8 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
             MaintenanceFindingRepository repository,
             MaintenanceFindingService findingService,
             MaintenanceAssessmentService assessmentService,
-            DuplicateAmbiguityResolutionAgent duplicateAgent
+            DuplicateAmbiguityResolutionAgent duplicateAgent,
+            CrossSurfacePatternDetectionAgent crossSurfaceAgent
     ) {
         this.projectRepository = projectRepository;
         this.freshnessService = freshnessService;
@@ -74,6 +78,7 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
         this.findingService = findingService;
         this.assessmentService = assessmentService;
         this.duplicateAgent = duplicateAgent;
+        this.crossSurfaceAgent = crossSurfaceAgent;
     }
 
     @Override
@@ -136,6 +141,8 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
         }
 
         autoResolveClearedDeterministicFindings(projectId, currentFindings, activeDeterministicKeys);
+
+        evaluateCrossSurfacePatterns(projectId, currentFindings, created);
 
         return new MaintenanceEvaluationResponse(
                 MaintenanceEvaluationResponse.PROJECTION_VERSION,
@@ -407,6 +414,40 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
         } catch (Exception e) {
             log.warn("Failed to evaluate duplicate finding {} with agent: {}",
                     finding.id(), e.getMessage());
+        }
+    }
+
+    private void evaluateCrossSurfacePatterns(
+            UUID projectId,
+            List<MaintenanceFinding> currentFindings,
+            List<MaintenanceFindingResponse> created
+    ) {
+        try {
+            List<MaintenanceFinding> allActiveFindings = new ArrayList<>(currentFindings);
+            created.stream()
+                    .map(response -> repository.findByIdAndProject_Id(response.id(), projectId).orElse(null))
+                    .filter(Objects::nonNull)
+                    .forEach(allActiveFindings::add);
+
+            crossSurfaceAgent.evaluate(allActiveFindings)
+                    .ifPresent(assessment -> {
+                        UUID representativeFindingId = assessment.contributingFindingIds().getFirst();
+                        CreateMaintenanceAssessmentRequest request = new CreateMaintenanceAssessmentRequest(
+                                representativeFindingId,
+                                assessment.confidenceLevel(),
+                                assessment.semanticClassification(),
+                                assessment.recommendedAction(),
+                                assessment.rationale(),
+                                assessment.supportingSignals()
+                        );
+                        assessmentService.create(projectId, request);
+                        log.info("Cross-surface pattern assessment created for project={} classification={} findingCount={}",
+                                projectId, assessment.semanticClassification(),
+                                assessment.contributingFindingIds().size());
+                    });
+        } catch (Exception e) {
+            log.warn("Failed to evaluate cross-surface patterns for project {}: {}",
+                    projectId, e.getMessage());
         }
     }
 }
