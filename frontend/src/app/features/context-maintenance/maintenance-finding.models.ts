@@ -29,11 +29,7 @@ export type MaintenanceAssessmentSemanticClassification =
   | 'NOT_APPLICABLE';
 
 export type MaintenanceAssessmentRecommendedAction =
-  | 'RESOLVE'
-  | 'DISMISS'
-  | 'ESCALATE'
-  | 'MONITOR'
-  | 'NO_ACTION';
+  'RESOLVE' | 'DISMISS' | 'ESCALATE' | 'MONITOR' | 'NO_ACTION';
 
 export interface MaintenanceFindingAction {
   readonly id: string;

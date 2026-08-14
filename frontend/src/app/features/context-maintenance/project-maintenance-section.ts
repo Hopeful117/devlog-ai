@@ -140,22 +140,22 @@ export class ProjectMaintenanceSection implements OnChanges {
 
   classificationLabel(classification: MaintenanceAssessmentSemanticClassification): string {
     const labels: Record<MaintenanceAssessmentSemanticClassification, string> = {
-      'LIKELY_DUPLICATE': 'Likely Duplicate',
-      'LIKELY_ENRICHMENT': 'Likely Enrichment',
-      'UNCERTAIN': 'Uncertain',
-      'CORRELATED_STALENESS': 'Correlated Staleness',
-      'ISOLATED_SIGNAL': 'Isolated Signal',
-      'NOT_APPLICABLE': 'Not Applicable',
+      LIKELY_DUPLICATE: 'Likely Duplicate',
+      LIKELY_ENRICHMENT: 'Likely Enrichment',
+      UNCERTAIN: 'Uncertain',
+      CORRELATED_STALENESS: 'Correlated Staleness',
+      ISOLATED_SIGNAL: 'Isolated Signal',
+      NOT_APPLICABLE: 'Not Applicable',
     };
     return labels[classification] ?? this.humanize(classification);
   }
 
   confidenceLabel(confidence: MaintenanceAssessmentConfidenceLevel): string {
     const labels: Record<MaintenanceAssessmentConfidenceLevel, string> = {
-      'HIGH': 'High Confidence',
-      'MEDIUM': 'Medium Confidence',
-      'LOW': 'Low Confidence',
-      'VERY_LOW': 'Very Low Confidence',
+      HIGH: 'High Confidence',
+      MEDIUM: 'Medium Confidence',
+      LOW: 'Low Confidence',
+      VERY_LOW: 'Very Low Confidence',
     };
     return labels[confidence] ?? this.humanize(confidence);
   }

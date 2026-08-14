@@ -46,13 +46,21 @@
                   @for (assessment of finding.assessments; track assessment.id) {
                     <div class="maintenance-assessment">
                       <div class="maintenance-assessment__header">
-                        <span class="maintenance-assessment__classification">{{ classificationLabel(assessment.semanticClassification) }}</span>
-                        <span class="maintenance-assessment__confidence">{{ confidenceLabel(assessment.confidenceLevel) }}</span>
-                        <span class="maintenance-assessment__action">{{ assessmentActionLabel(assessment.recommendedAction) }}</span>
+                        <span class="maintenance-assessment__classification">{{
+                          classificationLabel(assessment.semanticClassification)
+                        }}</span>
+                        <span class="maintenance-assessment__confidence">{{
+                          confidenceLabel(assessment.confidenceLevel)
+                        }}</span>
+                        <span class="maintenance-assessment__action">{{
+                          assessmentActionLabel(assessment.recommendedAction)
+                        }}</span>
                       </div>
                       <p class="maintenance-assessment__rationale">{{ assessment.rationale }}</p>
                       @if (assessment.supportingSignals) {
-                        <p class="maintenance-assessment__signals">{{ assessment.supportingSignals }}</p>
+                        <p class="maintenance-assessment__signals">
+                          {{ assessment.supportingSignals }}
+                        </p>
                       }
                     </div>
                   }
