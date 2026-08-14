@@ -3,7 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { APP_ENVIRONMENT } from '../../core/config/app-environment';
-import { MaintenanceFinding } from './maintenance-finding.models';
+import { MaintenanceFinding, MaintenanceFindingActionRequest } from './maintenance-finding.models';
 
 @Injectable({ providedIn: 'root' })
 export class MaintenanceFindingService {
@@ -14,6 +14,39 @@ export class MaintenanceFindingService {
   getByProject(projectId: string): Observable<readonly MaintenanceFinding[]> {
     return this.http.get<readonly MaintenanceFinding[]>(
       `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings`,
+    );
+  }
+
+  acknowledge(
+    projectId: string,
+    findingId: string,
+    request: MaintenanceFindingActionRequest,
+  ): Observable<MaintenanceFinding> {
+    return this.http.post<MaintenanceFinding>(
+      `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings/${encodeURIComponent(findingId)}/acknowledgements`,
+      request,
+    );
+  }
+
+  dismiss(
+    projectId: string,
+    findingId: string,
+    request: MaintenanceFindingActionRequest,
+  ): Observable<MaintenanceFinding> {
+    return this.http.post<MaintenanceFinding>(
+      `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings/${encodeURIComponent(findingId)}/dismissals`,
+      request,
+    );
+  }
+
+  resolve(
+    projectId: string,
+    findingId: string,
+    request: MaintenanceFindingActionRequest,
+  ): Observable<MaintenanceFinding> {
+    return this.http.post<MaintenanceFinding>(
+      `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings/${encodeURIComponent(findingId)}/resolutions`,
+      request,
     );
   }
 }

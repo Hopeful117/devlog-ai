@@ -1,3 +1,4 @@
+import '@angular/compiler';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -18,6 +19,7 @@ const finding: MaintenanceFinding = {
   humanReviewRequired: true,
   summary: 'Projection freshness is lagging behind repository changes.',
   details: 'A manual review is required before relying on the current projection.',
+  actionHistory: [],
   createdAt: '2026-08-14T10:00:00Z',
   updatedAt: '2026-08-14T10:05:00Z',
 };
@@ -50,5 +52,22 @@ describe('MaintenanceFindingService', () => {
     expect(request.request.method).toBe('GET');
     request.flush([finding]);
     expect(result).toEqual([finding]);
+  });
+
+  it('posts an acknowledgement action for a finding', () => {
+    let result: MaintenanceFinding | undefined;
+    service
+      .acknowledge(projectId, finding.id, {
+        actedBy: '00000000-0000-0000-0000-000000000001',
+        comment: 'Reviewed and acknowledged',
+      })
+      .subscribe((response) => (result = response));
+
+    const request = http.expectOne(
+      `http://core.test/api/v1/projects/${projectId}/maintenance-findings/${finding.id}/acknowledgements`,
+    );
+    expect(request.request.method).toBe('POST');
+    request.flush({ ...finding, status: 'ACKNOWLEDGED' });
+    expect(result?.status).toBe('ACKNOWLEDGED');
   });
 });

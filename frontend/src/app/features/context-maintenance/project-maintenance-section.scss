@@ -76,7 +76,63 @@
 
 .maintenance-meta,
 .maintenance-details,
+.maintenance-audit,
 .maintenance-timestamp {
   color: var(--text-muted);
   font-size: 0.78rem;
+}
+
+.maintenance-audit {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+}
+
+.maintenance-actions {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.maintenance-actions__label {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.maintenance-actions__comment {
+  width: 100%;
+  min-height: 4.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: rgb(8 14 26 / 0.65);
+  color: var(--text-primary);
+  resize: vertical;
+}
+
+.maintenance-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.maintenance-button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  background: rgb(77 141 255 / 0.12);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.maintenance-button:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.maintenance-button--secondary {
+  background: rgb(240 173 78 / 0.14);
+}
+
+.maintenance-button--primary {
+  background: rgb(79 198 138 / 0.14);
 }

@@ -8,6 +8,8 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -56,6 +58,11 @@ public class MaintenanceFinding {
 
     @Column(columnDefinition = "TEXT")
     private String details;
+
+    @OneToMany(mappedBy = "finding", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("actedAt DESC, id DESC")
+    @Builder.Default
+    private List<MaintenanceFindingAction> actions = new ArrayList<>();
 
     @CreatedDate
     @Column(nullable = false, updatable = false)

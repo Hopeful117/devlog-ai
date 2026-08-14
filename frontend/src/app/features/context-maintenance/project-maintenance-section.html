@@ -32,6 +32,64 @@
               @if (finding.details) {
                 <p class="maintenance-details">{{ finding.details }}</p>
               }
+              @if (latestActionSummary(finding); as latestAction) {
+                <p class="maintenance-audit">
+                  Last action: {{ latestAction }}
+                  @if (latestActionComment(finding); as latestComment) {
+                    · “{{ latestComment }}”
+                  }
+                </p>
+              }
+              @if (supportsWorkflow(finding)) {
+                <div class="maintenance-actions">
+                  <label class="maintenance-actions__label" [attr.for]="'comment-' + finding.id">
+                    Remediation note
+                  </label>
+                  <textarea
+                    class="maintenance-actions__comment"
+                    [id]="'comment-' + finding.id"
+                    [ngModel]="commentValue(finding.id)"
+                    (ngModelChange)="setComment(finding.id, $event)"
+                    rows="3"
+                    [disabled]="pendingActions[finding.id]"
+                  ></textarea>
+                  <div class="maintenance-actions__buttons">
+                    @if (canAcknowledge(finding)) {
+                      <button
+                        type="button"
+                        class="maintenance-button"
+                        (click)="acknowledge(finding)"
+                        [disabled]="pendingActions[finding.id]"
+                      >
+                        Acknowledge
+                      </button>
+                    }
+                    @if (canDismissOrResolve(finding)) {
+                      <button
+                        type="button"
+                        class="maintenance-button maintenance-button--secondary"
+                        (click)="dismiss(finding)"
+                        [disabled]="pendingActions[finding.id]"
+                      >
+                        Dismiss
+                      </button>
+                      <button
+                        type="button"
+                        class="maintenance-button maintenance-button--primary"
+                        (click)="resolve(finding)"
+                        [disabled]="pendingActions[finding.id]"
+                      >
+                        Resolve
+                      </button>
+                    }
+                  </div>
+                  @if (actionErrors[finding.id]) {
+                    <p class="maintenance-copy maintenance-copy--error">
+                      {{ actionErrors[finding.id] }}
+                    </p>
+                  }
+                </div>
+              }
               <small class="maintenance-timestamp">
                 Updated {{ finding.updatedAt | date: 'medium' }}
               </small>

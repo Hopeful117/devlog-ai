@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.contextmaintenance.controller;
 
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceEvaluationResponse;
+import com.hopeful117.devlogai.contextmaintenance.dto.request.MaintenanceFindingActionRequest;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceContextSurface;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingIssueType;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingSeverity;
@@ -22,6 +23,8 @@ import java.util.UUID;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,6 +54,7 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                 true,
                 "Projection freshness is lagging behind repository changes.",
                 "A manual review is required before relying on the current projection.",
+                List.of(),
                 Instant.parse("2026-08-14T10:00:00Z"),
                 Instant.parse("2026-08-14T10:05:00Z")
         );
@@ -112,5 +116,71 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                 .andExpect(jsonPath("$.createdFindings[0].issueType").value("PROJECTION_REFRESH_GAP"));
 
         verify(evaluationService).evaluate(projectId);
+    }
+
+    @Test
+    void shouldExposeAcknowledgementRoute() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFindingResponse acknowledged = new MaintenanceFindingResponse(
+                response.id(), projectId, response.contextSurface(), response.issueType(),
+                response.severity(), MaintenanceFindingStatus.ACKNOWLEDGED, response.suggestedAction(),
+                response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                response.createdAt(), response.updatedAt()
+        );
+        when(service.acknowledge(eq(projectId), eq(findingId), any(MaintenanceFindingActionRequest.class)))
+                .thenReturn(acknowledged);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/acknowledgements",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Reviewed and acknowledged"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ACKNOWLEDGED"));
+    }
+
+    @Test
+    void shouldExposeDismissalRoute() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFindingResponse dismissed = new MaintenanceFindingResponse(
+                response.id(), projectId, response.contextSurface(), response.issueType(),
+                response.severity(), MaintenanceFindingStatus.DISMISSED, response.suggestedAction(),
+                response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                response.createdAt(), response.updatedAt()
+        );
+        when(service.dismiss(eq(projectId), eq(findingId), any(MaintenanceFindingActionRequest.class)))
+                .thenReturn(dismissed);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/dismissals",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"False positive after review"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DISMISSED"));
+    }
+
+    @Test
+    void shouldExposeResolutionRoute() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFindingResponse resolved = new MaintenanceFindingResponse(
+                response.id(), projectId, response.contextSurface(), response.issueType(),
+                response.severity(), MaintenanceFindingStatus.RESOLVED, response.suggestedAction(),
+                response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                response.createdAt(), response.updatedAt()
+        );
+        when(service.resolve(eq(projectId), eq(findingId), any(MaintenanceFindingActionRequest.class)))
+                .thenReturn(resolved);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/resolutions",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Resolved through external cleanup"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
     }
 }

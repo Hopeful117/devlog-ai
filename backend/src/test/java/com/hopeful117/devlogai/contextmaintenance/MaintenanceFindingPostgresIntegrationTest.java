@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.contextmaintenance;
 
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceFindingRequest;
+import com.hopeful117.devlogai.contextmaintenance.dto.request.MaintenanceFindingActionRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
 import com.hopeful117.devlogai.contextmaintenance.entity.*;
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceFindingService;
@@ -62,6 +63,7 @@ class MaintenanceFindingPostgresIntegrationTest {
         assertEquals("REFRESH", jdbc.queryForObject(
                 "select suggested_action from maintenance_findings where id = ?",
                 String.class, created.id()));
+        assertEquals(0, created.actionHistory().size());
 
         MaintenanceFindingResponse updated = service.updateStatus(
                 projectId, created.id(), MaintenanceFindingStatus.RESOLVED
@@ -72,6 +74,37 @@ class MaintenanceFindingPostgresIntegrationTest {
                 "select status from maintenance_findings where id = ?",
                 String.class, created.id()));
         assertEquals(1, service.getByProject(projectId).size());
+    }
+
+    @Test
+    void shouldPersistAcknowledgementAuditActionForDuplicateDebtFinding() {
+        UUID projectId = UUID.randomUUID();
+        insertProject(projectId, "Duplicate debt project", "duplicate-debt-project");
+
+        MaintenanceFindingResponse created = service.create(projectId, new CreateMaintenanceFindingRequest(
+                MaintenanceContextSurface.PROJECT_UNDERSTANDING,
+                MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_EXACT_DUPLICATE,
+                MaintenanceFindingSeverity.HIGH,
+                MaintenanceSuggestedActionCategory.REVIEW,
+                true,
+                "Trusted knowledge exact duplicate debt detected for cluster 'adr'.",
+                "Duplicate cluster key: adr"
+        ));
+
+        MaintenanceFindingResponse acknowledged = service.acknowledge(
+                projectId,
+                created.id(),
+                new MaintenanceFindingActionRequest(
+                        UUID.fromString("00000000-0000-0000-0000-000000000321"),
+                        "Reviewed and acknowledged"
+                )
+        );
+
+        assertEquals(MaintenanceFindingStatus.ACKNOWLEDGED, acknowledged.status());
+        assertEquals(1, acknowledged.actionHistory().size());
+        assertEquals("ACKNOWLEDGE", jdbc.queryForObject(
+                "select action_type from maintenance_finding_actions where finding_id = ?",
+                String.class, created.id()));
     }
 
     private void insertProject(UUID id, String name, String slug) {

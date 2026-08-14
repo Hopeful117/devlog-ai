@@ -351,6 +351,27 @@ This first policy is intentionally bounded:
 * it treats missing freshness checks as a projection gap on the freshness
   surface itself, not as a timeline-refresh scheduler.
 
+Maintenance findings now also support a bounded human-reviewed remediation
+workflow for duplicate-debt findings:
+
+* `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/acknowledgements`
+* `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/dismissals`
+* `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/resolutions`
+
+Each action records:
+
+* who acted;
+* when they acted;
+* the action type;
+* an optional or required rationale, depending on the action.
+
+The first remediation slice is intentionally narrow:
+
+* it is currently supported only for trusted-knowledge duplicate-debt findings;
+* dismissal and resolution require explicit rationale;
+* it records workflow decisions without merging, deleting, or rewriting trusted
+  knowledge.
+
 ### Engineering Story Context
 
 Complete Engineering Stories should be submitted in a JSON request body so their size is not

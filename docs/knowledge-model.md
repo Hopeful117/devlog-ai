@@ -74,6 +74,19 @@ The first deterministic slice is deliberately narrow:
 - these findings remain operational maintenance records rather than trusted
   project truth.
 
+Maintenance findings now also support explicit human-reviewed remediation
+actions for the first bounded family of duplicate-debt findings.
+
+Those actions are:
+
+- acknowledge,
+- dismiss with rationale,
+- resolve with rationale.
+
+They create audit history for the finding workflow itself.
+
+They do not, by themselves, merge, delete, or rewrite trusted knowledge.
+
 They are:
 
 - operational maintenance records,
