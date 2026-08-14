@@ -128,6 +128,43 @@ They are:
 Maintenance findings help DevLog track context hygiene without asserting new
 project truth.
 
+#### Maintenance Assessments
+
+DevLog may also persist AI-assisted maintenance assessments as advisory
+interpretation artifacts attached to maintenance findings.
+
+Assessments represent the Context Maintenance Agent's interpretation of
+ambiguous maintenance situations that deterministic rules cannot resolve
+cleanly.
+
+Each assessment includes:
+
+- confidence level (HIGH, MEDIUM, LOW, VERY_LOW);
+- semantic classification (LIKELY_DUPLICATE, LIKELY_ENRICHMENT, UNCERTAIN,
+  CORRELATED_STALENESS, ISOLATED_SIGNAL, NOT_APPLICABLE);
+- recommended action (RESOLVE, DISMISS, ESCALATE, MONITOR, NO_ACTION);
+- rationale explaining the interpretation;
+- optional supporting signals as JSON-serialized data.
+
+Assessments are:
+
+- advisory artifacts, not lifecycle transitions;
+- attached to findings but do not modify finding status;
+- retrievable through project-scoped and finding-scoped API endpoints;
+- reviewable by humans for informed remediation decisions;
+- distinct from trusted knowledge, proposal history, and finding lifecycle.
+
+Assessments do not:
+
+- directly modify trusted knowledge;
+- automatically resolve or dismiss findings;
+- override human decisions on previously reviewed findings;
+- expand AUTO_RESOLVE eligibility.
+
+The deterministic layer remains the primary evaluation path. Assessments
+activate only when deterministic evaluation surfaces findings that benefit
+from AI-assisted interpretation.
+
 ### Future Knowledge Sources
 
 The architecture should support additional sources of knowledge in future versions, including:
