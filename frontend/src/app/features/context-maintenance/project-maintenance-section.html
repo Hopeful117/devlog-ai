@@ -1,0 +1,44 @@
+<app-dashboard-card title="Context maintenance" eyebrow="Operational findings">
+  @if (view$ | async; as view) {
+    @if (view.state === 'loading') {
+      <p role="status" class="maintenance-copy">Loading maintenance findings…</p>
+    } @else if (view.state === 'error') {
+      <p role="alert" class="maintenance-copy maintenance-copy--error">
+        {{ view.error.message }} Maintenance guidance remains unavailable for this project.
+      </p>
+    } @else {
+      @if (view.findings.length === 0) {
+        <p class="maintenance-copy">
+          No active maintenance findings currently exist for this project.
+        </p>
+      } @else {
+        <ul class="maintenance-list">
+          @for (finding of view.findings; track finding.id) {
+            <li
+              class="maintenance-item"
+              [attr.data-review-required]="requiresReview(finding)"
+              [attr.data-severity]="severityTone(finding.severity)"
+            >
+              <div class="maintenance-item__header">
+                <span class="maintenance-surface">{{ surfaceLabel(finding.contextSurface) }}</span>
+                <span class="maintenance-severity">{{ humanize(finding.severity) }}</span>
+                <span class="maintenance-status">{{ statusLabel(finding.status) }}</span>
+              </div>
+              <p class="maintenance-summary">{{ finding.summary }}</p>
+              <p class="maintenance-meta">
+                Action: {{ actionLabel(finding.suggestedAction) }} ·
+                {{ requiresReview(finding) ? 'Human review required' : 'Informational guidance' }}
+              </p>
+              @if (finding.details) {
+                <p class="maintenance-details">{{ finding.details }}</p>
+              }
+              <small class="maintenance-timestamp">
+                Updated {{ finding.updatedAt | date: 'medium' }}
+              </small>
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+</app-dashboard-card>

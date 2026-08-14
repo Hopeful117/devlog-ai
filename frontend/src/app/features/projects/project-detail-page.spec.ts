@@ -14,6 +14,7 @@ import { InsightService } from '../insights/insight.service';
 import { ProjectUnderstandingService } from './project-understanding.service';
 import { ProjectFreshnessService } from './project-freshness.service';
 import { EngineeringEventService } from '../engineering-events/engineering-event.service';
+import { MaintenanceFindingService } from '../context-maintenance/maintenance-finding.service';
 
 const project: ProjectDetail = {
   id: 'a1ee6d55-e034-491a-a6e6-cdad70573b24',
@@ -73,6 +74,10 @@ describe('ProjectDetailPage', () => {
         {
           provide: EngineeringEventService,
           useValue: { byProject: () => of({ content: [] }), execute: vi.fn() },
+        },
+        {
+          provide: MaintenanceFindingService,
+          useValue: { getByProject: () => of([]) },
         },
       ],
     }).compileComponents();

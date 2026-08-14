@@ -32,6 +32,7 @@ import { ProjectService } from './project.service';
 import { SourceSummary } from './source.models';
 import { SourceService } from './source.service';
 import { ProjectEngineeringEventsSection } from '../engineering-events/project-engineering-events-section';
+import { ProjectMaintenanceSection } from '../context-maintenance/project-maintenance-section';
 
 type ProjectDetailViewState =
   | { readonly state: 'loading' }
@@ -64,6 +65,7 @@ type ProjectActionState =
     ProjectUnderstandingSection,
     ProjectFreshnessSection,
     ProjectEngineeringEventsSection,
+    ProjectMaintenanceSection,
   ],
   templateUrl: './project-detail-page.html',
   styleUrl: './project-detail-page.scss',
