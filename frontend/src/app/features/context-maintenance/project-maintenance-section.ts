@@ -21,6 +21,9 @@ import {
   MaintenanceFindingSeverity,
   MaintenanceFindingStatus,
   MaintenanceSuggestedActionCategory,
+  MaintenanceAssessmentConfidenceLevel,
+  MaintenanceAssessmentSemanticClassification,
+  MaintenanceAssessmentRecommendedAction,
 } from './maintenance-finding.models';
 import { MaintenanceFindingService } from './maintenance-finding.service';
 
@@ -133,6 +136,32 @@ export class ProjectMaintenanceSection implements OnChanges {
 
   latestActionComment(finding: MaintenanceFinding): string | null {
     return finding.actionHistory[0]?.comment ?? null;
+  }
+
+  classificationLabel(classification: MaintenanceAssessmentSemanticClassification): string {
+    const labels: Record<MaintenanceAssessmentSemanticClassification, string> = {
+      LIKELY_DUPLICATE: 'Likely Duplicate',
+      LIKELY_ENRICHMENT: 'Likely Enrichment',
+      UNCERTAIN: 'Uncertain',
+      CORRELATED_STALENESS: 'Correlated Staleness',
+      ISOLATED_SIGNAL: 'Isolated Signal',
+      NOT_APPLICABLE: 'Not Applicable',
+    };
+    return labels[classification] ?? this.humanize(classification);
+  }
+
+  confidenceLabel(confidence: MaintenanceAssessmentConfidenceLevel): string {
+    const labels: Record<MaintenanceAssessmentConfidenceLevel, string> = {
+      HIGH: 'High Confidence',
+      MEDIUM: 'Medium Confidence',
+      LOW: 'Low Confidence',
+      VERY_LOW: 'Very Low Confidence',
+    };
+    return labels[confidence] ?? this.humanize(confidence);
+  }
+
+  assessmentActionLabel(action: MaintenanceAssessmentRecommendedAction): string {
+    return this.humanize(action);
   }
 
   acknowledge(finding: MaintenanceFinding): void {

@@ -4,7 +4,9 @@ import com.hopeful117.devlogai.contextmaintenance.dto.request.MaintenanceFinding
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceFindingRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
 import com.hopeful117.devlogai.contextmaintenance.entity.*;
+import com.hopeful117.devlogai.contextmaintenance.mapper.MaintenanceAssessmentMapper;
 import com.hopeful117.devlogai.contextmaintenance.mapper.MaintenanceFindingMapper;
+import com.hopeful117.devlogai.contextmaintenance.repository.MaintenanceAssessmentRepository;
 import com.hopeful117.devlogai.contextmaintenance.repository.MaintenanceFindingRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
@@ -28,7 +30,9 @@ class MaintenanceFindingServiceTest {
 
     @Mock ProjectRepository projectRepository;
     @Mock MaintenanceFindingRepository repository;
+    @Mock MaintenanceAssessmentRepository assessmentRepository;
     @Mock MaintenanceFindingMapper mapper;
+    @Mock MaintenanceAssessmentMapper assessmentMapper;
 
     @InjectMocks MaintenanceFindingServiceImpl service;
 
@@ -60,7 +64,7 @@ class MaintenanceFindingServiceTest {
         MaintenanceFindingResponse response = new MaintenanceFindingResponse(
                 saved.getId(), projectId, saved.getContextSurface(), saved.getIssueType(),
                 saved.getSeverity(), saved.getStatus(), saved.getSuggestedAction(),
-                saved.isHumanReviewRequired(), saved.getSummary(), saved.getDetails(), List.of(), null, null
+                saved.isHumanReviewRequired(), saved.getSummary(), saved.getDetails(), List.of(), List.of(), null, null
         );
 
         when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
@@ -115,7 +119,7 @@ class MaintenanceFindingServiceTest {
         when(mapper.toResponse(saved)).thenReturn(new MaintenanceFindingResponse(
                 saved.getId(), projectId, saved.getContextSurface(), saved.getIssueType(),
                 saved.getSeverity(), saved.getStatus(), saved.getSuggestedAction(),
-                saved.isHumanReviewRequired(), saved.getSummary(), saved.getDetails(), List.of(), null, null
+                saved.isHumanReviewRequired(), saved.getSummary(), saved.getDetails(), List.of(), List.of(), null, null
         ));
 
         service.create(projectId, request);
@@ -135,7 +139,7 @@ class MaintenanceFindingServiceTest {
                 findingId, projectId, MaintenanceContextSurface.PROJECT_PROJECTION,
                 MaintenanceFindingIssueType.PROJECTION_REFRESH_GAP,
                 MaintenanceFindingSeverity.MEDIUM, MaintenanceFindingStatus.RESOLVED,
-                MaintenanceSuggestedActionCategory.REFRESH, false, "Gap", "Body", List.of(), null, null
+                MaintenanceSuggestedActionCategory.REFRESH, false, "Gap", "Body", List.of(), List.of(), null, null
         );
 
         when(projectRepository.existsById(projectId)).thenReturn(true);
@@ -162,17 +166,21 @@ class MaintenanceFindingServiceTest {
                 finding.getId(), projectId, MaintenanceContextSurface.PROJECT_PROJECTION,
                 MaintenanceFindingIssueType.PROJECTION_REFRESH_GAP,
                 MaintenanceFindingSeverity.LOW, MaintenanceFindingStatus.OPEN,
-                MaintenanceSuggestedActionCategory.MONITOR, false, "Gap", null, List.of(), null, null
+                MaintenanceSuggestedActionCategory.MONITOR, false, "Gap", null, List.of(), List.of(), null, null
         );
 
         when(projectRepository.existsById(projectId)).thenReturn(true);
         when(repository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId))
                 .thenReturn(List.of(finding));
-        when(mapper.toResponse(List.of(finding))).thenReturn(List.of(response));
+        when(assessmentRepository.findByFindingIdInOrderByCreatedAtDescIdDesc(List.of(finding.getId())))
+                .thenReturn(List.of());
+        when(mapper.toResponse(finding)).thenReturn(response);
+        when(assessmentMapper.toResponse(List.of())).thenReturn(List.of());
 
         List<MaintenanceFindingResponse> results = service.getByProject(projectId);
 
-        assertEquals(List.of(response), results);
+        assertEquals(1, results.size());
+        assertEquals(List.of(), results.getFirst().assessments());
     }
 
     @Test
@@ -211,7 +219,7 @@ class MaintenanceFindingServiceTest {
             return new MaintenanceFindingResponse(
                     saved.getId(), projectId, saved.getContextSurface(), saved.getIssueType(),
                     saved.getSeverity(), saved.getStatus(), saved.getSuggestedAction(), true,
-                    saved.getSummary(), saved.getDetails(), List.of(), null, null
+                    saved.getSummary(), saved.getDetails(), List.of(), List.of(), null, null
             );
         });
 
@@ -288,7 +296,7 @@ class MaintenanceFindingServiceTest {
                     findingId, projectId, saved.getContextSurface(), saved.getIssueType(),
                     MaintenanceFindingSeverity.MEDIUM, saved.getStatus(),
                     MaintenanceSuggestedActionCategory.REVIEW, true,
-                    "Stale human input", "details", List.of(), null, null
+                    "Stale human input", "details", List.of(), List.of(), null, null
             );
         });
 
@@ -322,7 +330,7 @@ class MaintenanceFindingServiceTest {
                     findingId, projectId, saved.getContextSurface(), saved.getIssueType(),
                     MaintenanceFindingSeverity.MEDIUM, saved.getStatus(),
                     MaintenanceSuggestedActionCategory.REFRESH, false,
-                    "Understanding stale", "details", List.of(), null, null
+                    "Understanding stale", "details", List.of(), List.of(), null, null
             );
         });
 

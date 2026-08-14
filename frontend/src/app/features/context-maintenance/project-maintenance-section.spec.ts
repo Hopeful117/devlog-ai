@@ -20,6 +20,7 @@ const finding: MaintenanceFinding = {
   summary: 'Projection freshness is lagging behind repository changes.',
   details: 'A manual review is required before relying on the current projection.',
   actionHistory: [],
+  assessments: [],
   createdAt: '2026-08-14T10:00:00Z',
   updatedAt: '2026-08-14T10:05:00Z',
 };

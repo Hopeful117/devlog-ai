@@ -55,6 +55,7 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                 "Projection freshness is lagging behind repository changes.",
                 "A manual review is required before relying on the current projection.",
                 List.of(),
+                List.of(),
                 Instant.parse("2026-08-14T10:00:00Z"),
                 Instant.parse("2026-08-14T10:05:00Z")
         );
@@ -125,6 +126,7 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                 response.id(), projectId, response.contextSurface(), response.issueType(),
                 response.severity(), MaintenanceFindingStatus.ACKNOWLEDGED, response.suggestedAction(),
                 response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                List.of(),
                 response.createdAt(), response.updatedAt()
         );
         when(service.acknowledge(eq(projectId), eq(findingId), any(MaintenanceFindingActionRequest.class)))
@@ -147,6 +149,7 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                 response.id(), projectId, response.contextSurface(), response.issueType(),
                 response.severity(), MaintenanceFindingStatus.DISMISSED, response.suggestedAction(),
                 response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                List.of(),
                 response.createdAt(), response.updatedAt()
         );
         when(service.dismiss(eq(projectId), eq(findingId), any(MaintenanceFindingActionRequest.class)))
@@ -169,6 +172,7 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                 response.id(), projectId, response.contextSurface(), response.issueType(),
                 response.severity(), MaintenanceFindingStatus.RESOLVED, response.suggestedAction(),
                 response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                List.of(),
                 response.createdAt(), response.updatedAt()
         );
         when(service.resolve(eq(projectId), eq(findingId), any(MaintenanceFindingActionRequest.class)))
