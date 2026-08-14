@@ -532,6 +532,7 @@ class MaintenanceEvaluationServiceTest {
                 request.summary(),
                 request.details(),
                 List.of(),
+                List.of(),
                 Instant.now(),
                 Instant.now()
         );

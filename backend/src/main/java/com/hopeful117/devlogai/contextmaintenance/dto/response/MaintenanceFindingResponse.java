@@ -22,10 +22,12 @@ public record MaintenanceFindingResponse(
         String summary,
         String details,
         List<MaintenanceFindingActionResponse> actionHistory,
+        List<MaintenanceAssessmentResponse> assessments,
         Instant createdAt,
         Instant updatedAt
 ) {
     public MaintenanceFindingResponse {
         actionHistory = actionHistory == null ? List.of() : List.copyOf(actionHistory);
+        assessments = assessments == null ? List.of() : List.copyOf(assessments);
     }
 }

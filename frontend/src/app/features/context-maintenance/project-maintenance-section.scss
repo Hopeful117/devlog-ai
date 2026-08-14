@@ -136,3 +136,71 @@
 .maintenance-button--primary {
   background: rgb(79 198 138 / 0.14);
 }
+
+.maintenance-assessments {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
+}
+
+.maintenance-assessments__title {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.maintenance-assessment {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-left: 0.2rem solid rgb(123 44 186 / 0.6);
+  border-radius: 0.6rem;
+  background: rgb(123 44 186 / 0.06);
+}
+
+.maintenance-assessment__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.maintenance-assessment__classification,
+.maintenance-assessment__confidence,
+.maintenance-assessment__action {
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.maintenance-assessment__classification {
+  background: rgb(123 44 186 / 0.18);
+  color: #c4a6e8;
+}
+
+.maintenance-assessment__confidence {
+  background: rgb(77 141 255 / 0.12);
+}
+
+.maintenance-assessment__action {
+  background: rgb(79 198 138 / 0.14);
+}
+
+.maintenance-assessment__rationale {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.maintenance-assessment__signals {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-style: italic;
+}

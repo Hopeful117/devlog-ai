@@ -18,12 +18,42 @@ export type MaintenanceSuggestedActionCategory = 'MONITOR' | 'REFRESH' | 'INVEST
 
 export type MaintenanceFindingActionType = 'ACKNOWLEDGE' | 'DISMISS' | 'RESOLVE' | 'AUTO_RESOLVE';
 
+export type MaintenanceAssessmentConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'VERY_LOW';
+
+export type MaintenanceAssessmentSemanticClassification =
+  | 'LIKELY_DUPLICATE'
+  | 'LIKELY_ENRICHMENT'
+  | 'UNCERTAIN'
+  | 'CORRELATED_STALENESS'
+  | 'ISOLATED_SIGNAL'
+  | 'NOT_APPLICABLE';
+
+export type MaintenanceAssessmentRecommendedAction =
+  | 'RESOLVE'
+  | 'DISMISS'
+  | 'ESCALATE'
+  | 'MONITOR'
+  | 'NO_ACTION';
+
 export interface MaintenanceFindingAction {
   readonly id: string;
   readonly actionType: MaintenanceFindingActionType;
   readonly actedBy: string;
   readonly actedAt: string;
   readonly comment: string | null;
+}
+
+export interface MaintenanceAssessment {
+  readonly id: string;
+  readonly projectId: string;
+  readonly findingId: string;
+  readonly confidenceLevel: MaintenanceAssessmentConfidenceLevel;
+  readonly semanticClassification: MaintenanceAssessmentSemanticClassification;
+  readonly recommendedAction: MaintenanceAssessmentRecommendedAction;
+  readonly rationale: string;
+  readonly supportingSignals: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
 }
 
 export interface MaintenanceFindingActionRequest {
@@ -43,6 +73,7 @@ export interface MaintenanceFinding {
   readonly summary: string;
   readonly details: string | null;
   readonly actionHistory: readonly MaintenanceFindingAction[];
+  readonly assessments: readonly MaintenanceAssessment[];
   readonly createdAt: string;
   readonly updatedAt: string;
 }

@@ -2,9 +2,12 @@ package com.hopeful117.devlogai.contextmaintenance.service;
 
 import com.hopeful117.devlogai.contextmaintenance.dto.request.MaintenanceFindingActionRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceFindingRequest;
+import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceAssessmentResponse;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
 import com.hopeful117.devlogai.contextmaintenance.entity.*;
+import com.hopeful117.devlogai.contextmaintenance.mapper.MaintenanceAssessmentMapper;
 import com.hopeful117.devlogai.contextmaintenance.mapper.MaintenanceFindingMapper;
+import com.hopeful117.devlogai.contextmaintenance.repository.MaintenanceAssessmentRepository;
 import com.hopeful117.devlogai.contextmaintenance.repository.MaintenanceFindingRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
@@ -15,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +28,9 @@ public class MaintenanceFindingServiceImpl implements MaintenanceFindingService 
 
     private final ProjectRepository projectRepository;
     private final MaintenanceFindingRepository repository;
+    private final MaintenanceAssessmentRepository assessmentRepository;
     private final MaintenanceFindingMapper mapper;
+    private final MaintenanceAssessmentMapper assessmentMapper;
 
     @Override
     @Transactional
@@ -50,7 +57,34 @@ public class MaintenanceFindingServiceImpl implements MaintenanceFindingService 
     @Transactional(readOnly = true)
     public List<MaintenanceFindingResponse> getByProject(UUID projectId) {
         ensureProjectExists(projectId);
-        return mapper.toResponse(repository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId));
+        List<MaintenanceFinding> findings = repository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId);
+        List<UUID> findingIds = findings.stream().map(MaintenanceFinding::getId).toList();
+        Map<UUID, List<MaintenanceAssessment>> assessmentsByFinding = assessmentRepository
+                .findByFindingIdInOrderByCreatedAtDescIdDesc(findingIds).stream()
+                .collect(Collectors.groupingBy(a -> a.getFinding().getId()));
+        return findings.stream()
+                .map(finding -> {
+                    MaintenanceFindingResponse response = mapper.toResponse(finding);
+                    List<MaintenanceAssessmentResponse> assessments = assessmentMapper
+                            .toResponse(assessmentsByFinding.getOrDefault(finding.getId(), List.of()));
+                    return new MaintenanceFindingResponse(
+                            response.id(),
+                            response.projectId(),
+                            response.contextSurface(),
+                            response.issueType(),
+                            response.severity(),
+                            response.status(),
+                            response.suggestedAction(),
+                            response.humanReviewRequired(),
+                            response.summary(),
+                            response.details(),
+                            response.actionHistory(),
+                            assessments,
+                            response.createdAt(),
+                            response.updatedAt()
+                    );
+                })
+                .toList();
     }
 
     @Override
