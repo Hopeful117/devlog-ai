@@ -3,10 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { APP_ENVIRONMENT } from '../../core/config/app-environment';
-import {
-  MaintenanceFinding,
-  MaintenanceFindingActionRequest,
-} from './maintenance-finding.models';
+import { MaintenanceFinding, MaintenanceFindingActionRequest } from './maintenance-finding.models';
 
 @Injectable({ providedIn: 'root' })
 export class MaintenanceFindingService {

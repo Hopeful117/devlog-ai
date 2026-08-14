@@ -85,7 +85,10 @@ export class ProjectMaintenanceSection implements OnChanges {
   }
 
   requiresReview(finding: MaintenanceFinding): boolean {
-    return finding.humanReviewRequired && (finding.status === 'OPEN' || finding.status === 'ACKNOWLEDGED');
+    return (
+      finding.humanReviewRequired &&
+      (finding.status === 'OPEN' || finding.status === 'ACKNOWLEDGED')
+    );
   }
 
   supportsWorkflow(finding: MaintenanceFinding): boolean {
@@ -101,7 +104,10 @@ export class ProjectMaintenanceSection implements OnChanges {
   }
 
   canDismissOrResolve(finding: MaintenanceFinding): boolean {
-    return this.supportsWorkflow(finding) && (finding.status === 'OPEN' || finding.status === 'ACKNOWLEDGED');
+    return (
+      this.supportsWorkflow(finding) &&
+      (finding.status === 'OPEN' || finding.status === 'ACKNOWLEDGED')
+    );
   }
 
   requiresComment(finding: MaintenanceFinding): boolean {
@@ -127,15 +133,25 @@ export class ProjectMaintenanceSection implements OnChanges {
   }
 
   acknowledge(finding: MaintenanceFinding): void {
-    this.runAction(finding, (request) => this.service.acknowledge(this.projectId, finding.id, request));
+    this.runAction(finding, (request) =>
+      this.service.acknowledge(this.projectId, finding.id, request),
+    );
   }
 
   dismiss(finding: MaintenanceFinding): void {
-    this.runAction(finding, (request) => this.service.dismiss(this.projectId, finding.id, request), true);
+    this.runAction(
+      finding,
+      (request) => this.service.dismiss(this.projectId, finding.id, request),
+      true,
+    );
   }
 
   resolve(finding: MaintenanceFinding): void {
-    this.runAction(finding, (request) => this.service.resolve(this.projectId, finding.id, request), true);
+    this.runAction(
+      finding,
+      (request) => this.service.resolve(this.projectId, finding.id, request),
+      true,
+    );
   }
 
   private runAction(

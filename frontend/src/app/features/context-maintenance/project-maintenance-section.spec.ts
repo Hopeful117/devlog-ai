@@ -99,7 +99,9 @@ describe('ProjectMaintenanceSection', () => {
 
   it('renders remediation actions for duplicate debt and posts acknowledgement', async () => {
     getByProject.mockReturnValue(of([duplicateFinding]));
-    acknowledge.mockReturnValue(of({ ...duplicateFinding, status: 'ACKNOWLEDGED', actionHistory: [] }));
+    acknowledge.mockReturnValue(
+      of({ ...duplicateFinding, status: 'ACKNOWLEDGED', actionHistory: [] }),
+    );
     const fixture = await render();
 
     const button = fixture.debugElement
