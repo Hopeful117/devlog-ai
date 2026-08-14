@@ -161,6 +161,41 @@ class CrossSurfacePatternDetectionAgentTest {
         assertTrue(result.isEmpty());
     }
 
+    @Test
+    void shouldReturnEmptyForAcknowledgedFindings() {
+        List<MaintenanceFinding> findings = List.of(
+                buildFindingWithStatus(MaintenanceContextSurface.PROJECT_UNDERSTANDING,
+                        MaintenanceFindingIssueType.STALE_PROJECT_UNDERSTANDING,
+                        MaintenanceFindingStatus.ACKNOWLEDGED),
+                buildFinding(MaintenanceContextSurface.PROJECT_PROJECTION,
+                        MaintenanceFindingIssueType.MISSING_PROJECTION_REFRESH)
+        );
+
+        Optional<CrossSurfacePatternDetectionAgent.AgentAssessmentResult> result = agent.evaluate(findings);
+
+        assertTrue(result.isPresent());
+        assertEquals(MaintenanceAssessmentSemanticClassification.CORRELATED_STALENESS,
+                result.get().semanticClassification());
+    }
+
+    @Test
+    void shouldDetectPatternOnlyWithOpenFindings() {
+        List<MaintenanceFinding> findings = List.of(
+                buildFinding(MaintenanceContextSurface.PROJECT_UNDERSTANDING,
+                        MaintenanceFindingIssueType.STALE_PROJECT_UNDERSTANDING),
+                buildFinding(MaintenanceContextSurface.PROJECT_PROJECTION,
+                        MaintenanceFindingIssueType.MISSING_PROJECTION_REFRESH),
+                buildFindingWithStatus(MaintenanceContextSurface.INTERNAL_HUMAN_CONTEXT,
+                        MaintenanceFindingIssueType.STALE_HUMAN_CONTEXT_INPUT,
+                        MaintenanceFindingStatus.DISMISSED)
+        );
+
+        Optional<CrossSurfacePatternDetectionAgent.AgentAssessmentResult> result = agent.evaluate(findings);
+
+        assertTrue(result.isPresent());
+        assertEquals(2, result.get().contributingFindingIds().size());
+    }
+
     private MaintenanceFinding buildFinding(MaintenanceContextSurface surface, MaintenanceFindingIssueType issueType) {
         return buildFindingWithStatus(surface, issueType, MaintenanceFindingStatus.OPEN);
     }

@@ -188,6 +188,63 @@ class DuplicateAmbiguityResolutionAgentTest {
                 result.get().semanticClassification());
     }
 
+    @Test
+    void shouldReturnEmptyForEmptyMembers() {
+        InsightDuplicateClusterResponse cluster = buildCluster(
+                InsightDuplicateClusterCategory.LIKELY_SEMANTIC_DUPLICATE,
+                List.of()
+        );
+
+        Optional<DuplicateAmbiguityResolutionAgent.AgentAssessmentResult> result =
+                agent.evaluate("TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE", cluster);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void shouldHandleThreeOrMoreMembers() {
+        InsightDuplicateClusterResponse cluster = buildCluster(
+                InsightDuplicateClusterCategory.LIKELY_SEMANTIC_DUPLICATE,
+                List.of(
+                        buildMember("architecture-docs"),
+                        buildMember("architecture-docs"),
+                        buildMember("architecture-docs")
+                )
+        );
+
+        Optional<DuplicateAmbiguityResolutionAgent.AgentAssessmentResult> result =
+                agent.evaluate("TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE", cluster);
+
+        assertTrue(result.isPresent());
+        assertEquals(MaintenanceAssessmentSemanticClassification.LIKELY_DUPLICATE,
+                result.get().semanticClassification());
+    }
+
+    @Test
+    void shouldClassifyRicherSuccessorWithProvenanceAdvantageAsEnrichment() {
+        InsightDuplicateMemberResponse rich = buildMemberWithContent(
+                "architecture-docs", "Rich title", "Detailed content with many words. ".repeat(10),
+                "Comprehensive rationale with provenance"
+        );
+        InsightDuplicateMemberResponse poor = buildMemberWithContent(
+                "architecture-docs", "Poor title", "Short", null
+        );
+
+        InsightDuplicateClusterResponse cluster = buildCluster(
+                InsightDuplicateClusterCategory.LIKELY_RICHER_SUCCESSOR,
+                List.of(rich, poor)
+        );
+
+        Optional<DuplicateAmbiguityResolutionAgent.AgentAssessmentResult> result =
+                agent.evaluate("TRUSTED_KNOWLEDGE_OVERLAP_REVIEW", cluster);
+
+        assertTrue(result.isPresent());
+        assertEquals(MaintenanceAssessmentSemanticClassification.LIKELY_ENRICHMENT,
+                result.get().semanticClassification());
+        assertEquals(MaintenanceAssessmentConfidenceLevel.HIGH, result.get().confidenceLevel());
+        assertEquals(MaintenanceAssessmentRecommendedAction.RESOLVE, result.get().recommendedAction());
+    }
+
     private InsightDuplicateClusterResponse buildCluster(
             InsightDuplicateClusterCategory category,
             List<InsightDuplicateMemberResponse> members

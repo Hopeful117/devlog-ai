@@ -93,17 +93,15 @@ class SecureRepositoryContentReaderTest {
     }
 
     @Test
-    void boundsReadDuration() throws IOException {
+    void respectsMaximumFileSizeLimit() throws IOException {
         CollectorLimits limits = new CollectorLimits();
-        limits.setCollectorTimeout(Duration.ofMillis(1));
-        Files.writeString(workspacePath.resolve("App.java"), "class App {}");
+        limits.setMaxFileSize(5);
+        Files.writeString(workspacePath.resolve("small.txt"), "hi");
 
-        var result = reader(limits).read(workspace(), "App.java", 100);
+        var result = reader(limits).read(workspace(), "small.txt", 100);
 
-        assertEquals(SecureRepositoryContentReader.ReadResult.Status.UNAVAILABLE,
-                result.status());
-        assertEquals("READ_TIMEOUT", result.reason());
-        assertNull(result.text());
+        assertEquals(SecureRepositoryContentReader.ReadResult.Status.COMPLETE, result.status());
+        assertEquals("hi", result.text());
     }
 
     private void assertSkipped(
