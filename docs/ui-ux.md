@@ -98,9 +98,11 @@ The Cockpit should not expose internal implementation concepts such as Tasks, Pr
 Instead it provides an operational overview.
 
 The Cockpit may expose internal context-maintenance findings only as bounded,
-operational guidance. These findings are read-only in the first slice and must
-not be presented as trusted knowledge, hidden health scores, or implicit
-remediation controls.
+operational guidance. These findings must not be presented as trusted
+knowledge, hidden health scores, or broad implicit remediation controls.
+
+When maintenance history includes automatic actions, the UI must render them as
+explicit system-owned audit events rather than as human review decisions.
 
 ---
 
@@ -387,6 +389,8 @@ This module should:
 * provide an explicit empty state when no findings exist;
 * support explicit human-reviewed actions only for bounded finding families
   that already have dedicated remediation workflows;
+* show automatic maintenance reconciliation through ordinary audit history
+  rather than through separate automation controls;
 * keep maintenance review distinct from the underlying domain mutation when a
   finding references project memory such as internal human context inputs.
 
@@ -396,6 +400,7 @@ The module must not:
 * collapse multiple findings into a vague green/red score;
 * expose dismiss, resolve, or review mutations before dedicated remediation
   workflows exist;
+* imply that duplicate-debt findings can be automatically closed;
 * silently archive, merge, or rewrite project memory from the maintenance
   module alone.
 

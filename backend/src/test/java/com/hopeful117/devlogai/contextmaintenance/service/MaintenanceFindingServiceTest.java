@@ -300,4 +300,39 @@ class MaintenanceFindingServiceTest {
         assertEquals(1, finding.getActions().size());
         assertEquals(MaintenanceFindingActionType.RESOLVE, finding.getActions().getFirst().getActionType());
     }
+
+    @Test
+    void shouldAutoResolveEligibleFindingWithSystemAuditTrail() {
+        UUID projectId = UUID.randomUUID();
+        UUID findingId = UUID.randomUUID();
+        UUID systemActorId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        MaintenanceFinding finding = MaintenanceFinding.builder()
+                .id(findingId)
+                .issueType(MaintenanceFindingIssueType.STALE_PROJECT_UNDERSTANDING)
+                .contextSurface(MaintenanceContextSurface.PROJECT_UNDERSTANDING)
+                .status(MaintenanceFindingStatus.ACKNOWLEDGED)
+                .actions(new java.util.ArrayList<>())
+                .build();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(repository.findByIdAndProject_Id(findingId, projectId)).thenReturn(Optional.of(finding));
+        when(repository.save(finding)).thenReturn(finding);
+        when(mapper.toResponse(finding)).thenAnswer(invocation -> {
+            MaintenanceFinding saved = invocation.getArgument(0);
+            return new MaintenanceFindingResponse(
+                    findingId, projectId, saved.getContextSurface(), saved.getIssueType(),
+                    MaintenanceFindingSeverity.MEDIUM, saved.getStatus(),
+                    MaintenanceSuggestedActionCategory.REFRESH, false,
+                    "Understanding stale", "details", List.of(), null, null
+            );
+        });
+
+        MaintenanceFindingResponse result = service.autoResolve(projectId, findingId, systemActorId,
+                "Automatically resolved because the deterministic maintenance condition no longer applies.");
+
+        assertEquals(MaintenanceFindingStatus.RESOLVED, finding.getStatus());
+        assertEquals(MaintenanceFindingStatus.RESOLVED, result.status());
+        assertEquals(1, finding.getActions().size());
+        assertEquals(MaintenanceFindingActionType.AUTO_RESOLVE, finding.getActions().getFirst().getActionType());
+        assertEquals(systemActorId, finding.getActions().getFirst().getActedBy());
+    }
 }

@@ -21,4 +21,6 @@ public interface MaintenanceFindingService {
     MaintenanceFindingResponse dismiss(UUID projectId, UUID findingId, MaintenanceFindingActionRequest request);
 
     MaintenanceFindingResponse resolve(UUID projectId, UUID findingId, MaintenanceFindingActionRequest request);
+
+    MaintenanceFindingResponse autoResolve(UUID projectId, UUID findingId, UUID actedBy, String comment);
 }

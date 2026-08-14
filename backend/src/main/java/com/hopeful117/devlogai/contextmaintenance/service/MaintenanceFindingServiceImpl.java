@@ -93,6 +93,19 @@ public class MaintenanceFindingServiceImpl implements MaintenanceFindingService 
         return applyAction(projectId, findingId, request, MaintenanceFindingActionType.RESOLVE);
     }
 
+    @Override
+    @Transactional
+    public MaintenanceFindingResponse autoResolve(
+            UUID projectId,
+            UUID findingId,
+            UUID actedBy,
+            String comment
+    ) {
+        return applyAction(projectId, findingId,
+                new MaintenanceFindingActionRequest(actedBy, comment),
+                MaintenanceFindingActionType.AUTO_RESOLVE);
+    }
+
     private void ensureProjectExists(UUID projectId) {
         if (!projectRepository.existsById(projectId)) {
             throw new EntityNotFoundException("Project", projectId);
@@ -117,7 +130,7 @@ public class MaintenanceFindingServiceImpl implements MaintenanceFindingService 
         MaintenanceFinding finding = repository.findByIdAndProject_Id(findingId, projectId)
                 .orElseThrow(() -> new EntityNotFoundException("MaintenanceFinding", findingId));
 
-        if (!supportsHumanRemediationWorkflow(finding)) {
+        if (!supportsWorkflow(finding, actionType)) {
             throw new ConflictException("This maintenance finding family does not yet support remediation actions.");
         }
         validateTransition(finding, actionType, request.comment());
@@ -134,7 +147,19 @@ public class MaintenanceFindingServiceImpl implements MaintenanceFindingService 
         return mapper.toResponse(repository.save(finding));
     }
 
-    private boolean supportsHumanRemediationWorkflow(MaintenanceFinding finding) {
+    private boolean supportsWorkflow(
+            MaintenanceFinding finding,
+            MaintenanceFindingActionType actionType
+    ) {
+        if (actionType == MaintenanceFindingActionType.AUTO_RESOLVE) {
+            return switch (finding.getIssueType()) {
+                case STALE_PROJECT_UNDERSTANDING,
+                        MISSING_PROJECTION_REFRESH,
+                        STALE_HUMAN_CONTEXT_INPUT -> true;
+                default -> false;
+            };
+        }
+
         return switch (finding.getIssueType()) {
             case STALE_HUMAN_CONTEXT_INPUT,
                     TRUSTED_KNOWLEDGE_EXACT_DUPLICATE,
@@ -158,7 +183,14 @@ public class MaintenanceFindingServiceImpl implements MaintenanceFindingService 
                 && finding.getStatus() != MaintenanceFindingStatus.ACKNOWLEDGED) {
             throw new ConflictException("Only open or acknowledged maintenance findings can be dismissed or resolved.");
         }
-        if ((actionType == MaintenanceFindingActionType.DISMISS || actionType == MaintenanceFindingActionType.RESOLVE)
+        if (actionType == MaintenanceFindingActionType.AUTO_RESOLVE
+                && finding.getStatus() != MaintenanceFindingStatus.OPEN
+                && finding.getStatus() != MaintenanceFindingStatus.ACKNOWLEDGED) {
+            throw new ConflictException("Only open or acknowledged maintenance findings can be auto-resolved.");
+        }
+        if ((actionType == MaintenanceFindingActionType.DISMISS
+                || actionType == MaintenanceFindingActionType.RESOLVE
+                || actionType == MaintenanceFindingActionType.AUTO_RESOLVE)
                 && normalizeDetails(comment) == null) {
             throw new ConflictException("A rationale comment is required for this maintenance action.");
         }
@@ -168,7 +200,7 @@ public class MaintenanceFindingServiceImpl implements MaintenanceFindingService 
         return switch (actionType) {
             case ACKNOWLEDGE -> MaintenanceFindingStatus.ACKNOWLEDGED;
             case DISMISS -> MaintenanceFindingStatus.DISMISSED;
-            case RESOLVE -> MaintenanceFindingStatus.RESOLVED;
+            case RESOLVE, AUTO_RESOLVE -> MaintenanceFindingStatus.RESOLVED;
         };
     }
 }

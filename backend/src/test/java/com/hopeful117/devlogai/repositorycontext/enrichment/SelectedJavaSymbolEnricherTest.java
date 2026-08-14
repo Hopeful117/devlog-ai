@@ -250,7 +250,8 @@ class SelectedJavaSymbolEnricherTest {
     void appliesAggregateSymbolAndTokenLimits() throws IOException {
         UUID projectId = UUID.randomUUID();
         UUID sourceId = UUID.randomUUID();
-        Files.writeString(workspace.resolve("First.java"), "class First {}");
+        Files.writeString(workspace.resolve("First.java"),
+                "class First { void consumeBudget() {} }");
         Files.writeString(workspace.resolve("Second.java"), "class Second {}");
         Files.writeString(workspace.resolve("Large.java"), "class Large { "
                 + java.util.stream.IntStream.range(0, 30)
@@ -267,9 +268,11 @@ class SelectedJavaSymbolEnricherTest {
         RepositorySymbolPolicy symbolBound = new RepositorySymbolPolicy();
         symbolBound.setMaxTotalSymbols(1);
         var symbolResult = enricher(symbolBound, sources, manager).enrich(
-                request(projectId, 1000), selection(List.of(
+                request(projectId, 5_000), selection(List.of(
                         evidence(sourceId, "SOURCE_FILE", "First.java", 300),
                         evidence(sourceId, "SOURCE_FILE", "Second.java", 200))));
+        assertEquals(RepositoryEvidenceSymbols.Status.SKIPPED,
+                symbolResult.selection().selected().get(1).symbols().status());
         assertEquals("SYMBOL_COUNT_LIMIT",
                 symbolResult.selection().selected().get(1).symbols().reason());
 

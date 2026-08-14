@@ -42,6 +42,22 @@ const humanContextFinding: MaintenanceFinding = {
   summary: "Active human context input 'Medium-term objective' may be stale or superseded.",
 };
 
+const autoResolvedFinding: MaintenanceFinding = {
+  ...humanContextFinding,
+  id: 'auto-1',
+  status: 'RESOLVED',
+  actionHistory: [
+    {
+      id: 'action-1',
+      actionType: 'AUTO_RESOLVE',
+      actedBy: '00000000-0000-0000-0000-000000000002',
+      actedAt: '2026-08-14T14:00:00Z',
+      comment:
+        'Automatically resolved because the deterministic maintenance condition no longer applies.',
+    },
+  ],
+};
+
 describe('ProjectMaintenanceSection', () => {
   const getByProject = vi.fn();
   const acknowledge = vi.fn();
@@ -142,5 +158,17 @@ describe('ProjectMaintenanceSection', () => {
       actedBy: '00000000-0000-0000-0000-000000000001',
       comment: 'Archived after review',
     });
+  });
+
+  it('renders automatic maintenance history clearly', async () => {
+    getByProject.mockReturnValue(of([autoResolvedFinding]));
+    const fixture = await render();
+
+    expect(fixture.nativeElement.textContent).toContain(
+      'auto resolve by 00000000-0000-0000-0000-000000000002',
+    );
+    expect(fixture.nativeElement.textContent).toContain(
+      'Automatically resolved because the deterministic maintenance condition no longer applies.',
+    );
   });
 });

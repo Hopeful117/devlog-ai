@@ -97,6 +97,25 @@ For internal human context inputs, they also do not automatically archive or
 rewrite the note itself. Note lifecycle state remains in the dedicated
 human-context-input domain.
 
+Maintenance findings also now support one narrow automatic workflow action:
+
+- `AUTO_RESOLVE`
+
+This action is reserved for deterministic findings whose underlying condition
+can be safely recomputed and shown to have disappeared. In the current slice it
+is limited to:
+
+- `STALE_PROJECT_UNDERSTANDING`
+- `MISSING_PROJECTION_REFRESH`
+- `STALE_HUMAN_CONTEXT_INPUT`
+
+Every automatic resolution writes explicit action history with a reserved
+system actor identity and explanatory comment.
+
+Duplicate-debt findings remain excluded from automatic closure because they
+still require semantic or human judgment about whether remediation actually
+occurred.
+
 They are:
 
 - operational maintenance records,
