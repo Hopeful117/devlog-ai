@@ -9,6 +9,11 @@ import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingSever
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingStatus;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceSuggestedActionCategory;
 import com.hopeful117.devlogai.contextmaintenance.repository.MaintenanceFindingRepository;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateClusterCategory;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateClusterResponse;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateMemberResponse;
+import com.hopeful117.devlogai.insight.service.TrustedKnowledgeDuplicateAuditService;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
@@ -19,7 +24,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
@@ -27,17 +34,20 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
 
     private final ProjectRepository projectRepository;
     private final ProjectFreshnessService freshnessService;
+    private final TrustedKnowledgeDuplicateAuditService duplicateAuditService;
     private final MaintenanceFindingRepository repository;
     private final MaintenanceFindingService findingService;
 
     public MaintenanceEvaluationServiceImpl(
             ProjectRepository projectRepository,
             ProjectFreshnessService freshnessService,
+            TrustedKnowledgeDuplicateAuditService duplicateAuditService,
             MaintenanceFindingRepository repository,
             MaintenanceFindingService findingService
     ) {
         this.projectRepository = projectRepository;
         this.freshnessService = freshnessService;
+        this.duplicateAuditService = duplicateAuditService;
         this.repository = repository;
         this.findingService = findingService;
     }
@@ -48,6 +58,7 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
         ensureProjectExists(projectId);
 
         ProjectFreshnessSummary summary = freshnessService.summary(projectId);
+        InsightDuplicateAuditResponse duplicateAudit = duplicateAuditService.audit(projectId);
         List<MaintenanceFindingResponse> created = new ArrayList<>();
         int skipped = 0;
 
@@ -72,6 +83,18 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
             }
         }
 
+        for (InsightDuplicateClusterResponse cluster : duplicateAudit.clusters()) {
+            CreateMaintenanceFindingRequest request = duplicateDebtRequest(cluster);
+            if (request == null) {
+                continue;
+            }
+            if (hasEquivalentOpenFinding(projectId, request)) {
+                skipped++;
+                continue;
+            }
+            created.add(findingService.create(projectId, request));
+        }
+
         return new MaintenanceEvaluationResponse(
                 MaintenanceEvaluationResponse.PROJECTION_VERSION,
                 projectId,
@@ -79,6 +102,41 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
                 skipped,
                 created
         );
+    }
+
+    private CreateMaintenanceFindingRequest duplicateDebtRequest(InsightDuplicateClusterResponse cluster) {
+        return switch (cluster.category()) {
+            case EXACT_DUPLICATE -> new CreateMaintenanceFindingRequest(
+                    MaintenanceContextSurface.PROJECT_UNDERSTANDING,
+                    MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_EXACT_DUPLICATE,
+                    MaintenanceFindingSeverity.HIGH,
+                    MaintenanceSuggestedActionCategory.REVIEW,
+                    true,
+                    "Trusted knowledge exact duplicate debt detected for cluster '%s'."
+                            .formatted(cluster.clusterKey()),
+                    duplicateClusterDetails(cluster)
+            );
+            case LIKELY_SEMANTIC_DUPLICATE -> new CreateMaintenanceFindingRequest(
+                    MaintenanceContextSurface.PROJECT_UNDERSTANDING,
+                    MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE,
+                    MaintenanceFindingSeverity.MEDIUM,
+                    MaintenanceSuggestedActionCategory.REVIEW,
+                    true,
+                    "Trusted knowledge semantic duplicate candidate detected for cluster '%s'."
+                            .formatted(cluster.clusterKey()),
+                    duplicateClusterDetails(cluster)
+            );
+            case LIKELY_RICHER_SUCCESSOR, REVIEW_REQUIRED -> new CreateMaintenanceFindingRequest(
+                    MaintenanceContextSurface.PROJECT_UNDERSTANDING,
+                    MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_OVERLAP_REVIEW,
+                    MaintenanceFindingSeverity.MEDIUM,
+                    MaintenanceSuggestedActionCategory.REVIEW,
+                    true,
+                    "Trusted knowledge overlap requires review for cluster '%s'."
+                            .formatted(cluster.clusterKey()),
+                    duplicateClusterDetails(cluster)
+            );
+        };
     }
 
     private void ensureProjectExists(UUID projectId) {
@@ -154,6 +212,30 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
                 false,
                 summaryText,
                 details
+        );
+    }
+
+    private String duplicateClusterDetails(InsightDuplicateClusterResponse cluster) {
+        String members = cluster.members().stream()
+                .sorted(Comparator.comparing(InsightDuplicateMemberResponse::createdAt).reversed()
+                        .thenComparing(InsightDuplicateMemberResponse::insightId, Comparator.reverseOrder()))
+                .map(member -> "%s | %s".formatted(member.insightId(), member.title()))
+                .collect(Collectors.joining("\n"));
+        return """
+                Duplicate cluster key: %s
+                Cluster category: %s
+                Recommendation: %s
+                Member count: %d
+                Detector rationale: %s
+                Members:
+                %s
+                """.formatted(
+                cluster.clusterKey(),
+                cluster.category(),
+                cluster.recommendation(),
+                cluster.members().size(),
+                cluster.rationale(),
+                members
         );
     }
 }

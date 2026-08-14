@@ -67,6 +67,10 @@ The first deterministic slice is deliberately narrow:
 - stale understanding is derived from persisted project freshness checks;
 - missing projection refresh currently means the project freshness projection is
   absent for one or more active Sources;
+- trusted-knowledge duplicate debt is derived from the bounded duplicate audit
+  already produced in the insight domain;
+- duplicate maintenance findings can represent exact duplicate debt, semantic
+  duplicate candidates, or review-oriented overlap such as richer successors;
 - these findings remain operational maintenance records rather than trusted
   project truth.
 

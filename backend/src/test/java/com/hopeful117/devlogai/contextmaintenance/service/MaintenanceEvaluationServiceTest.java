@@ -6,10 +6,16 @@ import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindin
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceContextSurface;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFinding;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingIssueType;
-import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingSeverity;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingStatus;
-import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceSuggestedActionCategory;
 import com.hopeful117.devlogai.contextmaintenance.repository.MaintenanceFindingRepository;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateClusterCategory;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateClusterResponse;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateMemberResponse;
+import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateRecommendation;
+import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightType;
+import com.hopeful117.devlogai.insight.service.TrustedKnowledgeDuplicateAuditService;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
@@ -20,6 +26,7 @@ import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -32,14 +39,16 @@ class MaintenanceEvaluationServiceTest {
 
     private final ProjectRepository projectRepository = mock(ProjectRepository.class);
     private final ProjectFreshnessService freshnessService = mock(ProjectFreshnessService.class);
+    private final TrustedKnowledgeDuplicateAuditService duplicateAuditService =
+            mock(TrustedKnowledgeDuplicateAuditService.class);
     private final MaintenanceFindingRepository repository = mock(MaintenanceFindingRepository.class);
     private final MaintenanceFindingService findingService = mock(MaintenanceFindingService.class);
     private final MaintenanceEvaluationService service = new MaintenanceEvaluationServiceImpl(
-            projectRepository, freshnessService, repository, findingService
+            projectRepository, freshnessService, duplicateAuditService, repository, findingService
     );
 
     @Test
-    void shouldCreateStaleUnderstandingAndMissingProjectionFindings() {
+    void shouldCreateFreshnessAndDuplicateDebtFindings() {
         UUID projectId = UUID.randomUUID();
         UUID sourceId = UUID.randomUUID();
         when(projectRepository.existsById(projectId)).thenReturn(true);
@@ -50,28 +59,59 @@ class MaintenanceEvaluationServiceTest {
                 1,
                 false
         ));
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId,
+                2,
+                2,
+                List.of(exactDuplicateCluster(), semanticDuplicateCluster())
+        ));
         when(repository.findByProject_IdAndStatusOrderByCreatedAtDescIdDesc(projectId, MaintenanceFindingStatus.OPEN))
-                .thenReturn(List.of(), List.of());
+                .thenReturn(List.of(), List.of(), List.of(), List.of());
         when(findingService.create(eq(projectId), any(CreateMaintenanceFindingRequest.class)))
                 .thenAnswer(invocation -> toResponse(projectId, invocation.getArgument(1)));
 
         MaintenanceEvaluationResponse result = service.evaluate(projectId);
 
         assertEquals("maintenance-evaluation-v1", result.version());
-        assertEquals(2, result.createdCount());
+        assertEquals(4, result.createdCount());
         assertEquals(0, result.skippedCount());
-        assertEquals(2, result.createdFindings().size());
+        assertEquals(4, result.createdFindings().size());
 
         ArgumentCaptor<CreateMaintenanceFindingRequest> captor =
                 ArgumentCaptor.forClass(CreateMaintenanceFindingRequest.class);
-        verify(findingService, times(2)).create(eq(projectId), captor.capture());
+        verify(findingService, times(4)).create(eq(projectId), captor.capture());
         List<CreateMaintenanceFindingRequest> requests = captor.getAllValues();
         assertEquals(MaintenanceFindingIssueType.STALE_PROJECT_UNDERSTANDING, requests.get(0).issueType());
         assertEquals(MaintenanceFindingIssueType.MISSING_PROJECTION_REFRESH, requests.get(1).issueType());
+        assertEquals(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_EXACT_DUPLICATE, requests.get(2).issueType());
+        assertEquals(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE, requests.get(3).issueType());
     }
 
     @Test
-    void shouldNotCreateFindingForCurrentFreshnessWithoutUncheckedSources() {
+    void shouldCreateReviewFindingForRicherSuccessorCluster() {
+        UUID projectId = UUID.randomUUID();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(freshnessService.summary(projectId)).thenReturn(new ProjectFreshnessSummary(
+                ProjectFreshnessSummary.PROJECTION_VERSION, projectId, List.of(), 0, false
+        ));
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId, 2, 1, List.of(richerSuccessorCluster())
+        ));
+        when(repository.findByProject_IdAndStatusOrderByCreatedAtDescIdDesc(projectId, MaintenanceFindingStatus.OPEN))
+                .thenReturn(List.of());
+        when(findingService.create(eq(projectId), any(CreateMaintenanceFindingRequest.class)))
+                .thenAnswer(invocation -> toResponse(projectId, invocation.getArgument(1)));
+
+        MaintenanceEvaluationResponse result = service.evaluate(projectId);
+
+        assertEquals(1, result.createdCount());
+        assertEquals(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_OVERLAP_REVIEW,
+                result.createdFindings().getFirst().issueType());
+        assertEquals(true, result.createdFindings().getFirst().humanReviewRequired());
+    }
+
+    @Test
+    void shouldNotCreateDuplicateDebtFindingWhenAuditIsEmptyAndFreshnessCurrent() {
         UUID projectId = UUID.randomUUID();
         when(projectRepository.existsById(projectId)).thenReturn(true);
         when(freshnessService.summary(projectId)).thenReturn(new ProjectFreshnessSummary(
@@ -80,6 +120,9 @@ class MaintenanceEvaluationServiceTest {
                 List.of(currentFreshness(UUID.randomUUID())),
                 0,
                 false
+        ));
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId, 0, 0, List.of()
         ));
 
         MaintenanceEvaluationResponse result = service.evaluate(projectId);
@@ -90,24 +133,23 @@ class MaintenanceEvaluationServiceTest {
     }
 
     @Test
-    void shouldSkipDuplicateOpenFindings() {
+    void shouldSkipEquivalentOpenDuplicateDebtFinding() {
         UUID projectId = UUID.randomUUID();
-        UUID sourceId = UUID.randomUUID();
         when(projectRepository.existsById(projectId)).thenReturn(true);
         when(freshnessService.summary(projectId)).thenReturn(new ProjectFreshnessSummary(
-                ProjectFreshnessSummary.PROJECTION_VERSION,
-                projectId,
-                List.of(staleFreshness(sourceId)),
-                1,
-                false
+                ProjectFreshnessSummary.PROJECTION_VERSION, projectId, List.of(), 0, false
+        ));
+        InsightDuplicateClusterResponse cluster = exactDuplicateCluster();
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId, 2, 1, List.of(cluster)
         ));
         when(repository.findByProject_IdAndStatusOrderByCreatedAtDescIdDesc(projectId, MaintenanceFindingStatus.OPEN))
-                .thenReturn(List.of(existingStaleFinding(projectId)), List.of(existingMissingProjectionFinding(projectId)));
+                .thenReturn(List.of(existingDuplicateFinding(projectId, cluster)));
 
         MaintenanceEvaluationResponse result = service.evaluate(projectId);
 
         assertEquals(0, result.createdCount());
-        assertEquals(2, result.skippedCount());
+        assertEquals(1, result.skippedCount());
         verifyNoInteractions(findingService);
     }
 
@@ -159,36 +201,94 @@ class MaintenanceEvaluationServiceTest {
         );
     }
 
-    private MaintenanceFinding existingStaleFinding(UUID projectId) {
-        return MaintenanceFinding.builder()
-                .contextSurface(MaintenanceContextSurface.PROJECT_UNDERSTANDING)
-                .issueType(MaintenanceFindingIssueType.STALE_PROJECT_UNDERSTANDING)
-                .status(MaintenanceFindingStatus.OPEN)
-                .summary("Project understanding is stale for source 'repo'.")
-                .details("""
-                        Freshness check status is STALE with guidance REFRESH_RECOMMENDED.
-                        Source requested revision: origin/main
-                        Source current revision: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-                        Baseline analyzed revision: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-                        Baseline completed at: 2026-08-14T09:00:00Z
-                        Checked at: 2026-08-14T10:00:00Z
-                        """)
-                .project(com.hopeful117.devlogai.project.entity.Project.builder().id(projectId).build())
-                .build();
+    private InsightDuplicateClusterResponse exactDuplicateCluster() {
+        return new InsightDuplicateClusterResponse(
+                "ARCHITECTURE_DESCRIPTION::adr",
+                InsightDuplicateClusterCategory.EXACT_DUPLICATE,
+                InsightDuplicateRecommendation.KEEP_NEWEST_AS_CANONICAL,
+                "Members share the same normalized trusted fingerprint.",
+                List.of(
+                        member("Architecture Decision Records (ADR) Documentation",
+                                Instant.parse("2026-08-14T10:00:00Z")),
+                        member("Architecture Decision Records (ADR) Documentation",
+                                Instant.parse("2026-08-14T09:00:00Z"))
+                )
+        );
     }
 
-    private MaintenanceFinding existingMissingProjectionFinding(UUID projectId) {
+    private InsightDuplicateClusterResponse semanticDuplicateCluster() {
+        return new InsightDuplicateClusterResponse(
+                "ARCHITECTURE_DESCRIPTION::rest-spring",
+                InsightDuplicateClusterCategory.LIKELY_SEMANTIC_DUPLICATE,
+                InsightDuplicateRecommendation.REVIEW_MANUALLY,
+                "Members appear semantically close but no single richer canonical record is confidently dominant.",
+                List.of(
+                        member("REST Spring Boot Application Architecture",
+                                Instant.parse("2026-08-14T10:00:00Z")),
+                        member("RESTful Spring Boot Application Architecture",
+                                Instant.parse("2026-08-14T09:00:00Z"))
+                )
+        );
+    }
+
+    private InsightDuplicateClusterResponse richerSuccessorCluster() {
+        return new InsightDuplicateClusterResponse(
+                "TECHNOLOGY_DESCRIPTION::testing",
+                InsightDuplicateClusterCategory.LIKELY_RICHER_SUCCESSOR,
+                InsightDuplicateRecommendation.KEEP_RICHEST_AS_CANONICAL,
+                "Members share the same topic family, and one record is materially richer in provenance or detail.",
+                List.of(
+                        member("Automated Testing Structure",
+                                Instant.parse("2026-08-14T10:00:00Z")),
+                        member("Automated and Integration Testing Infrastructure",
+                                Instant.parse("2026-08-14T09:00:00Z"))
+                )
+        );
+    }
+
+    private InsightDuplicateMemberResponse member(String title, Instant createdAt) {
+        return new InsightDuplicateMemberResponse(
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                InsightType.ARCHITECTURAL,
+                InsightSeverity.INFO,
+                "ARCHITECTURE_DESCRIPTION",
+                title,
+                "content",
+                "rationale",
+                BigDecimal.ONE,
+                1,
+                createdAt
+        );
+    }
+
+    private MaintenanceFinding existingDuplicateFinding(UUID projectId, InsightDuplicateClusterResponse cluster) {
         return MaintenanceFinding.builder()
-                .contextSurface(MaintenanceContextSurface.PROJECT_PROJECTION)
-                .issueType(MaintenanceFindingIssueType.MISSING_PROJECTION_REFRESH)
+                .contextSurface(MaintenanceContextSurface.PROJECT_UNDERSTANDING)
+                .issueType(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_EXACT_DUPLICATE)
                 .status(MaintenanceFindingStatus.OPEN)
-                .summary("Project freshness projection is missing for active sources.")
+                .summary("Trusted knowledge exact duplicate debt detected for cluster '%s'."
+                        .formatted(cluster.clusterKey()))
                 .details("""
-                        Active sources without any persisted freshness check: 1
-                        Checked sources included in summary: 1
-                        Summary truncated: false
-                        Run freshness checks before relying on freshness-based maintenance signals.
-                        """)
+                        Duplicate cluster key: %s
+                        Cluster category: %s
+                        Recommendation: %s
+                        Member count: %d
+                        Detector rationale: %s
+                        Members:
+                        %s | %s
+                        %s | %s
+                        """.formatted(
+                        cluster.clusterKey(),
+                        cluster.category(),
+                        cluster.recommendation(),
+                        cluster.members().size(),
+                        cluster.rationale(),
+                        cluster.members().get(0).insightId(),
+                        cluster.members().get(0).title(),
+                        cluster.members().get(1).insightId(),
+                        cluster.members().get(1).title()
+                ))
                 .project(com.hopeful117.devlogai.project.entity.Project.builder().id(projectId).build())
                 .build();
     }
