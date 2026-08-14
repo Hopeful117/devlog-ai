@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.contextmaintenance.service;
 
+import com.hopeful117.devlogai.contextmaintenance.agent.CrossSurfacePatternDetectionAgent;
 import com.hopeful117.devlogai.contextmaintenance.agent.DuplicateAmbiguityResolutionAgent;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceFindingRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceEvaluationResponse;
@@ -54,9 +55,10 @@ class MaintenanceEvaluationServiceTest {
     private final MaintenanceFindingService findingService = mock(MaintenanceFindingService.class);
     private final MaintenanceAssessmentService assessmentService = mock(MaintenanceAssessmentService.class);
     private final DuplicateAmbiguityResolutionAgent duplicateAgent = mock(DuplicateAmbiguityResolutionAgent.class);
+    private final CrossSurfacePatternDetectionAgent crossSurfaceAgent = mock(CrossSurfacePatternDetectionAgent.class);
     private final MaintenanceEvaluationService service = new MaintenanceEvaluationServiceImpl(
             projectRepository, freshnessService, duplicateAuditService, humanContextInputRepository,
-            repository, findingService, assessmentService, duplicateAgent
+            repository, findingService, assessmentService, duplicateAgent, crossSurfaceAgent
     );
 
     @Test
