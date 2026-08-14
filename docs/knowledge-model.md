@@ -54,6 +54,26 @@ These inputs enrich future analysis context but remain distinct from validated
 trusted knowledge until they contribute to proposals accepted through the normal
 validation lifecycle.
 
+#### Context Maintenance Findings
+
+DevLog may also persist internal context-maintenance findings as project-scoped,
+reviewable records about context health.
+
+These findings describe issues such as stale understanding or projection refresh
+gaps.
+
+They are:
+
+- operational maintenance records,
+- bounded by explicit classification,
+- reviewable by humans and future workflows,
+- distinct from trusted knowledge,
+- distinct from proposal history,
+- distinct from internal human context inputs themselves.
+
+Maintenance findings help DevLog track context hygiene without asserting new
+project truth.
+
 ### Future Knowledge Sources
 
 The architecture should support additional sources of knowledge in future versions, including:
