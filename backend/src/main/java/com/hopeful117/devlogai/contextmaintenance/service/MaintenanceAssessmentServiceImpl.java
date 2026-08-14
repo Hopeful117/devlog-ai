@@ -52,7 +52,7 @@ public class MaintenanceAssessmentServiceImpl implements MaintenanceAssessmentSe
     @Transactional(readOnly = true)
     public List<MaintenanceAssessmentResponse> getByProject(UUID projectId) {
         return assessmentMapper.toResponse(
-                assessmentRepository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId)
+                assessmentRepository.findByProjectIdOrderByCreatedAtDescIdDesc(projectId)
         );
     }
 
@@ -63,7 +63,7 @@ public class MaintenanceAssessmentServiceImpl implements MaintenanceAssessmentSe
             UUID findingId
     ) {
         return assessmentMapper.toResponse(
-                assessmentRepository.findByFinding_IdAndProject_IdOrderByCreatedAtDescIdDesc(
+                assessmentRepository.findByFinding_IdAndProjectIdOrderByCreatedAtDescIdDesc(
                         findingId,
                         projectId
                 )

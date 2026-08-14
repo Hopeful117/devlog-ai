@@ -9,12 +9,12 @@ import java.util.UUID;
 
 public interface MaintenanceAssessmentRepository extends JpaRepository<MaintenanceAssessment, UUID> {
 
-    List<MaintenanceAssessment> findByProject_IdOrderByCreatedAtDescIdDesc(UUID projectId);
+    List<MaintenanceAssessment> findByProjectIdOrderByCreatedAtDescIdDesc(UUID projectId);
 
-    List<MaintenanceAssessment> findByFinding_IdAndProject_IdOrderByCreatedAtDescIdDesc(
+    List<MaintenanceAssessment> findByFinding_IdAndProjectIdOrderByCreatedAtDescIdDesc(
             UUID findingId,
             UUID projectId
     );
 
-    Optional<MaintenanceAssessment> findByIdAndProject_Id(UUID id, UUID projectId);
+    Optional<MaintenanceAssessment> findByIdAndProjectId(UUID id, UUID projectId);
 }

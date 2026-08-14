@@ -150,7 +150,7 @@ class MaintenanceAssessmentServiceTest {
                 Instant.now(), Instant.now()
         );
 
-        when(assessmentRepository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId))
+        when(assessmentRepository.findByProjectIdOrderByCreatedAtDescIdDesc(projectId))
                 .thenReturn(List.of(assessment));
         when(assessmentMapper.toResponse(List.of(assessment))).thenReturn(List.of(response));
 
@@ -180,7 +180,7 @@ class MaintenanceAssessmentServiceTest {
                 Instant.now(), Instant.now()
         );
 
-        when(assessmentRepository.findByFinding_IdAndProject_IdOrderByCreatedAtDescIdDesc(findingId, projectId))
+        when(assessmentRepository.findByFinding_IdAndProjectIdOrderByCreatedAtDescIdDesc(findingId, projectId))
                 .thenReturn(List.of(assessment));
         when(assessmentMapper.toResponse(List.of(assessment))).thenReturn(List.of(response));
 
