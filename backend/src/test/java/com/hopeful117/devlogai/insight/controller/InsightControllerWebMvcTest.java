@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.insight.controller;
 import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
 import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightTrustState;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.service.InsightService;
 import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
@@ -29,8 +30,8 @@ class InsightControllerWebMvcTest extends ControllerWebMvcTestSupport {
         UUID analysisId = UUID.randomUUID();
         InsightResponse response = new InsightResponse(id, projectId, analysisId,
                 UUID.randomUUID(), UUID.randomUUID(), InsightType.ARCHITECTURAL,
-                InsightSeverity.CRITICAL, "Boundary", "content", "rationale",
-                null, List.of(), "ARCHITECTURE_DESCRIPTION", null, null);
+                InsightSeverity.CRITICAL, InsightTrustState.ACTIVE, "Boundary", "content",
+                "rationale", null, List.of(), "ARCHITECTURE_DESCRIPTION", null, null);
         InsightDuplicateAuditResponse auditResponse = new InsightDuplicateAuditResponse(projectId, 1, 0, List.of());
         List<InsightResponse> responses = List.of(response);
         when(service.getById(id)).thenReturn(response);

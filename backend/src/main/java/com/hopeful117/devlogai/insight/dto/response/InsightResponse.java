@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.insight.dto.response;
 
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightTrustState;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 
 import java.math.BigDecimal;
@@ -23,6 +24,8 @@ public record InsightResponse(
         InsightType type,
 
         InsightSeverity severity,
+
+        InsightTrustState trustState,
 
         String title,
 

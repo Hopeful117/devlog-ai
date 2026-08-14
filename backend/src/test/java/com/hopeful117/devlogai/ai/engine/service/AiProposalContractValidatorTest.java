@@ -120,8 +120,16 @@ class AiProposalContractValidatorTest {
                         "rationale", "Container evidence is newly grounded.",
                         "deltaType", "NEW"),
                 new BigDecimal("0.9100"), List.of(factId), List.of(observationId), List.of(reference));
+        AiProposalResult supersedes = new AiProposalResult(ProposalType.INSIGHT,
+                Map.of("insightType", "TECHNOLOGY_DESCRIPTION",
+                        "title", "Angular is now the UI technology",
+                        "summary", "The template engine was replaced by a SPA framework.",
+                        "rationale", "Repository evidence shows Thymeleaf removed.",
+                        "deltaType", "SUPERSEDES",
+                        "targetInsightId", targetInsightId.toString()),
+                new BigDecimal("0.9300"), List.of(factId), List.of(observationId), List.of(reference));
 
-        assertDoesNotThrow(() -> validator.validate(task, List.of(enriches, newInsight)));
+        assertDoesNotThrow(() -> validator.validate(task, List.of(enriches, newInsight, supersedes)));
         assertThrows(InvalidAiTaskResultException.class,
                 () -> validator.validate(task, List.of(invalidTarget)));
     }

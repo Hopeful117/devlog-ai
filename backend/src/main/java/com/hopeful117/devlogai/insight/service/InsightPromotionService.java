@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.insight.service;
 
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightTrustState;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
@@ -46,29 +47,47 @@ public class InsightPromotionService {
                 .sourceType(InsightPayloadSupport.optionalText(payload, "insightType"))
                 .build();
         Insight savedInsight = insightRepository.save(insight);
-        createEnrichmentRelationIfNeeded(proposal, savedInsight);
+        createDeltaRelationIfNeeded(proposal, savedInsight);
     }
 
-    private void createEnrichmentRelationIfNeeded(ValidatableProposal proposal, Insight savedInsight) {
-        if (!"ENRICHES".equals(InsightPayloadSupport.optionalText(proposal.getPayload(), "deltaType"))) {
+    private void createDeltaRelationIfNeeded(ValidatableProposal proposal, Insight savedInsight) {
+        String deltaType = InsightPayloadSupport.optionalText(proposal.getPayload(), "deltaType");
+        if (!"ENRICHES".equals(deltaType) && !"SUPERSEDES".equals(deltaType)) {
             return;
         }
         UUID targetInsightId = InsightPayloadSupport.requiredUuid(proposal.getPayload(), "targetInsightId");
         Insight target = insightRepository.findById(targetInsightId)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "Accepted insight enrichment target does not exist: " + targetInsightId));
+                        "Accepted insight " + deltaType + " target does not exist: " + targetInsightId));
         if (!target.getProject().getId().equals(proposal.getProject().getId())) {
             throw new IllegalArgumentException(
-                    "Accepted insight enrichment target belongs to another project: " + targetInsightId);
+                    "Accepted insight " + deltaType + " target belongs to another project: " + targetInsightId);
         }
+        if (deltaType == null) {
+            return;
+        }
+        if ("SUPERSEDES".equals(deltaType)) {
+            if (target.getTrustState() != InsightTrustState.ACTIVE) {
+                throw new IllegalArgumentException(
+                        "Accepted insight supersession target is not active: " + targetInsightId);
+            }
+            target.setTrustState(InsightTrustState.SUPERSEDED);
+            insightRepository.save(target);
+        }
+        String description = "SUPERSEDES".equals(deltaType)
+                ? "Incremental architecture supersession accepted from trusted knowledge"
+                : "Incremental architecture enrichment accepted from trusted knowledge";
+        KnowledgeRelationType relationType = "SUPERSEDES".equals(deltaType)
+                ? KnowledgeRelationType.SUPERSEDES
+                : KnowledgeRelationType.DERIVED_FROM;
         knowledgeRelationRepository.save(KnowledgeRelation.builder()
                 .project(proposal.getProject())
                 .sourceEntityType(EntityType.INSIGHT)
                 .sourceEntityId(savedInsight.getId())
                 .targetEntityType(EntityType.INSIGHT)
                 .targetEntityId(targetInsightId)
-                .relationType(KnowledgeRelationType.DERIVED_FROM)
-                .description("Incremental architecture enrichment accepted from trusted knowledge")
+                .relationType(relationType)
+                .description(description)
                 .build());
     }
 }

@@ -1,0 +1,2 @@
+ALTER TABLE insights
+    ADD COLUMN trust_state VARCHAR(50) NOT NULL DEFAULT 'ACTIVE';

@@ -8,6 +8,7 @@ from enum import Enum
 class KnowledgeDeltaType(str, Enum):
     NEW = "NEW"
     ENRICHES = "ENRICHES"
+    SUPERSEDES = "SUPERSEDES"
 
 
 class InsightOutputModel(BaseModel):
@@ -43,8 +44,8 @@ class InsightProposalOutput(InsightOutputModel):
 
     @model_validator(mode="after")
     def validate_delta_target(self) -> "InsightProposalOutput":
-        if self.delta_type == KnowledgeDeltaType.ENRICHES and self.target_insight_id is None:
-            raise ValueError("targetInsightId is required when deltaType is ENRICHES")
+        if self.delta_type in (KnowledgeDeltaType.ENRICHES, KnowledgeDeltaType.SUPERSEDES) and self.target_insight_id is None:
+            raise ValueError("targetInsightId is required when deltaType is " + self.delta_type.value)
         if self.delta_type == KnowledgeDeltaType.NEW and self.target_insight_id is not None:
             raise ValueError("targetInsightId must be omitted when deltaType is NEW")
         return self

@@ -108,7 +108,7 @@ class AiProposalContractValidator {
 
     private void validateArchitectureDelta(AiTask task, Map<String, Object> payload) {
         String deltaType = text(payload, "deltaType", 50);
-        if (!Set.of("NEW", "ENRICHES").contains(deltaType)) {
+        if (!Set.of("NEW", "ENRICHES", "SUPERSEDES").contains(deltaType)) {
             fail("Architecture Insight deltaType is invalid");
         }
         Object target = payload.get("targetInsightId");
@@ -117,10 +117,10 @@ class AiProposalContractValidator {
             return;
         }
         if (!(target instanceof String)) {
-            fail("Architecture Insight ENRICHES requires targetInsightId");
+            fail("Architecture Insight " + deltaType + " requires targetInsightId");
         }
         String targetText = ((String) target).trim();
-        if (targetText.isBlank()) fail("Architecture Insight ENRICHES requires targetInsightId");
+        if (targetText.isBlank()) fail("Architecture Insight " + deltaType + " requires targetInsightId");
         UUID targetId;
         try {
             targetId = UUID.fromString(targetText);

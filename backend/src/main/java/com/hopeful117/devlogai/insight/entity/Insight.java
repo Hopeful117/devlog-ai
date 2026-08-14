@@ -54,6 +54,12 @@ public class Insight {
     @Column(nullable = false)
     private InsightSeverity severity;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "trust_state", nullable = false)
+    @Builder.Default
+    @Setter
+    private InsightTrustState trustState = InsightTrustState.ACTIVE;
+
     @Column(nullable = false)
     private String title;
 

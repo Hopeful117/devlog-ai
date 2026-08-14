@@ -20,5 +20,4 @@ public interface InsightMapper {
     @Mapping(target = "validationId", source = "validation.id")
     InsightResponse toResponse(
             Insight insight
-    );
-}
+    );}

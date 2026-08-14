@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.insight.service;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightTrustState;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelation;
@@ -146,5 +147,73 @@ class InsightPromotionServiceTest {
         assertEquals(savedInsight.getId(), relation.getSourceEntityId());
         assertEquals(targetInsightId, relation.getTargetEntityId());
         assertEquals(KnowledgeRelationType.DERIVED_FROM, relation.getRelationType());
+    }
+
+    @Test
+    void shouldMarkTargetSupersededAndCreateRelationForAcceptedSupersession() {
+        UUID targetInsightId = java.util.UUID.randomUUID();
+        Project project = Project.builder().id(java.util.UUID.randomUUID()).build();
+        Analysis analysis = new Analysis();
+        Validation validation = new Validation();
+        ValidatableProposal proposal = ValidatableProposal.builder()
+                .project(project)
+                .analysis(analysis)
+                .type(ProposalType.INSIGHT)
+                .payload(Map.of(
+                        "insightType", "TECHNOLOGY_DESCRIPTION",
+                        "title", "Angular is now the UI technology",
+                        "summary", "The frontend has migrated from Thymeleaf to Angular.",
+                        "rationale", "New repository evidence shows the template engine was replaced.",
+                        "deltaType", "SUPERSEDES",
+                        "targetInsightId", targetInsightId.toString()
+                ))
+                .build();
+        Insight savedInsight = Insight.builder().id(java.util.UUID.randomUUID()).project(project).build();
+        Insight targetInsight = Insight.builder().id(targetInsightId).project(project)
+                .trustState(InsightTrustState.ACTIVE).build();
+        when(repository.save(any(Insight.class))).thenReturn(savedInsight);
+        when(repository.findById(targetInsightId)).thenReturn(java.util.Optional.of(targetInsight));
+
+        new InsightPromotionService(repository, relations).promote(proposal, validation, InsightSeverity.INFO);
+
+        assertEquals(InsightTrustState.SUPERSEDED, targetInsight.getTrustState());
+        verify(repository, times(2)).save(any(Insight.class));
+        ArgumentCaptor<KnowledgeRelation> relationCaptor = ArgumentCaptor.forClass(KnowledgeRelation.class);
+        verify(relations).save(relationCaptor.capture());
+        KnowledgeRelation relation = relationCaptor.getValue();
+        assertEquals(savedInsight.getId(), relation.getSourceEntityId());
+        assertEquals(targetInsightId, relation.getTargetEntityId());
+        assertEquals(KnowledgeRelationType.SUPERSEDES, relation.getRelationType());
+    }
+
+    @Test
+    void shouldRejectSupersessionOfNonActiveTarget() {
+        UUID targetInsightId = java.util.UUID.randomUUID();
+        Project project = Project.builder().id(java.util.UUID.randomUUID()).build();
+        Analysis analysis = new Analysis();
+        Validation validation = new Validation();
+        ValidatableProposal proposal = ValidatableProposal.builder()
+                .project(project)
+                .analysis(analysis)
+                .type(ProposalType.INSIGHT)
+                .payload(Map.of(
+                        "insightType", "TECHNOLOGY_DESCRIPTION",
+                        "title", "Successor",
+                        "summary", "Replaces a previously superseded statement.",
+                        "rationale", "Evidence.",
+                        "deltaType", "SUPERSEDES",
+                        "targetInsightId", targetInsightId.toString()
+                ))
+                .build();
+        Insight targetInsight = Insight.builder().id(targetInsightId).project(project)
+                .trustState(InsightTrustState.SUPERSEDED).build();
+        when(repository.findById(targetInsightId)).thenReturn(java.util.Optional.of(targetInsight));
+
+        InsightPromotionService service = new InsightPromotionService(repository, relations);
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> service.promote(proposal, validation, InsightSeverity.INFO));
+        assertEquals("Accepted insight supersession target is not active: " + targetInsightId,
+                error.getMessage());
+        verify(relations, never()).save(any());
     }
 }

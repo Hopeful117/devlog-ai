@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightTrustState;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
@@ -38,6 +39,7 @@ class InsightMapperTest {
                 .validation(Validation.builder().id(validationId).build())
                 .type(InsightType.ARCHITECTURAL)
                 .severity(InsightSeverity.WARNING)
+                .trustState(InsightTrustState.ACTIVE)
                 .title("Modular architecture")
                 .content("The application is split into bounded modules.")
                 .rationale("Boundaries keep modules independently deployable.")
@@ -56,6 +58,7 @@ class InsightMapperTest {
         assertEquals(validationId, response.validationId());
         assertEquals(InsightType.ARCHITECTURAL, response.type());
         assertEquals(InsightSeverity.WARNING, response.severity());
+        assertEquals(InsightTrustState.ACTIVE, response.trustState());
         assertEquals("Modular architecture", response.title());
         assertEquals("The application is split into bounded modules.", response.content());
         assertEquals("Boundaries keep modules independently deployable.", response.rationale());

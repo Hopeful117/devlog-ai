@@ -199,7 +199,7 @@ class InsightGenerationService:
                 evidence_references,
                 "evidenceReferences",
             )
-            if proposal.delta_type.value == "ENRICHES":
+            if proposal.delta_type.value in ("ENRICHES", "SUPERSEDES"):
                 existing = context.get("existingArchitectureKnowledge", [])
                 allowed_targets = {
                     UUID(str(item["insightId"]))

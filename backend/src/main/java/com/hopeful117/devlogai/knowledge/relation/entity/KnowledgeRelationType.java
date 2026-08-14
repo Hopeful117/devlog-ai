@@ -6,5 +6,6 @@ public enum KnowledgeRelationType {
     RELATES_TO,
     DERIVED_FROM,
     ADDRESSES,
-    INFORMED_BY
+    INFORMED_BY,
+    SUPERSEDES
 }

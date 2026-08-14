@@ -130,8 +130,8 @@ Return only grounded, structured Insight proposals that require human validation
             f"{guidance_json}\n"
             "END OPTIONAL UNTRUSTED USER GUIDANCE\n\n"
             f"EXPECTED OUTPUT CONTRACT\n{schema_json}\n\n"
-            "Delta contract: include targetInsightId only when deltaType is ENRICHES. "
-            "When deltaType is NEW, omit targetInsightId completely.\n\n"
+            "Delta contract: include targetInsightId only when deltaType is ENRICHES or "
+            "SUPERSEDES. When deltaType is NEW, omit targetInsightId completely.\n\n"
             + (
                 "BEGIN EXISTING TRUSTED ARCHITECTURE KNOWLEDGE\n"
                 f"{existing_knowledge_json}\n"
@@ -140,9 +140,12 @@ Return only grounded, structured Insight proposals that require human validation
                 "evidence against it. Return only meaningful architecture deltas. Use "
                 'deltaType "NEW" for genuinely new knowledge. Use deltaType "ENRICHES" only '
                 "when the proposal adds meaningful information to one supplied trusted "
-                "architecture knowledge item and copy its targetInsightId exactly. Never emit "
-                "targetInsightId for NEW proposals. If nothing materially new is learned, "
-                "return an empty proposals array.\n\n"
+                "architecture knowledge item and copy its targetInsightId exactly. Use "
+                'deltaType "SUPERSEDES" only when new evidence contradicts or dominates a '
+                "supplied trusted architecture knowledge item so that it is no longer "
+                "representative of the current project state, and copy its targetInsightId "
+                "exactly. Never emit targetInsightId for NEW proposals. If nothing "
+                "materially new is learned, return an empty proposals array.\n\n"
                 if request.intent.id == "architecture-overview" else ""
             )
             + "Return an object with a proposals array. Every proposal must remain grounded "
