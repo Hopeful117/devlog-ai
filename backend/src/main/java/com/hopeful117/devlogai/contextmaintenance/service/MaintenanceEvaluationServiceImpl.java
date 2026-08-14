@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceF
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceEvaluationResponse;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceContextSurface;
+import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFinding;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingIssueType;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingSeverity;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingStatus;
@@ -29,13 +30,18 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
 public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationService {
+
+    static final UUID SYSTEM_AUTOMATION_ACTOR_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000002");
 
     private final ProjectRepository projectRepository;
     private final ProjectFreshnessService freshnessService;
@@ -67,15 +73,18 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
 
         ProjectFreshnessSummary summary = freshnessService.summary(projectId);
         InsightDuplicateAuditResponse duplicateAudit = duplicateAuditService.audit(projectId);
+        List<MaintenanceFinding> currentFindings = repository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId);
         List<MaintenanceFindingResponse> created = new ArrayList<>();
         int skipped = 0;
+        Set<String> activeDeterministicKeys = new HashSet<>();
 
         for (ProjectFreshnessResponse source : summary.checkedSources()) {
             if (source.status() != ProjectFreshnessStatus.STALE) {
                 continue;
             }
             CreateMaintenanceFindingRequest request = staleUnderstandingRequest(source);
-            if (hasEquivalentOpenFinding(projectId, request)) {
+            activeDeterministicKeys.add(keyFor(request));
+            if (hasEquivalentActiveFinding(currentFindings, request)) {
                 skipped++;
                 continue;
             }
@@ -84,7 +93,8 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
 
         if (summary.uncheckedSourceCount() > 0) {
             CreateMaintenanceFindingRequest request = missingFreshnessProjectionRequest(summary);
-            if (hasEquivalentOpenFinding(projectId, request)) {
+            activeDeterministicKeys.add(keyFor(request));
+            if (hasEquivalentActiveFinding(currentFindings, request)) {
                 skipped++;
             } else {
                 created.add(findingService.create(projectId, request));
@@ -93,7 +103,8 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
 
         for (ProjectHumanContextInput input : staleHumanContextCandidates(projectId)) {
             CreateMaintenanceFindingRequest request = staleHumanContextRequest(input);
-            if (hasEquivalentOpenFinding(projectId, request)) {
+            activeDeterministicKeys.add(keyFor(request));
+            if (hasEquivalentActiveFinding(currentFindings, request)) {
                 skipped++;
                 continue;
             }
@@ -105,12 +116,14 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
             if (request == null) {
                 continue;
             }
-            if (hasEquivalentOpenFinding(projectId, request)) {
+            if (hasEquivalentActiveFinding(currentFindings, request)) {
                 skipped++;
                 continue;
             }
             created.add(findingService.create(projectId, request));
         }
+
+        autoResolveClearedDeterministicFindings(projectId, currentFindings, activeDeterministicKeys);
 
         return new MaintenanceEvaluationResponse(
                 MaintenanceEvaluationResponse.PROJECTION_VERSION,
@@ -217,21 +230,69 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
         }
     }
 
-    private boolean hasEquivalentOpenFinding(UUID projectId, CreateMaintenanceFindingRequest request) {
-        return repository.findByProject_IdAndStatusOrderByCreatedAtDescIdDesc(projectId, MaintenanceFindingStatus.OPEN)
-                .stream()
+    private boolean hasEquivalentActiveFinding(List<MaintenanceFinding> findings, CreateMaintenanceFindingRequest request) {
+        return findings.stream()
+                .filter(existing -> existing.getStatus() == MaintenanceFindingStatus.OPEN
+                        || existing.getStatus() == MaintenanceFindingStatus.ACKNOWLEDGED)
                 .anyMatch(existing ->
                         existing.getContextSurface() == request.contextSurface()
                                 && existing.getIssueType() == request.issueType()
-                                && existing.getSummary().equals(request.summary())
-                                && sameDetails(existing.getDetails(), request.details()));
+                                && sameText(existing.getSummary(), request.summary())
+                                && sameText(existing.getDetails(), request.details()));
     }
 
-    private boolean sameDetails(String left, String right) {
-        if (left == null) {
-            return right == null;
+    private void autoResolveClearedDeterministicFindings(
+            UUID projectId,
+            List<MaintenanceFinding> currentFindings,
+            Set<String> activeDeterministicKeys
+    ) {
+        currentFindings.stream()
+                .filter(this::supportsAutomaticResolution)
+                .filter(finding -> finding.getStatus() == MaintenanceFindingStatus.OPEN
+                        || finding.getStatus() == MaintenanceFindingStatus.ACKNOWLEDGED)
+                .filter(finding -> !activeDeterministicKeys.contains(keyFor(finding)))
+                .forEach(finding -> findingService.autoResolve(
+                        projectId,
+                        finding.getId(),
+                        SYSTEM_AUTOMATION_ACTOR_ID,
+                        "Automatically resolved because the deterministic maintenance condition no longer applies."
+                ));
+    }
+
+    private boolean supportsAutomaticResolution(MaintenanceFinding finding) {
+        return switch (finding.getIssueType()) {
+            case STALE_PROJECT_UNDERSTANDING, MISSING_PROJECTION_REFRESH, STALE_HUMAN_CONTEXT_INPUT -> true;
+            default -> false;
+        };
+    }
+
+    private String keyFor(CreateMaintenanceFindingRequest request) {
+        return "%s|%s|%s|%s".formatted(
+                request.contextSurface(),
+                request.issueType(),
+                normalizeText(request.summary()),
+                normalizeText(request.details())
+        );
+    }
+
+    private String keyFor(MaintenanceFinding finding) {
+        return "%s|%s|%s|%s".formatted(
+                finding.getContextSurface(),
+                finding.getIssueType(),
+                normalizeText(finding.getSummary()),
+                normalizeText(finding.getDetails())
+        );
+    }
+
+    private boolean sameText(String left, String right) {
+        return normalizeText(left).equals(normalizeText(right));
+    }
+
+    private String normalizeText(String value) {
+        if (value == null) {
+            return "";
         }
-        return left.equals(right);
+        return value.trim();
     }
 
     private CreateMaintenanceFindingRequest staleUnderstandingRequest(ProjectFreshnessResponse source) {

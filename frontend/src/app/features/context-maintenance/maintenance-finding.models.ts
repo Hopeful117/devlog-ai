@@ -16,7 +16,7 @@ export type MaintenanceFindingStatus = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED' | 'D
 
 export type MaintenanceSuggestedActionCategory = 'MONITOR' | 'REFRESH' | 'INVESTIGATE' | 'REVIEW';
 
-export type MaintenanceFindingActionType = 'ACKNOWLEDGE' | 'DISMISS' | 'RESOLVE';
+export type MaintenanceFindingActionType = 'ACKNOWLEDGE' | 'DISMISS' | 'RESOLVE' | 'AUTO_RESOLVE';
 
 export interface MaintenanceFindingAction {
   readonly id: string;
