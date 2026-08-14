@@ -1,11 +1,13 @@
 package com.hopeful117.devlogai.contextmaintenance.controller;
 
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
+import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceEvaluationResponse;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceContextSurface;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingIssueType;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingSeverity;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingStatus;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceSuggestedActionCategory;
+import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceEvaluationService;
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceFindingService;
 import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
@@ -21,12 +23,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport {
 
     private MaintenanceFindingService service;
+    private MaintenanceEvaluationService evaluationService;
     private MockMvc mvc;
     private UUID projectId;
     private MaintenanceFindingResponse response;
@@ -34,7 +38,8 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
     @BeforeEach
     void setUp() {
         service = mock(MaintenanceFindingService.class);
-        mvc = mockMvc(new MaintenanceFindingController(service));
+        evaluationService = mock(MaintenanceEvaluationService.class);
+        mvc = mockMvc(new MaintenanceFindingController(service, evaluationService));
         projectId = UUID.randomUUID();
         response = new MaintenanceFindingResponse(
                 UUID.randomUUID(), projectId,
@@ -85,5 +90,27 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
         mvc.perform(get("/api/v1/projects/{projectId}/maintenance-findings", projectId))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ENTITY_NOT_FOUND"));
+    }
+
+    @Test
+    void shouldExposeMaintenanceEvaluationRoute() throws Exception {
+        MaintenanceEvaluationResponse evaluation = new MaintenanceEvaluationResponse(
+                MaintenanceEvaluationResponse.PROJECTION_VERSION,
+                projectId,
+                1,
+                0,
+                List.of(response)
+        );
+        when(evaluationService.evaluate(projectId)).thenReturn(evaluation);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/evaluations", projectId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value("maintenance-evaluation-v1"))
+                .andExpect(jsonPath("$.projectId").value(projectId.toString()))
+                .andExpect(jsonPath("$.createdCount").value(1))
+                .andExpect(jsonPath("$.skippedCount").value(0))
+                .andExpect(jsonPath("$.createdFindings[0].issueType").value("PROJECTION_REFRESH_GAP"));
+
+        verify(evaluationService).evaluate(projectId);
     }
 }

@@ -62,6 +62,14 @@ reviewable records about context health.
 These findings describe issues such as stale understanding or projection refresh
 gaps.
 
+The first deterministic slice is deliberately narrow:
+
+- stale understanding is derived from persisted project freshness checks;
+- missing projection refresh currently means the project freshness projection is
+  absent for one or more active Sources;
+- these findings remain operational maintenance records rather than trusted
+  project truth.
+
 They are:
 
 - operational maintenance records,

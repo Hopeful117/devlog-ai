@@ -296,6 +296,28 @@ Context-maintenance findings are exposed through the bounded read endpoint:
 GET /api/v1/projects/{projectId}/maintenance-findings
 ```
 
+Deterministic maintenance evaluation is triggered explicitly through:
+
+```text
+POST /api/v1/projects/{projectId}/maintenance-findings/evaluations
+```
+
+The current evaluation slice is intentionally narrow. It can:
+
+* create `STALE_PROJECT_UNDERSTANDING` when a persisted project freshness check
+  reports `STALE` for an active Source;
+* create `MISSING_PROJECTION_REFRESH` when active Sources exist without any
+  persisted freshness check, meaning the freshness projection itself is missing
+  for part of the Project.
+
+The evaluation response returns:
+
+* `version`
+* `projectId`
+* `createdCount`
+* `skippedCount`
+* `createdFindings`
+
 The response returns project-scoped operational records with explicit
 classification:
 
@@ -312,6 +334,15 @@ classification:
 These findings are read-only in the current slice. They are visible in the
 Project Cockpit as operational maintenance guidance and must not be interpreted
 as trusted project knowledge or as an implicit remediation workflow.
+
+This first policy is intentionally bounded:
+
+* it reuses persisted freshness results rather than reclassifying repository
+  state inside context maintenance;
+* it does not mutate trusted knowledge;
+* it does not claim a universal context-health score;
+* it treats missing freshness checks as a projection gap on the freshness
+  surface itself, not as a timeline-refresh scheduler.
 
 ### Engineering Story Context
 
