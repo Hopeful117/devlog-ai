@@ -33,6 +33,15 @@ const duplicateFinding: MaintenanceFinding = {
   summary: 'Trusted knowledge exact duplicate debt detected for cluster "adr".',
 };
 
+const humanContextFinding: MaintenanceFinding = {
+  ...finding,
+  id: 'human-1',
+  contextSurface: 'INTERNAL_HUMAN_CONTEXT',
+  issueType: 'STALE_HUMAN_CONTEXT_INPUT',
+  suggestedAction: 'REVIEW',
+  summary: "Active human context input 'Medium-term objective' may be stale or superseded.",
+};
+
 describe('ProjectMaintenanceSection', () => {
   const getByProject = vi.fn();
   const acknowledge = vi.fn();
@@ -115,6 +124,23 @@ describe('ProjectMaintenanceSection', () => {
     expect(acknowledge).toHaveBeenCalledWith('project-1', 'debt-1', {
       actedBy: '00000000-0000-0000-0000-000000000001',
       comment: '',
+    });
+  });
+
+  it('renders human context findings with the shared remediation workflow', async () => {
+    getByProject.mockReturnValue(of([humanContextFinding]));
+    resolve.mockReturnValue(of({ ...humanContextFinding, status: 'RESOLVED', actionHistory: [] }));
+    const fixture = await render();
+
+    expect(fixture.nativeElement.textContent).toContain('Human context');
+    expect(fixture.nativeElement.textContent).toContain('may be stale or superseded');
+
+    fixture.componentInstance.setComment('human-1', 'Archived after review');
+    fixture.componentInstance.resolve(humanContextFinding);
+
+    expect(resolve).toHaveBeenCalledWith('project-1', 'human-1', {
+      actedBy: '00000000-0000-0000-0000-000000000001',
+      comment: 'Archived after review',
     });
   });
 });

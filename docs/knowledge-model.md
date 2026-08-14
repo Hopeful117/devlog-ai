@@ -67,6 +67,9 @@ The first deterministic slice is deliberately narrow:
 - stale understanding is derived from persisted project freshness checks;
 - missing projection refresh currently means the project freshness projection is
   absent for one or more active Sources;
+- internal human context maintenance is now able to flag a bounded class of
+  stale active human-authored context inputs when they appear older than newer
+  active context of the same note type;
 - trusted-knowledge duplicate debt is derived from the bounded duplicate audit
   already produced in the insight domain;
 - duplicate maintenance findings can represent exact duplicate debt, semantic
@@ -75,7 +78,10 @@ The first deterministic slice is deliberately narrow:
   project truth.
 
 Maintenance findings now also support explicit human-reviewed remediation
-actions for the first bounded family of duplicate-debt findings.
+actions for:
+
+- the first bounded family of duplicate-debt findings;
+- the first bounded family of stale internal human-context findings.
 
 Those actions are:
 
@@ -86,6 +92,10 @@ Those actions are:
 They create audit history for the finding workflow itself.
 
 They do not, by themselves, merge, delete, or rewrite trusted knowledge.
+
+For internal human context inputs, they also do not automatically archive or
+rewrite the note itself. Note lifecycle state remains in the dedicated
+human-context-input domain.
 
 They are:
 

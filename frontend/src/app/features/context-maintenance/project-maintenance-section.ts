@@ -67,7 +67,9 @@ export class ProjectMaintenanceSection implements OnChanges {
   }
 
   surfaceLabel(surface: MaintenanceContextSurface): string {
-    return surface === 'PROJECT_PROJECTION' ? 'Projection' : 'Understanding';
+    if (surface === 'PROJECT_PROJECTION') return 'Projection';
+    if (surface === 'INTERNAL_HUMAN_CONTEXT') return 'Human context';
+    return 'Understanding';
   }
 
   actionLabel(action: MaintenanceSuggestedActionCategory): string {
@@ -95,7 +97,8 @@ export class ProjectMaintenanceSection implements OnChanges {
     return (
       finding.issueType === 'TRUSTED_KNOWLEDGE_EXACT_DUPLICATE' ||
       finding.issueType === 'TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE' ||
-      finding.issueType === 'TRUSTED_KNOWLEDGE_OVERLAP_REVIEW'
+      finding.issueType === 'TRUSTED_KNOWLEDGE_OVERLAP_REVIEW' ||
+      finding.issueType === 'STALE_HUMAN_CONTEXT_INPUT'
     );
   }
 

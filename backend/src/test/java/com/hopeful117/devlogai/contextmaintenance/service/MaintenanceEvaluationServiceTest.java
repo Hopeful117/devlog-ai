@@ -17,6 +17,10 @@ import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.service.TrustedKnowledgeDuplicateAuditService;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInput;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputStatus;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputType;
+import com.hopeful117.devlogai.projectcontextinput.repository.ProjectHumanContextInputRepository;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus;
@@ -41,10 +45,13 @@ class MaintenanceEvaluationServiceTest {
     private final ProjectFreshnessService freshnessService = mock(ProjectFreshnessService.class);
     private final TrustedKnowledgeDuplicateAuditService duplicateAuditService =
             mock(TrustedKnowledgeDuplicateAuditService.class);
+    private final ProjectHumanContextInputRepository humanContextInputRepository =
+            mock(ProjectHumanContextInputRepository.class);
     private final MaintenanceFindingRepository repository = mock(MaintenanceFindingRepository.class);
     private final MaintenanceFindingService findingService = mock(MaintenanceFindingService.class);
     private final MaintenanceEvaluationService service = new MaintenanceEvaluationServiceImpl(
-            projectRepository, freshnessService, duplicateAuditService, repository, findingService
+            projectRepository, freshnessService, duplicateAuditService, humanContextInputRepository,
+            repository, findingService
     );
 
     @Test
@@ -65,6 +72,8 @@ class MaintenanceEvaluationServiceTest {
                 2,
                 List.of(exactDuplicateCluster(), semanticDuplicateCluster())
         ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of());
         when(repository.findByProject_IdAndStatusOrderByCreatedAtDescIdDesc(projectId, MaintenanceFindingStatus.OPEN))
                 .thenReturn(List.of(), List.of(), List.of(), List.of());
         when(findingService.create(eq(projectId), any(CreateMaintenanceFindingRequest.class)))
@@ -97,6 +106,8 @@ class MaintenanceEvaluationServiceTest {
         when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
                 projectId, 2, 1, List.of(richerSuccessorCluster())
         ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of());
         when(repository.findByProject_IdAndStatusOrderByCreatedAtDescIdDesc(projectId, MaintenanceFindingStatus.OPEN))
                 .thenReturn(List.of());
         when(findingService.create(eq(projectId), any(CreateMaintenanceFindingRequest.class)))
@@ -124,6 +135,8 @@ class MaintenanceEvaluationServiceTest {
         when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
                 projectId, 0, 0, List.of()
         ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of());
 
         MaintenanceEvaluationResponse result = service.evaluate(projectId);
 
@@ -143,6 +156,8 @@ class MaintenanceEvaluationServiceTest {
         when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
                 projectId, 2, 1, List.of(cluster)
         ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of());
         when(repository.findByProject_IdAndStatusOrderByCreatedAtDescIdDesc(projectId, MaintenanceFindingStatus.OPEN))
                 .thenReturn(List.of(existingDuplicateFinding(projectId, cluster)));
 
@@ -159,6 +174,77 @@ class MaintenanceEvaluationServiceTest {
         when(projectRepository.existsById(projectId)).thenReturn(false);
 
         assertThrows(EntityNotFoundException.class, () -> service.evaluate(projectId));
+    }
+
+    @Test
+    void shouldCreateHumanContextMaintenanceFindingForStaleActiveInput() {
+        UUID projectId = UUID.randomUUID();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(freshnessService.summary(projectId)).thenReturn(new ProjectFreshnessSummary(
+                ProjectFreshnessSummary.PROJECTION_VERSION, projectId, List.of(), 0, false
+        ));
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId, 0, 0, List.of()
+        ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of(
+                humanContextInput("Fresh goal", ProjectHumanContextInputType.GOAL, 5),
+                humanContextInput("Older goal", ProjectHumanContextInputType.GOAL, 60)
+        ));
+        when(repository.findByProject_IdAndStatusOrderByCreatedAtDescIdDesc(projectId, MaintenanceFindingStatus.OPEN))
+                .thenReturn(List.of());
+        when(findingService.create(eq(projectId), any(CreateMaintenanceFindingRequest.class)))
+                .thenAnswer(invocation -> toResponse(projectId, invocation.getArgument(1)));
+
+        MaintenanceEvaluationResponse result = service.evaluate(projectId);
+
+        assertEquals(1, result.createdCount());
+        assertEquals(MaintenanceContextSurface.INTERNAL_HUMAN_CONTEXT,
+                result.createdFindings().getFirst().contextSurface());
+        assertEquals(MaintenanceFindingIssueType.STALE_HUMAN_CONTEXT_INPUT,
+                result.createdFindings().getFirst().issueType());
+    }
+
+    @Test
+    void shouldNotCreateHumanContextFindingForSingleActiveInput() {
+        UUID projectId = UUID.randomUUID();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(freshnessService.summary(projectId)).thenReturn(new ProjectFreshnessSummary(
+                ProjectFreshnessSummary.PROJECTION_VERSION, projectId, List.of(), 0, false
+        ));
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId, 0, 0, List.of()
+        ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of(
+                humanContextInput("Medium-term objective", ProjectHumanContextInputType.GOAL, 5)
+        ));
+
+        MaintenanceEvaluationResponse result = service.evaluate(projectId);
+
+        assertEquals(0, result.createdCount());
+        verifyNoInteractions(findingService);
+    }
+
+    @Test
+    void shouldNotCreateHumanContextFindingForArchivedInput() {
+        UUID projectId = UUID.randomUUID();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(freshnessService.summary(projectId)).thenReturn(new ProjectFreshnessSummary(
+                ProjectFreshnessSummary.PROJECTION_VERSION, projectId, List.of(), 0, false
+        ));
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId, 0, 0, List.of()
+        ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of(
+                humanContextInput("Fresh goal", ProjectHumanContextInputType.GOAL, 5)
+        ));
+
+        MaintenanceEvaluationResponse result = service.evaluate(projectId);
+
+        assertEquals(0, result.createdCount());
+        verifyNoInteractions(findingService);
     }
 
     private ProjectFreshnessResponse staleFreshness(UUID sourceId) {
@@ -309,5 +395,20 @@ class MaintenanceEvaluationServiceTest {
                 Instant.now(),
                 Instant.now()
         );
+    }
+
+    private ProjectHumanContextInput humanContextInput(
+            String title,
+            ProjectHumanContextInputType type,
+            long updatedDaysAgo
+    ) {
+        return ProjectHumanContextInput.builder()
+                .id(UUID.randomUUID())
+                .title(title)
+                .contentMarkdown("body")
+                .type(type)
+                .status(ProjectHumanContextInputStatus.ACTIVE)
+                .updatedAt(Instant.now().minusSeconds(updatedDaysAgo * 24 * 60 * 60))
+                .build();
     }
 }
