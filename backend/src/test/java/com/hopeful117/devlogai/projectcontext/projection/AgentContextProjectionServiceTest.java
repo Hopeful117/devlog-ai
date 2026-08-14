@@ -130,6 +130,22 @@ class AgentContextProjectionServiceTest {
     }
 
     @Test
+    void shouldCompactProjectContextWhenEmptyEvidenceStillDoesNotFit() {
+        AgentRepositoryContext projected = service(32_768, 8_192).project(
+                PROJECT_ID, oversizedProjectContext(),
+                context(List.of(evidence(RepositoryContextLayer.GIT_HISTORY,
+                        "COMMIT", "git:abc", null))), GENERATED_AT)
+                .repositoryContext();
+
+        assertTrue(projected.accounting().canonicalBytes() <= 32_768);
+        assertTrue(projected.accounting().estimatedTokens() <= 8_192);
+        assertTrue(projected.warnings().contains("AGENT_PROJECTION_PROFILE_DETAILS_REMOVED"));
+        assertTrue(projected.warnings().contains("AGENT_PROJECTION_HUMAN_CONTEXT_INPUTS_COMPACTED")
+                || projected.warnings().contains("AGENT_PROJECTION_PROJECT_CONTEXT_LISTS_REMOVED")
+                || projected.warnings().contains("AGENT_PROJECTION_PROJECT_CONTEXT_MINIMAL"));
+    }
+
+    @Test
     void shouldRemoveOnlyTheExistingTailAsLastResort() {
         List<RepositoryEvidence> evidence = java.util.stream.IntStream.range(0, 8)
                 .mapToObj(index -> evidence(RepositoryContextLayer.COMMIT_DIFF,
@@ -188,6 +204,39 @@ class AgentContextProjectionServiceTest {
     private ProjectContextSnapshot projectContext() {
         return new ProjectContextSnapshot(null, null, List.of(), List.of(),
                 List.of(), List.of(), List.of(), List.of());
+    }
+
+    private ProjectContextSnapshot oversizedProjectContext() {
+        return new ProjectContextSnapshot(
+                new com.hopeful117.devlogai.analysis.context.AnalysisContext.ProjectSnapshot(
+                        PROJECT_ID, "Devlog AI", "devlog-ai", "d".repeat(8_000), null),
+                new com.hopeful117.devlogai.profile.dto.ProjectProfileResponse(
+                        UUID.randomUUID(), PROJECT_ID, UUID.randomUUID(), "v1", "v1",
+                        GENERATED_AT, "main",
+                        Map.of("repository", "r".repeat(12_000)),
+                        new com.hopeful117.devlogai.profile.dto.ProjectProfileResponse.Completeness(
+                                null, true, false, 0, 0, 1, 0, 0),
+                        List.of(Map.of("summary", "s".repeat(20_000))),
+                        "p".repeat(20_000),
+                        List.of(Map.of("observation", "o".repeat(20_000))),
+                        1),
+                List.of(),
+                List.of(new com.hopeful117.devlogai.analysis.context.AnalysisContext
+                        .ValidatedProposalSnapshot(
+                        UUID.randomUUID(), null, Map.of("payload", "x".repeat(12_000)),
+                        GENERATED_AT, GENERATED_AT)),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(new ProjectContextSnapshot.HumanContextInputSnapshot(
+                        UUID.randomUUID(), null, "Title " + "t".repeat(3_000),
+                        "h".repeat(24_000), "ACTIVE", GENERATED_AT))
+        );
     }
 
     private RepositoryContext context(List<RepositoryEvidence> evidence) {

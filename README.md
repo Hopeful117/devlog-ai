@@ -288,6 +288,31 @@ explicit result without contacting Git. A resolution failure returns
 `503 SOURCE_REVISION_UNAVAILABLE` and preserves existing knowledge and the previous successful
 check. Freshness guidance never launches understanding or validates proposals automatically.
 
+### Maintenance Findings
+
+Context-maintenance findings are exposed through the bounded read endpoint:
+
+```text
+GET /api/v1/projects/{projectId}/maintenance-findings
+```
+
+The response returns project-scoped operational records with explicit
+classification:
+
+* `contextSurface`
+* `issueType`
+* `severity`
+* `status`
+* `suggestedAction`
+* `humanReviewRequired`
+* `summary`
+* `details`
+* timestamps
+
+These findings are read-only in the current slice. They are visible in the
+Project Cockpit as operational maintenance guidance and must not be interpreted
+as trusted project knowledge or as an implicit remediation workflow.
+
 ### Engineering Story Context
 
 Complete Engineering Stories should be submitted in a JSON request body so their size is not

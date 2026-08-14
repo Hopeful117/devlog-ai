@@ -149,6 +149,8 @@
         </section>
 
         <div class="cockpit-grid">
+          <app-project-maintenance-section [projectId]="viewModel.project.id" />
+
           <app-dashboard-card title="Recent activity" eyebrow="Project history">
             @if (viewModel.analyses.length) {
               <ul class="timeline">

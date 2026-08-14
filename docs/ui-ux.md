@@ -97,6 +97,11 @@ The Cockpit should not expose internal implementation concepts such as Tasks, Pr
 
 Instead it provides an operational overview.
 
+The Cockpit may expose internal context-maintenance findings only as bounded,
+operational guidance. These findings are read-only in the first slice and must
+not be presented as trusted knowledge, hidden health scores, or implicit
+remediation controls.
+
 ---
 
 ## Header
@@ -368,6 +373,26 @@ Stale or absent baselines offer a navigation/focus action toward the existing Pr
 form; they never submit it automatically. Check failures use an alert, preserve existing knowledge,
 and do not degrade into a current/green state. The cockpit does not claim passive monitoring and no
 longer infers “up to date” from the presence of Sources, Analyses, or Deliverables.
+
+## Context Maintenance
+
+The Project Cockpit may expose a compact **Context maintenance** module showing
+current maintenance findings.
+
+This module should:
+
+* remain read-only;
+* distinguish informational guidance from findings that require human review;
+* show explicit bounded details such as surface, severity, status, suggested
+  action, summary, and update time;
+* provide an explicit empty state when no findings exist.
+
+The module must not:
+
+* imply that findings are validated project truth;
+* collapse multiple findings into a vague green/red score;
+* expose dismiss, resolve, or review mutations before dedicated remediation
+  workflows exist.
 
 ---
 

@@ -1,5 +1,7 @@
 package com.hopeful117.devlogai.projectcontext.projection;
 
+import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
@@ -13,10 +15,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -41,6 +43,19 @@ public class AgentContextProjectionService {
             "AGENT_PROJECTION_MINIMAL_EVIDENCE_COMPACTED";
     private static final String ALL_EVIDENCE_REMOVED =
             "AGENT_PROJECTION_ALL_EVIDENCE_REMOVED";
+    private static final String PROFILE_DETAILS_REMOVED =
+            "AGENT_PROJECTION_PROFILE_DETAILS_REMOVED";
+    private static final String HUMAN_CONTEXT_INPUTS_COMPACTED =
+            "AGENT_PROJECTION_HUMAN_CONTEXT_INPUTS_COMPACTED";
+    private static final String PROJECT_CONTEXT_LISTS_REMOVED =
+            "AGENT_PROJECTION_PROJECT_CONTEXT_LISTS_REMOVED";
+    private static final String PROJECT_CONTEXT_MINIMAL =
+            "AGENT_PROJECTION_PROJECT_CONTEXT_MINIMAL";
+
+    private static final int PROFILE_SUMMARY_LIMIT = 500;
+    private static final int PROJECT_TEXT_LIMIT = 160;
+    private static final int HUMAN_CONTEXT_TITLE_LIMIT = 120;
+    private static final int HUMAN_CONTEXT_CONTENT_LIMIT = 500;
 
     private final ObjectMapper objectMapper;
     private final AgentContextProjectionPolicy policy;
@@ -69,10 +84,9 @@ public class AgentContextProjectionService {
             Instant generatedAt,
             ProjectFreshnessSummary freshness
     ) {
-        ProjectionState state = initial(repositoryContext);
-        state = fit(projectId, projectContext, repositoryContext, state, freshness);
-        CanonicalProjection canonical = canonical(
-                projectId, projectContext, repositoryContext, state, freshness);
+        ProjectionState state = initial(projectContext, repositoryContext);
+        state = fit(projectId, repositoryContext, state, freshness);
+        CanonicalProjection canonical = canonical(projectId, repositoryContext, state, freshness);
         byte[] bytes = objectMapper.writeValueAsBytes(canonical);
         int estimatedTokens = estimateTokens(bytes.length);
         AgentRepositoryContext.Accounting accounting = new AgentRepositoryContext.Accounting(
@@ -83,10 +97,13 @@ public class AgentContextProjectionService {
         AgentRepositoryContext projected = repositoryContext(
                 repositoryContext, state, digest(bytes), accounting);
         return new AgentEngineeringStoryContext(
-                projectContext, generatedAt, projectId, projected, freshness);
+                state.projectContext, generatedAt, projectId, projected, freshness);
     }
 
-    private ProjectionState initial(RepositoryContext context) {
+    private ProjectionState initial(
+            ProjectContextSnapshot projectContext,
+            RepositoryContext context
+    ) {
         Map<String, String> selectedReasons = new LinkedHashMap<>();
         context.selectionDecisions().stream().filter(RepositoryContext.SelectionDecision::selected)
                 .forEach(value -> selectedReasons.putIfAbsent(
@@ -94,36 +111,51 @@ public class AgentContextProjectionService {
         List<AgentRepositoryContext.Evidence> evidence = context.evidence().stream()
                 .map(value -> evidence(value, selectedReasons.get(value.reference())))
                 .toList();
-        return new ProjectionState(evidence, new ArrayList<>(context.warnings()),
-                0, 0, 0, 0, 0);
+        return new ProjectionState(projectContext, evidence,
+                new ArrayList<>(context.warnings()), 0, 0, 0, 0, 0);
     }
 
     private ProjectionState fit(
             UUID projectId,
-            ProjectContextSnapshot projectContext,
             RepositoryContext repositoryContext,
             ProjectionState initial,
             ProjectFreshnessSummary freshness
     ) {
         ProjectionState state = initial;
-        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
 
         state = removeRelatedReferences(state);
-        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
 
         state = compactReasons(state);
-        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
 
         state = removeDeclarations(state);
-        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
 
         state = removeContent(state);
-        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
 
         state = compactSummary(state);
-        if (fits(projectId, projectContext, repositoryContext, state, freshness)) return state;
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
 
-        return removeTailEvidence(projectId, projectContext, repositoryContext, state, freshness);
+        state = removeTailEvidence(projectId, repositoryContext, state, freshness);
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
+
+        state = removeProfileDetails(state);
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
+
+        state = compactHumanContextInputs(state);
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
+
+        state = removeProjectContextLists(state);
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
+
+        state = minimalProjectContext(state);
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
+
+        throw new AgentContextProjectionException(
+                "Agent context cannot fit configured projection limits");
     }
 
     private ProjectionState removeRelatedReferences(ProjectionState state) {
@@ -175,56 +207,165 @@ public class AgentContextProjectionService {
     }
 
     private String compactSummary(String summary) {
-        if (summary == null) return null;
-        String normalized = summary.replaceAll("\\s+", " ").trim();
-        if (normalized.length() <= 160) return normalized;
-        return normalized.substring(0, 157).trim() + "...";
+        return compact(summary, 160);
     }
 
     private ProjectionState removeTailEvidence(
-            UUID projectId, ProjectContextSnapshot projectContext,
-            RepositoryContext repositoryContext, ProjectionState state,
-            ProjectFreshnessSummary freshness) {
-        List<AgentRepositoryContext.Evidence> remaining =
-                new ArrayList<>(state.evidence);
+            UUID projectId,
+            RepositoryContext repositoryContext,
+            ProjectionState state,
+            ProjectFreshnessSummary freshness
+    ) {
+        List<AgentRepositoryContext.Evidence> remaining = new ArrayList<>(state.evidence);
         List<String> warnings = new ArrayList<>(state.warnings);
         if (!warnings.contains(EVIDENCE_REMOVED)) warnings.add(EVIDENCE_REMOVED);
         int removed = state.removedEvidenceItems;
         while (remaining.size() > 1) {
             remaining.removeLast();
             removed++;
-            ProjectionState candidate = new ProjectionState(List.copyOf(remaining),
-                    List.copyOf(warnings), state.removedRelatedReferences,
-                    state.removedReasons, state.removedDeclarationPayloads,
-                    state.removedContentPayloads, removed);
-            if (fits(projectId, projectContext, repositoryContext, candidate, freshness)) {
+            ProjectionState candidate = new ProjectionState(state.projectContext,
+                    List.copyOf(remaining), List.copyOf(warnings),
+                    state.removedRelatedReferences, state.removedReasons,
+                    state.removedDeclarationPayloads, state.removedContentPayloads, removed);
+            if (fits(projectId, repositoryContext, candidate, freshness)) {
                 return candidate;
             }
         }
 
-        ProjectionState singleEvidenceState = new ProjectionState(List.copyOf(remaining),
-                List.copyOf(warnings), state.removedRelatedReferences,
-                state.removedReasons, state.removedDeclarationPayloads,
-                state.removedContentPayloads, removed);
+        ProjectionState singleEvidenceState = new ProjectionState(state.projectContext,
+                List.copyOf(remaining), List.copyOf(warnings),
+                state.removedRelatedReferences, state.removedReasons,
+                state.removedDeclarationPayloads, state.removedContentPayloads, removed);
 
         ProjectionState minimalCandidate = transform(singleEvidenceState,
                 AgentRepositoryContext.Evidence::minimal,
                 MINIMAL_EVIDENCE_COMPACTED, 0, 0, 0, 0);
-        if (fits(projectId, projectContext, repositoryContext, minimalCandidate, freshness)) {
+        if (fits(projectId, repositoryContext, minimalCandidate, freshness)) {
             return minimalCandidate;
         }
 
-        ProjectionState emptyCandidate = new ProjectionState(List.of(),
+        return new ProjectionState(state.projectContext, List.of(),
                 appendWarning(minimalCandidate.warnings, ALL_EVIDENCE_REMOVED),
                 state.removedRelatedReferences, state.removedReasons,
                 state.removedDeclarationPayloads, state.removedContentPayloads,
                 state.evidence.size());
-        if (fits(projectId, projectContext, repositoryContext, emptyCandidate, freshness)) {
-            return emptyCandidate;
-        }
+    }
 
-        throw new AgentContextProjectionException(
-                "Agent context cannot fit configured projection limits");
+    private ProjectionState removeProfileDetails(ProjectionState state) {
+        ProjectContextSnapshot context = state.projectContext;
+        if (context == null || context.latestProjectProfile() == null) return state;
+        ProjectProfileResponse profile = context.latestProjectProfile();
+        ProjectProfileResponse compacted = new ProjectProfileResponse(
+                profile.id(), profile.projectId(), profile.analysisId(),
+                profile.profileVersion(), profile.rendererVersion(), profile.generatedAt(),
+                profile.requestedRevision(), Map.of(), profile.completeness(),
+                List.of(), compact(profile.deterministicSummary(), PROFILE_SUMMARY_LIMIT),
+                List.of(), profile.characteristicCount());
+        if (profile.equals(compacted)) return state;
+        return withProjectContext(state, replaceProjectContext(state.projectContext, compacted,
+                context.recentKnowledgeEvents(), context.validatedProposals(),
+                context.architectureArtifacts(), context.relatedDecisions(),
+                context.recentMilestones(), context.recentAnalyses(),
+                context.validatedEngineeringEvents(), context.openChallenges(),
+                context.knowledgeRelations(), context.engineeringStories(),
+                context.humanContextInputs()), PROFILE_DETAILS_REMOVED);
+    }
+
+    private ProjectionState compactHumanContextInputs(ProjectionState state) {
+        ProjectContextSnapshot context = state.projectContext;
+        if (context == null || context.humanContextInputs().isEmpty()) return state;
+        List<ProjectContextSnapshot.HumanContextInputSnapshot> compacted =
+                context.humanContextInputs().stream()
+                        .map(value -> new ProjectContextSnapshot.HumanContextInputSnapshot(
+                                value.id(),
+                                value.type(),
+                                compact(value.title(), HUMAN_CONTEXT_TITLE_LIMIT),
+                                compact(value.contentMarkdown(), HUMAN_CONTEXT_CONTENT_LIMIT),
+                                value.status(),
+                                value.updatedAt()))
+                        .toList();
+        if (context.humanContextInputs().equals(compacted)) return state;
+        return withProjectContext(state, replaceProjectContext(context,
+                context.latestProjectProfile(), context.recentKnowledgeEvents(),
+                context.validatedProposals(), context.architectureArtifacts(),
+                context.relatedDecisions(), context.recentMilestones(),
+                context.recentAnalyses(), context.validatedEngineeringEvents(),
+                context.openChallenges(), context.knowledgeRelations(),
+                context.engineeringStories(), compacted),
+                HUMAN_CONTEXT_INPUTS_COMPACTED);
+    }
+
+    private ProjectionState removeProjectContextLists(ProjectionState state) {
+        ProjectContextSnapshot context = state.projectContext;
+        if (context == null) return state;
+        ProjectContextSnapshot compacted = replaceProjectContext(context,
+                context.latestProjectProfile(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        if (context.equals(compacted)) return state;
+        return withProjectContext(state, compacted, PROJECT_CONTEXT_LISTS_REMOVED);
+    }
+
+    private ProjectionState minimalProjectContext(ProjectionState state) {
+        ProjectContextSnapshot context = state.projectContext;
+        if (context == null) return state;
+        AnalysisContext.ProjectSnapshot project = context.project() == null ? null
+                : new AnalysisContext.ProjectSnapshot(
+                        context.project().id(),
+                        compact(context.project().name(), PROJECT_TEXT_LIMIT),
+                        compact(context.project().slug(), PROJECT_TEXT_LIMIT),
+                        compact(context.project().description(), PROJECT_TEXT_LIMIT),
+                        context.project().status());
+        ProjectContextSnapshot compacted = replaceProjectContext(
+                new ProjectContextSnapshot(project, null, List.of(), List.of(), List.of(),
+                        List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                        List.of(), List.of()),
+                null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(), List.of());
+        if (context.equals(compacted)) return state;
+        return withProjectContext(state, compacted, PROJECT_CONTEXT_MINIMAL);
+    }
+
+    private ProjectContextSnapshot replaceProjectContext(
+            ProjectContextSnapshot context,
+            ProjectProfileResponse latestProjectProfile,
+            List<AnalysisContext.KnowledgeEventSnapshot> recentKnowledgeEvents,
+            List<AnalysisContext.ValidatedProposalSnapshot> validatedProposals,
+            List<AnalysisContext.ArtifactSnapshot> architectureArtifacts,
+            List<AnalysisContext.DecisionSnapshot> relatedDecisions,
+            List<AnalysisContext.MilestoneSnapshot> recentMilestones,
+            List<AnalysisContext.AnalysisSnapshot> recentAnalyses,
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> validatedEngineeringEvents,
+            List<ProjectContextSnapshot.ChallengeSnapshot> openChallenges,
+            List<ProjectContextSnapshot.KnowledgeRelationSnapshot> knowledgeRelations,
+            List<ProjectContextSnapshot.EngineeringStorySnapshot> engineeringStories,
+            List<ProjectContextSnapshot.HumanContextInputSnapshot> humanContextInputs
+    ) {
+        return new ProjectContextSnapshot(
+                context.project(),
+                latestProjectProfile,
+                recentKnowledgeEvents,
+                validatedProposals,
+                architectureArtifacts,
+                relatedDecisions,
+                recentMilestones,
+                recentAnalyses,
+                validatedEngineeringEvents,
+                openChallenges,
+                knowledgeRelations,
+                engineeringStories,
+                humanContextInputs
+        );
+    }
+
+    private ProjectionState withProjectContext(
+            ProjectionState state,
+            ProjectContextSnapshot projectContext,
+            String warning
+    ) {
+        return new ProjectionState(projectContext, state.evidence,
+                appendWarning(state.warnings, warning), state.removedRelatedReferences,
+                state.removedReasons, state.removedDeclarationPayloads,
+                state.removedContentPayloads, state.removedEvidenceItems);
     }
 
     private ProjectionState transform(
@@ -237,7 +378,8 @@ public class AgentContextProjectionService {
             int content
     ) {
         List<String> warnings = appendWarning(state.warnings, warning);
-        return new ProjectionState(state.evidence.stream().map(transformation).toList(),
+        return new ProjectionState(state.projectContext,
+                state.evidence.stream().map(transformation).toList(),
                 List.copyOf(warnings), state.removedRelatedReferences + related,
                 state.removedReasons + reasons,
                 state.removedDeclarationPayloads + declarations,
@@ -252,25 +394,23 @@ public class AgentContextProjectionService {
 
     private boolean fits(
             UUID projectId,
-            ProjectContextSnapshot projectContext,
             RepositoryContext repositoryContext,
             ProjectionState state,
             ProjectFreshnessSummary freshness
     ) {
         int bytes = objectMapper.writeValueAsBytes(canonical(
-                projectId, projectContext, repositoryContext, state, freshness)).length;
+                projectId, repositoryContext, state, freshness)).length;
         return bytes <= policy.maximumBytes()
                 && estimateTokens(bytes) <= policy.maximumEstimatedTokens();
     }
 
     private CanonicalProjection canonical(
             UUID projectId,
-            ProjectContextSnapshot projectContext,
             RepositoryContext context,
             ProjectionState state,
             ProjectFreshnessSummary freshness
     ) {
-        return new CanonicalProjection(projectContext, projectId, freshness,
+        return new CanonicalProjection(state.projectContext, projectId, freshness,
                 new CanonicalRepositoryContext(
                         AgentRepositoryContext.VERSION,
                         AgentContextProjectionPolicy.POLICY_ID,
@@ -424,7 +564,16 @@ public class AgentContextProjectionService {
         }
     }
 
+    private String compact(String value, int maximumLength) {
+        if (value == null) return null;
+        String normalized = value.replaceAll("\\s+", " ").trim();
+        if (normalized.length() <= maximumLength) return normalized;
+        if (maximumLength <= 3) return normalized.substring(0, maximumLength);
+        return normalized.substring(0, maximumLength - 3).trim() + "...";
+    }
+
     private record ProjectionState(
+            ProjectContextSnapshot projectContext,
             List<AgentRepositoryContext.Evidence> evidence,
             List<String> warnings,
             int removedRelatedReferences,
