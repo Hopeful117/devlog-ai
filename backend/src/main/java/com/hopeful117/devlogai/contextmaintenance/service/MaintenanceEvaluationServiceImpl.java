@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.contextmaintenance.service;
 
 import com.hopeful117.devlogai.contextmaintenance.agent.CrossSurfacePatternDetectionAgent;
 import com.hopeful117.devlogai.contextmaintenance.agent.DuplicateAmbiguityResolutionAgent;
+import com.hopeful117.devlogai.contextmaintenance.config.MaintenanceAgentProperties;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceAssessmentRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceFindingRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceEvaluationResponse;
@@ -58,6 +59,7 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
     private final MaintenanceAssessmentService assessmentService;
     private final DuplicateAmbiguityResolutionAgent duplicateAgent;
     private final CrossSurfacePatternDetectionAgent crossSurfaceAgent;
+    private final MaintenanceAgentProperties agentProperties;
 
     public MaintenanceEvaluationServiceImpl(
             ProjectRepository projectRepository,
@@ -68,7 +70,8 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
             MaintenanceFindingService findingService,
             MaintenanceAssessmentService assessmentService,
             DuplicateAmbiguityResolutionAgent duplicateAgent,
-            CrossSurfacePatternDetectionAgent crossSurfaceAgent
+            CrossSurfacePatternDetectionAgent crossSurfaceAgent,
+            MaintenanceAgentProperties agentProperties
     ) {
         this.projectRepository = projectRepository;
         this.freshnessService = freshnessService;
@@ -79,6 +82,7 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
         this.assessmentService = assessmentService;
         this.duplicateAgent = duplicateAgent;
         this.crossSurfaceAgent = crossSurfaceAgent;
+        this.agentProperties = agentProperties;
     }
 
     @Override
@@ -399,6 +403,12 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
         try {
             duplicateAgent.evaluate(finding.issueType().name(), cluster)
                     .ifPresent(assessment -> {
+                        if (!agentProperties.isAboveThreshold(assessment.confidenceLevel())) {
+                            log.info("Suppressed low-confidence assessment for findingId={} confidence={} classification={}",
+                                    finding.id(), assessment.confidenceLevel(),
+                                    assessment.semanticClassification());
+                            return;
+                        }
                         CreateMaintenanceAssessmentRequest request = new CreateMaintenanceAssessmentRequest(
                                 finding.id(),
                                 assessment.confidenceLevel(),
@@ -408,8 +418,9 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
                                 assessment.supportingSignals()
                         );
                         assessmentService.create(projectId, request);
-                        log.info("Agent assessment created for findingId={} classification={}",
-                                finding.id(), assessment.semanticClassification());
+                        log.info("Agent assessment created for findingId={} classification={} confidence={}",
+                                finding.id(), assessment.semanticClassification(),
+                                assessment.confidenceLevel());
                     });
         } catch (Exception e) {
             log.warn("Failed to evaluate duplicate finding {} with agent: {}",
@@ -431,6 +442,12 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
 
             crossSurfaceAgent.evaluate(allActiveFindings)
                     .ifPresent(assessment -> {
+                        if (!agentProperties.isAboveThreshold(assessment.confidenceLevel())) {
+                            log.info("Suppressed low-confidence cross-surface assessment for project={} confidence={} classification={}",
+                                    projectId, assessment.confidenceLevel(),
+                                    assessment.semanticClassification());
+                            return;
+                        }
                         UUID representativeFindingId = assessment.contributingFindingIds().getFirst();
                         CreateMaintenanceAssessmentRequest request = new CreateMaintenanceAssessmentRequest(
                                 representativeFindingId,
@@ -441,8 +458,9 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
                                 assessment.supportingSignals()
                         );
                         assessmentService.create(projectId, request);
-                        log.info("Cross-surface pattern assessment created for project={} classification={} findingCount={}",
+                        log.info("Cross-surface pattern assessment created for project={} classification={} confidence={} findingCount={}",
                                 projectId, assessment.semanticClassification(),
+                                assessment.confidenceLevel(),
                                 assessment.contributingFindingIds().size());
                     });
         } catch (Exception e) {

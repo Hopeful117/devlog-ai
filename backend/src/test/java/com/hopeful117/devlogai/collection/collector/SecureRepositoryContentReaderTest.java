@@ -95,7 +95,7 @@ class SecureRepositoryContentReaderTest {
     @Test
     void boundsReadDuration() throws IOException {
         CollectorLimits limits = new CollectorLimits();
-        limits.setCollectorTimeout(Duration.ofNanos(1));
+        limits.setCollectorTimeout(Duration.ofMillis(1));
         Files.writeString(workspacePath.resolve("App.java"), "class App {}");
 
         var result = reader(limits).read(workspace(), "App.java", 100);
