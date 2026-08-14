@@ -1,4 +1,22 @@
 <app-dashboard-card title="Context maintenance" eyebrow="Operational findings">
+  <div class="maintenance-toolbar">
+    <button
+      type="button"
+      class="maintenance-button maintenance-button--primary"
+      (click)="evaluate()"
+      [disabled]="evaluating"
+    >
+      {{ evaluating ? 'Evaluating…' : 'Run evaluation' }}
+    </button>
+    @if (lastEvaluationTime) {
+      <span class="maintenance-toolbar__info">
+        Last evaluation: {{ lastEvaluationTime | date: 'medium' }}
+      </span>
+    }
+    @if (evaluationError) {
+      <span class="maintenance-copy maintenance-copy--error">{{ evaluationError }}</span>
+    }
+  </div>
   @if (view$ | async; as view) {
     @if (view.state === 'loading') {
       <p role="status" class="maintenance-copy">Loading maintenance findings…</p>

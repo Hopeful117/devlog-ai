@@ -3,7 +3,11 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { APP_ENVIRONMENT } from '../../core/config/app-environment';
-import { MaintenanceFinding, MaintenanceFindingActionRequest } from './maintenance-finding.models';
+import {
+  MaintenanceEvaluationResponse,
+  MaintenanceFinding,
+  MaintenanceFindingActionRequest,
+} from './maintenance-finding.models';
 
 @Injectable({ providedIn: 'root' })
 export class MaintenanceFindingService {
@@ -14,6 +18,13 @@ export class MaintenanceFindingService {
   getByProject(projectId: string): Observable<readonly MaintenanceFinding[]> {
     return this.http.get<readonly MaintenanceFinding[]>(
       `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings`,
+    );
+  }
+
+  evaluate(projectId: string): Observable<MaintenanceEvaluationResponse> {
+    return this.http.post<MaintenanceEvaluationResponse>(
+      `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings/evaluations`,
+      {},
     );
   }
 
