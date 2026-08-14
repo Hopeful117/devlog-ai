@@ -267,4 +267,37 @@ class MaintenanceFindingServiceTest {
         assertEquals("This maintenance finding family does not yet support remediation actions.",
                 error.getMessage());
     }
+
+    @Test
+    void shouldResolveHumanContextFindingWithAuditTrail() {
+        UUID projectId = UUID.randomUUID();
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFinding finding = MaintenanceFinding.builder()
+                .id(findingId)
+                .issueType(MaintenanceFindingIssueType.STALE_HUMAN_CONTEXT_INPUT)
+                .contextSurface(MaintenanceContextSurface.INTERNAL_HUMAN_CONTEXT)
+                .status(MaintenanceFindingStatus.OPEN)
+                .actions(new java.util.ArrayList<>())
+                .build();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(repository.findByIdAndProject_Id(findingId, projectId)).thenReturn(Optional.of(finding));
+        when(repository.save(finding)).thenReturn(finding);
+        when(mapper.toResponse(finding)).thenAnswer(invocation -> {
+            MaintenanceFinding saved = invocation.getArgument(0);
+            return new MaintenanceFindingResponse(
+                    findingId, projectId, saved.getContextSurface(), saved.getIssueType(),
+                    MaintenanceFindingSeverity.MEDIUM, saved.getStatus(),
+                    MaintenanceSuggestedActionCategory.REVIEW, true,
+                    "Stale human input", "details", List.of(), null, null
+            );
+        });
+
+        MaintenanceFindingResponse result = service.resolve(projectId, findingId,
+                new MaintenanceFindingActionRequest(UUID.randomUUID(), "Archived after review"));
+
+        assertEquals(MaintenanceFindingStatus.RESOLVED, finding.getStatus());
+        assertEquals(MaintenanceFindingStatus.RESOLVED, result.status());
+        assertEquals(1, finding.getActions().size());
+        assertEquals(MaintenanceFindingActionType.RESOLVE, finding.getActions().getFirst().getActionType());
+    }
 }

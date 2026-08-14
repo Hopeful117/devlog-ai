@@ -381,18 +381,23 @@ current maintenance findings.
 
 This module should:
 
-* remain read-only;
 * distinguish informational guidance from findings that require human review;
 * show explicit bounded details such as surface, severity, status, suggested
   action, summary, and update time;
-* provide an explicit empty state when no findings exist.
+* provide an explicit empty state when no findings exist;
+* support explicit human-reviewed actions only for bounded finding families
+  that already have dedicated remediation workflows;
+* keep maintenance review distinct from the underlying domain mutation when a
+  finding references project memory such as internal human context inputs.
 
 The module must not:
 
 * imply that findings are validated project truth;
 * collapse multiple findings into a vague green/red score;
 * expose dismiss, resolve, or review mutations before dedicated remediation
-  workflows exist.
+  workflows exist;
+* silently archive, merge, or rewrite project memory from the maintenance
+  module alone.
 
 ---
 

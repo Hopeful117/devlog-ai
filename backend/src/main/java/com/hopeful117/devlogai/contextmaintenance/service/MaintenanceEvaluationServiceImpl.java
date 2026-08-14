@@ -15,6 +15,9 @@ import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateClusterRespo
 import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateMemberResponse;
 import com.hopeful117.devlogai.insight.service.TrustedKnowledgeDuplicateAuditService;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInput;
+import com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputStatus;
+import com.hopeful117.devlogai.projectcontextinput.repository.ProjectHumanContextInputRepository;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus;
@@ -25,7 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.UUID;
 
@@ -35,6 +40,7 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
     private final ProjectRepository projectRepository;
     private final ProjectFreshnessService freshnessService;
     private final TrustedKnowledgeDuplicateAuditService duplicateAuditService;
+    private final ProjectHumanContextInputRepository humanContextInputRepository;
     private final MaintenanceFindingRepository repository;
     private final MaintenanceFindingService findingService;
 
@@ -42,12 +48,14 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
             ProjectRepository projectRepository,
             ProjectFreshnessService freshnessService,
             TrustedKnowledgeDuplicateAuditService duplicateAuditService,
+            ProjectHumanContextInputRepository humanContextInputRepository,
             MaintenanceFindingRepository repository,
             MaintenanceFindingService findingService
     ) {
         this.projectRepository = projectRepository;
         this.freshnessService = freshnessService;
         this.duplicateAuditService = duplicateAuditService;
+        this.humanContextInputRepository = humanContextInputRepository;
         this.repository = repository;
         this.findingService = findingService;
     }
@@ -83,6 +91,15 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
             }
         }
 
+        for (ProjectHumanContextInput input : staleHumanContextCandidates(projectId)) {
+            CreateMaintenanceFindingRequest request = staleHumanContextRequest(input);
+            if (hasEquivalentOpenFinding(projectId, request)) {
+                skipped++;
+                continue;
+            }
+            created.add(findingService.create(projectId, request));
+        }
+
         for (InsightDuplicateClusterResponse cluster : duplicateAudit.clusters()) {
             CreateMaintenanceFindingRequest request = duplicateDebtRequest(cluster);
             if (request == null) {
@@ -101,6 +118,61 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
                 created.size(),
                 skipped,
                 created
+        );
+    }
+
+    private List<ProjectHumanContextInput> staleHumanContextCandidates(UUID projectId) {
+        List<ProjectHumanContextInput> activeInputs = humanContextInputRepository
+                .findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(projectId, ProjectHumanContextInputStatus.ACTIVE);
+        if (activeInputs.size() < 2) {
+            return List.of();
+        }
+
+        Map<com.hopeful117.devlogai.projectcontextinput.entity.ProjectHumanContextInputType, ProjectHumanContextInput>
+                newestByType = new HashMap<>();
+        List<ProjectHumanContextInput> staleCandidates = new ArrayList<>();
+        for (ProjectHumanContextInput input : activeInputs) {
+            ProjectHumanContextInput newest = newestByType.get(input.getType());
+            if (newest == null) {
+                newestByType.put(input.getType(), input);
+                continue;
+            }
+
+            if (input.getUpdatedAt() == null || newest.getUpdatedAt() == null) {
+                continue;
+            }
+
+            long ageDays = java.time.Duration.between(input.getUpdatedAt(), java.time.Instant.now()).toDays();
+            long lagDays = java.time.Duration.between(input.getUpdatedAt(), newest.getUpdatedAt()).toDays();
+            if (ageDays >= 30 && lagDays >= 14) {
+                staleCandidates.add(input);
+            }
+        }
+        return staleCandidates;
+    }
+
+    private CreateMaintenanceFindingRequest staleHumanContextRequest(ProjectHumanContextInput input) {
+        String summary = "Active human context input '%s' may be stale or superseded."
+                .formatted(input.getTitle());
+        String details = """
+                Input type: %s
+                Current status: %s
+                Last updated at: %s
+                This active note is older than a newer active note of the same type.
+                Review whether it should remain active, be archived, or be replaced by fresher context.
+                """.formatted(
+                input.getType(),
+                input.getStatus(),
+                input.getUpdatedAt()
+        );
+        return new CreateMaintenanceFindingRequest(
+                MaintenanceContextSurface.INTERNAL_HUMAN_CONTEXT,
+                MaintenanceFindingIssueType.STALE_HUMAN_CONTEXT_INPUT,
+                MaintenanceFindingSeverity.MEDIUM,
+                MaintenanceSuggestedActionCategory.REVIEW,
+                true,
+                summary,
+                details
         );
     }
 
