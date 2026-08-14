@@ -1,5 +1,7 @@
 package com.hopeful117.devlogai.contextmaintenance.service;
 
+import com.hopeful117.devlogai.contextmaintenance.agent.DuplicateAmbiguityResolutionAgent;
+import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceAssessmentRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceFindingRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceEvaluationResponse;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
@@ -24,6 +26,7 @@ import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +41,7 @@ import java.util.stream.Collectors;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationService {
 
     static final UUID SYSTEM_AUTOMATION_ACTOR_ID =
@@ -49,6 +53,8 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
     private final ProjectHumanContextInputRepository humanContextInputRepository;
     private final MaintenanceFindingRepository repository;
     private final MaintenanceFindingService findingService;
+    private final MaintenanceAssessmentService assessmentService;
+    private final DuplicateAmbiguityResolutionAgent duplicateAgent;
 
     public MaintenanceEvaluationServiceImpl(
             ProjectRepository projectRepository,
@@ -56,7 +62,9 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
             TrustedKnowledgeDuplicateAuditService duplicateAuditService,
             ProjectHumanContextInputRepository humanContextInputRepository,
             MaintenanceFindingRepository repository,
-            MaintenanceFindingService findingService
+            MaintenanceFindingService findingService,
+            MaintenanceAssessmentService assessmentService,
+            DuplicateAmbiguityResolutionAgent duplicateAgent
     ) {
         this.projectRepository = projectRepository;
         this.freshnessService = freshnessService;
@@ -64,6 +72,8 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
         this.humanContextInputRepository = humanContextInputRepository;
         this.repository = repository;
         this.findingService = findingService;
+        this.assessmentService = assessmentService;
+        this.duplicateAgent = duplicateAgent;
     }
 
     @Override
@@ -120,7 +130,9 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
                 skipped++;
                 continue;
             }
-            created.add(findingService.create(projectId, request));
+            MaintenanceFindingResponse createdFinding = findingService.create(projectId, request);
+            created.add(createdFinding);
+            evaluateDuplicateFinding(projectId, createdFinding, cluster);
         }
 
         autoResolveClearedDeterministicFindings(projectId, currentFindings, activeDeterministicKeys);
@@ -370,5 +382,31 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
                 cluster.rationale(),
                 members
         );
+    }
+
+    private void evaluateDuplicateFinding(
+            UUID projectId,
+            MaintenanceFindingResponse finding,
+            InsightDuplicateClusterResponse cluster
+    ) {
+        try {
+            duplicateAgent.evaluate(finding.issueType().name(), cluster)
+                    .ifPresent(assessment -> {
+                        CreateMaintenanceAssessmentRequest request = new CreateMaintenanceAssessmentRequest(
+                                finding.id(),
+                                assessment.confidenceLevel(),
+                                assessment.semanticClassification(),
+                                assessment.recommendedAction(),
+                                assessment.rationale(),
+                                assessment.supportingSignals()
+                        );
+                        assessmentService.create(projectId, request);
+                        log.info("Agent assessment created for findingId={} classification={}",
+                                finding.id(), assessment.semanticClassification());
+                    });
+        } catch (Exception e) {
+            log.warn("Failed to evaluate duplicate finding {} with agent: {}",
+                    finding.id(), e.getMessage());
+        }
     }
 }
