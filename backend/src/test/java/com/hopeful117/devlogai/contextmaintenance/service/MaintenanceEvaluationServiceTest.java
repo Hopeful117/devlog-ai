@@ -2,6 +2,8 @@ package com.hopeful117.devlogai.contextmaintenance.service;
 
 import com.hopeful117.devlogai.contextmaintenance.agent.CrossSurfacePatternDetectionAgent;
 import com.hopeful117.devlogai.contextmaintenance.agent.DuplicateAmbiguityResolutionAgent;
+import com.hopeful117.devlogai.contextmaintenance.agent.DuplicateAmbiguityResolutionAgent.AgentAssessmentResult;
+import com.hopeful117.devlogai.contextmaintenance.config.MaintenanceAgentProperties;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.CreateMaintenanceFindingRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceEvaluationResponse;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
@@ -37,6 +39,7 @@ import org.mockito.ArgumentCaptor;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,9 +59,10 @@ class MaintenanceEvaluationServiceTest {
     private final MaintenanceAssessmentService assessmentService = mock(MaintenanceAssessmentService.class);
     private final DuplicateAmbiguityResolutionAgent duplicateAgent = mock(DuplicateAmbiguityResolutionAgent.class);
     private final CrossSurfacePatternDetectionAgent crossSurfaceAgent = mock(CrossSurfacePatternDetectionAgent.class);
+    private final MaintenanceAgentProperties agentProperties = mock(MaintenanceAgentProperties.class);
     private final MaintenanceEvaluationService service = new MaintenanceEvaluationServiceImpl(
             projectRepository, freshnessService, duplicateAuditService, humanContextInputRepository,
-            repository, findingService, assessmentService, duplicateAgent, crossSurfaceAgent
+            repository, findingService, assessmentService, duplicateAgent, crossSurfaceAgent, agentProperties
     );
 
     @Test
@@ -577,5 +581,115 @@ class MaintenanceEvaluationServiceTest {
                         .actedBy(UUID.randomUUID())
                         .build())))
                 .build();
+    }
+
+    @Test
+    void shouldSuppressLowConfidenceDuplicateAssessments() {
+        UUID projectId = UUID.randomUUID();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(freshnessService.summary(projectId)).thenReturn(new ProjectFreshnessSummary(
+                ProjectFreshnessSummary.PROJECTION_VERSION,
+                projectId,
+                List.of(),
+                0,
+                false
+        ));
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId,
+                1,
+                1,
+                List.of(semanticDuplicateCluster())
+        ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of());
+        when(repository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId)).thenReturn(List.of());
+
+        MaintenanceFindingResponse createdFinding = toResponse(projectId,
+                duplicateDebtRequest(semanticDuplicateCluster()));
+        when(findingService.create(eq(projectId), any(CreateMaintenanceFindingRequest.class)))
+                .thenReturn(createdFinding);
+
+        when(agentProperties.isAboveThreshold(any())).thenReturn(false);
+
+        service.evaluate(projectId);
+
+        verify(assessmentService, never()).create(eq(projectId), any());
+    }
+
+    @Test
+    void shouldPersistHighConfidenceDuplicateAssessments() {
+        UUID projectId = UUID.randomUUID();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(freshnessService.summary(projectId)).thenReturn(new ProjectFreshnessSummary(
+                ProjectFreshnessSummary.PROJECTION_VERSION,
+                projectId,
+                List.of(),
+                0,
+                false
+        ));
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId,
+                1,
+                1,
+                List.of(semanticDuplicateCluster())
+        ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of());
+        when(repository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId)).thenReturn(List.of());
+
+        MaintenanceFindingResponse createdFinding = toResponse(projectId,
+                duplicateDebtRequest(semanticDuplicateCluster()));
+        when(findingService.create(eq(projectId), any(CreateMaintenanceFindingRequest.class)))
+                .thenReturn(createdFinding);
+
+        when(agentProperties.isAboveThreshold(any())).thenReturn(true);
+        when(duplicateAgent.evaluate(any(), any())).thenReturn(Optional.of(
+                new AgentAssessmentResult(
+                        com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceAssessmentSemanticClassification.LIKELY_DUPLICATE,
+                        com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceAssessmentConfidenceLevel.HIGH,
+                        com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceAssessmentRecommendedAction.RESOLVE,
+                        "rationale",
+                        "signal"
+                )
+        ));
+
+        service.evaluate(projectId);
+
+        verify(assessmentService, times(1)).create(eq(projectId), any());
+    }
+
+    private CreateMaintenanceFindingRequest duplicateDebtRequest(InsightDuplicateClusterResponse cluster) {
+        return switch (cluster.category()) {
+            case EXACT_DUPLICATE -> new CreateMaintenanceFindingRequest(
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceContextSurface.PROJECT_UNDERSTANDING,
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_EXACT_DUPLICATE,
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingSeverity.HIGH,
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceSuggestedActionCategory.REVIEW,
+                    true,
+                    "Trusted knowledge exact duplicate debt detected for cluster '%s'."
+                            .formatted(cluster.clusterKey()),
+                    "details"
+            );
+            case LIKELY_SEMANTIC_DUPLICATE -> new CreateMaintenanceFindingRequest(
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceContextSurface.PROJECT_UNDERSTANDING,
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE,
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingSeverity.MEDIUM,
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceSuggestedActionCategory.REVIEW,
+                    true,
+                    "Trusted knowledge semantic duplicate candidate detected for cluster '%s'."
+                            .formatted(cluster.clusterKey()),
+                    "details"
+            );
+            default -> new CreateMaintenanceFindingRequest(
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceContextSurface.PROJECT_UNDERSTANDING,
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_OVERLAP_REVIEW,
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingSeverity.MEDIUM,
+                    com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceSuggestedActionCategory.REVIEW,
+                    true,
+                    "Trusted knowledge overlap requires review for cluster '%s'."
+                            .formatted(cluster.clusterKey()),
+                    "details"
+            );
+        };
     }
 }
