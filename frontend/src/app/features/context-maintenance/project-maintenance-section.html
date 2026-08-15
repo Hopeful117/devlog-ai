@@ -90,15 +90,27 @@
               }
               @if (supportsWorkflow(finding)) {
                 <div class="maintenance-actions">
+                  <p class="maintenance-actions__hint">
+                    @if (canAcknowledge(finding)) {
+                      Acknowledge to review later, or Dismiss/Resolve to close this finding.
+                    } @else {
+                      Dismiss if this is a false positive, or Resolve if you've fixed the issue.
+                    }
+                  </p>
                   <label class="maintenance-actions__label" [attr.for]="'comment-' + finding.id">
-                    Remediation note
+                    {{ requiresComment(finding) ? 'Comment (required)' : 'Comment (optional)' }}
                   </label>
                   <textarea
                     class="maintenance-actions__comment"
                     [id]="'comment-' + finding.id"
                     [ngModel]="commentValue(finding.id)"
                     (ngModelChange)="setComment(finding.id, $event)"
-                    rows="3"
+                    rows="2"
+                    [placeholder]="
+                      requiresComment(finding)
+                        ? 'Explain why you are dismissing or resolving this finding...'
+                        : 'Add a note about this finding...'
+                    "
                     [disabled]="pendingActions[finding.id]"
                   ></textarea>
                   <div class="maintenance-actions__buttons">

@@ -116,6 +116,13 @@
   gap: 0.45rem;
 }
 
+.maintenance-actions__hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .maintenance-actions__label {
   font-size: 0.76rem;
   color: var(--text-muted);
