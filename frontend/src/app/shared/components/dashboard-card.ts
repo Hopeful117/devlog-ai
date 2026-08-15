@@ -9,7 +9,7 @@ import { Component, Input } from '@angular/core';
           @if (eyebrow) {
             <p class="dashboard-card__eyebrow">{{ eyebrow }}</p>
           }
-          <h2>{{ title }}</h2>
+          <h2 [attr.title]="description || null">{{ title }}</h2>
         </div>
         <ng-content select="[card-icon]" />
       </header>
@@ -79,4 +79,5 @@ export class DashboardCard {
   @Input({ required: true }) title = '';
   @Input() eyebrow = '';
   @Input() accent = false;
+  @Input() description = '';
 }

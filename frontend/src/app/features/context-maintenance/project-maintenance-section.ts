@@ -54,7 +54,10 @@ export class ProjectMaintenanceSection implements OnChanges {
   readonly view$: Observable<MaintenanceViewState> = this.projectIds.pipe(
     switchMap((projectId) =>
       this.service.getByProject(projectId).pipe(
-        map((findings) => ({ state: 'loaded' as const, findings })),
+        map((findings) => ({
+          state: 'loaded' as const,
+          findings: findings.filter((f) => f.status === 'OPEN' || f.status === 'ACKNOWLEDGED'),
+        })),
         catchError((error: unknown) =>
           of({ state: 'error' as const, error: toRequestError(error, 'project') }),
         ),
@@ -101,6 +104,9 @@ export class ProjectMaintenanceSection implements OnChanges {
 
   supportsWorkflow(finding: MaintenanceFinding): boolean {
     return (
+      finding.issueType === 'STALE_PROJECT_UNDERSTANDING' ||
+      finding.issueType === 'MISSING_PROJECTION_REFRESH' ||
+      finding.issueType === 'PROJECTION_REFRESH_GAP' ||
       finding.issueType === 'TRUSTED_KNOWLEDGE_EXACT_DUPLICATE' ||
       finding.issueType === 'TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE' ||
       finding.issueType === 'TRUSTED_KNOWLEDGE_OVERLAP_REVIEW' ||
@@ -119,6 +125,78 @@ export class ProjectMaintenanceSection implements OnChanges {
     );
   }
 
+  hasRemediation(finding: MaintenanceFinding): boolean {
+    if (!this.canDismissOrResolve(finding)) return false;
+    const t = finding.issueType;
+    return (
+      t === 'PROJECTION_REFRESH_GAP' ||
+      t === 'STALE_HUMAN_CONTEXT_INPUT' ||
+      t === 'MISSING_PROJECTION_REFRESH' ||
+      t === 'STALE_PROJECT_UNDERSTANDING' ||
+      t === 'TRUSTED_KNOWLEDGE_EXACT_DUPLICATE' ||
+      t === 'TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE' ||
+      t === 'TRUSTED_KNOWLEDGE_OVERLAP_REVIEW'
+    );
+  }
+
+  remediationLabel(finding: MaintenanceFinding): string {
+    const labels: Record<string, string> = {
+      PROJECTION_REFRESH_GAP: 'Refresh projection',
+      STALE_HUMAN_CONTEXT_INPUT: 'Archive stale input',
+      MISSING_PROJECTION_REFRESH: 'Refresh missing projection',
+      STALE_PROJECT_UNDERSTANDING: 'Refresh understanding',
+      TRUSTED_KNOWLEDGE_EXACT_DUPLICATE: 'Merge duplicates',
+      TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE: 'Resolve duplicate',
+      TRUSTED_KNOWLEDGE_OVERLAP_REVIEW: 'Resolve overlap',
+    };
+    return labels[finding.issueType] ?? 'Fix this';
+  }
+
+  remediate(finding: MaintenanceFinding): void {
+    this.pendingActions[finding.id] = true;
+    this.actionErrors[finding.id] = '';
+
+    const request: MaintenanceFindingActionRequest = {
+      actedBy: this.reviewerId,
+      comment: 'Automated remediation triggered from dashboard.',
+    };
+
+    const callMap: Record<string, () => Observable<MaintenanceFinding>> = {
+      PROJECTION_REFRESH_GAP: () =>
+        this.service.refreshProjection(this.projectId, finding.id, request),
+      STALE_HUMAN_CONTEXT_INPUT: () =>
+        this.service.archiveStaleHumanContext(this.projectId, finding.id, request),
+      MISSING_PROJECTION_REFRESH: () =>
+        this.service.refreshMissingProjection(this.projectId, finding.id, request),
+      STALE_PROJECT_UNDERSTANDING: () =>
+        this.service.refreshProjectUnderstanding(this.projectId, finding.id, request),
+      TRUSTED_KNOWLEDGE_EXACT_DUPLICATE: () =>
+        this.service.mergeDuplicate(this.projectId, finding.id, request),
+      TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE: () =>
+        this.service.resolveSemanticDuplicate(this.projectId, finding.id, request),
+      TRUSTED_KNOWLEDGE_OVERLAP_REVIEW: () =>
+        this.service.resolveOverlapReview(this.projectId, finding.id, request),
+    };
+
+    const call = callMap[finding.issueType];
+    if (!call) {
+      this.pendingActions[finding.id] = false;
+      this.actionErrors[finding.id] = 'No remediation action available for this finding type.';
+      return;
+    }
+
+    call().subscribe({
+      next: () => {
+        this.pendingActions[finding.id] = false;
+        this.projectIds.next(this.projectId);
+      },
+      error: (error: unknown) => {
+        this.pendingActions[finding.id] = false;
+        this.actionErrors[finding.id] = toRequestError(error, 'project').message;
+      },
+    });
+  }
+
   requiresComment(finding: MaintenanceFinding): boolean {
     return this.canDismissOrResolve(finding);
   }
@@ -129,6 +207,13 @@ export class ProjectMaintenanceSection implements OnChanges {
 
   setComment(findingId: string, value: string): void {
     this.comments[findingId] = value;
+  }
+
+  getPlaceholder(finding: MaintenanceFinding): string {
+    if (this.requiresReview(finding)) {
+      return 'Describe the corrective action you took to resolve this issue...';
+    }
+    return 'Add a note about this finding...';
   }
 
   latestActionSummary(finding: MaintenanceFinding): string | null {

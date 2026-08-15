@@ -21,6 +21,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "insights")
 @Getter
+@Setter
 @EntityListeners(AuditingEntityListener.class)
 @Builder
 @AllArgsConstructor
@@ -53,6 +54,11 @@ public class Insight {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private InsightSeverity severity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private InsightStatus status = InsightStatus.ACTIVE;
 
     @Column(nullable = false)
     private String title;

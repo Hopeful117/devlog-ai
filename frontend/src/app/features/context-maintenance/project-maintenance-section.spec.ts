@@ -43,20 +43,24 @@ const humanContextFinding: MaintenanceFinding = {
   summary: "Active human context input 'Medium-term objective' may be stale or superseded.",
 };
 
-const autoResolvedFinding: MaintenanceFinding = {
-  ...humanContextFinding,
-  id: 'auto-1',
-  status: 'RESOLVED',
-  actionHistory: [
-    {
-      id: 'action-1',
-      actionType: 'AUTO_RESOLVE',
-      actedBy: '00000000-0000-0000-0000-000000000002',
-      actedAt: '2026-08-14T14:00:00Z',
-      comment:
-        'Automatically resolved because the deterministic maintenance condition no longer applies.',
-    },
-  ],
+const staleUnderstandingFinding: MaintenanceFinding = {
+  ...finding,
+  id: 'stale-1',
+  contextSurface: 'PROJECT_UNDERSTANDING',
+  issueType: 'STALE_PROJECT_UNDERSTANDING',
+  severity: 'HIGH',
+  suggestedAction: 'REFRESH',
+  summary: 'Project understanding is stale for source Github.',
+};
+
+const missingProjectionFinding: MaintenanceFinding = {
+  ...finding,
+  id: 'missing-1',
+  contextSurface: 'PROJECT_PROJECTION',
+  issueType: 'MISSING_PROJECTION_REFRESH',
+  severity: 'MEDIUM',
+  suggestedAction: 'INVESTIGATE',
+  summary: 'Projection refresh missing.',
 };
 
 describe('ProjectMaintenanceSection', () => {
@@ -64,6 +68,13 @@ describe('ProjectMaintenanceSection', () => {
   const acknowledge = vi.fn();
   const dismiss = vi.fn();
   const resolve = vi.fn();
+  const refreshProjection = vi.fn();
+  const archiveStaleHumanContext = vi.fn();
+  const refreshMissingProjection = vi.fn();
+  const refreshProjectUnderstanding = vi.fn();
+  const mergeDuplicate = vi.fn();
+  const resolveSemanticDuplicate = vi.fn();
+  const resolveOverlapReview = vi.fn();
 
   async function render() {
     await TestBed.configureTestingModule({
@@ -71,7 +82,19 @@ describe('ProjectMaintenanceSection', () => {
       providers: [
         {
           provide: MaintenanceFindingService,
-          useValue: { getByProject, acknowledge, dismiss, resolve },
+          useValue: {
+            getByProject,
+            acknowledge,
+            dismiss,
+            resolve,
+            refreshProjection,
+            archiveStaleHumanContext,
+            refreshMissingProjection,
+            refreshProjectUnderstanding,
+            mergeDuplicate,
+            resolveSemanticDuplicate,
+            resolveOverlapReview,
+          },
         },
       ],
     }).compileComponents();
@@ -98,7 +121,7 @@ describe('ProjectMaintenanceSection', () => {
 
     expect(getByProject).toHaveBeenCalledWith('project-1');
     expect(fixture.nativeElement.textContent).toContain(
-      'No active maintenance findings currently exist for this project.',
+      'No active maintenance findings. Run an evaluation to check context health.',
     );
   });
 
@@ -123,46 +146,97 @@ describe('ProjectMaintenanceSection', () => {
     );
   });
 
-  it('renders remediation actions for duplicate debt and posts acknowledgement', async () => {
+  it('renders one-click remediation for duplicate debt and calls mergeDuplicate', async () => {
     getByProject.mockReturnValue(of([duplicateFinding]));
-    acknowledge.mockReturnValue(
-      of({ ...duplicateFinding, status: 'ACKNOWLEDGED', actionHistory: [] }),
+    mergeDuplicate.mockReturnValue(
+      of({ ...duplicateFinding, status: 'RESOLVED', actionHistory: [] }),
     );
     const fixture = await render();
 
     const button = fixture.debugElement
       .queryAll(By.css('button'))
-      .find((candidate) => candidate.nativeElement.textContent.includes('Acknowledge'));
+      .find((candidate) => candidate.nativeElement.textContent.includes('Merge duplicates'));
 
     expect(button).toBeDefined();
     button!.nativeElement.click();
     fixture.detectChanges();
 
-    expect(acknowledge).toHaveBeenCalledWith('project-1', 'debt-1', {
+    expect(mergeDuplicate).toHaveBeenCalledWith('project-1', 'debt-1', {
       actedBy: '00000000-0000-0000-0000-000000000001',
-      comment: '',
+      comment: 'Automated remediation triggered from dashboard.',
     });
   });
 
-  it('renders human context findings with the shared remediation workflow', async () => {
+  it('renders one-click remediation for human context findings and calls archiveStaleHumanContext', async () => {
     getByProject.mockReturnValue(of([humanContextFinding]));
-    resolve.mockReturnValue(of({ ...humanContextFinding, status: 'RESOLVED', actionHistory: [] }));
+    archiveStaleHumanContext.mockReturnValue(
+      of({ ...humanContextFinding, status: 'RESOLVED', actionHistory: [] }),
+    );
     const fixture = await render();
 
     expect(fixture.nativeElement.textContent).toContain('Human context');
     expect(fixture.nativeElement.textContent).toContain('may be stale or superseded');
 
-    fixture.componentInstance.setComment('human-1', 'Archived after review');
-    fixture.componentInstance.resolve(humanContextFinding);
+    const button = fixture.debugElement
+      .queryAll(By.css('button'))
+      .find((candidate) => candidate.nativeElement.textContent.includes('Archive stale input'));
 
-    expect(resolve).toHaveBeenCalledWith('project-1', 'human-1', {
+    expect(button).toBeDefined();
+    button!.nativeElement.click();
+    fixture.detectChanges();
+
+    expect(archiveStaleHumanContext).toHaveBeenCalledWith('project-1', 'human-1', {
       actedBy: '00000000-0000-0000-0000-000000000001',
-      comment: 'Archived after review',
+      comment: 'Automated remediation triggered from dashboard.',
+    });
+  });
+
+  it('renders one-click remediation for overlap review findings and calls resolveOverlapReview', async () => {
+    const overlapFinding: MaintenanceFinding = {
+      ...finding,
+      id: 'overlap-1',
+      contextSurface: 'PROJECT_UNDERSTANDING',
+      issueType: 'TRUSTED_KNOWLEDGE_OVERLAP_REVIEW',
+      status: 'OPEN',
+      summary: 'Trusted knowledge overlap requires review for cluster "boot-rest-spring".',
+    };
+    getByProject.mockReturnValue(of([overlapFinding]));
+    resolveOverlapReview.mockReturnValue(
+      of({ ...overlapFinding, status: 'RESOLVED', actionHistory: [] }),
+    );
+    const fixture = await render();
+
+    const button = fixture.debugElement
+      .queryAll(By.css('button'))
+      .find((candidate) => candidate.nativeElement.textContent.includes('Resolve overlap'));
+
+    expect(button).toBeDefined();
+    button!.nativeElement.click();
+    fixture.detectChanges();
+
+    expect(resolveOverlapReview).toHaveBeenCalledWith('project-1', 'overlap-1', {
+      actedBy: '00000000-0000-0000-0000-000000000001',
+      comment: 'Automated remediation triggered from dashboard.',
     });
   });
 
   it('renders automatic maintenance history clearly', async () => {
-    getByProject.mockReturnValue(of([autoResolvedFinding]));
+    const openFindingWithAutoResolve = {
+      ...humanContextFinding,
+      id: 'auto-1',
+      status: 'OPEN' as const,
+      actionHistory: [
+        {
+          id: 'action-1',
+          actionType: 'AUTO_RESOLVE' as const,
+          actedBy: '00000000-0000-0000-0000-000000000002',
+          actedAt: '2026-08-14T14:00:00Z',
+          comment:
+            'Automatically resolved because the deterministic maintenance condition no longer applies.',
+        },
+      ],
+    };
+    getByProject.mockReturnValue(of([openFindingWithAutoResolve]));
     const fixture = await render();
 
     expect(fixture.nativeElement.textContent).toContain(
@@ -171,5 +245,39 @@ describe('ProjectMaintenanceSection', () => {
     expect(fixture.nativeElement.textContent).toContain(
       'Automatically resolved because the deterministic maintenance condition no longer applies.',
     );
+  });
+
+  it('renders dismiss button for stale project understanding finding', async () => {
+    getByProject.mockReturnValue(of([staleUnderstandingFinding]));
+    dismiss.mockReturnValue(
+      of({ ...staleUnderstandingFinding, status: 'DISMISSED', actionHistory: [] }),
+    );
+    const fixture = await render();
+
+    expect(fixture.nativeElement.textContent).toContain('Understanding');
+    expect(fixture.nativeElement.textContent).toContain('Project understanding is stale');
+
+    const dismissButton = fixture.debugElement
+      .queryAll(By.css('button'))
+      .find((candidate) => candidate.nativeElement.textContent.includes('Dismiss'));
+
+    expect(dismissButton).toBeDefined();
+  });
+
+  it('renders dismiss button for missing projection refresh finding', async () => {
+    getByProject.mockReturnValue(of([missingProjectionFinding]));
+    dismiss.mockReturnValue(
+      of({ ...missingProjectionFinding, status: 'DISMISSED', actionHistory: [] }),
+    );
+    const fixture = await render();
+
+    expect(fixture.nativeElement.textContent).toContain('Projection');
+    expect(fixture.nativeElement.textContent).toContain('Projection refresh missing');
+
+    const dismissButton = fixture.debugElement
+      .queryAll(By.css('button'))
+      .find((candidate) => candidate.nativeElement.textContent.includes('Dismiss'));
+
+    expect(dismissButton).toBeDefined();
   });
 });

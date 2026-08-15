@@ -16,6 +16,15 @@
   margin: 0;
 }
 
+.maintenance-cta {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.5rem;
+  background: rgb(77 141 255 / 0.08);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .maintenance-copy--error {
   color: var(--danger);
 }
@@ -107,6 +116,19 @@
   gap: 0.45rem;
 }
 
+.maintenance-actions__hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.maintenance-actions__hint--action {
+  color: var(--info);
+  font-style: normal;
+  font-weight: 500;
+}
+
 .maintenance-actions__label {
   font-size: 0.76rem;
   color: var(--text-muted);
@@ -149,6 +171,14 @@
 
 .maintenance-button--primary {
   background: rgb(79 198 138 / 0.14);
+}
+
+.maintenance-button--remediation {
+  padding: 0.55rem 1.1rem;
+  font-weight: 700;
+  border-color: rgb(79 198 138 / 0.5);
+  background: rgb(79 198 138 / 0.22);
+  box-shadow: 0 0 8px rgb(79 198 138 / 0.15);
 }
 
 .maintenance-assessments {
