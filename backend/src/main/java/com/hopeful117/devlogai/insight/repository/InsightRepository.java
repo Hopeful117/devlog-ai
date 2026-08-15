@@ -2,9 +2,11 @@ package com.hopeful117.devlogai.insight.repository;
 
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,6 +21,11 @@ public interface InsightRepository extends JpaRepository<Insight, UUID> {
     );
 
     List<Insight> findByProjectIdOrderByCreatedAtDescIdDesc(UUID projectId);
+
+    List<Insight> findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+            UUID projectId,
+            Collection<InsightStatus> statuses
+    );
 
     List<Insight> findByAnalysisIdOrderByCreatedAtDescIdDesc(UUID analysisId);
 

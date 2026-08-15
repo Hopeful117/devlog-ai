@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.insight.service;
 
 import com.hopeful117.devlogai.insight.dto.response.*;
 import com.hopeful117.devlogai.insight.entity.Insight;
+import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,8 @@ public class TrustedKnowledgeDuplicateAuditService {
     private final InsightRepository insightRepository;
 
     public InsightDuplicateAuditResponse audit(UUID projectId) {
-        List<Insight> insights = insightRepository.findByProjectIdOrderByCreatedAtDescIdDesc(projectId);
+        List<Insight> insights = insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE));
         List<InsightNode> nodes = insights.stream().map(InsightNode::new).toList();
         List<InsightDuplicateClusterResponse> clusters = buildClusters(nodes);
         return new InsightDuplicateAuditResponse(projectId, insights.size(), clusters.size(), clusters);

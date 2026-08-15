@@ -8,8 +8,13 @@ import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.mapper.InsightMapper;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
+import com.hopeful117.devlogai.knowledge.relation.dto.request.CreateKnowledgeRelationRequest;
+import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
+import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
+import com.hopeful117.devlogai.knowledge.relation.service.KnowledgeRelationService;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,12 +23,14 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class InsightServiceImpl implements InsightService{
 
     private final InsightRepository insightRepository;
 
     private final InsightMapper insightMapper;
     private final TrustedKnowledgeDuplicateAuditService trustedKnowledgeDuplicateAuditService;
+    private final KnowledgeRelationService knowledgeRelationService;
 
 
     @Override
@@ -47,7 +54,8 @@ public class InsightServiceImpl implements InsightService{
             UUID projectId) {
 
         return insightRepository
-                .findByProjectIdOrderByCreatedAtDesc(projectId)
+                .findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                        projectId, List.of(InsightStatus.ACTIVE))
                 .stream()
                 .map(insightMapper::toResponse)
                 .toList();
@@ -138,7 +146,23 @@ public class InsightServiceImpl implements InsightService{
                 .orElseThrow(() -> new EntityNotFoundException("Insight", canonicalInsightId));
 
         insight.setStatus(InsightStatus.SUPERSEDED);
-        return insightMapper.toResponse(insightRepository.save(insight));
+        InsightResponse response = insightMapper.toResponse(insightRepository.save(insight));
+
+        try {
+            knowledgeRelationService.create(CreateKnowledgeRelationRequest.builder()
+                    .projectId(canonical.getProject().getId())
+                    .sourceEntityType(EntityType.INSIGHT)
+                    .sourceEntityId(insightId)
+                    .targetEntityType(EntityType.INSIGHT)
+                    .targetEntityId(canonicalInsightId)
+                    .relationType(KnowledgeRelationType.RESOLVES)
+                    .description("Insight superseded during duplicate resolution")
+                    .build());
+        } catch (Exception e) {
+            log.warn("Failed to create RESOLVES relation for superseded insight {}: {}", insightId, e.getMessage());
+        }
+
+        return response;
     }
 
 }

@@ -6,6 +6,7 @@ import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateClusterCateg
 import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateRecommendation;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.project.entity.Project;
@@ -17,10 +18,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,7 +35,7 @@ class TrustedKnowledgeDuplicateAuditServiceTest {
     @Test
     void shouldReturnEmptyAuditWhenNoTrustedKnowledgeExists() {
         UUID projectId = UUID.randomUUID();
-        when(insightRepository.findByProjectIdOrderByCreatedAtDescIdDesc(projectId)).thenReturn(List.of());
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
 
         InsightDuplicateAuditResponse response = new TrustedKnowledgeDuplicateAuditService(insightRepository).audit(projectId);
 
@@ -45,7 +49,7 @@ class TrustedKnowledgeDuplicateAuditServiceTest {
     void shouldDetectExactDuplicateClusterDeterministically() {
         UUID projectId = UUID.randomUUID();
         Project project = Project.builder().id(projectId).build();
-        when(insightRepository.findByProjectIdOrderByCreatedAtDescIdDesc(projectId)).thenReturn(List.of(
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of(
                 insight(project, "Architecture Decision Records (ADR) Documentation",
                         "The project documents architectural decisions with ADRs.",
                         null, null, "ARCHITECTURE_DESCRIPTION", Instant.parse("2026-08-11T23:11:14Z")),
@@ -66,7 +70,7 @@ class TrustedKnowledgeDuplicateAuditServiceTest {
     void shouldDetectLikelyRicherSuccessorCluster() {
         UUID projectId = UUID.randomUUID();
         Project project = Project.builder().id(projectId).build();
-        when(insightRepository.findByProjectIdOrderByCreatedAtDescIdDesc(projectId)).thenReturn(List.of(
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of(
                 insight(project, "REST Spring Boot Application Architecture",
                         "The project architecture is centered around a RESTful application structured with Spring Boot framework.",
                         null, null, null, Instant.parse("2026-08-11T23:10:52Z")),
@@ -87,7 +91,7 @@ class TrustedKnowledgeDuplicateAuditServiceTest {
     void shouldMarkAmbiguousClusterForReview() {
         UUID projectId = UUID.randomUUID();
         Project project = Project.builder().id(projectId).build();
-        when(insightRepository.findByProjectIdOrderByCreatedAtDescIdDesc(projectId)).thenReturn(List.of(
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of(
                 insight(project, "Automated Testing Structure",
                         "The project contains an automated test source tree and test files that support continuous integration and quality control.",
                         null, null, "TECHNOLOGY_DESCRIPTION", Instant.parse("2026-08-11T23:12:00Z")),
@@ -106,7 +110,7 @@ class TrustedKnowledgeDuplicateAuditServiceTest {
     @Test
     void shouldKeepProjectsIsolated() {
         UUID projectId = UUID.randomUUID();
-        when(insightRepository.findByProjectIdOrderByCreatedAtDescIdDesc(projectId)).thenReturn(List.of());
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
 
         InsightDuplicateAuditResponse response = new TrustedKnowledgeDuplicateAuditService(insightRepository).audit(projectId);
 

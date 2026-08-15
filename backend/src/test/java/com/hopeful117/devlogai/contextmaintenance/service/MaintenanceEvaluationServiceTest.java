@@ -13,6 +13,7 @@ import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingActio
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingActionType;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingIssueType;
 import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingStatus;
+import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceFindingSeverity;
 import com.hopeful117.devlogai.contextmaintenance.repository.MaintenanceFindingRepository;
 import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
 import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateClusterCategory;
@@ -169,7 +170,30 @@ class MaintenanceEvaluationServiceTest {
         when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
                 projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of());
         when(repository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId))
-                .thenReturn(List.of(existingDuplicateFinding(projectId, cluster)));
+                .thenReturn(List.of(existingDuplicateFinding(projectId, cluster, MaintenanceFindingStatus.OPEN)));
+
+        MaintenanceEvaluationResponse result = service.evaluate(projectId);
+
+        assertEquals(0, result.createdCount());
+        assertEquals(1, result.skippedCount());
+        verifyNoInteractions(findingService);
+    }
+
+    @Test
+    void shouldSkipDuplicateFindingWhenEquivalentResolvedFindingExists() {
+        UUID projectId = UUID.randomUUID();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(freshnessService.summary(projectId)).thenReturn(new ProjectFreshnessSummary(
+                ProjectFreshnessSummary.PROJECTION_VERSION, projectId, List.of(), 0, false
+        ));
+        InsightDuplicateClusterResponse cluster = exactDuplicateCluster();
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId, 2, 1, List.of(cluster)
+        ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of());
+        when(repository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId))
+                .thenReturn(List.of(existingDuplicateFinding(projectId, cluster, MaintenanceFindingStatus.RESOLVED)));
 
         MaintenanceEvaluationResponse result = service.evaluate(projectId);
 
@@ -391,6 +415,38 @@ class MaintenanceEvaluationServiceTest {
         verify(findingService, never()).create(any(), any());
     }
 
+    @Test
+    void shouldSkipOverlapReviewWhenEquivalentResolvedFindingExists() {
+        UUID projectId = UUID.randomUUID();
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(freshnessService.summary(projectId)).thenReturn(new ProjectFreshnessSummary(
+                ProjectFreshnessSummary.PROJECTION_VERSION, projectId, List.of(), 0, false
+        ));
+        when(duplicateAuditService.audit(projectId)).thenReturn(new InsightDuplicateAuditResponse(
+                projectId, 0, 0, List.of()
+        ));
+        when(humanContextInputRepository.findByProject_IdAndStatusOrderByUpdatedAtDescIdDesc(
+                projectId, ProjectHumanContextInputStatus.ACTIVE)).thenReturn(List.of());
+        UUID clusterId = UUID.randomUUID();
+        when(repository.findByProject_IdOrderByCreatedAtDescIdDesc(projectId)).thenReturn(List.of(
+                MaintenanceFinding.builder()
+                        .contextSurface(MaintenanceContextSurface.PROJECT_UNDERSTANDING)
+                        .issueType(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_OVERLAP_REVIEW)
+                        .severity(MaintenanceFindingSeverity.MEDIUM)
+                        .status(MaintenanceFindingStatus.RESOLVED)
+                        .summary("Overlap review pending for cluster '%s'".formatted(clusterId))
+                        .details("Cluster key: " + clusterId)
+                        .project(com.hopeful117.devlogai.project.entity.Project.builder().id(projectId).build())
+                        .build()
+        ));
+
+        MaintenanceEvaluationResponse result = service.evaluate(projectId);
+
+        assertEquals(0, result.createdCount());
+        assertEquals(0, result.skippedCount());
+        verifyNoInteractions(findingService);
+    }
+
     private ProjectFreshnessResponse staleFreshness(UUID sourceId) {
         return new ProjectFreshnessResponse(
                 ProjectFreshnessResponse.PROJECTION_VERSION,
@@ -492,11 +548,11 @@ class MaintenanceEvaluationServiceTest {
         );
     }
 
-    private MaintenanceFinding existingDuplicateFinding(UUID projectId, InsightDuplicateClusterResponse cluster) {
+    private MaintenanceFinding existingDuplicateFinding(UUID projectId, InsightDuplicateClusterResponse cluster, MaintenanceFindingStatus status) {
         return MaintenanceFinding.builder()
                 .contextSurface(MaintenanceContextSurface.PROJECT_UNDERSTANDING)
                 .issueType(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_EXACT_DUPLICATE)
-                .status(MaintenanceFindingStatus.OPEN)
+                .status(status)
                 .summary("Trusted knowledge exact duplicate debt detected for cluster '%s'."
                         .formatted(cluster.clusterKey()))
                 .details("""
