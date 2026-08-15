@@ -182,7 +182,22 @@ describe('ProjectMaintenanceSection', () => {
   });
 
   it('renders automatic maintenance history clearly', async () => {
-    getByProject.mockReturnValue(of([autoResolvedFinding]));
+    const openFindingWithAutoResolve = {
+      ...humanContextFinding,
+      id: 'auto-1',
+      status: 'OPEN' as const,
+      actionHistory: [
+        {
+          id: 'action-1',
+          actionType: 'AUTO_RESOLVE' as const,
+          actedBy: '00000000-0000-0000-0000-000000000002',
+          actedAt: '2026-08-14T14:00:00Z',
+          comment:
+            'Automatically resolved because the deterministic maintenance condition no longer applies.',
+        },
+      ],
+    };
+    getByProject.mockReturnValue(of([openFindingWithAutoResolve]));
     const fixture = await render();
 
     expect(fixture.nativeElement.textContent).toContain(

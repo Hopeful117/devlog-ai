@@ -302,13 +302,16 @@ Deterministic maintenance evaluation is triggered explicitly through:
 POST /api/v1/projects/{projectId}/maintenance-findings/evaluations
 ```
 
-The current evaluation slice is intentionally narrow. It can:
+The current evaluation slice can:
 
 * create `STALE_PROJECT_UNDERSTANDING` when a persisted project freshness check
   reports `STALE` for an active Source;
 * create `MISSING_PROJECTION_REFRESH` when active Sources exist without any
   persisted freshness check, meaning the freshness projection itself is missing
   for part of the Project.
+* create `PROJECTION_REFRESH_GAP` when projection freshness is lagging behind
+  repository changes;
+* create `STALE_HUMAN_CONTEXT_INPUT` when human context inputs may be stale;
 * create trusted-knowledge duplicate-debt findings from the existing duplicate
   audit for:
   * exact duplicates;
@@ -336,23 +339,11 @@ classification:
 * `details`
 * timestamps
 
-These findings are read-only in the current slice. They are visible in the
-Project Cockpit as operational maintenance guidance and must not be interpreted
-as trusted project knowledge or as an implicit remediation workflow.
+#### Workflow Actions
 
-This first policy is intentionally bounded:
+Maintenance findings support a bounded human-reviewed remediation workflow:
 
-* it reuses persisted freshness results rather than reclassifying repository
-  state inside context maintenance;
-* it reuses the trusted duplicate audit rather than introducing a second
-  duplicate matcher in context maintenance;
-* it does not mutate trusted knowledge;
-* it does not claim a universal context-health score;
-* it treats missing freshness checks as a projection gap on the freshness
-  surface itself, not as a timeline-refresh scheduler.
-
-Maintenance findings now also support a bounded human-reviewed remediation
-workflow for duplicate-debt findings:
+**Standard Actions:**
 
 * `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/acknowledgements`
 * `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/dismissals`
@@ -365,12 +356,45 @@ Each action records:
 * the action type;
 * an optional or required rationale, depending on the action.
 
-The first remediation slice is intentionally narrow:
+**Remediation Actions:**
 
-* it is currently supported only for trusted-knowledge duplicate-debt findings;
-* dismissal and resolution require explicit rationale;
-* it records workflow decisions without merging, deleting, or rewriting trusted
-  knowledge.
+For findings requiring corrective action, dedicated remediation endpoints are available:
+
+* `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/refresh-projection`
+  Triggers batch freshness check for all active sources.
+  Available for: `PROJECTION_REFRESH_GAP`
+
+* `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/archive-context-input`
+  Archives the stale human context input.
+  Available for: `STALE_HUMAN_CONTEXT_INPUT`
+
+* `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/refresh-missing-projection`
+  Triggers batch freshness check for missing projections.
+  Available for: `MISSING_PROJECTION_REFRESH`
+
+* `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/refresh-understanding`
+  Chains freshness check with project understanding re-analysis.
+  Available for: `STALE_PROJECT_UNDERSTANDING`
+
+* `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/merge-duplicate`
+  Merges exact duplicate insights, keeping the canonical one.
+  Available for: `TRUSTED_KNOWLEDGE_EXACT_DUPLICATE`
+
+* `POST /api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/resolve-semantic-duplicate`
+  Resolves semantic duplicate insights based on assessment recommendations.
+  Available for: `TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE`
+
+#### Workflow Coverage
+
+| Finding Type | Acknowledge | Dismiss | Resolve | Auto-Resolve | Remediation Action |
+|-------------|-------------|---------|---------|--------------|-------------------|
+| PROJECTION_REFRESH_GAP | ✅ | ✅ | ✅ | ❌ | Refresh projection |
+| STALE_PROJECT_UNDERSTANDING | ✅ | ✅ | ✅ | ✅ | Chain: freshness → understanding |
+| MISSING_PROJECTION_REFRESH | ✅ | ✅ | ✅ | ✅ | Refresh missing projection |
+| STALE_HUMAN_CONTEXT_INPUT | ✅ | ✅ | ✅ | ✅ | Archive context input |
+| TRUSTED_KNOWLEDGE_EXACT_DUPLICATE | ✅ | ✅ | ✅ | ❌ | Merge exact duplicate |
+| TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE | ✅ | ✅ | ✅ | ❌ | Resolve semantic duplicate |
+| TRUSTED_KNOWLEDGE_OVERLAP_REVIEW | ✅ | ✅ | ✅ | ❌ | Human review only |
 
 ### Engineering Story Context
 
