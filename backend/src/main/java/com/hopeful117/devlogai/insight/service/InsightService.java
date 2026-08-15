@@ -2,10 +2,12 @@ package com.hopeful117.devlogai.insight.service;
 
 import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
 import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
+import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface InsightService {
@@ -36,4 +38,8 @@ public interface InsightService {
     InsightResponse archiveInsight(UUID insightId);
 
     InsightResponse supersedeInsight(UUID insightId, UUID canonicalInsightId);
+
+    Optional<Insight> findById(UUID id);
+
+    InsightResponse updateInsight(UUID insightId, String content, String rationale);
 }

@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.insight.service;
 
+import com.hopeful117.devlogai.insight.config.InsightSimilarityProperties;
 import com.hopeful117.devlogai.insight.dto.response.*;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightStatus;
@@ -14,15 +15,13 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class TrustedKnowledgeDuplicateAuditService {
-    private static final Set<String> TITLE_STOP_WORDS = Set.of(
-            "the", "and", "or", "of", "for", "with", "using", "use", "project", "application", "present"
-    );
-
     private final InsightRepository insightRepository;
+    private final InsightSimilarityService similarityService;
+    private final InsightSimilarityProperties similarityProperties;
 
     public InsightDuplicateAuditResponse audit(UUID projectId) {
         List<Insight> insights = insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                projectId, List.of(InsightStatus.ACTIVE));
+                projectId, List.of(InsightStatus.ACTIVE, InsightStatus.ARCHIVED));
         List<InsightNode> nodes = insights.stream().map(InsightNode::new).toList();
         List<InsightDuplicateClusterResponse> clusters = buildClusters(nodes);
         return new InsightDuplicateAuditResponse(projectId, insights.size(), clusters.size(), clusters);
@@ -68,6 +67,10 @@ public class TrustedKnowledgeDuplicateAuditService {
         List<InsightDuplicateClusterResponse> result = new ArrayList<>();
         Set<UUID> visited = new HashSet<>();
 
+        List<String> corpus = nodes.stream()
+                .map(node -> buildInsightText(node.insight()))
+                .toList();
+
         for (InsightNode node : nodes) {
             if (!visited.add(node.insight().getId())) {
                 continue;
@@ -83,7 +86,7 @@ public class TrustedKnowledgeDuplicateAuditService {
                     if (visited.contains(candidate.insight().getId())) {
                         continue;
                     }
-                    if (sameTopic(current, candidate)) {
+                    if (sameTopic(current, candidate, corpus)) {
                         visited.add(candidate.insight().getId());
                         queue.add(candidate);
                         cluster.add(candidate);
@@ -141,27 +144,30 @@ public class TrustedKnowledgeDuplicateAuditService {
         );
     }
 
-    private boolean sameTopic(InsightNode left, InsightNode right) {
+    private boolean sameTopic(InsightNode left, InsightNode right, List<String> corpus) {
         if (left.insight().getType() != right.insight().getType()) {
             return false;
         }
-        Set<String> leftTokens = left.titleTokens();
-        Set<String> rightTokens = right.titleTokens();
-        if (leftTokens.isEmpty() || rightTokens.isEmpty()) {
-            return false;
+
+        String textA = buildInsightText(left.insight());
+        String textB = buildInsightText(right.insight());
+        double similarity = similarityService.computeSimilarity(textA, textB, corpus);
+
+        return similarity >= similarityProperties.getOverlapThreshold();
+    }
+
+    private String buildInsightText(Insight insight) {
+        StringBuilder sb = new StringBuilder();
+        if (insight.getTitle() != null) {
+            sb.append(insight.getTitle()).append(" ");
         }
-        Set<String> overlap = new LinkedHashSet<>(leftTokens);
-        overlap.retainAll(rightTokens);
-        if (overlap.size() >= 3) {
-            return true;
+        if (insight.getContent() != null) {
+            sb.append(insight.getContent()).append(" ");
         }
-        if (overlap.size() < 2) {
-            return false;
+        if (insight.getRationale() != null) {
+            sb.append(insight.getRationale());
         }
-        Set<String> union = new LinkedHashSet<>(leftTokens);
-        union.addAll(rightTokens);
-        int unionSize = union.size();
-        return (double) overlap.size() / (double) unionSize >= 0.4D;
+        return sb.toString();
     }
 
     private String topicClusterKey(List<InsightNode> members) {
@@ -237,11 +243,14 @@ public class TrustedKnowledgeDuplicateAuditService {
         }
 
         Set<String> titleTokens() {
+            Set<String> stopWords = Set.of(
+                    "the", "and", "or", "of", "for", "with", "using", "use", "project", "application", "present"
+            );
             return Arrays.stream(InsightPayloadSupport.normalize(insight.getTitle()).split("[^a-z0-9]+"))
                     .map(this::canonicalToken)
                     .filter(token -> !token.isBlank())
                     .filter(token -> token.length() >= 4)
-                    .filter(token -> !TITLE_STOP_WORDS.contains(token))
+                    .filter(token -> !stopWords.contains(token))
                     .collect(Collectors.toCollection(LinkedHashSet::new));
         }
 

@@ -122,7 +122,7 @@ class KnowledgeDeduplicationServiceTest {
     }
 
     @Test
-    void mergeExactDuplicate_shouldHandleSupersedeFailureGracefully() {
+    void mergeExactDuplicate_shouldThrowWhenSupersedeFails() {
         UUID findingId = UUID.randomUUID();
         UUID insight1 = UUID.randomUUID();
         UUID insight2 = UUID.randomUUID();
@@ -131,12 +131,10 @@ class KnowledgeDeduplicationServiceTest {
 
         when(findingRepository.findByIdAndProject_Id(findingId, project.getId())).thenReturn(Optional.of(finding));
         when(insightService.supersedeInsight(insight2, insight1)).thenThrow(new RuntimeException("Insight not found"));
-        when(findingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(findingMapper.toResponse(any(MaintenanceFinding.class))).thenAnswer(inv -> responseFor(inv.getArgument(0)));
 
-        MaintenanceFindingResponse result = service.mergeExactDuplicate(project.getId(), findingId, UUID.randomUUID(), "Merged");
-
-        assertEquals(MaintenanceFindingStatus.RESOLVED, result.status());
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+                service.mergeExactDuplicate(project.getId(), findingId, UUID.randomUUID(), "Merged"));
+        assertEquals("Insight not found", ex.getMessage());
     }
 
     // =================== resolveSemanticDuplicate ===================
@@ -230,7 +228,7 @@ class KnowledgeDeduplicationServiceTest {
     }
 
     @Test
-    void resolveOverlapReview_shouldHandleSupersedeFailureGracefully() {
+    void resolveOverlapReview_shouldThrowWhenSupersedeFails() {
         UUID findingId = UUID.randomUUID();
         UUID insight1 = UUID.randomUUID();
         UUID insight2 = UUID.randomUUID();
@@ -239,12 +237,10 @@ class KnowledgeDeduplicationServiceTest {
 
         when(findingRepository.findByIdAndProject_Id(findingId, project.getId())).thenReturn(Optional.of(finding));
         when(insightService.supersedeInsight(insight2, insight1)).thenThrow(new RuntimeException("Insight not found"));
-        when(findingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(findingMapper.toResponse(any(MaintenanceFinding.class))).thenAnswer(inv -> responseFor(inv.getArgument(0)));
 
-        MaintenanceFindingResponse result = service.resolveOverlapReview(project.getId(), findingId, UUID.randomUUID(), "Resolved");
-
-        assertEquals(MaintenanceFindingStatus.RESOLVED, result.status());
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+                service.resolveOverlapReview(project.getId(), findingId, UUID.randomUUID(), "Resolved"));
+        assertEquals("Insight not found", ex.getMessage());
     }
 
     @Test

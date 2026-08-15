@@ -174,6 +174,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
             factsById.putIfAbsent(fact.id(), fact);
         }
 
+        // Phase 1: budget-constrained selection (existing logic)
         List<AnalysisContext.ObservationSnapshot> observations = new ArrayList<>(rankedObservations.stream()
                 .limit(BUDGET.maximumObservations())
                 .toList());
@@ -182,24 +183,59 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
             observations.removeLast();
         }
 
-        LinkedHashSet<UUID> requiredFactIds = requiredFactIdsFor(observations, factsById.keySet());
-        List<AnalysisContext.FactSnapshot> requiredFacts = requiredFactIds.stream()
+        // Phase 2: grounding-closure enforcement (NEW)
+        // Ensure every selected observation's supportingFactIds ⊆ selectedFacts.ids
+        // If budget pressure cannot satisfy closure, remove observations until it does.
+        // Required facts must never be removed while the observation depending on them remains selected.
+        boolean closureAchieved = false;
+        int maxIterations = Math.max(observations.size(), 1);
+        for (int iteration = 0; iteration < maxIterations && !closureAchieved; iteration++) {
+            LinkedHashSet<UUID> currentRequiredFactIds = requiredFactIdsFor(observations, factsById.keySet());
+            List<AnalysisContext.FactSnapshot> currentRequiredFacts = currentRequiredFactIds.stream()
+                    .map(factsById::get)
+                    .filter(Objects::nonNull)
+                    .sorted(factOrder)
+                    .toList();
+
+            // Check: are all selected observations' supportingFactIds covered by the current fact set?
+            boolean closureOk = observations.stream().allMatch(
+                    observation -> observation.supportingFactIds().stream()
+                            .allMatch(currentRequiredFactIds::contains)
+            );
+
+            if (closureOk) {
+                closureAchieved = true;
+                break;
+            }
+
+            // Closure failed: remove the lowest-priority observation and recompute
+            if (!observations.isEmpty()) {
+                observations.removeLast();
+            } else {
+                // No observations left; break with empty selection
+                break;
+            }
+        }
+
+        // Re-compute required facts and discretionary facts after closure phase
+        LinkedHashSet<UUID> finalRequiredFactIds = requiredFactIdsFor(observations, factsById.keySet());
+        List<AnalysisContext.FactSnapshot> finalRequiredFacts = finalRequiredFactIds.stream()
                 .map(factsById::get)
                 .filter(Objects::nonNull)
                 .sorted(factOrder)
                 .toList();
 
         Set<String> usedFactContentKeys = new HashSet<>();
-        requiredFacts.forEach(fact -> usedFactContentKeys.add(factContentKey(fact)));
+        finalRequiredFacts.forEach(fact -> usedFactContentKeys.add(factContentKey(fact)));
         List<AnalysisContext.FactSnapshot> discretionaryFacts = rankedFacts.stream()
-                .filter(fact -> !requiredFactIds.contains(fact.id()))
+                .filter(fact -> !finalRequiredFactIds.contains(fact.id()))
                 .filter(distinctByKey(this::factContentKey))
                 .filter(fact -> usedFactContentKeys.add(factContentKey(fact)))
-                .limit(Math.max(0, BUDGET.maximumFacts() - requiredFacts.size()))
+                .limit(Math.max(0, BUDGET.maximumFacts() - finalRequiredFacts.size()))
                 .toList();
 
-        List<AnalysisContext.FactSnapshot> facts = new ArrayList<>(requiredFacts.size() + discretionaryFacts.size());
-        facts.addAll(requiredFacts);
+        List<AnalysisContext.FactSnapshot> facts = new ArrayList<>(finalRequiredFacts.size() + discretionaryFacts.size());
+        facts.addAll(finalRequiredFacts);
         facts.addAll(discretionaryFacts);
         return new SelectionSlice(List.copyOf(observations), List.copyOf(facts));
     }
