@@ -279,7 +279,6 @@ export class ProjectMaintenanceSection implements OnChanges {
     this.runAction(
       finding,
       (request) => this.service.dismiss(this.projectId, finding.id, request),
-      true,
     );
   }
 

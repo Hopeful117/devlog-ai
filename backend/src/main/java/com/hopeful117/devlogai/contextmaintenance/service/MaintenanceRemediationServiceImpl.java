@@ -134,18 +134,12 @@ public class MaintenanceRemediationServiceImpl implements MaintenanceRemediation
         }
 
         var sources = sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId);
-        boolean allFresh = true;
         for (Source source : sources) {
             try {
                 freshnessService.check(projectId, source.getId());
             } catch (Exception e) {
-                log.error("Freshness check failed for source {}: {}", source.getId(), e.getMessage());
-                allFresh = false;
+                log.warn("Freshness check failed for source {}: {}", source.getId(), e.getMessage());
             }
-        }
-
-        if (!allFresh) {
-            throw new ConflictException("Freshness check failed for one or more sources. Understanding refresh aborted.");
         }
 
         try {

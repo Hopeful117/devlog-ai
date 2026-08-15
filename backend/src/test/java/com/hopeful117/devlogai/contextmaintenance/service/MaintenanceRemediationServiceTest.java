@@ -250,7 +250,7 @@ class MaintenanceRemediationServiceTest {
     }
 
     @Test
-    void refreshProjectUnderstanding_shouldAbortWhenFreshnessCheckFails() {
+    void refreshProjectUnderstanding_shouldContinueWhenFreshnessCheckFails() {
         UUID findingId = UUID.randomUUID();
         UUID sourceId = UUID.randomUUID();
         MaintenanceFinding finding = buildFinding(MaintenanceFindingIssueType.STALE_PROJECT_UNDERSTANDING, null);
@@ -259,11 +259,14 @@ class MaintenanceRemediationServiceTest {
         when(findingRepository.findByIdAndProject_Id(findingId, project.getId())).thenReturn(Optional.of(finding));
         when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(project.getId())).thenReturn(List.of(source));
         when(freshnessService.check(project.getId(), sourceId)).thenThrow(new RuntimeException("Git error"));
+        when(understandingService.execute(any(), any())).thenReturn(null);
+        when(findingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(findingMapper.toResponse(any(MaintenanceFinding.class))).thenAnswer(inv -> responseFor(inv.getArgument(0)));
 
-        ConflictException ex = assertThrows(ConflictException.class, () ->
-                service.refreshProjectUnderstanding(project.getId(), findingId, UUID.randomUUID(), "comment"));
-        assertTrue(ex.getMessage().contains("Freshness check failed"));
-        verify(understandingService, never()).execute(any(), any());
+        MaintenanceFindingResponse result = service.refreshProjectUnderstanding(project.getId(), findingId, UUID.randomUUID(), "Refreshed despite freshness failure");
+
+        assertEquals(MaintenanceFindingStatus.RESOLVED, result.status());
+        verify(understandingService).execute(any(), any());
     }
 
     @Test
