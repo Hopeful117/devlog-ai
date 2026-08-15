@@ -136,6 +136,13 @@ export class ProjectMaintenanceSection implements OnChanges {
     this.comments[findingId] = value;
   }
 
+  getPlaceholder(finding: MaintenanceFinding): string {
+    if (this.requiresReview(finding)) {
+      return 'Describe the corrective action you took to resolve this issue...';
+    }
+    return 'Add a note about this finding...';
+  }
+
   latestActionSummary(finding: MaintenanceFinding): string | null {
     const latest = finding.actionHistory[0];
     if (!latest) return null;

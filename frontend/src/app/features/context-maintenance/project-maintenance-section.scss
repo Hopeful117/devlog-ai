@@ -123,6 +123,12 @@
   font-style: italic;
 }
 
+.maintenance-actions__hint--action {
+  color: var(--info);
+  font-style: normal;
+  font-weight: 500;
+}
+
 .maintenance-actions__label {
   font-size: 0.76rem;
   color: var(--text-muted);
