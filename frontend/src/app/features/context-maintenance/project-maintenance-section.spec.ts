@@ -43,22 +43,6 @@ const humanContextFinding: MaintenanceFinding = {
   summary: "Active human context input 'Medium-term objective' may be stale or superseded.",
 };
 
-const autoResolvedFinding: MaintenanceFinding = {
-  ...humanContextFinding,
-  id: 'auto-1',
-  status: 'RESOLVED',
-  actionHistory: [
-    {
-      id: 'action-1',
-      actionType: 'AUTO_RESOLVE',
-      actedBy: '00000000-0000-0000-0000-000000000002',
-      actedAt: '2026-08-14T14:00:00Z',
-      comment:
-        'Automatically resolved because the deterministic maintenance condition no longer applies.',
-    },
-  ],
-};
-
 const staleUnderstandingFinding: MaintenanceFinding = {
   ...finding,
   id: 'stale-1',
