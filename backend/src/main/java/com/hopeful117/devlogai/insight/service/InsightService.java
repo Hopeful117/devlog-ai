@@ -32,4 +32,8 @@ public interface InsightService {
     );
 
     InsightDuplicateAuditResponse getDuplicateAudit(UUID projectId);
+
+    InsightResponse archiveInsight(UUID insightId);
+
+    InsightResponse supersedeInsight(UUID insightId, UUID canonicalInsightId);
 }

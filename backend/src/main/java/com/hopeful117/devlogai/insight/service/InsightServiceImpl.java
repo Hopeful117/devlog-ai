@@ -4,12 +4,14 @@ import com.hopeful117.devlogai.insight.dto.response.InsightResponse;
 import com.hopeful117.devlogai.insight.dto.response.InsightDuplicateAuditResponse;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.insight.mapper.InsightMapper;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
@@ -116,6 +118,27 @@ public class InsightServiceImpl implements InsightService{
     @Override
     public InsightDuplicateAuditResponse getDuplicateAudit(UUID projectId) {
         return trustedKnowledgeDuplicateAuditService.audit(projectId);
+    }
+
+    @Override
+    @Transactional
+    public InsightResponse archiveInsight(UUID insightId) {
+        Insight insight = insightRepository.findById(insightId)
+                .orElseThrow(() -> new EntityNotFoundException("Insight", insightId));
+        insight.setStatus(InsightStatus.ARCHIVED);
+        return insightMapper.toResponse(insightRepository.save(insight));
+    }
+
+    @Override
+    @Transactional
+    public InsightResponse supersedeInsight(UUID insightId, UUID canonicalInsightId) {
+        Insight insight = insightRepository.findById(insightId)
+                .orElseThrow(() -> new EntityNotFoundException("Insight", insightId));
+        Insight canonical = insightRepository.findById(canonicalInsightId)
+                .orElseThrow(() -> new EntityNotFoundException("Insight", canonicalInsightId));
+
+        insight.setStatus(InsightStatus.SUPERSEDED);
+        return insightMapper.toResponse(insightRepository.save(insight));
     }
 
 }

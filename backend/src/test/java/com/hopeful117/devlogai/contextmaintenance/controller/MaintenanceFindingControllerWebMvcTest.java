@@ -11,6 +11,7 @@ import com.hopeful117.devlogai.contextmaintenance.entity.MaintenanceSuggestedAct
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceEvaluationService;
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceFindingService;
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceRemediationService;
+import com.hopeful117.devlogai.contextmaintenance.service.KnowledgeDeduplicationService;
 import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,7 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
     private MaintenanceFindingService service;
     private MaintenanceEvaluationService evaluationService;
     private MaintenanceRemediationService remediationService;
+    private KnowledgeDeduplicationService deduplicationService;
     private MockMvc mvc;
     private UUID projectId;
     private MaintenanceFindingResponse response;
@@ -45,7 +47,8 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
         service = mock(MaintenanceFindingService.class);
         evaluationService = mock(MaintenanceEvaluationService.class);
         remediationService = mock(MaintenanceRemediationService.class);
-        mvc = mockMvc(new MaintenanceFindingController(service, evaluationService, remediationService));
+        deduplicationService = mock(KnowledgeDeduplicationService.class);
+        mvc = mockMvc(new MaintenanceFindingController(service, evaluationService, remediationService, deduplicationService));
         projectId = UUID.randomUUID();
         response = new MaintenanceFindingResponse(
                 UUID.randomUUID(), projectId,

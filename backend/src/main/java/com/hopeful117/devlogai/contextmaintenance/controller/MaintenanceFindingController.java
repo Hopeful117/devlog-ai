@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.contextmaintenance.controller;
 import com.hopeful117.devlogai.contextmaintenance.dto.request.MaintenanceFindingActionRequest;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceEvaluationResponse;
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
+import com.hopeful117.devlogai.contextmaintenance.service.KnowledgeDeduplicationService;
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceEvaluationService;
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceFindingService;
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceRemediationService;
@@ -27,6 +28,7 @@ public class MaintenanceFindingController {
     private final MaintenanceFindingService service;
     private final MaintenanceEvaluationService evaluationService;
     private final MaintenanceRemediationService remediationService;
+    private final KnowledgeDeduplicationService deduplicationService;
 
     @GetMapping
     public ResponseEntity<List<MaintenanceFindingResponse>> getByProject(
@@ -106,6 +108,26 @@ public class MaintenanceFindingController {
             @Valid @RequestBody MaintenanceFindingActionRequest request
     ) {
         return ResponseEntity.ok(remediationService.refreshProjectUnderstanding(
+                projectId, findingId, request.actedBy(), request.comment()));
+    }
+
+    @PostMapping("/{findingId}/actions/merge-duplicate")
+    public ResponseEntity<MaintenanceFindingResponse> mergeDuplicate(
+            @PathVariable UUID projectId,
+            @PathVariable UUID findingId,
+            @Valid @RequestBody MaintenanceFindingActionRequest request
+    ) {
+        return ResponseEntity.ok(deduplicationService.mergeExactDuplicate(
+                projectId, findingId, request.actedBy(), request.comment()));
+    }
+
+    @PostMapping("/{findingId}/actions/resolve-semantic-duplicate")
+    public ResponseEntity<MaintenanceFindingResponse> resolveSemanticDuplicate(
+            @PathVariable UUID projectId,
+            @PathVariable UUID findingId,
+            @Valid @RequestBody MaintenanceFindingActionRequest request
+    ) {
+        return ResponseEntity.ok(deduplicationService.resolveSemanticDuplicate(
                 projectId, findingId, request.actedBy(), request.comment()));
     }
 }
