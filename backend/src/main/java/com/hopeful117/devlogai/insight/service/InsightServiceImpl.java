@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -163,6 +164,25 @@ public class InsightServiceImpl implements InsightService{
         }
 
         return response;
+    }
+
+    @Override
+    public Optional<Insight> findById(UUID id) {
+        return insightRepository.findById(id);
+    }
+
+    @Override
+    @Transactional
+    public InsightResponse updateInsight(UUID insightId, String content, String rationale) {
+        Insight insight = insightRepository.findById(insightId)
+                .orElseThrow(() -> new EntityNotFoundException("Insight", insightId));
+        if (content != null && !content.isBlank()) {
+            insight.setContent(content);
+        }
+        if (rationale != null) {
+            insight.setRationale(rationale);
+        }
+        return insightMapper.toResponse(insightRepository.save(insight));
     }
 
 }
