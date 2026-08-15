@@ -117,7 +117,7 @@ public class MaintenanceFindingController {
             @PathVariable UUID findingId,
             @Valid @RequestBody MaintenanceFindingActionRequest request
     ) {
-        return ResponseEntity.ok(deduplicationService.resolveSemanticDuplicate(
+        return ResponseEntity.ok(deduplicationService.resolveOverlapReview(
                 projectId, findingId, request.actedBy(), request.comment()));
     }
 

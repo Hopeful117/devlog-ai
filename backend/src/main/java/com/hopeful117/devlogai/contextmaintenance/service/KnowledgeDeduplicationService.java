@@ -19,4 +19,11 @@ public interface KnowledgeDeduplicationService {
             UUID actedBy,
             String comment
     );
+
+    MaintenanceFindingResponse resolveOverlapReview(
+            UUID projectId,
+            UUID findingId,
+            UUID actedBy,
+            String comment
+    );
 }

@@ -44,22 +44,7 @@ public class KnowledgeDeduplicationServiceImpl implements KnowledgeDeduplication
             throw new ConflictException("This action is only available for TRUSTED_KNOWLEDGE_EXACT_DUPLICATE findings.");
         }
 
-        UUID[] insightIds = extractInsightIdsFromDetails(finding.getDetails());
-        if (insightIds == null || insightIds.length < 2) {
-            throw new ConflictException("Could not extract insight IDs from finding details.");
-        }
-
-        UUID canonicalInsightId = insightIds[0];
-        for (int i = 1; i < insightIds.length; i++) {
-            try {
-                insightService.supersedeInsight(insightIds[i], canonicalInsightId);
-            } catch (Exception e) {
-                log.warn("Failed to supersede insight {}: {}", insightIds[i], e.getMessage());
-            }
-        }
-
-        applyAction(finding, MaintenanceFindingActionType.RESOLVE, actedBy, comment);
-        return findingMapper.toResponse(findingRepository.save(finding));
+        return mergeAndResolve(finding, actedBy, comment);
     }
 
     @Override
@@ -77,6 +62,32 @@ public class KnowledgeDeduplicationServiceImpl implements KnowledgeDeduplication
             throw new ConflictException("This action is only available for TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE findings.");
         }
 
+        return mergeAndResolve(finding, actedBy, comment);
+    }
+
+    @Override
+    @Transactional
+    public MaintenanceFindingResponse resolveOverlapReview(
+            UUID projectId,
+            UUID findingId,
+            UUID actedBy,
+            String comment
+    ) {
+        MaintenanceFinding finding = findingRepository.findByIdAndProject_Id(findingId, projectId)
+                .orElseThrow(() -> new EntityNotFoundException("MaintenanceFinding", findingId));
+
+        if (finding.getIssueType() != MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_OVERLAP_REVIEW) {
+            throw new ConflictException("This action is only available for TRUSTED_KNOWLEDGE_OVERLAP_REVIEW findings.");
+        }
+
+        return mergeAndResolve(finding, actedBy, comment);
+    }
+
+    private MaintenanceFindingResponse mergeAndResolve(
+            MaintenanceFinding finding,
+            UUID actedBy,
+            String comment
+    ) {
         UUID[] insightIds = extractInsightIdsFromDetails(finding.getDetails());
         if (insightIds == null || insightIds.length < 2) {
             throw new ConflictException("Could not extract insight IDs from finding details.");

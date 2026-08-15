@@ -188,4 +188,70 @@ class KnowledgeDeduplicationServiceTest {
                 service.resolveSemanticDuplicate(project.getId(), finding.getId(), UUID.randomUUID(), "comment"));
         assertTrue(ex.getMessage().contains("Could not extract insight IDs"));
     }
+
+    // =================== resolveOverlapReview ===================
+
+    @Test
+    void resolveOverlapReview_shouldSupersedeNonCanonicalInsights() {
+        UUID findingId = UUID.randomUUID();
+        UUID insight1 = UUID.randomUUID();
+        UUID insight2 = UUID.randomUUID();
+        String details = "Members:\n" + insight1 + " | Title A\n" + insight2 + " | Title B";
+        MaintenanceFinding finding = buildFinding(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_OVERLAP_REVIEW, details);
+
+        when(findingRepository.findByIdAndProject_Id(findingId, project.getId())).thenReturn(Optional.of(finding));
+        when(findingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(findingMapper.toResponse(any(MaintenanceFinding.class))).thenAnswer(inv -> responseFor(inv.getArgument(0)));
+
+        MaintenanceFindingResponse result = service.resolveOverlapReview(project.getId(), findingId, UUID.randomUUID(), "Resolved");
+
+        assertEquals(MaintenanceFindingStatus.RESOLVED, result.status());
+        verify(insightService).supersedeInsight(insight2, insight1);
+    }
+
+    @Test
+    void resolveOverlapReview_shouldThrowForWrongIssueType() {
+        MaintenanceFinding finding = buildFinding(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_EXACT_DUPLICATE, null);
+        when(findingRepository.findByIdAndProject_Id(any(), any())).thenReturn(Optional.of(finding));
+
+        ConflictException ex = assertThrows(ConflictException.class, () ->
+                service.resolveOverlapReview(project.getId(), finding.getId(), UUID.randomUUID(), "comment"));
+        assertTrue(ex.getMessage().contains("TRUSTED_KNOWLEDGE_OVERLAP_REVIEW"));
+    }
+
+    @Test
+    void resolveOverlapReview_shouldThrowWhenInsightIdsCannotBeExtracted() {
+        MaintenanceFinding finding = buildFinding(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_OVERLAP_REVIEW, "No UUIDs here");
+        when(findingRepository.findByIdAndProject_Id(any(), any())).thenReturn(Optional.of(finding));
+
+        ConflictException ex = assertThrows(ConflictException.class, () ->
+                service.resolveOverlapReview(project.getId(), finding.getId(), UUID.randomUUID(), "comment"));
+        assertTrue(ex.getMessage().contains("Could not extract insight IDs"));
+    }
+
+    @Test
+    void resolveOverlapReview_shouldHandleSupersedeFailureGracefully() {
+        UUID findingId = UUID.randomUUID();
+        UUID insight1 = UUID.randomUUID();
+        UUID insight2 = UUID.randomUUID();
+        String details = "Members:\n" + insight1 + " | Title A\n" + insight2 + " | Title B";
+        MaintenanceFinding finding = buildFinding(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_OVERLAP_REVIEW, details);
+
+        when(findingRepository.findByIdAndProject_Id(findingId, project.getId())).thenReturn(Optional.of(finding));
+        when(insightService.supersedeInsight(insight2, insight1)).thenThrow(new RuntimeException("Insight not found"));
+        when(findingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(findingMapper.toResponse(any(MaintenanceFinding.class))).thenAnswer(inv -> responseFor(inv.getArgument(0)));
+
+        MaintenanceFindingResponse result = service.resolveOverlapReview(project.getId(), findingId, UUID.randomUUID(), "Resolved");
+
+        assertEquals(MaintenanceFindingStatus.RESOLVED, result.status());
+    }
+
+    @Test
+    void resolveOverlapReview_shouldThrowWhenFindingNotFound() {
+        when(findingRepository.findByIdAndProject_Id(any(), any())).thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class, () ->
+                service.resolveOverlapReview(project.getId(), UUID.randomUUID(), UUID.randomUUID(), "comment"));
+    }
 }

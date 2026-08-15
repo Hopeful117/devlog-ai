@@ -464,7 +464,7 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                 List.of(),
                 response.createdAt(), response.updatedAt()
         );
-        when(deduplicationService.resolveSemanticDuplicate(eq(projectId), eq(findingId), any(UUID.class), any()))
+        when(deduplicationService.resolveOverlapReview(eq(projectId), eq(findingId), any(UUID.class), any()))
                 .thenReturn(resolved);
 
         mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/resolve-overlap",
@@ -475,6 +475,21 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
+    @Test
+    void shouldReturn409WhenResolveOverlapReviewHasWrongIssueType() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        when(deduplicationService.resolveOverlapReview(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenThrow(new ConflictException("Wrong issue type"));
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/resolve-overlap",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Wrong type"}
+                                """))
+                .andExpect(status().isConflict());
     }
 
     // =================== request validation ===================
