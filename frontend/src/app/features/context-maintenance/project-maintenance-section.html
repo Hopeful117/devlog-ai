@@ -120,6 +120,18 @@
                         Dismiss
                       </button>
                     </div>
+                    @if (pendingActions[finding.id]) {
+                      <div
+                        class="maintenance-progress"
+                        role="status"
+                        aria-label="Action in progress"
+                      >
+                        <div class="maintenance-progress__bar"></div>
+                      </div>
+                      <p class="maintenance-progress__label">
+                        {{ remediationProgressLabel(finding) }}
+                      </p>
+                    }
                   } @else {
                     @if (requiresReview(finding)) {
                       <p class="maintenance-actions__hint maintenance-actions__hint--action">

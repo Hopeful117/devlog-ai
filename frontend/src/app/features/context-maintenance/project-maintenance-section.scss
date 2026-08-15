@@ -181,6 +181,42 @@
   box-shadow: 0 0 8px rgb(79 198 138 / 0.15);
 }
 
+.maintenance-progress {
+  height: 3px;
+  border-radius: 999px;
+  background: rgb(79 198 138 / 0.15);
+  overflow: hidden;
+}
+
+.maintenance-progress__bar {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgb(79 198 138 / 0.4) 0%,
+    rgb(79 198 138 / 0.9) 50%,
+    rgb(79 198 138 / 0.4) 100%
+  );
+  animation: maintenance-progress-slide 1.8s ease-in-out infinite;
+}
+
+.maintenance-progress__label {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+@keyframes maintenance-progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .maintenance-assessments {
   display: grid;
   gap: 0.45rem;

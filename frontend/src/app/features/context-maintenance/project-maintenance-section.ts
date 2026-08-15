@@ -152,6 +152,19 @@ export class ProjectMaintenanceSection implements OnChanges {
     return labels[finding.issueType] ?? 'Fix this';
   }
 
+  remediationProgressLabel(finding: MaintenanceFinding): string {
+    const labels: Record<string, string> = {
+      PROJECTION_REFRESH_GAP: 'Running freshness checks across all sources…',
+      STALE_HUMAN_CONTEXT_INPUT: 'Archiving stale human context input…',
+      MISSING_PROJECTION_REFRESH: 'Generating missing freshness projection…',
+      STALE_PROJECT_UNDERSTANDING: 'Refreshing project understanding (this may take a moment)…',
+      TRUSTED_KNOWLEDGE_EXACT_DUPLICATE: 'Merging duplicate knowledge entries…',
+      TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE: 'Resolving semantic duplicate…',
+      TRUSTED_KNOWLEDGE_OVERLAP_REVIEW: 'Resolving knowledge overlap…',
+    };
+    return labels[finding.issueType] ?? 'Processing…';
+  }
+
   remediate(finding: MaintenanceFinding): void {
     this.pendingActions[finding.id] = true;
     this.actionErrors[finding.id] = '';
@@ -276,10 +289,7 @@ export class ProjectMaintenanceSection implements OnChanges {
   }
 
   dismiss(finding: MaintenanceFinding): void {
-    this.runAction(
-      finding,
-      (request) => this.service.dismiss(this.projectId, finding.id, request),
-    );
+    this.runAction(finding, (request) => this.service.dismiss(this.projectId, finding.id, request));
   }
 
   resolve(finding: MaintenanceFinding): void {
