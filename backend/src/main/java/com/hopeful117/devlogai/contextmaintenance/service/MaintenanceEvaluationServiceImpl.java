@@ -255,8 +255,7 @@ public class MaintenanceEvaluationServiceImpl implements MaintenanceEvaluationSe
 
     private boolean hasEquivalentActiveFinding(List<MaintenanceFinding> findings, CreateMaintenanceFindingRequest request) {
         return findings.stream()
-                .filter(existing -> existing.getStatus() == MaintenanceFindingStatus.OPEN
-                        || existing.getStatus() == MaintenanceFindingStatus.ACKNOWLEDGED)
+                .filter(existing -> existing.getStatus() != MaintenanceFindingStatus.DISMISSED)
                 .anyMatch(existing ->
                         existing.getContextSurface() == request.contextSurface()
                                 && existing.getIssueType() == request.issueType()
