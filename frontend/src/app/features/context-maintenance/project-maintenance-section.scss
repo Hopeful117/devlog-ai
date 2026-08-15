@@ -173,6 +173,14 @@
   background: rgb(79 198 138 / 0.14);
 }
 
+.maintenance-button--remediation {
+  padding: 0.55rem 1.1rem;
+  font-weight: 700;
+  border-color: rgb(79 198 138 / 0.5);
+  background: rgb(79 198 138 / 0.22);
+  box-shadow: 0 0 8px rgb(79 198 138 / 0.15);
+}
+
 .maintenance-assessments {
   display: grid;
   gap: 0.45rem;

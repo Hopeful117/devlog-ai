@@ -94,44 +94,22 @@
               }
               @if (supportsWorkflow(finding)) {
                 <div class="maintenance-actions">
-                  @if (requiresReview(finding)) {
+                  @if (hasRemediation(finding)) {
                     <p class="maintenance-actions__hint maintenance-actions__hint--action">
-                      This finding requires your intervention. Review the issue below, take
-                      corrective action, then mark as resolved with a comment describing what you
-                      did.
+                      This finding can be resolved automatically. Click the button below to trigger
+                      the corrective action. The finding will be marked resolved once the action
+                      completes.
                     </p>
-                  } @else {
-                    <p class="maintenance-actions__hint">
-                      Dismiss if this is a false positive, or resolve if the condition has cleared.
-                    </p>
-                  }
-                  <label class="maintenance-actions__label" [attr.for]="'comment-' + finding.id">
-                    {{
-                      requiresComment(finding) ? 'Action taken (required)' : 'Comment (optional)'
-                    }}
-                  </label>
-                  <textarea
-                    class="maintenance-actions__comment"
-                    [id]="'comment-' + finding.id"
-                    [ngModel]="commentValue(finding.id)"
-                    (ngModelChange)="setComment(finding.id, $event)"
-                    rows="2"
-                    [placeholder]="getPlaceholder(finding)"
-                    [disabled]="pendingActions[finding.id]"
-                  ></textarea>
-                  <div class="maintenance-actions__buttons">
-                    @if (canAcknowledge(finding)) {
+                    <div class="maintenance-actions__buttons">
                       <button
                         type="button"
-                        class="maintenance-button"
-                        (click)="acknowledge(finding)"
+                        class="maintenance-button maintenance-button--primary maintenance-button--remediation"
+                        (click)="remediate(finding)"
                         [disabled]="pendingActions[finding.id]"
-                        title="Record that you are aware of this finding and will address it later"
+                        title="Trigger the corrective action and resolve this finding"
                       >
-                        Acknowledge
+                        {{ pendingActions[finding.id] ? 'Working…' : remediationLabel(finding) }}
                       </button>
-                    }
-                    @if (canDismissOrResolve(finding)) {
                       <button
                         type="button"
                         class="maintenance-button maintenance-button--secondary"
@@ -141,17 +119,68 @@
                       >
                         Dismiss
                       </button>
-                      <button
-                        type="button"
-                        class="maintenance-button maintenance-button--primary"
-                        (click)="resolve(finding)"
-                        [disabled]="pendingActions[finding.id]"
-                        title="Confirm the issue has been addressed and close this finding"
-                      >
-                        Resolve
-                      </button>
+                    </div>
+                  } @else {
+                    @if (requiresReview(finding)) {
+                      <p class="maintenance-actions__hint maintenance-actions__hint--action">
+                        This finding requires your intervention. Review the issue below, take
+                        corrective action, then mark as resolved with a comment describing what you
+                        did.
+                      </p>
+                    } @else {
+                      <p class="maintenance-actions__hint">
+                        Dismiss if this is a false positive, or resolve if the condition has
+                        cleared.
+                      </p>
                     }
-                  </div>
+                    <label class="maintenance-actions__label" [attr.for]="'comment-' + finding.id">
+                      {{
+                        requiresComment(finding) ? 'Action taken (required)' : 'Comment (optional)'
+                      }}
+                    </label>
+                    <textarea
+                      class="maintenance-actions__comment"
+                      [id]="'comment-' + finding.id"
+                      [ngModel]="commentValue(finding.id)"
+                      (ngModelChange)="setComment(finding.id, $event)"
+                      rows="2"
+                      [placeholder]="getPlaceholder(finding)"
+                      [disabled]="pendingActions[finding.id]"
+                    ></textarea>
+                    <div class="maintenance-actions__buttons">
+                      @if (canAcknowledge(finding)) {
+                        <button
+                          type="button"
+                          class="maintenance-button"
+                          (click)="acknowledge(finding)"
+                          [disabled]="pendingActions[finding.id]"
+                          title="Record that you are aware of this finding and will address it later"
+                        >
+                          Acknowledge
+                        </button>
+                      }
+                      @if (canDismissOrResolve(finding)) {
+                        <button
+                          type="button"
+                          class="maintenance-button maintenance-button--secondary"
+                          (click)="dismiss(finding)"
+                          [disabled]="pendingActions[finding.id]"
+                          title="Mark this finding as a false positive or no longer applicable"
+                        >
+                          Dismiss
+                        </button>
+                        <button
+                          type="button"
+                          class="maintenance-button maintenance-button--primary"
+                          (click)="resolve(finding)"
+                          [disabled]="pendingActions[finding.id]"
+                          title="Confirm the issue has been addressed and close this finding"
+                        >
+                          Resolve
+                        </button>
+                      }
+                    </div>
+                  }
                   @if (actionErrors[finding.id]) {
                     <p class="maintenance-copy maintenance-copy--error">
                       {{ actionErrors[finding.id] }}

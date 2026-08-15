@@ -68,6 +68,12 @@ describe('ProjectMaintenanceSection', () => {
   const acknowledge = vi.fn();
   const dismiss = vi.fn();
   const resolve = vi.fn();
+  const refreshProjection = vi.fn();
+  const archiveStaleHumanContext = vi.fn();
+  const refreshMissingProjection = vi.fn();
+  const refreshProjectUnderstanding = vi.fn();
+  const mergeDuplicate = vi.fn();
+  const resolveSemanticDuplicate = vi.fn();
 
   async function render() {
     await TestBed.configureTestingModule({
@@ -75,7 +81,18 @@ describe('ProjectMaintenanceSection', () => {
       providers: [
         {
           provide: MaintenanceFindingService,
-          useValue: { getByProject, acknowledge, dismiss, resolve },
+          useValue: {
+            getByProject,
+            acknowledge,
+            dismiss,
+            resolve,
+            refreshProjection,
+            archiveStaleHumanContext,
+            refreshMissingProjection,
+            refreshProjectUnderstanding,
+            mergeDuplicate,
+            resolveSemanticDuplicate,
+          },
         },
       ],
     }).compileComponents();
@@ -127,41 +144,48 @@ describe('ProjectMaintenanceSection', () => {
     );
   });
 
-  it('renders remediation actions for duplicate debt and posts acknowledgement', async () => {
+  it('renders one-click remediation for duplicate debt and calls mergeDuplicate', async () => {
     getByProject.mockReturnValue(of([duplicateFinding]));
-    acknowledge.mockReturnValue(
-      of({ ...duplicateFinding, status: 'ACKNOWLEDGED', actionHistory: [] }),
+    mergeDuplicate.mockReturnValue(
+      of({ ...duplicateFinding, status: 'RESOLVED', actionHistory: [] }),
     );
     const fixture = await render();
 
     const button = fixture.debugElement
       .queryAll(By.css('button'))
-      .find((candidate) => candidate.nativeElement.textContent.includes('Acknowledge'));
+      .find((candidate) => candidate.nativeElement.textContent.includes('Merge duplicates'));
 
     expect(button).toBeDefined();
     button!.nativeElement.click();
     fixture.detectChanges();
 
-    expect(acknowledge).toHaveBeenCalledWith('project-1', 'debt-1', {
+    expect(mergeDuplicate).toHaveBeenCalledWith('project-1', 'debt-1', {
       actedBy: '00000000-0000-0000-0000-000000000001',
-      comment: '',
+      comment: 'Automated remediation triggered from dashboard.',
     });
   });
 
-  it('renders human context findings with the shared remediation workflow', async () => {
+  it('renders one-click remediation for human context findings and calls archiveStaleHumanContext', async () => {
     getByProject.mockReturnValue(of([humanContextFinding]));
-    resolve.mockReturnValue(of({ ...humanContextFinding, status: 'RESOLVED', actionHistory: [] }));
+    archiveStaleHumanContext.mockReturnValue(
+      of({ ...humanContextFinding, status: 'RESOLVED', actionHistory: [] }),
+    );
     const fixture = await render();
 
     expect(fixture.nativeElement.textContent).toContain('Human context');
     expect(fixture.nativeElement.textContent).toContain('may be stale or superseded');
 
-    fixture.componentInstance.setComment('human-1', 'Archived after review');
-    fixture.componentInstance.resolve(humanContextFinding);
+    const button = fixture.debugElement
+      .queryAll(By.css('button'))
+      .find((candidate) => candidate.nativeElement.textContent.includes('Archive stale input'));
 
-    expect(resolve).toHaveBeenCalledWith('project-1', 'human-1', {
+    expect(button).toBeDefined();
+    button!.nativeElement.click();
+    fixture.detectChanges();
+
+    expect(archiveStaleHumanContext).toHaveBeenCalledWith('project-1', 'human-1', {
       actedBy: '00000000-0000-0000-0000-000000000001',
-      comment: 'Archived after review',
+      comment: 'Automated remediation triggered from dashboard.',
     });
   });
 
