@@ -270,20 +270,29 @@ class MaintenanceRemediationServiceTest {
     }
 
     @Test
-    void refreshProjectUnderstanding_shouldThrowWhenUnderstandingFails() {
+    void refreshProjectUnderstanding_shouldContinueWhenUnderstandingFailsForOneSource() {
         UUID findingId = UUID.randomUUID();
-        UUID sourceId = UUID.randomUUID();
+        UUID sourceId1 = UUID.randomUUID();
+        UUID sourceId2 = UUID.randomUUID();
         MaintenanceFinding finding = buildFinding(MaintenanceFindingIssueType.STALE_PROJECT_UNDERSTANDING, null);
-        Source source = Source.builder().id(sourceId).build();
+        Source source1 = Source.builder().id(sourceId1).build();
+        Source source2 = Source.builder().id(sourceId2).build();
 
         when(findingRepository.findByIdAndProject_Id(findingId, project.getId())).thenReturn(Optional.of(finding));
-        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(project.getId())).thenReturn(List.of(source));
-        when(freshnessService.check(project.getId(), sourceId)).thenReturn(null);
-        when(understandingService.execute(any(), any())).thenThrow(new RuntimeException("Analysis failed"));
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(project.getId())).thenReturn(List.of(source1, source2));
+        when(freshnessService.check(project.getId(), sourceId1)).thenReturn(null);
+        when(freshnessService.check(project.getId(), sourceId2)).thenReturn(null);
+        when(understandingService.execute(eq(project.getId()), argThat(req -> req.sourceId().equals(sourceId1))))
+                .thenThrow(new RuntimeException("Analysis failed for source 1"));
+        when(understandingService.execute(eq(project.getId()), argThat(req -> req.sourceId().equals(sourceId2))))
+                .thenReturn(null);
+        when(findingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(findingMapper.toResponse(any(MaintenanceFinding.class))).thenAnswer(inv -> responseFor(inv.getArgument(0)));
 
-        ConflictException ex = assertThrows(ConflictException.class, () ->
-                service.refreshProjectUnderstanding(project.getId(), findingId, UUID.randomUUID(), "comment"));
-        assertTrue(ex.getMessage().contains("Understanding re-analysis failed"));
+        MaintenanceFindingResponse result = service.refreshProjectUnderstanding(project.getId(), findingId, UUID.randomUUID(), "Partial success");
+
+        assertEquals(MaintenanceFindingStatus.RESOLVED, result.status());
+        verify(understandingService, times(2)).execute(any(), any());
     }
 
     @Test
@@ -303,13 +312,12 @@ class MaintenanceRemediationServiceTest {
 
         when(findingRepository.findByIdAndProject_Id(findingId, project.getId())).thenReturn(Optional.of(finding));
         when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(project.getId())).thenReturn(List.of());
-        when(understandingService.execute(any(), any())).thenReturn(null);
         when(findingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         when(findingMapper.toResponse(any(MaintenanceFinding.class))).thenAnswer(inv -> responseFor(inv.getArgument(0)));
 
         MaintenanceFindingResponse result = service.refreshProjectUnderstanding(project.getId(), findingId, UUID.randomUUID(), "Done");
 
         assertEquals(MaintenanceFindingStatus.RESOLVED, result.status());
-        verify(understandingService).execute(any(), any());
+        verify(understandingService, never()).execute(any(), any());
     }
 }

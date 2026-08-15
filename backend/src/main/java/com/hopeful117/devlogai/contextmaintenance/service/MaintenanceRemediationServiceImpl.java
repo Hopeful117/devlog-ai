@@ -143,7 +143,14 @@ public class MaintenanceRemediationServiceImpl implements MaintenanceRemediation
         }
 
         try {
-            understandingService.execute(projectId, new ProjectUnderstandingRequest(null, null, null));
+            for (Source source : sources) {
+                try {
+                    understandingService.execute(projectId,
+                            new ProjectUnderstandingRequest(source.getId(), null, null));
+                } catch (Exception e) {
+                    log.warn("Understanding re-analysis failed for source {}: {}", source.getId(), e.getMessage());
+                }
+            }
         } catch (Exception e) {
             log.error("Understanding re-analysis failed: {}", e.getMessage());
             throw new ConflictException("Understanding re-analysis failed: " + e.getMessage());
