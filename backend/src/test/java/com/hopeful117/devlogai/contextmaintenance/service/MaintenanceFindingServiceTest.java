@@ -259,7 +259,7 @@ class MaintenanceFindingServiceTest {
         UUID findingId = UUID.randomUUID();
         MaintenanceFinding finding = MaintenanceFinding.builder()
                 .id(findingId)
-                .issueType(MaintenanceFindingIssueType.STALE_PROJECT_UNDERSTANDING)
+                .issueType(MaintenanceFindingIssueType.PROJECTION_REFRESH_GAP)
                 .status(MaintenanceFindingStatus.OPEN)
                 .actions(new java.util.ArrayList<>())
                 .build();
@@ -342,5 +342,85 @@ class MaintenanceFindingServiceTest {
         assertEquals(1, finding.getActions().size());
         assertEquals(MaintenanceFindingActionType.AUTO_RESOLVE, finding.getActions().getFirst().getActionType());
         assertEquals(systemActorId, finding.getActions().getFirst().getActedBy());
+    }
+
+    @Test
+    void shouldDismissStaleProjectUnderstandingWithAuditTrail() {
+        UUID projectId = UUID.randomUUID();
+        UUID findingId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).build();
+        MaintenanceFinding finding = MaintenanceFinding.builder()
+                .id(findingId)
+                .project(project)
+                .issueType(MaintenanceFindingIssueType.STALE_PROJECT_UNDERSTANDING)
+                .contextSurface(MaintenanceContextSurface.PROJECT_UNDERSTANDING)
+                .severity(MaintenanceFindingSeverity.HIGH)
+                .status(MaintenanceFindingStatus.OPEN)
+                .suggestedAction(MaintenanceSuggestedActionCategory.REFRESH)
+                .summary("Source is stale")
+                .actions(new java.util.ArrayList<>())
+                .build();
+        MaintenanceFindingActionRequest request = new MaintenanceFindingActionRequest(
+                UUID.fromString("00000000-0000-0000-0000-000000000123"),
+                "Source is intentionally kept at current revision"
+        );
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(repository.findByIdAndProject_Id(findingId, projectId)).thenReturn(Optional.of(finding));
+        when(repository.save(finding)).thenReturn(finding);
+        when(mapper.toResponse(finding)).thenAnswer(invocation -> {
+            MaintenanceFinding saved = invocation.getArgument(0);
+            return new MaintenanceFindingResponse(
+                    saved.getId(), projectId, saved.getContextSurface(), saved.getIssueType(),
+                    saved.getSeverity(), saved.getStatus(), saved.getSuggestedAction(), true,
+                    saved.getSummary(), saved.getDetails(), List.of(), List.of(), null, null
+            );
+        });
+
+        MaintenanceFindingResponse result = service.dismiss(projectId, findingId, request);
+
+        assertEquals(MaintenanceFindingStatus.DISMISSED, finding.getStatus());
+        assertEquals(MaintenanceFindingStatus.DISMISSED, result.status());
+        assertEquals(1, finding.getActions().size());
+        assertEquals(MaintenanceFindingActionType.DISMISS, finding.getActions().getFirst().getActionType());
+    }
+
+    @Test
+    void shouldDismissMissingProjectionRefreshWithAuditTrail() {
+        UUID projectId = UUID.randomUUID();
+        UUID findingId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).build();
+        MaintenanceFinding finding = MaintenanceFinding.builder()
+                .id(findingId)
+                .project(project)
+                .issueType(MaintenanceFindingIssueType.MISSING_PROJECTION_REFRESH)
+                .contextSurface(MaintenanceContextSurface.PROJECT_PROJECTION)
+                .severity(MaintenanceFindingSeverity.MEDIUM)
+                .status(MaintenanceFindingStatus.OPEN)
+                .suggestedAction(MaintenanceSuggestedActionCategory.INVESTIGATE)
+                .summary("Projection refresh missing")
+                .actions(new java.util.ArrayList<>())
+                .build();
+        MaintenanceFindingActionRequest request = new MaintenanceFindingActionRequest(
+                UUID.fromString("00000000-0000-0000-0000-000000000123"),
+                "Projection not needed for this project"
+        );
+        when(projectRepository.existsById(projectId)).thenReturn(true);
+        when(repository.findByIdAndProject_Id(findingId, projectId)).thenReturn(Optional.of(finding));
+        when(repository.save(finding)).thenReturn(finding);
+        when(mapper.toResponse(finding)).thenAnswer(invocation -> {
+            MaintenanceFinding saved = invocation.getArgument(0);
+            return new MaintenanceFindingResponse(
+                    saved.getId(), projectId, saved.getContextSurface(), saved.getIssueType(),
+                    saved.getSeverity(), saved.getStatus(), saved.getSuggestedAction(), false,
+                    saved.getSummary(), saved.getDetails(), List.of(), List.of(), null, null
+            );
+        });
+
+        MaintenanceFindingResponse result = service.dismiss(projectId, findingId, request);
+
+        assertEquals(MaintenanceFindingStatus.DISMISSED, finding.getStatus());
+        assertEquals(MaintenanceFindingStatus.DISMISSED, result.status());
+        assertEquals(1, finding.getActions().size());
+        assertEquals(MaintenanceFindingActionType.DISMISS, finding.getActions().getFirst().getActionType());
     }
 }

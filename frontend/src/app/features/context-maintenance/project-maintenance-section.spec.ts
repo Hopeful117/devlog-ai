@@ -59,6 +59,26 @@ const autoResolvedFinding: MaintenanceFinding = {
   ],
 };
 
+const staleUnderstandingFinding: MaintenanceFinding = {
+  ...finding,
+  id: 'stale-1',
+  contextSurface: 'PROJECT_UNDERSTANDING',
+  issueType: 'STALE_PROJECT_UNDERSTANDING',
+  severity: 'HIGH',
+  suggestedAction: 'REFRESH',
+  summary: 'Project understanding is stale for source Github.',
+};
+
+const missingProjectionFinding: MaintenanceFinding = {
+  ...finding,
+  id: 'missing-1',
+  contextSurface: 'PROJECT_PROJECTION',
+  issueType: 'MISSING_PROJECTION_REFRESH',
+  severity: 'MEDIUM',
+  suggestedAction: 'INVESTIGATE',
+  summary: 'Projection refresh missing.',
+};
+
 describe('ProjectMaintenanceSection', () => {
   const getByProject = vi.fn();
   const acknowledge = vi.fn();
@@ -171,5 +191,39 @@ describe('ProjectMaintenanceSection', () => {
     expect(fixture.nativeElement.textContent).toContain(
       'Automatically resolved because the deterministic maintenance condition no longer applies.',
     );
+  });
+
+  it('renders dismiss button for stale project understanding finding', async () => {
+    getByProject.mockReturnValue(of([staleUnderstandingFinding]));
+    dismiss.mockReturnValue(
+      of({ ...staleUnderstandingFinding, status: 'DISMISSED', actionHistory: [] }),
+    );
+    const fixture = await render();
+
+    expect(fixture.nativeElement.textContent).toContain('Understanding');
+    expect(fixture.nativeElement.textContent).toContain('Project understanding is stale');
+
+    const dismissButton = fixture.debugElement
+      .queryAll(By.css('button'))
+      .find((candidate) => candidate.nativeElement.textContent.includes('Dismiss'));
+
+    expect(dismissButton).toBeDefined();
+  });
+
+  it('renders dismiss button for missing projection refresh finding', async () => {
+    getByProject.mockReturnValue(of([missingProjectionFinding]));
+    dismiss.mockReturnValue(
+      of({ ...missingProjectionFinding, status: 'DISMISSED', actionHistory: [] }),
+    );
+    const fixture = await render();
+
+    expect(fixture.nativeElement.textContent).toContain('Projection');
+    expect(fixture.nativeElement.textContent).toContain('Projection refresh missing');
+
+    const dismissButton = fixture.debugElement
+      .queryAll(By.css('button'))
+      .find((candidate) => candidate.nativeElement.textContent.includes('Dismiss'));
+
+    expect(dismissButton).toBeDefined();
   });
 });

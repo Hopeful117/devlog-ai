@@ -101,6 +101,8 @@ export class ProjectMaintenanceSection implements OnChanges {
 
   supportsWorkflow(finding: MaintenanceFinding): boolean {
     return (
+      finding.issueType === 'STALE_PROJECT_UNDERSTANDING' ||
+      finding.issueType === 'MISSING_PROJECTION_REFRESH' ||
       finding.issueType === 'TRUSTED_KNOWLEDGE_EXACT_DUPLICATE' ||
       finding.issueType === 'TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE' ||
       finding.issueType === 'TRUSTED_KNOWLEDGE_OVERLAP_REVIEW' ||
