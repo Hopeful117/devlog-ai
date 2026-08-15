@@ -118,7 +118,7 @@ describe('ProjectMaintenanceSection', () => {
 
     expect(getByProject).toHaveBeenCalledWith('project-1');
     expect(fixture.nativeElement.textContent).toContain(
-      'No active maintenance findings currently exist for this project.',
+      'No active maintenance findings. Run an evaluation to check context health.',
     );
   });
 

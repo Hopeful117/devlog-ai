@@ -54,7 +54,10 @@ export class ProjectMaintenanceSection implements OnChanges {
   readonly view$: Observable<MaintenanceViewState> = this.projectIds.pipe(
     switchMap((projectId) =>
       this.service.getByProject(projectId).pipe(
-        map((findings) => ({ state: 'loaded' as const, findings })),
+        map((findings) => ({
+          state: 'loaded' as const,
+          findings: findings.filter((f) => f.status === 'OPEN' || f.status === 'ACKNOWLEDGED'),
+        })),
         catchError((error: unknown) =>
           of({ state: 'error' as const, error: toRequestError(error, 'project') }),
         ),

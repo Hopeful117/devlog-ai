@@ -27,9 +27,13 @@
     } @else {
       @if (view.findings.length === 0) {
         <p class="maintenance-copy">
-          No active maintenance findings currently exist for this project.
+          No active maintenance findings. Run an evaluation to check context health.
         </p>
       } @else {
+        <p class="maintenance-cta">
+          {{ view.findings.length }} finding(s) require your attention. Review each finding below
+          and dismiss false positives or resolve confirmed issues.
+        </p>
         <ul class="maintenance-list">
           @for (finding of view.findings; track finding.id) {
             <li

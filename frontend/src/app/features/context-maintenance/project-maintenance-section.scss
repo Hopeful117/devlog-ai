@@ -16,6 +16,15 @@
   margin: 0;
 }
 
+.maintenance-cta {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.5rem;
+  background: rgb(77 141 255 / 0.08);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .maintenance-copy--error {
   color: var(--danger);
 }
