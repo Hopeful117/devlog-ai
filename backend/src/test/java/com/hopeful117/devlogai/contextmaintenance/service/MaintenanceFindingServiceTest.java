@@ -254,26 +254,35 @@ class MaintenanceFindingServiceTest {
     }
 
     @Test
-    void shouldRejectRemediationForUnsupportedFindingFamily() {
+    void shouldResolveProjectionRefreshGapFindingWithAuditTrail() {
         UUID projectId = UUID.randomUUID();
         UUID findingId = UUID.randomUUID();
         MaintenanceFinding finding = MaintenanceFinding.builder()
                 .id(findingId)
                 .issueType(MaintenanceFindingIssueType.PROJECTION_REFRESH_GAP)
+                .contextSurface(MaintenanceContextSurface.PROJECT_PROJECTION)
                 .status(MaintenanceFindingStatus.OPEN)
                 .actions(new java.util.ArrayList<>())
                 .build();
         when(projectRepository.existsById(projectId)).thenReturn(true);
         when(repository.findByIdAndProject_Id(findingId, projectId)).thenReturn(Optional.of(finding));
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toResponse(any(MaintenanceFinding.class))).thenAnswer(invocation -> {
+            MaintenanceFinding f = invocation.getArgument(0);
+            return new MaintenanceFindingResponse(
+                    f.getId(), projectId,
+                    f.getContextSurface(), f.getIssueType(), f.getSeverity(), f.getStatus(),
+                    f.getSuggestedAction(), f.isHumanReviewRequired(), f.getSummary(), f.getDetails(),
+                    List.of(), List.of(), f.getCreatedAt(), f.getUpdatedAt());
+        });
 
-        var error = assertThrows(
-                com.hopeful117.devlogai.shared.exception.ConflictException.class,
-                () -> service.resolve(projectId, findingId,
-                        new MaintenanceFindingActionRequest(UUID.randomUUID(), "Handled elsewhere"))
-        );
+        var response = service.resolve(projectId, findingId,
+                new MaintenanceFindingActionRequest(UUID.randomUUID(), "Refreshed projection"));
 
-        assertEquals("This maintenance finding family does not yet support remediation actions.",
-                error.getMessage());
+        assertEquals(MaintenanceFindingStatus.RESOLVED, response.status());
+        verify(repository).save(finding);
+        assertEquals(1, finding.getActions().size());
+        assertEquals("Refreshed projection", finding.getActions().getFirst().getComment());
     }
 
     @Test

@@ -60,4 +60,48 @@ export class MaintenanceFindingService {
       request,
     );
   }
+
+  refreshProjection(
+    projectId: string,
+    findingId: string,
+    request: MaintenanceFindingActionRequest,
+  ): Observable<MaintenanceFinding> {
+    return this.http.post<MaintenanceFinding>(
+      `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings/${encodeURIComponent(findingId)}/actions/refresh-projection`,
+      request,
+    );
+  }
+
+  archiveStaleHumanContext(
+    projectId: string,
+    findingId: string,
+    request: MaintenanceFindingActionRequest,
+  ): Observable<MaintenanceFinding> {
+    return this.http.post<MaintenanceFinding>(
+      `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings/${encodeURIComponent(findingId)}/actions/archive-context-input`,
+      request,
+    );
+  }
+
+  refreshMissingProjection(
+    projectId: string,
+    findingId: string,
+    request: MaintenanceFindingActionRequest,
+  ): Observable<MaintenanceFinding> {
+    return this.http.post<MaintenanceFinding>(
+      `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings/${encodeURIComponent(findingId)}/actions/refresh-missing-projection`,
+      request,
+    );
+  }
+
+  refreshProjectUnderstanding(
+    projectId: string,
+    findingId: string,
+    request: MaintenanceFindingActionRequest,
+  ): Observable<MaintenanceFinding> {
+    return this.http.post<MaintenanceFinding>(
+      `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings/${encodeURIComponent(findingId)}/actions/refresh-understanding`,
+      request,
+    );
+  }
 }

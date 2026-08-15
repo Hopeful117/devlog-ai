@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceEvalua
 import com.hopeful117.devlogai.contextmaintenance.dto.response.MaintenanceFindingResponse;
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceEvaluationService;
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceFindingService;
+import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceRemediationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +26,7 @@ public class MaintenanceFindingController {
 
     private final MaintenanceFindingService service;
     private final MaintenanceEvaluationService evaluationService;
+    private final MaintenanceRemediationService remediationService;
 
     @GetMapping
     public ResponseEntity<List<MaintenanceFindingResponse>> getByProject(
@@ -65,5 +67,45 @@ public class MaintenanceFindingController {
             @Valid @RequestBody MaintenanceFindingActionRequest request
     ) {
         return ResponseEntity.ok(service.resolve(projectId, findingId, request));
+    }
+
+    @PostMapping("/{findingId}/actions/refresh-projection")
+    public ResponseEntity<MaintenanceFindingResponse> refreshProjection(
+            @PathVariable UUID projectId,
+            @PathVariable UUID findingId,
+            @Valid @RequestBody MaintenanceFindingActionRequest request
+    ) {
+        return ResponseEntity.ok(remediationService.refreshProjection(
+                projectId, findingId, request.actedBy(), request.comment()));
+    }
+
+    @PostMapping("/{findingId}/actions/archive-context-input")
+    public ResponseEntity<MaintenanceFindingResponse> archiveStaleHumanContext(
+            @PathVariable UUID projectId,
+            @PathVariable UUID findingId,
+            @Valid @RequestBody MaintenanceFindingActionRequest request
+    ) {
+        return ResponseEntity.ok(remediationService.archiveStaleHumanContext(
+                projectId, findingId, request.actedBy(), request.comment()));
+    }
+
+    @PostMapping("/{findingId}/actions/refresh-missing-projection")
+    public ResponseEntity<MaintenanceFindingResponse> refreshMissingProjection(
+            @PathVariable UUID projectId,
+            @PathVariable UUID findingId,
+            @Valid @RequestBody MaintenanceFindingActionRequest request
+    ) {
+        return ResponseEntity.ok(remediationService.refreshMissingProjection(
+                projectId, findingId, request.actedBy(), request.comment()));
+    }
+
+    @PostMapping("/{findingId}/actions/refresh-understanding")
+    public ResponseEntity<MaintenanceFindingResponse> refreshProjectUnderstanding(
+            @PathVariable UUID projectId,
+            @PathVariable UUID findingId,
+            @Valid @RequestBody MaintenanceFindingActionRequest request
+    ) {
+        return ResponseEntity.ok(remediationService.refreshProjectUnderstanding(
+                projectId, findingId, request.actedBy(), request.comment()));
     }
 }

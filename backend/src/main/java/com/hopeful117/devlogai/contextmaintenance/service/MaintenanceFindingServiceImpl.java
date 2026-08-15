@@ -197,6 +197,7 @@ public class MaintenanceFindingServiceImpl implements MaintenanceFindingService 
         return switch (finding.getIssueType()) {
             case STALE_PROJECT_UNDERSTANDING,
                     MISSING_PROJECTION_REFRESH,
+                    PROJECTION_REFRESH_GAP,
                     STALE_HUMAN_CONTEXT_INPUT,
                     TRUSTED_KNOWLEDGE_EXACT_DUPLICATE,
                     TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE,

@@ -106,6 +106,7 @@ export class ProjectMaintenanceSection implements OnChanges {
     return (
       finding.issueType === 'STALE_PROJECT_UNDERSTANDING' ||
       finding.issueType === 'MISSING_PROJECTION_REFRESH' ||
+      finding.issueType === 'PROJECTION_REFRESH_GAP' ||
       finding.issueType === 'TRUSTED_KNOWLEDGE_EXACT_DUPLICATE' ||
       finding.issueType === 'TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE' ||
       finding.issueType === 'TRUSTED_KNOWLEDGE_OVERLAP_REVIEW' ||
