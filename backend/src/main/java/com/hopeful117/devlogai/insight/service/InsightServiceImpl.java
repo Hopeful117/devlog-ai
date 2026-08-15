@@ -54,7 +54,8 @@ public class InsightServiceImpl implements InsightService{
             UUID projectId) {
 
         return insightRepository
-                .findByProjectIdOrderByCreatedAtDesc(projectId)
+                .findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                        projectId, List.of(InsightStatus.ACTIVE))
                 .stream()
                 .map(insightMapper::toResponse)
                 .toList();

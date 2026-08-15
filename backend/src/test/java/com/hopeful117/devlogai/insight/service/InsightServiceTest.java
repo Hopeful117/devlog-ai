@@ -56,7 +56,8 @@ class InsightServiceTest {
         Insight insight = new Insight();
         InsightResponse response = mock(InsightResponse.class);
         when(mapper.toResponse(insight)).thenReturn(response);
-        when(repository.findByProjectIdOrderByCreatedAtDesc(projectId)).thenReturn(List.of(insight));
+        when(repository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of(insight));
         when(repository.findByProjectIdAndTypeOrderByCreatedAtDesc(projectId, InsightType.ARCHITECTURAL))
                 .thenReturn(List.of(insight));
         when(repository.findByProjectIdAndSeverityOrderByCreatedAtDesc(projectId, InsightSeverity.CRITICAL))

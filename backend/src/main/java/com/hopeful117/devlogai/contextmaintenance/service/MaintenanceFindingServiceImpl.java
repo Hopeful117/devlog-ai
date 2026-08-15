@@ -225,8 +225,7 @@ public class MaintenanceFindingServiceImpl implements MaintenanceFindingService 
                 && finding.getStatus() != MaintenanceFindingStatus.ACKNOWLEDGED) {
             throw new ConflictException("Only open or acknowledged maintenance findings can be auto-resolved.");
         }
-        if ((actionType == MaintenanceFindingActionType.DISMISS
-                || actionType == MaintenanceFindingActionType.RESOLVE
+        if ((actionType == MaintenanceFindingActionType.RESOLVE
                 || actionType == MaintenanceFindingActionType.AUTO_RESOLVE)
                 && normalizeDetails(comment) == null) {
             throw new ConflictException("A rationale comment is required for this maintenance action.");

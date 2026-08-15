@@ -232,7 +232,7 @@ class MaintenanceFindingServiceTest {
     }
 
     @Test
-    void shouldRequireCommentToDismissFinding() {
+    void shouldDismissFindingWithoutComment() {
         UUID projectId = UUID.randomUUID();
         UUID findingId = UUID.randomUUID();
         MaintenanceFinding finding = MaintenanceFinding.builder()
@@ -240,17 +240,24 @@ class MaintenanceFindingServiceTest {
                 .issueType(MaintenanceFindingIssueType.TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE)
                 .status(MaintenanceFindingStatus.OPEN)
                 .actions(new java.util.ArrayList<>())
+                .project(com.hopeful117.devlogai.project.entity.Project.builder().id(projectId).build())
                 .build();
         when(projectRepository.existsById(projectId)).thenReturn(true);
         when(repository.findByIdAndProject_Id(findingId, projectId)).thenReturn(Optional.of(finding));
+        when(repository.save(any(MaintenanceFinding.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toResponse(any(MaintenanceFinding.class))).thenAnswer(invocation -> {
+            MaintenanceFinding f = invocation.getArgument(0);
+            return new MaintenanceFindingResponse(
+                    f.getId(), projectId,
+                    f.getContextSurface(), f.getIssueType(), f.getSeverity(), f.getStatus(),
+                    f.getSuggestedAction(), f.isHumanReviewRequired(), f.getSummary(), f.getDetails(),
+                    List.of(), List.of(), f.getCreatedAt(), f.getUpdatedAt());
+        });
 
-        var error = assertThrows(
-                com.hopeful117.devlogai.shared.exception.ConflictException.class,
-                () -> service.dismiss(projectId, findingId,
-                        new MaintenanceFindingActionRequest(UUID.randomUUID(), "   "))
-        );
+        MaintenanceFindingResponse result = service.dismiss(projectId, findingId,
+                new MaintenanceFindingActionRequest(UUID.randomUUID(), ""));
 
-        assertEquals("A rationale comment is required for this maintenance action.", error.getMessage());
+        assertEquals(MaintenanceFindingStatus.DISMISSED, result.status());
     }
 
     @Test
