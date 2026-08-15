@@ -13,6 +13,7 @@ import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceFindingServ
 import com.hopeful117.devlogai.contextmaintenance.service.MaintenanceRemediationService;
 import com.hopeful117.devlogai.contextmaintenance.service.KnowledgeDeduplicationService;
 import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
+import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import com.hopeful117.devlogai.shared.exception.ConflictException;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport {
@@ -64,6 +66,22 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                 List.of(),
                 Instant.parse("2026-08-14T10:00:00Z"),
                 Instant.parse("2026-08-14T10:05:00Z")
+        );
+    }
+
+    private String validRequest() {
+        return """
+                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Action comment"}
+                """;
+    }
+
+    private MaintenanceFindingResponse resolvedResponse(MaintenanceFindingResponse original) {
+        return new MaintenanceFindingResponse(
+                original.id(), projectId, original.contextSurface(), original.issueType(),
+                original.severity(), MaintenanceFindingStatus.RESOLVED, original.suggestedAction(),
+                original.humanReviewRequired(), original.summary(), original.details(),
+                List.of(), List.of(),
+                original.createdAt(), original.updatedAt()
         );
     }
 
@@ -192,5 +210,262 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
+    // =================== refresh-projection ===================
+
+    @Test
+    void shouldExposeRefreshProjectionRoute() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFindingResponse resolved = new MaintenanceFindingResponse(
+                response.id(), projectId, response.contextSurface(), response.issueType(),
+                response.severity(), MaintenanceFindingStatus.RESOLVED, response.suggestedAction(),
+                response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                List.of(),
+                response.createdAt(), response.updatedAt()
+        );
+        when(remediationService.refreshProjection(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenReturn(resolved);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/refresh-projection",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Refresh projection"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
+    @Test
+    void shouldReturn409WhenRefreshProjectionHasWrongIssueType() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        when(remediationService.refreshProjection(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenThrow(new ConflictException("This action is only available for PROJECTION_REFRESH_GAP findings."));
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/refresh-projection",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Wrong type"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RESOURCE_CONFLICT"));
+    }
+
+    // =================== archive-context-input ===================
+
+    @Test
+    void shouldExposeArchiveContextInputRoute() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFindingResponse resolved = new MaintenanceFindingResponse(
+                response.id(), projectId, response.contextSurface(), response.issueType(),
+                response.severity(), MaintenanceFindingStatus.RESOLVED, response.suggestedAction(),
+                response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                List.of(),
+                response.createdAt(), response.updatedAt()
+        );
+        when(remediationService.archiveStaleHumanContext(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenReturn(resolved);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/archive-context-input",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Archive stale input"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
+    @Test
+    void shouldReturn409WhenArchiveContextInputHasWrongIssueType() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        when(remediationService.archiveStaleHumanContext(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenThrow(new ConflictException("Wrong issue type"));
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/archive-context-input",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Wrong type"}
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    // =================== refresh-missing-projection ===================
+
+    @Test
+    void shouldExposeRefreshMissingProjectionRoute() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFindingResponse resolved = new MaintenanceFindingResponse(
+                response.id(), projectId, response.contextSurface(), response.issueType(),
+                response.severity(), MaintenanceFindingStatus.RESOLVED, response.suggestedAction(),
+                response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                List.of(),
+                response.createdAt(), response.updatedAt()
+        );
+        when(remediationService.refreshMissingProjection(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenReturn(resolved);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/refresh-missing-projection",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Refresh missing"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
+    @Test
+    void shouldReturn409WhenRefreshMissingProjectionHasWrongIssueType() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        when(remediationService.refreshMissingProjection(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenThrow(new ConflictException("Wrong issue type"));
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/refresh-missing-projection",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Wrong type"}
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    // =================== refresh-understanding ===================
+
+    @Test
+    void shouldExposeRefreshUnderstandingRoute() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFindingResponse resolved = new MaintenanceFindingResponse(
+                response.id(), projectId, response.contextSurface(), response.issueType(),
+                response.severity(), MaintenanceFindingStatus.RESOLVED, response.suggestedAction(),
+                response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                List.of(),
+                response.createdAt(), response.updatedAt()
+        );
+        when(remediationService.refreshProjectUnderstanding(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenReturn(resolved);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/refresh-understanding",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Refresh understanding"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
+    @Test
+    void shouldReturn409WhenRefreshUnderstandingFails() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        when(remediationService.refreshProjectUnderstanding(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenThrow(new ConflictException("Freshness check failed"));
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/refresh-understanding",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Should fail"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Freshness check failed"));
+    }
+
+    // =================== merge-duplicate ===================
+
+    @Test
+    void shouldExposeMergeDuplicateRoute() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFindingResponse resolved = new MaintenanceFindingResponse(
+                response.id(), projectId, response.contextSurface(), response.issueType(),
+                response.severity(), MaintenanceFindingStatus.RESOLVED, response.suggestedAction(),
+                response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                List.of(),
+                response.createdAt(), response.updatedAt()
+        );
+        when(deduplicationService.mergeExactDuplicate(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenReturn(resolved);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/merge-duplicate",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Merge duplicates"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
+    @Test
+    void shouldReturn409WhenMergeDuplicateHasWrongIssueType() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        when(deduplicationService.mergeExactDuplicate(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenThrow(new ConflictException("Wrong issue type"));
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/merge-duplicate",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Wrong type"}
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    // =================== resolve-semantic-duplicate ===================
+
+    @Test
+    void shouldExposeResolveSemanticDuplicateRoute() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFindingResponse resolved = new MaintenanceFindingResponse(
+                response.id(), projectId, response.contextSurface(), response.issueType(),
+                response.severity(), MaintenanceFindingStatus.RESOLVED, response.suggestedAction(),
+                response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                List.of(),
+                response.createdAt(), response.updatedAt()
+        );
+        when(deduplicationService.resolveSemanticDuplicate(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenReturn(resolved);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/resolve-semantic-duplicate",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Resolve semantic"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
+    @Test
+    void shouldReturn409WhenResolveSemanticDuplicateHasWrongIssueType() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        when(deduplicationService.resolveSemanticDuplicate(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenThrow(new ConflictException("Wrong issue type"));
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/resolve-semantic-duplicate",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Wrong type"}
+                                """))
+                .andExpect(status().isConflict());
+    }
+
+    // =================== request validation ===================
+
+    @Test
+    void shouldReturn400WhenActedByIsNull() throws Exception {
+        UUID findingId = UUID.randomUUID();
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/refresh-projection",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"comment":"test"}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 }
