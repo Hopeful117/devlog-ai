@@ -126,6 +126,7 @@
                         class="maintenance-button"
                         (click)="acknowledge(finding)"
                         [disabled]="pendingActions[finding.id]"
+                        title="Record that you are aware of this finding and will address it later"
                       >
                         Acknowledge
                       </button>
@@ -136,6 +137,7 @@
                         class="maintenance-button maintenance-button--secondary"
                         (click)="dismiss(finding)"
                         [disabled]="pendingActions[finding.id]"
+                        title="Mark this finding as a false positive or no longer applicable"
                       >
                         Dismiss
                       </button>
@@ -144,6 +146,7 @@
                         class="maintenance-button maintenance-button--primary"
                         (click)="resolve(finding)"
                         [disabled]="pendingActions[finding.id]"
+                        title="Confirm the issue has been addressed and close this finding"
                       >
                         Resolve
                       </button>
