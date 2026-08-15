@@ -111,6 +111,16 @@ public class MaintenanceFindingController {
                 projectId, findingId, request.actedBy(), request.comment()));
     }
 
+    @PostMapping("/{findingId}/actions/resolve-overlap")
+    public ResponseEntity<MaintenanceFindingResponse> resolveOverlapReview(
+            @PathVariable UUID projectId,
+            @PathVariable UUID findingId,
+            @Valid @RequestBody MaintenanceFindingActionRequest request
+    ) {
+        return ResponseEntity.ok(deduplicationService.resolveSemanticDuplicate(
+                projectId, findingId, request.actedBy(), request.comment()));
+    }
+
     @PostMapping("/{findingId}/actions/merge-duplicate")
     public ResponseEntity<MaintenanceFindingResponse> mergeDuplicate(
             @PathVariable UUID projectId,

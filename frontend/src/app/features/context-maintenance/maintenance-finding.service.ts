@@ -126,4 +126,15 @@ export class MaintenanceFindingService {
       request,
     );
   }
+
+  resolveOverlapReview(
+    projectId: string,
+    findingId: string,
+    request: MaintenanceFindingActionRequest,
+  ): Observable<MaintenanceFinding> {
+    return this.http.post<MaintenanceFinding>(
+      `${this.projectsUrl}/${encodeURIComponent(projectId)}/maintenance-findings/${encodeURIComponent(findingId)}/actions/resolve-overlap`,
+      request,
+    );
+  }
 }

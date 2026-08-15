@@ -74,6 +74,7 @@ describe('ProjectMaintenanceSection', () => {
   const refreshProjectUnderstanding = vi.fn();
   const mergeDuplicate = vi.fn();
   const resolveSemanticDuplicate = vi.fn();
+  const resolveOverlapReview = vi.fn();
 
   async function render() {
     await TestBed.configureTestingModule({
@@ -92,6 +93,7 @@ describe('ProjectMaintenanceSection', () => {
             refreshProjectUnderstanding,
             mergeDuplicate,
             resolveSemanticDuplicate,
+            resolveOverlapReview,
           },
         },
       ],
@@ -184,6 +186,35 @@ describe('ProjectMaintenanceSection', () => {
     fixture.detectChanges();
 
     expect(archiveStaleHumanContext).toHaveBeenCalledWith('project-1', 'human-1', {
+      actedBy: '00000000-0000-0000-0000-000000000001',
+      comment: 'Automated remediation triggered from dashboard.',
+    });
+  });
+
+  it('renders one-click remediation for overlap review findings and calls resolveOverlapReview', async () => {
+    const overlapFinding: MaintenanceFinding = {
+      ...finding,
+      id: 'overlap-1',
+      contextSurface: 'PROJECT_UNDERSTANDING',
+      issueType: 'TRUSTED_KNOWLEDGE_OVERLAP_REVIEW',
+      status: 'OPEN',
+      summary: 'Trusted knowledge overlap requires review for cluster "boot-rest-spring".',
+    };
+    getByProject.mockReturnValue(of([overlapFinding]));
+    resolveOverlapReview.mockReturnValue(
+      of({ ...overlapFinding, status: 'RESOLVED', actionHistory: [] }),
+    );
+    const fixture = await render();
+
+    const button = fixture.debugElement
+      .queryAll(By.css('button'))
+      .find((candidate) => candidate.nativeElement.textContent.includes('Resolve overlap'));
+
+    expect(button).toBeDefined();
+    button!.nativeElement.click();
+    fixture.detectChanges();
+
+    expect(resolveOverlapReview).toHaveBeenCalledWith('project-1', 'overlap-1', {
       actedBy: '00000000-0000-0000-0000-000000000001',
       comment: 'Automated remediation triggered from dashboard.',
     });

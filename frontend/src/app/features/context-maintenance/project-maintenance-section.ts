@@ -134,7 +134,8 @@ export class ProjectMaintenanceSection implements OnChanges {
       t === 'MISSING_PROJECTION_REFRESH' ||
       t === 'STALE_PROJECT_UNDERSTANDING' ||
       t === 'TRUSTED_KNOWLEDGE_EXACT_DUPLICATE' ||
-      t === 'TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE'
+      t === 'TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE' ||
+      t === 'TRUSTED_KNOWLEDGE_OVERLAP_REVIEW'
     );
   }
 
@@ -146,6 +147,7 @@ export class ProjectMaintenanceSection implements OnChanges {
       STALE_PROJECT_UNDERSTANDING: 'Refresh understanding',
       TRUSTED_KNOWLEDGE_EXACT_DUPLICATE: 'Merge duplicates',
       TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE: 'Resolve duplicate',
+      TRUSTED_KNOWLEDGE_OVERLAP_REVIEW: 'Resolve overlap',
     };
     return labels[finding.issueType] ?? 'Fix this';
   }
@@ -172,6 +174,8 @@ export class ProjectMaintenanceSection implements OnChanges {
         this.service.mergeDuplicate(this.projectId, finding.id, request),
       TRUSTED_KNOWLEDGE_SEMANTIC_DUPLICATE: () =>
         this.service.resolveSemanticDuplicate(this.projectId, finding.id, request),
+      TRUSTED_KNOWLEDGE_OVERLAP_REVIEW: () =>
+        this.service.resolveOverlapReview(this.projectId, finding.id, request),
     };
 
     const call = callMap[finding.issueType];

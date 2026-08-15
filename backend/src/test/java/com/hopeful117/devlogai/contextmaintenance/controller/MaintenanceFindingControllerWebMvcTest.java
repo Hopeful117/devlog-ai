@@ -454,6 +454,29 @@ class MaintenanceFindingControllerWebMvcTest extends ControllerWebMvcTestSupport
                 .andExpect(status().isConflict());
     }
 
+    @Test
+    void shouldExposeResolveOverlapReviewRoute() throws Exception {
+        UUID findingId = UUID.randomUUID();
+        MaintenanceFindingResponse resolved = new MaintenanceFindingResponse(
+                response.id(), projectId, response.contextSurface(), response.issueType(),
+                response.severity(), MaintenanceFindingStatus.RESOLVED, response.suggestedAction(),
+                response.humanReviewRequired(), response.summary(), response.details(), List.of(),
+                List.of(),
+                response.createdAt(), response.updatedAt()
+        );
+        when(deduplicationService.resolveSemanticDuplicate(eq(projectId), eq(findingId), any(UUID.class), any()))
+                .thenReturn(resolved);
+
+        mvc.perform(post("/api/v1/projects/{projectId}/maintenance-findings/{findingId}/actions/resolve-overlap",
+                        projectId, findingId)
+                        .contentType("application/json")
+                        .content("""
+                                {"actedBy":"00000000-0000-0000-0000-000000000123","comment":"Resolve overlap"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"));
+    }
+
     // =================== request validation ===================
 
     @Test
