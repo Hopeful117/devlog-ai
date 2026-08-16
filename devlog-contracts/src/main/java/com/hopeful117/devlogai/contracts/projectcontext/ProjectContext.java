@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.contracts.projectcontext;
 
+import java.util.List;
 import java.util.UUID;
 
 public record ProjectContext(
@@ -7,6 +8,7 @@ public record ProjectContext(
         String name,
         String slug,
         String description,
-        String status
+        String status,
+        List<ProjectNote>notes
 ) {
 }
