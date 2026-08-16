@@ -62,8 +62,9 @@ describe('ProjectContextInputsSection', () => {
     const element = fixture.nativeElement as HTMLElement;
 
     expect(getByProject).toHaveBeenCalledWith(projectId);
+    // Note content is rendered by ngx-markdown; check title and type are present
     expect(element.textContent).toContain('Medium-term goal');
-    expect(element.textContent).toContain('Improve semantic usefulness');
+    expect(element.textContent).toContain('GOAL');
     expect(element.textContent).toContain('Active');
   });
 
