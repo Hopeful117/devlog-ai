@@ -120,6 +120,14 @@
 			<scope>test</scope>
 		</dependency>
 
+		<dependency>
+			<groupId>com.hopeful117</groupId>
+			<artifactId>devlog-contracts</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+
+
+
 
 	</dependencies>
 
