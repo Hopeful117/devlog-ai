@@ -1,5 +1,6 @@
 import { AsyncPipe, DatePipe } from '@angular/common';
 import { Component, inject, Input } from '@angular/core';
+import { MarkdownModule, MarkdownService } from 'ngx-markdown';
 import {
   AbstractControl,
   FormControl,
@@ -56,9 +57,10 @@ function nonBlankTrimmed(control: AbstractControl<string>): ValidationErrors | n
 
 @Component({
   selector: 'app-project-context-inputs-section',
-  imports: [AsyncPipe, DatePipe, ReactiveFormsModule],
+  imports: [AsyncPipe, DatePipe, ReactiveFormsModule, MarkdownModule],
   templateUrl: './project-context-inputs-section.html',
   styleUrl: './project-context-inputs-section.scss',
+  providers: [MarkdownService],
 })
 export class ProjectContextInputsSection {
   @Input({ required: true }) projectId = '';

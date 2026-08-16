@@ -52,7 +52,7 @@
                             {{ input.status === 'ACTIVE' ? 'Active' : 'Archived' }}
                           </span>
                         </div>
-                        <p class="input-content">{{ input.contentMarkdown }}</p>
+                        <markdown [data]="input.contentMarkdown"></markdown>
                         <div class="input-footer">
                           <small>Updated {{ input.updatedAt | date: 'medium' }}</small>
                           @if (input.status === 'ACTIVE') {

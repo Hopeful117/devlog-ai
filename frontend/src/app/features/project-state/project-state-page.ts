@@ -1,4 +1,5 @@
 import { AsyncPipe, DatePipe } from '@angular/common';
+import { MarkdownModule, MarkdownService } from 'ngx-markdown';
 import { Component, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { catchError, map, of, shareReplay, startWith, switchMap } from 'rxjs';
@@ -24,7 +25,8 @@ type OverviewViewState =
 
 @Component({
   selector: 'app-project-state-page',
-  imports: [AsyncPipe, DatePipe],
+  imports: [AsyncPipe, DatePipe, MarkdownModule],
+  providers: [MarkdownService],
   templateUrl: './project-state-page.html',
   styleUrl: './project-state-page.scss',
 })
@@ -91,10 +93,42 @@ export class ProjectStatePage {
     return `${Math.round(normalized)}% confidence`;
   }
 
-  humanContextPreview(contentMarkdown: string): string {
-    const normalized = contentMarkdown.replaceAll(/\s+/g, ' ').trim();
-    if (normalized.length <= 180) return normalized;
-    return `${normalized.slice(0, 177).trimEnd()}...`;
+  humanContextPreview(contentMarkdown: string | null | undefined): string {
+    if (!contentMarkdown) return '';
+
+    let text = contentMarkdown;
+
+    // Remove heading markers (#, ##, ###...)
+    text = text.replace(/^#+\s+/gm, '');
+
+    // Remove bold **text** or __text__
+    text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+
+    // Remove italic *text* or _text_ (but not ** which is bolder)
+    text = text.replace(/\*([^*]+)\*/g, '$1');
+    text = text.replace(/_([^_]+)_/g, '$1');
+
+    // Remove inline code `code`
+    text = text.replace(/`([^`]+)`/g, '$1');
+
+    // Remove unordered list markers - or * at line start
+    text = text.replace(/^[-*]\s+/gm, '');
+
+    // Remove ordered list markers 1. 2. at line start
+    text = text.replace(/^\d+\.\s+/gm, '');
+
+    // Remove blockquote markers > at line start
+    text = text.replace(/^>\s*/gm, '');
+
+    // Remove Markdown links [text](url) → keep text
+    text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+    // Normalize whitespace: collapse multiple spaces/newlines to single space
+    text = text.replace(/\s+/g, ' ').trim();
+
+    // Truncate if longer than 180 chars (preserving existing behavior)
+    if (text.length <= 180) return text;
+    return `${text.slice(0, 177).trimEnd()}...`;
   }
 
   private humanizeToken(value: string): string {

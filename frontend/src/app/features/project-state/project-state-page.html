@@ -81,6 +81,8 @@
                     </div>
                     <h3>{{ note.title }}</h3>
                     <p>{{ humanContextPreview(note.contentMarkdown) }}</p>
+                    <!-- Full Markdown rendering using ngx-markdown -->
+                    <markdown [data]="note.contentMarkdown"></markdown>
                   </article>
                 }
               </div>
