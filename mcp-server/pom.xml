@@ -71,6 +71,21 @@
 			<artifactId>spring-ai-starter-mcp-server</artifactId>
 		</dependency>
 
+		<dependency>
+			<groupId>com.hopeful117</groupId>
+			<artifactId>devlog-contracts</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-restclient</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-core</artifactId>
+		</dependency>
+
 
 	</dependencies>
 
