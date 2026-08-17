@@ -14,7 +14,11 @@ from app.services.ai_task_service import AiTaskAcceptanceService
 from app.services.task_processing_service import AiTaskProcessingService
 
 router = APIRouter(prefix="/ai/tasks", tags=["ai-tasks"])
-SUPPORTED_TASK_TYPES = frozenset({AiTaskType.INSIGHT_GENERATION, AiTaskType.EVENT_PROPOSAL_GENERATION})
+SUPPORTED_TASK_TYPES = frozenset({
+    AiTaskType.INSIGHT_GENERATION,
+    AiTaskType.EVENT_PROPOSAL_GENERATION,
+    AiTaskType.DECISION_PROPOSAL_GENERATION,
+})
 
 
 async def get_acceptance_service() -> AiTaskAcceptanceService:

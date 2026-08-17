@@ -52,6 +52,16 @@ public class IntentCatalog {
                         "Retourner zéro proposition lorsque les preuves sont insuffisantes."),
                 eventOutputContract(), "analyze-engineering-event-prompt-v1",
                 List.of(HISTORY_PROFILE, PROJECT_STATE_PROFILE)));
+register(result, new IntentDefinition(
+                "analyze-engineering-decision", "v1",
+                "Proposer des décisions d'ingénierie fondées sur l'analyse du code et son impact.",
+                ProposalType.ENGINEERING_DECISION, IntentExecutionMode.GENERIC,
+                List.of(),
+                List.of("Utiliser uniquement le contexte d'analyse sélectionné.",
+                        "Ne jamais inférer décision sans preuve étayée.",
+                        "Retourner zéro proposition lorsque les preuves sont insuffisantes."),
+                decisionOutputContract(), "analyze-engineering-decision-prompt-v1",
+                List.of(HISTORY_PROFILE, PROJECT_STATE_PROFILE)));
         return java.util.Collections.unmodifiableMap(new LinkedHashMap<>(result));
     }
 
@@ -102,6 +112,16 @@ public class IntentCatalog {
                 "requiredProposalFields", List.of("schemaVersion", "category", "title",
                         "summary", "significance", "confidence", "supportingFactIds",
                         "supportingObservationIds", "evidenceReferences"));
+    }
+
+    private static Map<String, Object> decisionOutputContract() {
+        return Map.of(
+                "type", "object", "root", "proposals", "structured", true,
+                "minimumProposalCount", 0, "maximumProposalCount", 10,
+                "proposalType", ProposalType.ENGINEERING_DECISION.name(),
+                "schemaVersion", "engineering-decision-proposal-v1",
+                "requiredProposalFields", List.of("title", "context", "choice",
+                        "rationale", "consequences"));
     }
 
     private static void register(Map<String, IntentDefinition> target, IntentDefinition intent) {

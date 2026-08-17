@@ -13,6 +13,7 @@ public class AnalysisAiTaskTypeResolver {
         return switch (intent.outputProposalType()) {
             case INSIGHT -> AiTaskType.INSIGHT_GENERATION;
             case ENGINEERING_EVENT -> AiTaskType.EVENT_PROPOSAL_GENERATION;
+            case ENGINEERING_DECISION -> AiTaskType.DECISION_PROPOSAL_GENERATION;
             default -> throw new IllegalArgumentException(
                     "Unsupported proposal output type: " + intent.outputProposalType());
         };
