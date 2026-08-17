@@ -9,6 +9,7 @@ import com.hopeful117.devlogai.fact.entity.FactType;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
@@ -20,6 +21,7 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import tools.jackson.databind.ObjectMapper;
@@ -76,7 +78,8 @@ class KnowledgeSelectionServiceAdditionalTest {
                 .warningCount(0).errorCount(0)
                 .build();
         when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.of(diagnostic));
-        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(context.project().id())).thenReturn(List.of());
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                context.project().id(), List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
         RepositoryContext repoContext = new RepositoryContext(
                 "v1", null, List.of(), "v1", List.of(), List.of(),
@@ -176,13 +179,95 @@ class KnowledgeSelectionServiceAdditionalTest {
                     .createdAt(Instant.now().minusSeconds(i))
                     .build());
         }
-        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(context.project().id())).thenReturn(insights);
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                context.project().id(), List.of(InsightStatus.ACTIVE))).thenReturn(insights);
 
         SelectedKnowledge result = service.select(context, architectureIntent(), null);
 
         assertEquals(5, result.existingArchitectureKnowledge().size());
         assertEquals("ARCHITECTURE_DESCRIPTION",
                 result.existingArchitectureKnowledge().getFirst().sourceType());
+    }
+
+    @Test
+    void shouldConsumeOnlyActiveInsightsFromRepository() throws Exception {
+        var service = createService();
+        var analysis = testAnalysis();
+        var context = createMinimalContext(analysis);
+        AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
+                .analysisId(context.analysis().id())
+                .collectionComplete(true).truncated(false)
+                .warningCount(0).errorCount(0)
+                .build();
+        when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.of(diagnostic));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        RepositoryContext repoContext = new RepositoryContext(
+                "v1", null, List.of(), "v1", List.of(), List.of(),
+                Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
+                0, 0, 0, false, List.of(), List.of(), "digest");
+        when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+
+        Insight active = Insight.builder()
+                .id(UUID.randomUUID())
+                .analysis(com.hopeful117.devlogai.analysis.entity.Analysis.builder().id(UUID.randomUUID()).build())
+                .proposal(com.hopeful117.devlogai.proposal.entity.ValidatableProposal.builder().id(UUID.randomUUID()).build())
+                .type(InsightType.ARCHITECTURAL)
+                .severity(InsightSeverity.INFO)
+                .title("Active architecture")
+                .content("Current understanding")
+                .sourceType("ARCHITECTURE_DESCRIPTION")
+                .status(InsightStatus.ACTIVE)
+                .createdAt(Instant.now())
+                .build();
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                context.project().id(), List.of(InsightStatus.ACTIVE)))
+                .thenReturn(List.of(active));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Insight>> insightsCaptor =
+                ArgumentCaptor.forClass(List.class);
+        SelectedKnowledge result = service.select(context, architectureIntent(), null);
+
+        assertEquals(1, result.selectedInsights().size());
+        assertEquals(1, result.existingArchitectureKnowledge().size());
+        verify(repositoryContextService).build(
+                any(), any(), any(), insightsCaptor.capture());
+        assertEquals(1, insightsCaptor.getValue().size());
+        assertEquals(InsightStatus.ACTIVE, insightsCaptor.getValue().getFirst().getStatus());
+    }
+
+    @Test
+    void shouldHandleEmptyActiveInsightsWithoutFallback() throws Exception {
+        var service = createService();
+        var analysis = testAnalysis();
+        var context = createMinimalContext(analysis);
+        AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
+                .analysisId(context.analysis().id())
+                .collectionComplete(true).truncated(false)
+                .warningCount(0).errorCount(0)
+                .build();
+        when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.of(diagnostic));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        RepositoryContext repoContext = new RepositoryContext(
+                "v1", null, List.of(), "v1", List.of(), List.of(),
+                Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
+                0, 0, 0, false, List.of(), List.of(), "digest");
+        when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                context.project().id(), List.of(InsightStatus.ACTIVE)))
+                .thenReturn(List.of());
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Insight>> insightsCaptor =
+                ArgumentCaptor.forClass(List.class);
+        SelectedKnowledge result = service.select(context, architectureIntent(), null);
+
+        assertEquals(0, result.selectedInsights().size());
+        assertEquals(0, result.existingArchitectureKnowledge().size());
+        assertNotNull(result.selectionDigest());
+        verify(repositoryContextService).build(
+                any(), any(), any(), insightsCaptor.capture());
+        assertEquals(0, insightsCaptor.getValue().size());
     }
 
     @Test
@@ -270,7 +355,8 @@ class KnowledgeSelectionServiceAdditionalTest {
         var service = createService();
         var context = createMinimalContext(testAnalysis());
 
-        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(context.project().id())).thenReturn(List.of());
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                context.project().id(), List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
         RepositoryContext repoContext = new RepositoryContext(
                 "v1", null, List.of(), "v1", List.of(), List.of(),
                 Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
