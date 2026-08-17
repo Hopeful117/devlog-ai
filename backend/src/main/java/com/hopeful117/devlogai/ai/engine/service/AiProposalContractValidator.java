@@ -22,6 +22,10 @@ class AiProposalContractValidator {
             "insightType", "title", "summary", "rationale");
     private static final Set<String> INSIGHT_NEW_FIELDS = Set.of(
             "insightType", "title", "summary", "rationale", "deltaType");
+    private static final Set<String> DECISION_FIELDS_BASE = Set.of(
+            "title", "context", "choice", "rationale");
+    private static final Set<String> DECISION_FIELDS_FULL = Set.of(
+            "title", "context", "choice", "rationale", "consequences");
     private final IntentCatalog intents;
 
     void validate(AiTask task, List<AiProposalResult> proposals) {
@@ -47,6 +51,8 @@ class AiProposalContractValidator {
                 validateEvent(proposal, duplicates);
             } else if (proposal.type() == ProposalType.INSIGHT) {
                 validateInsight(task, intent, proposal);
+            } else if (proposal.type() == ProposalType.ENGINEERING_DECISION) {
+                validateDecision(proposal);
             }
         }
     }
@@ -103,6 +109,21 @@ class AiProposalContractValidator {
         text(payload, "rationale", 5000);
         if ("architecture-overview".equals(intent.id())) {
             validateArchitectureDelta(task, payload);
+        }
+    }
+
+    private void validateDecision(AiProposalResult proposal) {
+        Map<String, Object> payload = proposal.payload();
+        if (!payload.keySet().equals(DECISION_FIELDS_BASE)
+                && !payload.keySet().equals(DECISION_FIELDS_FULL)) {
+            fail("Engineering Decision payload fields are invalid");
+        }
+        text(payload, "title", 255);
+        text(payload, "context", 5000);
+        text(payload, "choice", 5000);
+        text(payload, "rationale", 5000);
+        if (payload.keySet().equals(DECISION_FIELDS_FULL)) {
+            text(payload, "consequences", 5000);
         }
     }
 
