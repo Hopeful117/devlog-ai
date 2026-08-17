@@ -7,7 +7,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Component
@@ -52,6 +54,33 @@ public class ProjectKnowledgeContextCollector implements RepositoryContextCollec
                                 : List.of("repository:" + value.path()),
                         null, value.path(), value.id().toString()),
                         request.budget().maximumSummaryCharacters())));
+
+request.analysisContext().engineeringStories().forEach(story -> {
+            RepositoryEvidence evidence = evidenceFactory.create(metadata(), new EvidenceFactory.EvidenceInput(
+                    RepositoryContextLayer.ROADMAP, "ENGINEERING_STORY",
+                    "story:" + story.id(),
+                    story.title(),
+                    story.createdAt(),
+                    List.of(),
+                    "ENGINEERING_STORY", story.storyPath(),
+                    story.id().toString()),
+                    request.budget().maximumSummaryCharacters());
+            Map<String, String> extractionMetadata = new LinkedHashMap<>(evidence.extractionMetadata());
+            if (story.storyNumber() != null) {
+                extractionMetadata.put("storyNumber", story.storyNumber().toString());
+            }
+            if (story.status() != null) {
+                extractionMetadata.put("status", story.status());
+            }
+            if (story.baseCommit() != null) {
+                extractionMetadata.put("baseCommit", story.baseCommit());
+            }
+            if (story.targetCommit() != null) {
+                extractionMetadata.put("targetCommit", story.targetCommit());
+            }
+            result.add(evidence.withExtractionMetadata(extractionMetadata));
+        });
+
         return List.copyOf(result);
     }
 
