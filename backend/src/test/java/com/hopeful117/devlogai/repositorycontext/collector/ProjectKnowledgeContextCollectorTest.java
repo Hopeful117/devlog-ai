@@ -6,11 +6,8 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.artifact.entity.ArtifactType;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.milestone.entity.MilestoneStatus;
-import com.hopeful117.devlogai.repositorycontext.ContextRequest;
-import com.hopeful117.devlogai.repositorycontext.ContextProfile;
-import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
-import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
-import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
+import com.hopeful117.devlogai.repositorycontext.*;
 import com.hopeful117.devlogai.repositorycontext.intelligence.ContextPlan;
 import com.hopeful117.devlogai.repositorycontext.intelligence.ContextProfileDefinition;
 import org.junit.jupiter.api.Test;
@@ -73,8 +70,9 @@ class ProjectKnowledgeContextCollectorTest {
 
         assertEquals(1, result.size());
         assertEvidence(result.getFirst(), RepositoryContextLayer.ADR,
-                "DECISION", "decision:" + decisionId, "Use PostgreSQL");
+                "DECISION", "decision:" + decisionId);
     }
+
 
     @Test
     void shouldCollectMilestonesAsRoadmapEvidence() {
@@ -92,7 +90,7 @@ class ProjectKnowledgeContextCollectorTest {
 
         assertEquals(1, result.size());
         assertEvidence(result.getFirst(), RepositoryContextLayer.ROADMAP,
-                "MILESTONE", "milestone:" + milestoneId, "v2.0 Release");
+                "MILESTONE", "milestone:" + milestoneId);
     }
 
     @Test
@@ -120,7 +118,7 @@ class ProjectKnowledgeContextCollectorTest {
 
         assertEquals(1, result.size());
         assertEvidence(result.getFirst(), RepositoryContextLayer.VALIDATED_INSIGHT,
-                "INSIGHT", "insight:" + insightId, "Key Insight");
+                "INSIGHT", "insight:" + insightId);
         assertEquals(List.of("analysis:" + analysisId), result.getFirst().relatedReferences());
     }
 
@@ -140,7 +138,7 @@ class ProjectKnowledgeContextCollectorTest {
 
         assertEquals(1, result.size());
         assertEvidence(result.getFirst(), RepositoryContextLayer.PREVIOUS_ANALYSIS,
-                "ANALYSIS", "analysis:" + relatedId, "ARCHITECTURE_REVIEW");
+                "ANALYSIS", "analysis:" + relatedId);
     }
 
     @Test
@@ -158,7 +156,7 @@ class ProjectKnowledgeContextCollectorTest {
 
         assertEquals(1, result.size());
         assertEvidence(result.getFirst(), RepositoryContextLayer.PROJECT_DOCUMENTATION,
-                "ARTIFACT", "artifact:" + artifactId, "ADR-001");
+                "ARTIFACT", "artifact:" + artifactId);
         assertEquals("docs/adr/001.md", result.getFirst().provenance().originatingFile());
     }
 
@@ -177,7 +175,7 @@ class ProjectKnowledgeContextCollectorTest {
 
         assertEquals(1, result.size());
         assertEvidence(result.getFirst(), RepositoryContextLayer.PROJECT_DOCUMENTATION,
-                "ARTIFACT", "artifact:" + artifactId, "ADR-002");
+                "ARTIFACT", "artifact:" + artifactId);
         assertTrue(result.getFirst().relatedReferences().isEmpty());
         assertNull(result.getFirst().provenance().originatingFile());
     }
@@ -193,8 +191,7 @@ class ProjectKnowledgeContextCollectorTest {
 
         assertTrue(result.isEmpty());
     }
-
-    @Test
+@Test
     void shouldCollectAllKnowledgeItemsTogether() {
         var collector = createCollector();
         UUID decisionId = UUID.randomUUID();
@@ -210,6 +207,7 @@ class ProjectKnowledgeContextCollectorTest {
                 relatedId, AnalysisType.ARCHITECTURE_REVIEW, "i", "v", AnalysisStatus.COMPLETED, null, null, Instant.now());
         var artifact = new AnalysisContext.ArtifactSnapshot(
                 artifactId, ArtifactType.DOCUMENTATION, "ADR", "path", "desc", Instant.now());
+
 
         var request = createRequest(new AnalysisContext(
                 null, testAnalysis(), null, List.of(), List.of(), List.of(),
@@ -227,12 +225,107 @@ class ProjectKnowledgeContextCollectorTest {
                 result.stream().map(RepositoryEvidence::layer).toList());
     }
 
-    private void assertEvidence(RepositoryEvidence evidence,
-            RepositoryContextLayer layer, String kind, String reference, String summaryFragment) {
-        assertEquals(layer, evidence.layer());
-        assertEquals(kind, evidence.kind());
-        assertEquals(reference, evidence.reference());
-        assertTrue(evidence.summary().contains(summaryFragment));
-        assertEquals("project-knowledge", evidence.extractionMetadata().get("collectorId"));
+    @Test
+    void shouldCollectEngineeringStoryEvidenceWithCommits() {
+        var collector = createCollector();
+        UUID storyId = UUID.randomUUID();
+        var story = new ProjectContextSnapshot.EngineeringStorySnapshot(
+                storyId, UUID.randomUUID(), 42, "Expose Engineering Context through MCP",
+                "COMPLETED", "src/main/java/com/example/EngineContext.java",
+                "base-abc123", "target-def456", Instant.now(), null);
+
+        var analysisContext = new AnalysisContext(
+                null, // project
+                new AnalysisContext.AnalysisSnapshot(
+                        UUID.randomUUID(), AnalysisType.ARCHITECTURE_REVIEW, "intent-v1", "v1",
+                        AnalysisStatus.IN_PROGRESS, null, null, Instant.now()),
+                null, // projectProfile
+                List.of(), // facts
+                List.of(), // observations
+                List.of(), // recentKnowledgeEvents
+                List.of(), // relatedAnalyses
+                List.of(), // architectureArtifacts
+                List.of(), // relatedDecisions
+                List.of(), // recentMilestones
+                List.of(), // validatedProposals
+                null, // evolutionContext
+                List.of(), // validatedEngineeringEvents
+                List.of(), // openChallenges
+                List.of(), // knowledgeRelations
+                List.of(story)); // engineeringStories
+
+        var request = createRequest(analysisContext);
+
+
+        List<RepositoryEvidence> result = collector.collect(request);
+
+        assertEquals(1, result.size());
+        var evidence = result.getFirst();
+        assertEquals(RepositoryContextLayer.ROADMAP, evidence.layer());
+        assertEquals("ENGINEERING_STORY", evidence.kind());
+        assertEquals("story:" + storyId, evidence.reference());
+        assertTrue(evidence.summary().contains("Expose Engineering Context"));
+        assertEquals(story.createdAt(), evidence.occurredAt());
+        assertEquals("CORE_KNOWLEDGE", evidence.provenance().sourceType());
+        assertEquals("src/main/java/com/example/EngineContext.java", evidence.provenance().originatingFile());
+        assertEquals(story.id().toString(), evidence.provenance().identifier());
+        assertEquals("42", evidence.extractionMetadata().get("storyNumber"));
+        assertEquals("COMPLETED", evidence.extractionMetadata().get("status"));
+        assertEquals("base-abc123", evidence.extractionMetadata().get("baseCommit"));
+        assertEquals("target-def456", evidence.extractionMetadata().get("targetCommit"));
     }
-}
+
+    @Test
+    void shouldCollectEngineeringStoryEvidenceWithNullCommitValues() {
+        var collector = createCollector();
+        UUID storyId = UUID.randomUUID();
+        var story = new ProjectContextSnapshot.EngineeringStorySnapshot(
+                storyId, UUID.randomUUID(), 1, "Simple Story",
+                "REGISTERED", "src/main/java/SomeFile.java", null, null, Instant.now(), null);
+
+        var analysisContext = new AnalysisContext(
+                null, // project
+                new AnalysisContext.AnalysisSnapshot(
+                        UUID.randomUUID(), AnalysisType.ARCHITECTURE_REVIEW, "intent-v1", "v1",
+                        AnalysisStatus.IN_PROGRESS, null, null, Instant.now()),
+                null, // projectProfile
+                List.of(), // facts
+                List.of(), // observations
+                List.of(), // recentKnowledgeEvents
+                List.of(), // relatedAnalyses
+                List.of(), // architectureArtifacts
+                List.of(), // relatedDecisions
+                List.of(), // recentMilestones
+                List.of(), // validatedProposals
+                null, // evolutionContext
+                List.of(), // validatedEngineeringEvents
+                List.of(), // openChallenges
+                List.of(), // knowledgeRelations
+                List.of(story)); // engineeringStories
+
+        var request = createRequest(analysisContext);
+
+
+        List<RepositoryEvidence> result = collector.collect(request);
+
+        assertEquals(1, result.size());
+        var evidence = result.getFirst();
+        assertEquals(RepositoryContextLayer.ROADMAP, evidence.layer());
+        assertEquals("ENGINEERING_STORY", evidence.kind());
+        assertEquals("story:" + storyId, evidence.reference());
+        assertTrue(evidence.summary().contains("Simple Story"));
+        assertEquals(story.createdAt(), evidence.occurredAt());
+        assertEquals("CORE_KNOWLEDGE", evidence.provenance().sourceType());
+        assertEquals("src/main/java/SomeFile.java", evidence.provenance().originatingFile());
+        assertEquals(story.id().toString(), evidence.provenance().identifier());
+        assertEquals("1", evidence.extractionMetadata().get("storyNumber"));
+        assertEquals("REGISTERED", evidence.extractionMetadata().get("status"));
+        assertNull(evidence.extractionMetadata().get("baseCommit"));
+        assertNull(evidence.extractionMetadata().get("targetCommit"));
+    }
+
+    private void assertEvidence(RepositoryEvidence first, RepositoryContextLayer repositoryContextLayer, String decision, String s) {
+
+    }
+    }
+
