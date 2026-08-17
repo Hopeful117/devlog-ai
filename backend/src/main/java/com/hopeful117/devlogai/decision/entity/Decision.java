@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.decision.entity;
 
 import com.hopeful117.devlogai.project.entity.Project;
+import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -31,6 +32,10 @@ public class Decision {
             nullable = false
     )
     private Project project;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "proposal_id", updatable = false, unique = true)
+    private ValidatableProposal proposal;
 
 
     @Column(nullable = false)

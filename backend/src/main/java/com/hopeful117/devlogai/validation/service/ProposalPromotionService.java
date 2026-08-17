@@ -52,7 +52,7 @@ public class ProposalPromotionService {
     private void promoteDecision(ValidatableProposal proposal, Validation validation) {
         Map<String, Object> payload = proposal.getPayload();
         Decision decision = Decision.builder()
-                .project(proposal.getProject())
+                .project(proposal.getProject()).proposal(proposal)
                 .title((String) payload.get("title"))
                 .context((String) payload.get("context"))
                 .choice((String) payload.get("choice"))
