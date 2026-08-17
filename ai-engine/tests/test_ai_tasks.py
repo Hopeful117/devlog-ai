@@ -112,7 +112,7 @@ async def test_submit_ai_task_rejects_unsupported_type_without_background_task()
                 json={
                     "requestId": str(uuid4()),
                     "correlationId": str(uuid4()),
-                    "taskType": "DECISION_PROPOSAL_GENERATION",
+                    "taskType": "DOCUMENTATION_GENERATION",
                     "analysisId": str(analysis_id),
                     "aiTaskId": str(uuid4()),
                     "intent": describe_project_intent_json(),
@@ -127,10 +127,52 @@ async def test_submit_ai_task_rejects_unsupported_type_without_background_task()
     assert response.status_code == 422
     assert response.json() == {
         "code": "UNSUPPORTED_TASK_TYPE",
-        "taskType": "DECISION_PROPOSAL_GENERATION",
-        "supportedTaskTypes": ["EVENT_PROPOSAL_GENERATION", "INSIGHT_GENERATION"],
+        "taskType": "DOCUMENTATION_GENERATION",
+        "supportedTaskTypes": [
+            "DECISION_PROPOSAL_GENERATION",
+            "EVENT_PROPOSAL_GENERATION",
+            "INSIGHT_GENERATION",
+        ],
     }
     assert processing_service.calls == []
+
+
+@pytest.mark.asyncio
+async def test_submit_ai_task_accepts_decision_generation() -> None:
+    correlation_id = uuid4()
+    analysis_id = uuid4()
+    processing_service = RecordingProcessingService()
+
+    async def override_processing_service() -> RecordingProcessingService:
+        return processing_service
+
+    app.dependency_overrides[get_processing_service] = override_processing_service
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            response = await client.post(
+                "/api/v1/ai/tasks",
+                json={
+                    "requestId": str(uuid4()),
+                    "correlationId": str(correlation_id),
+                    "taskType": "DECISION_PROPOSAL_GENERATION",
+                    "analysisId": str(analysis_id),
+                    "aiTaskId": str(uuid4()),
+                    "intent": describe_project_intent_json(),
+                    "selectedKnowledge": selected_knowledge(analysis_id=analysis_id),
+                    "expectedOutputContract": {"type": "object", "root": "proposals"},
+                    "metadata": {"source": "test"},
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 202
+    assert response.json()["accepted"] is True
+    assert len(processing_service.calls) == 1
+    assert processing_service.calls[0][0].task_type.value == "DECISION_PROPOSAL_GENERATION"
 
 
 @pytest.mark.asyncio

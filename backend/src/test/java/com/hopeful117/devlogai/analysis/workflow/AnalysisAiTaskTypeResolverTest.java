@@ -18,5 +18,7 @@ class AnalysisAiTaskTypeResolverTest {
                 resolver.resolve(intents.resolve("describe-project-v1")));
         assertEquals(AiTaskType.EVENT_PROPOSAL_GENERATION,
                 resolver.resolve(intents.resolve("analyze-engineering-event-v1")));
+        assertEquals(AiTaskType.DECISION_PROPOSAL_GENERATION,
+                resolver.resolve(intents.resolve("analyze-engineering-decision-v1")));
     }
 }

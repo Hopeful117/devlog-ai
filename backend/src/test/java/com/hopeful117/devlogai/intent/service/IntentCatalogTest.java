@@ -10,10 +10,10 @@ class IntentCatalogTest {
     private final IntentCatalog catalog = new IntentCatalog();
 
     @Test
-    void shouldExposeTheThreeVersionedInitialIntentsInStableOrder() {
+    void shouldExposeTheFourVersionedInitialIntentsInStableOrder() {
         assertEquals(
                 java.util.List.of("describe-project-v1", "generate-readme-v1", "architecture-overview-v1",
-                        "analyze-engineering-event-v1"),
+                        "analyze-engineering-event-v1", "analyze-engineering-decision-v1"),
                 catalog.all().stream().map(
                         com.hopeful117.devlogai.intent.model.IntentDefinition::key).toList());
     }

@@ -43,7 +43,17 @@ async def test_no_retry_on_success():
     """Successful call should not retry."""
     client = AsyncMock()
     client.responses.parse = AsyncMock(return_value=MagicMock(
-        output_parsed={"title": "test", "category": "observation", "summary": "s", "significance": "low", "confidence": 0.8, "supporting_fact_ids": [], "supporting_observation_ids": [], "evidence_references": []}
+        output_parsed={"proposals": [{
+            "schemaVersion": "engineering-event-proposal-v1",
+            "category": "ENGINEERING_IMPROVEMENT",
+            "title": "test",
+            "summary": "s",
+            "significance": "low",
+            "confidence": 0.8,
+            "supportingFactIds": ["11111111-1111-1111-1111-111111111111"],
+            "supportingObservationIds": [],
+            "evidenceReferences": [],
+        }]}
     ))
     provider = OpenAiLlmProvider(
         api_key="test-key",
