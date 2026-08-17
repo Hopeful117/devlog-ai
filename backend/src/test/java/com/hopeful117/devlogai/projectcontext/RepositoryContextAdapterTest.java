@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.projectcontext;
 
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.insight.entity.Insight;
+import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
 import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
@@ -91,7 +92,8 @@ class RepositoryContextAdapterTest {
 
         when(projectContextProvider.build(projectId))
                 .thenReturn(snapshot(projectId));
-        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE)))
                 .thenReturn(List.of());
         when(repositoryContextService.build(
                 any(), any(), any(), any())).thenReturn(expected);
@@ -121,7 +123,8 @@ class RepositoryContextAdapterTest {
 
         when(projectContextProvider.build(projectId))
                 .thenReturn(snapshot(projectId));
-        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE)))
                 .thenReturn(List.of());
         when(repositoryContextService.build(
                 any(), any(), isNull(), any())).thenReturn(expected);
@@ -142,7 +145,8 @@ class RepositoryContextAdapterTest {
 
         when(projectContextProvider.build(projectId))
                 .thenReturn(snapshot(projectId));
-        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE)))
                 .thenReturn(List.of(insight1, insight2));
         when(repositoryContextService.build(
                 any(), any(), any(), any())).thenReturn(expected);
@@ -164,7 +168,8 @@ class RepositoryContextAdapterTest {
 
         when(projectContextProvider.build(projectId))
                 .thenReturn(snapshot(projectId));
-        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE)))
                 .thenReturn(List.of());
         when(repositoryContextService.build(
                 any(), any(), any(), any())).thenReturn(expected);
@@ -191,7 +196,8 @@ class RepositoryContextAdapterTest {
 
         when(projectContextProvider.build(projectId))
                 .thenReturn(snapshotWithKnowledge(projectId));
-        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE)))
                 .thenReturn(List.of());
         when(repositoryContextService.build(
                 any(), any(), any(), any())).thenReturn(expected);
@@ -216,7 +222,8 @@ class RepositoryContextAdapterTest {
 
         when(projectContextProvider.build(projectId))
                 .thenReturn(snapshotWithKnowledge(projectId));
-        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE)))
                 .thenReturn(List.of());
         when(repositoryContextService.build(
                 any(), any(), any(), any())).thenReturn(expected);
@@ -241,7 +248,8 @@ class RepositoryContextAdapterTest {
 
         when(projectContextProvider.build(projectId))
                 .thenReturn(snapshotWithKnowledge(projectId));
-        when(insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId))
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE)))
                 .thenReturn(List.of());
         when(repositoryContextService.build(
                 any(), any(), any(), any())).thenReturn(expected);
@@ -259,5 +267,63 @@ class RepositoryContextAdapterTest {
                 ctx.knowledgeRelations().getFirst().relationType());
         assertEquals(EntityType.CHALLENGE,
                 ctx.knowledgeRelations().getFirst().sourceEntityType());
+    }
+
+    @Test
+    void shouldForwardActiveInsightsToRepositoryContext() {
+        UUID projectId = UUID.randomUUID();
+        Insight active = Insight.builder()
+                .id(UUID.randomUUID())
+                .analysis(com.hopeful117.devlogai.analysis.entity.Analysis.builder().id(UUID.randomUUID()).build())
+                .proposal(com.hopeful117.devlogai.proposal.entity.ValidatableProposal.builder().id(UUID.randomUUID()).build())
+                .type(com.hopeful117.devlogai.insight.entity.InsightType.ARCHITECTURAL)
+                .severity(com.hopeful117.devlogai.insight.entity.InsightSeverity.INFO)
+                .title("Active insight")
+                .content("Current understanding")
+                .status(InsightStatus.ACTIVE)
+                .createdAt(Instant.now())
+                .build();
+        RepositoryContext expected = mock(RepositoryContext.class);
+
+        when(projectContextProvider.build(projectId))
+                .thenReturn(snapshot(projectId));
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE)))
+                .thenReturn(List.of(active));
+        when(repositoryContextService.build(
+                any(), any(), any(), any())).thenReturn(expected);
+
+        adapter.buildRepositoryContext(projectId, "Test");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Insight>> insightsCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(repositoryContextService).build(
+                any(), any(), any(), insightsCaptor.capture());
+        assertEquals(1, insightsCaptor.getValue().size());
+        assertEquals(InsightStatus.ACTIVE, insightsCaptor.getValue().getFirst().getStatus());
+    }
+
+    @Test
+    void shouldForwardEmptyActiveInsightsWithoutFallback() {
+        UUID projectId = UUID.randomUUID();
+        RepositoryContext expected = mock(RepositoryContext.class);
+
+        when(projectContextProvider.build(projectId))
+                .thenReturn(snapshot(projectId));
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE)))
+                .thenReturn(List.of());
+        when(repositoryContextService.build(
+                any(), any(), any(), any())).thenReturn(expected);
+
+        adapter.buildRepositoryContext(projectId, "Test");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Insight>> insightsCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(repositoryContextService).build(
+                any(), any(), any(), insightsCaptor.capture());
+        assertEquals(0, insightsCaptor.getValue().size());
     }
 }

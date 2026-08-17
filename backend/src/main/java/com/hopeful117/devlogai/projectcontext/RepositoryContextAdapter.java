@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.insight.entity.Insight;
+import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
@@ -57,7 +58,8 @@ public class RepositoryContextAdapter {
         IntentDefinition intent = createIntentDefinition(storyDescription);
 
         List<Insight> validatedInsights =
-                insightRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
+                insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                        projectId, List.of(InsightStatus.ACTIVE));
 
         UserGuidance guidance = createGuidance(storyDescription);
 

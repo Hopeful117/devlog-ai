@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.diagnostics.entity.AnalysisExecutionDiagnostic;
 import com.hopeful117.devlogai.analysis.diagnostics.repository.AnalysisExecutionDiagnosticRepository;
 import com.hopeful117.devlogai.insight.entity.Insight;
+import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
@@ -65,7 +66,8 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
         List<AnalysisContext.ObservationSnapshot> observations = selectionSlice.observations();
         List<AnalysisContext.FactSnapshot> facts = selectionSlice.facts();
         List<Insight> insightCandidates = insightRepository
-                .findByProjectIdOrderByCreatedAtDesc(context.project().id()).stream()
+                .findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                        context.project().id(), List.of(InsightStatus.ACTIVE)).stream()
                 .sorted(Comparator.comparing(Insight::getCreatedAt,
                                 Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(Insight::getId))

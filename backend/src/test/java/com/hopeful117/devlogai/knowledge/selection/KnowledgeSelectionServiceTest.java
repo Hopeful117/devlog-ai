@@ -7,6 +7,7 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.fact.entity.FactType;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
+import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.observation.entity.ObservationType;
@@ -44,7 +45,8 @@ class KnowledgeSelectionServiceTest {
         AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
                 .analysisId(analysisId).collectionComplete(true).warningCount(1).build();
         when(diagnostics.findById(analysisId)).thenReturn(Optional.of(diagnostic));
-        when(insights.findByProjectIdOrderByCreatedAtDesc(projectId)).thenReturn(List.of());
+        when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
         when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
 
         List<AnalysisContext.FactSnapshot> facts = new ArrayList<>();
@@ -122,7 +124,8 @@ class KnowledgeSelectionServiceTest {
         AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
                 .analysisId(analysisId).collectionComplete(true).warningCount(0).build();
         when(diagnostics.findById(analysisId)).thenReturn(Optional.of(diagnostic));
-        when(insights.findByProjectIdOrderByCreatedAtDesc(projectId)).thenReturn(List.of());
+        when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
         when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
 
         List<AnalysisContext.FactSnapshot> facts = new ArrayList<>();
@@ -197,7 +200,8 @@ class KnowledgeSelectionServiceTest {
         AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
                 .analysisId(analysisId).collectionComplete(true).warningCount(0).build();
         when(diagnostics.findById(analysisId)).thenReturn(Optional.of(diagnostic));
-        when(insights.findByProjectIdOrderByCreatedAtDesc(projectId)).thenReturn(List.of());
+        when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
         when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
 
         AnalysisContext.FactSnapshot requiredFact = fact(FactType.OTHER, "required-support");
