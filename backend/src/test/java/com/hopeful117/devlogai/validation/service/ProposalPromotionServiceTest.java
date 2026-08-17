@@ -89,7 +89,8 @@ class ProposalPromotionServiceTest {
                 () -> assertEquals("Manual mappings are becoming difficult to maintain", decision.getContext()),
                 () -> assertEquals("Use MapStruct", decision.getChoice()),
                 () -> assertEquals("Reduce repetitive mapping code", decision.getRationale()),
-                () -> assertNull(decision.getConsequences())
+                () -> assertNull(decision.getConsequences()),
+                () -> assertSame(proposal, decision.getProposal())
         );
     }
 
@@ -120,7 +121,8 @@ class ProposalPromotionServiceTest {
                 () -> assertEquals("Manual mappings are becoming difficult to maintain", decision.getContext()),
                 () -> assertEquals("Use MapStruct", decision.getChoice()),
                 () -> assertEquals("Reduce repetitive mapping code", decision.getRationale()),
-                () -> assertEquals("Adds MapStruct to the build and generated mapper code", decision.getConsequences())
+                () -> assertEquals("Adds MapStruct to the build and generated mapper code", decision.getConsequences()),
+                () -> assertSame(proposal, decision.getProposal())
         );
     }
 
