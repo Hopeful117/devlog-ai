@@ -27,10 +27,20 @@ public class ProjectKnowledgeContextCollector implements RepositoryContextCollec
     @Override
     public List<RepositoryEvidence> collect(ContextRequest request) {
         List<RepositoryEvidence> result = new ArrayList<>();
-        request.analysisContext().relatedDecisions().forEach(value -> result.add(create(
-                request, new KnowledgeEvidence(RepositoryContextLayer.ADR, "DECISION", "decision:" + value.id(),
-                value.title() + " — " + Objects.toString(value.choice(), ""),
-                value.createdAt(), value.id().toString(), List.of()))));
+        request.analysisContext().relatedDecisions().forEach(value -> {
+            String rationale = value.rationale();
+            String summary;
+            if (rationale == null || rationale.isBlank()) {
+                summary = value.title() + " — " + Objects.toString(value.choice(), "");
+            } else {
+                summary = value.title() + " — " + Objects.toString(value.choice(), "")
+                        + " — " + rationale;
+            }
+            result.add(create(
+                    request, new KnowledgeEvidence(RepositoryContextLayer.ADR, "DECISION", "decision:" + value.id(),
+                            summary,
+                            value.createdAt(), value.id().toString(), List.of())));
+        });
         request.analysisContext().recentMilestones().forEach(value -> result.add(create(
                 request, new KnowledgeEvidence(RepositoryContextLayer.ROADMAP, "MILESTONE",
                 "milestone:" + value.id(), value.name() + " — " + value.status(),

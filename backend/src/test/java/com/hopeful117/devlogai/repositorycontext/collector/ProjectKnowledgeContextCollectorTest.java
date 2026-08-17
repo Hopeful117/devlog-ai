@@ -73,6 +73,53 @@ class ProjectKnowledgeContextCollectorTest {
                 "DECISION", "decision:" + decisionId);
     }
 
+    @Test
+    void shouldCollectDecisionsAsAdrEvidenceWithRationale() {
+        var collector = createCollector();
+        UUID decisionId = UUID.randomUUID();
+        var decision = new AnalysisContext.DecisionSnapshot(
+                decisionId, "Use PostgreSQL", "Need database", "PostgreSQL chosen", "ACID", "Migration needed", Instant.now());
+        var request = createRequest(new AnalysisContext(
+                null, testAnalysis(), null, List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(decision), List.of(), List.of()));
+
+
+        List<RepositoryEvidence> result = collector.collect(request);
+
+        assertEquals(1, result.size());
+        var evidence = result.getFirst();
+        assertEquals(RepositoryContextLayer.ADR, evidence.layer());
+        assertEquals("DECISION", evidence.kind());
+        assertEquals("decision:" + decisionId, evidence.reference());
+        assertTrue(evidence.summary().contains("Use PostgreSQL"));
+        assertTrue(evidence.summary().contains("PostgreSQL chosen"));
+        assertTrue(evidence.summary().contains("ACID"));
+    }
+
+    @Test
+    void shouldCollectDecisionsAsAdrEvidenceWithoutRationale() {
+        var collector = createCollector();
+        UUID decisionId = UUID.randomUUID();
+        var decision = new AnalysisContext.DecisionSnapshot(
+                decisionId, "Use SQLite", "Need lightweight database", "SQLite chosen", null, null, Instant.now());
+        var request = createRequest(new AnalysisContext(
+                null, testAnalysis(), null, List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(decision), List.of(), List.of()));
+
+
+        List<RepositoryEvidence> result = collector.collect(request);
+
+        assertEquals(1, result.size());
+        var evidence = result.getFirst();
+        assertEquals(RepositoryContextLayer.ADR, evidence.layer());
+        assertEquals("DECISION", evidence.kind());
+        assertEquals("decision:" + decisionId, evidence.reference());
+        assertTrue(evidence.summary().contains("Use SQLite"));
+        assertTrue(evidence.summary().contains("SQLite chosen"));
+        assertFalse(evidence.summary().contains("— ACID"));
+        assertFalse(evidence.summary().contains("— null"));
+    }
+
 
     @Test
     void shouldCollectMilestonesAsRoadmapEvidence() {
