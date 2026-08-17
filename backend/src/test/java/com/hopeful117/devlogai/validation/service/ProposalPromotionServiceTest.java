@@ -1,4 +1,5 @@
 package com.hopeful117.devlogai.validation.service;
+import com.hopeful117.devlogai.validation.entity.Validation;
 
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.engineeringevent.*;
@@ -7,7 +8,8 @@ import com.hopeful117.devlogai.insight.service.InsightPromotionService;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.proposal.entity.*;
 import com.hopeful117.devlogai.source.entity.Source;
-import com.hopeful117.devlogai.validation.entity.Validation;
+import com.hopeful117.devlogai.decision.entity.Decision;
+import com.hopeful117.devlogai.decision.repository.DecisionRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -26,6 +28,7 @@ class ProposalPromotionServiceTest {
     @Mock InsightPromotionService insights;
     @Mock EngineeringEventRepository events;
     @Mock AnalysisEvolutionScopeRepository scopes;
+    @Mock DecisionRepository decisionRepository;
     @InjectMocks ProposalPromotionService service;
 
     @Test
@@ -61,16 +64,73 @@ class ProposalPromotionServiceTest {
     }
 
     @Test
-    void retainsInsightPromotionAndRejectsUnsupportedAcceptedTypes() {
-        ValidatableProposal insight = ValidatableProposal.builder().type(ProposalType.INSIGHT).build();
-        Validation validation = Validation.builder().build();
-        service.promote(insight, validation, InsightSeverity.WARNING);
-        verify(insights).promote(insight, validation, InsightSeverity.WARNING);
+    void promotesAnEngineeringDecisionWithBasePayload() {
+        UUID projectId = UUID.randomUUID();
+        UUID analysisId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).build();
+        Analysis analysis = Analysis.builder().id(analysisId).project(project).build();
+        ValidatableProposal proposal = ValidatableProposal.builder().id(UUID.randomUUID())
+                .project(project).analysis(analysis).type(ProposalType.ENGINEERING_DECISION)
+                .payload(Map.of("title", "Adopt MapStruct",
+                        "context", "Manual mappings are becoming difficult to maintain",
+                        "choice", "Use MapStruct",
+                        "rationale", "Reduce repetitive mapping code"))
+                .build();
+        Validation validation = Validation.builder().id(UUID.randomUUID()).proposal(proposal).build();
 
-        ValidatableProposal decision = ValidatableProposal.builder()
-                .type(ProposalType.ENGINEERING_DECISION).build();
+        service.promote(proposal, validation, null);
+
+        ArgumentCaptor<Decision> saved = ArgumentCaptor.forClass(Decision.class);
+        verify(decisionRepository).save(saved.capture());
+        Decision decision = saved.getValue();
+        assertAll(
+                () -> assertEquals(project, decision.getProject()),
+                () -> assertEquals("Adopt MapStruct", decision.getTitle()),
+                () -> assertEquals("Manual mappings are becoming difficult to maintain", decision.getContext()),
+                () -> assertEquals("Use MapStruct", decision.getChoice()),
+                () -> assertEquals("Reduce repetitive mapping code", decision.getRationale()),
+                () -> assertNull(decision.getConsequences())
+        );
+    }
+
+    @Test
+    void promotesAnEngineeringDecisionWithFullPayload() {
+        UUID projectId = UUID.randomUUID();
+        UUID analysisId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).build();
+        Analysis analysis = Analysis.builder().id(analysisId).project(project).build();
+        ValidatableProposal proposal = ValidatableProposal.builder().id(UUID.randomUUID())
+                .project(project).analysis(analysis).type(ProposalType.ENGINEERING_DECISION)
+                .payload(Map.of("title", "Adopt MapStruct",
+                        "context", "Manual mappings are becoming difficult to maintain",
+                        "choice", "Use MapStruct",
+                        "rationale", "Reduce repetitive mapping code",
+                        "consequences", "Adds MapStruct to the build and generated mapper code"))
+                .build();
+        Validation validation = Validation.builder().id(UUID.randomUUID()).proposal(proposal).build();
+
+        service.promote(proposal, validation, null);
+
+        ArgumentCaptor<Decision> saved = ArgumentCaptor.forClass(Decision.class);
+        verify(decisionRepository).save(saved.capture());
+        Decision decision = saved.getValue();
+        assertAll(
+                () -> assertEquals(project, decision.getProject()),
+                () -> assertEquals("Adopt MapStruct", decision.getTitle()),
+                () -> assertEquals("Manual mappings are becoming difficult to maintain", decision.getContext()),
+                () -> assertEquals("Use MapStruct", decision.getChoice()),
+                () -> assertEquals("Reduce repetitive mapping code", decision.getRationale()),
+                () -> assertEquals("Adds MapStruct to the build and generated mapper code", decision.getConsequences())
+        );
+    }
+
+    @Test
+    void rejectsUnsupportedAcceptedTypes() {
+        ValidatableProposal challenge = ValidatableProposal.builder()
+                .type(ProposalType.CHALLENGE).build();
+        Validation validation = Validation.builder().build();
         assertThrows(IllegalArgumentException.class,
-                () -> service.promote(decision, validation, null));
+                () -> service.promote(challenge, validation, null));
     }
 
     @Test

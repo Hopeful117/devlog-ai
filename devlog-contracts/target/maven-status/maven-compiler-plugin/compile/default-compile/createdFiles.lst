@@ -1,2 +1,5 @@
+com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringContext.class
+com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringEvidence.class
 com/hopeful117/devlogai/contracts/projectcontext/ProjectContext.class
+com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringContextMetadata.class
 com/hopeful117/devlogai/contracts/projectcontext/ProjectNote.class
