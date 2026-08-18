@@ -18,6 +18,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HexFormat;
 import java.util.List;
@@ -81,7 +82,12 @@ public class RepositoryContextEngine implements RepositoryContextService {
         SelectedFileContentEnricher.EnrichmentResult contentEnrichment =
                 contentEnricher.enrich(request, symbolEnrichment.selection());
         EvidenceSelector.SelectionResult selection = contentEnrichment.selection();
-        List<RepositoryEvidence> selected = selection.selected();
+        List<RepositoryEvidence> selected = selection.selected().stream()
+                .sorted(Comparator.comparingInt(RepositoryEvidence::relevanceScore)
+                        .reversed()
+                        .thenComparing(value -> value.layer().ordinal())
+                        .thenComparing(RepositoryEvidence::reference))
+                .toList();
         Map<RepositoryContextLayer, Integer> byLayer =
                 new EnumMap<>(RepositoryContextLayer.class);
         selected.forEach(value -> byLayer.merge(value.layer(), 1, Integer::sum));
