@@ -139,9 +139,6 @@ public class AgentContextProjectionService {
         state = compactSummary(state);
         if (fits(projectId, repositoryContext, state, freshness)) return state;
 
-        state = removeTailEvidence(projectId, repositoryContext, state, freshness);
-        if (fits(projectId, repositoryContext, state, freshness)) return state;
-
         state = removeProfileDetails(state);
         if (fits(projectId, repositoryContext, state, freshness)) return state;
 
@@ -152,6 +149,9 @@ public class AgentContextProjectionService {
         if (fits(projectId, repositoryContext, state, freshness)) return state;
 
         state = minimalProjectContext(state);
+        if (fits(projectId, repositoryContext, state, freshness)) return state;
+
+        state = removeTailEvidence(projectId, repositoryContext, state, freshness);
         if (fits(projectId, repositoryContext, state, freshness)) return state;
 
         throw new AgentContextProjectionException(

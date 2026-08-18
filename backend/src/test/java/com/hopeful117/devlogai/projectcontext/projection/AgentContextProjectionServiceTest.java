@@ -196,6 +196,89 @@ class AgentContextProjectionServiceTest {
         assertNotEquals(first, second);
     }
 
+    @Test
+    void shouldPreserveEvidenceWhenProjectContextIsOversized() {
+        List<RepositoryEvidence> evidenceItems = java.util.stream.IntStream.range(0, 8)
+                .mapToObj(index -> evidence(RepositoryContextLayer.COMMIT_DIFF,
+                        "CHANGED_FILE", "diff:file-" + index,
+                        "content-" + index + "-" + "x".repeat(200)))
+                .toList();
+
+        AgentRepositoryContext projected = service(32_768, 8_192).project(
+                PROJECT_ID, oversizedProjectContext(),
+                context(evidenceItems), GENERATED_AT)
+                .repositoryContext();
+
+        assertTrue(projected.accounting().canonicalBytes() <= 32_768);
+        assertTrue(projected.accounting().estimatedTokens() <= 8_192);
+        assertTrue(projected.evidence().size() > 0,
+                "At least one evidence item must survive when ProjectContext is reduced first");
+        assertFalse(projected.warnings().contains("AGENT_PROJECTION_ALL_EVIDENCE_REMOVED"),
+                "ALL_EVIDENCE_REMOVED must not be emitted when evidence survives");
+        assertTrue(
+                projected.warnings().contains("AGENT_PROJECTION_PROFILE_DETAILS_REMOVED")
+                        || projected.warnings().contains("AGENT_PROJECTION_HUMAN_CONTEXT_INPUTS_COMPACTED")
+                        || projected.warnings().contains("AGENT_PROJECTION_PROJECT_CONTEXT_LISTS_REMOVED")
+                        || projected.warnings().contains("AGENT_PROJECTION_PROJECT_CONTEXT_MINIMAL"),
+                "ProjectContext reduction warnings must be present");
+    }
+
+    @Test
+    void shouldNotReduceContextThatAlreadyFits() {
+        AgentContextProjectionService smallBudgetService = service(32_768, 8_192);
+        RepositoryContext smallContext = context(List.of(
+                evidence(RepositoryContextLayer.GIT_HISTORY, "COMMIT",
+                        "git:small", null)));
+
+        AgentEngineeringStoryContext result = smallBudgetService.project(
+                PROJECT_ID, projectContext(), smallContext, GENERATED_AT);
+        AgentRepositoryContext projected = result.repositoryContext();
+
+        assertEquals(1, projected.evidence().size());
+        assertFalse(projected.warnings().contains("AGENT_PROJECTION_EVIDENCE_REMOVED"));
+        assertFalse(projected.warnings().contains("AGENT_PROJECTION_ALL_EVIDENCE_REMOVED"));
+        assertFalse(projected.warnings().contains("AGENT_PROJECTION_PROFILE_DETAILS_REMOVED"));
+        assertFalse(projected.warnings().contains("AGENT_PROJECTION_PROJECT_CONTEXT_LISTS_REMOVED"));
+    }
+
+    @Test
+    void shouldRemoveEvidenceWhenPhysicallyImpossible() {
+        List<RepositoryEvidence> hugeEvidence = java.util.stream.IntStream.range(0, 10)
+                .mapToObj(index -> evidence(RepositoryContextLayer.COMMIT_DIFF,
+                        "CHANGED_FILE", "diff:huge-" + index,
+                        "x".repeat(8_000)))
+                .toList();
+
+        assertThrows(AgentContextProjectionException.class,
+                () -> service(800, 200).project(
+                        PROJECT_ID, oversizedProjectContext(),
+                        context(hugeEvidence), GENERATED_AT));
+    }
+
+    @Test
+    void shouldProduceDeterministicOutputForIdenticalInput() {
+        AgentContextProjectionService svc = service(32_768, 8_192);
+        ProjectContextSnapshot snapshot = oversizedProjectContext();
+        List<RepositoryEvidence> evidenceItems = java.util.stream.IntStream.range(0, 5)
+                .mapToObj(index -> evidence(RepositoryContextLayer.COMMIT_DIFF,
+                        "CHANGED_FILE", "diff:det-" + index,
+                        "content-" + "y".repeat(300)))
+                .toList();
+        RepositoryContext ctx = context(evidenceItems);
+
+        AgentEngineeringStoryContext first = svc.project(
+                PROJECT_ID, snapshot, ctx, GENERATED_AT);
+        AgentEngineeringStoryContext second = svc.project(
+                PROJECT_ID, snapshot, ctx, GENERATED_AT.plusSeconds(60));
+
+        assertEquals(first.repositoryContext().projectionDigest(),
+                second.repositoryContext().projectionDigest());
+        assertEquals(first.repositoryContext().evidence().size(),
+                second.repositoryContext().evidence().size());
+        assertEquals(first.repositoryContext().warnings(),
+                second.repositoryContext().warnings());
+    }
+
     private AgentContextProjectionService service(int bytes, int tokens) {
         return new AgentContextProjectionService(objectMapper,
                 new AgentContextProjectionPolicy(bytes, tokens, 3, 3));
