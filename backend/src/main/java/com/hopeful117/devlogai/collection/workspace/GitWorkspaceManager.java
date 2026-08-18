@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.collection.workspace;
 
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.entity.SourceType;
+import com.hopeful117.devlogai.temporal.port.RepositoryStatePort;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 @Component
-public class GitWorkspaceManager implements WorkspaceManager {
+public class GitWorkspaceManager implements WorkspaceManager, RepositoryStatePort {
 
     private static final String ORIGIN = "origin";
     private static final String REV_PARSE = "rev-parse";
@@ -241,6 +242,41 @@ public class GitWorkspaceManager implements WorkspaceManager {
         }
         if (source.getType() != SourceType.GIT_REPOSITORY) {
             throw new IllegalArgumentException("Unsupported source type: " + source.getType());
+        }
+    }
+
+    @Override
+    public boolean isFilePresentAtRevision(Source source, String commitHash, String relativePath) {
+        requireSupportedSource(source);
+        ReentrantLock lock = sourceLocks.computeIfAbsent(
+                source.getId(),
+                ignored -> new ReentrantLock()
+        );
+        lock.lock();
+        try {
+            Path workspace = resolveWorkspace(source.getId());
+            if (!isGitWorkspace(workspace)) {
+                throw new GitCommandException(
+                        "Workspace not available for source " + source.getId());
+            }
+            // Step 1: verify revision exists
+            git.execute(workspace, List.of("cat-file", "-e", commitHash));
+            // Step 2: verify file exists at that revision
+            try {
+                git.execute(workspace, List.of("cat-file", "-e", commitHash + ":" + relativePath));
+                return true;
+            } catch (GitCommandException exception) {
+                // Return false for exit code 1 or 128 (file not found at valid revision)
+                // These codes indicate the path does not exist at the given revision.
+                // Exit code 128 is system-dependent; git cat-file -e returns it when
+                // the named path does not exist in the object's tree.
+                if (exception.getExitCode() != null && (exception.getExitCode() == 1 || exception.getExitCode() == 128)) {
+                    return false;
+                }
+                throw exception; // Propagate for invalid revision, timeout, IO, etc.
+            }
+        } finally {
+            lock.unlock();
         }
     }
 }

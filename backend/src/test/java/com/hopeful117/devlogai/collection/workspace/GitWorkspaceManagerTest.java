@@ -18,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 class GitWorkspaceManagerTest {
 
     private final ProcessGitCommandExecutor git = new ProcessGitCommandExecutor();
@@ -131,4 +133,64 @@ class GitWorkspaceManagerTest {
             }
         }
     }
-}
+
+    @Test
+    void isFilePresentAtRevision_shouldReturnTrue_whenFileExistsAtValidRevision() throws IOException {
+        Path repository = createRepository();
+        String commitHash = git.execute(repository, List.of("rev-parse", "HEAD"));
+        Source source = source(repository);
+        GitWorkspaceManager manager = new GitWorkspaceManager(
+                temporaryDirectory.resolve("workspaces").toString(), git);
+
+        manager.synchronize(source, null);
+
+        boolean present = manager.isFilePresentAtRevision(source, commitHash, "tracked.txt");
+
+        assertTrue(present);
+    }
+
+    @Test
+    void isFilePresentAtRevision_shouldReturnFalse_whenFileDoesNotExistAtValidRevision() throws IOException {
+        Path repository = createRepository();
+        String commitHash = git.execute(repository, List.of("rev-parse", "HEAD"));
+        Source source = source(repository);
+        GitWorkspaceManager manager = new GitWorkspaceManager(
+                temporaryDirectory.resolve("workspaces").toString(), git);
+
+        manager.synchronize(source, null);
+
+        boolean present = manager.isFilePresentAtRevision(source, commitHash, "nonexistent.txt");
+
+        assertFalse(present);
+    }
+
+    @Test
+    void isFilePresentAtRevision_shouldThrow_whenRevisionIsInvalid() throws IOException {
+        Path repository = createRepository();
+        String validCommit = git.execute(repository, List.of("rev-parse", "HEAD"));
+        Source source = source(repository);
+        GitWorkspaceManager manager = new GitWorkspaceManager(
+                temporaryDirectory.resolve("workspaces").toString(), git);
+
+        manager.synchronize(source, null);
+
+        String invalidRevision = "0000000000000000000000000000000000000000";
+
+        assertThrows(GitCommandException.class,
+                () -> manager.isFilePresentAtRevision(source, invalidRevision, "tracked.txt"));
+    }
+
+    @Test
+    void isFilePresentAtRevision_shouldThrow_whenWorkspaceUnavailable() throws IOException {
+        Path repository = createRepository();
+        Source source = source(repository);
+        GitWorkspaceManager manager = new GitWorkspaceManager(
+                temporaryDirectory.resolve("workspaces").toString(), git);
+
+        String validCommit = git.execute(repository, List.of("rev-parse", "HEAD"));
+
+        assertThrows(GitCommandException.class,
+                () -> manager.isFilePresentAtRevision(source, validCommit, "tracked.txt"));
+    }
+
+    }
