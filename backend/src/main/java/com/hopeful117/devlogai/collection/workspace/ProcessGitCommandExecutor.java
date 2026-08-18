@@ -57,7 +57,8 @@ public class ProcessGitCommandExecutor implements GitCommandExecutor {
                                     process.exitValue(),
                                     String.join(" ", command),
                                     captured
-                            )
+                            ),
+                            process.exitValue()
                     );
                 }
                 return captured;
