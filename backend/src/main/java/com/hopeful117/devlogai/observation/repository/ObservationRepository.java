@@ -23,5 +23,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = "supportingFacts")
     List<Observation> findByAnalysisIdAndIdIn(UUID analysisId, java.util.Collection<UUID> ids);
 }

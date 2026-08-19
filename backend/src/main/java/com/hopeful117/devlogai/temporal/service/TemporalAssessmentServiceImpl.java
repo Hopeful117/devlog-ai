@@ -7,6 +7,11 @@ import com.hopeful117.devlogai.history.repository.ProjectCommitRepository;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.temporal.domain.TemporalAssessment;
+import com.hopeful117.devlogai.repositoryevidence.RepositoryEvidenceResolutionException;
+import com.hopeful117.devlogai.repositoryevidence.RepositoryEvidenceResolver;
+import com.hopeful117.devlogai.repositoryevidence.ResolvedFileEvidence;
+import com.hopeful117.devlogai.repositoryevidence.RepositoryEvidenceProjection;
+import com.hopeful117.devlogai.shared.evidence.EvidencePathValidator;
 import com.hopeful117.devlogai.temporal.port.RepositoryStatePort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +32,7 @@ public class TemporalAssessmentServiceImpl implements TemporalAssessmentService 
 
     private final RepositoryStatePort repositoryStatePort;
     private final ProjectCommitRepository projectCommitRepository;
+    private final RepositoryEvidenceResolver repositoryEvidenceResolver;
 
     @Override
     @Transactional(readOnly = true)
@@ -37,14 +43,46 @@ public class TemporalAssessmentServiceImpl implements TemporalAssessmentService 
         }
 
         UUID insightId = insight.getId();
-        List<String> evidenceReferences = insight.getEvidenceReferences();
 
-        if (evidenceReferences == null || evidenceReferences.isEmpty()) {
+        // --- Resolve repository evidence from proposal lineage ---
+        Optional<RepositoryEvidenceProjection> projection;
+        try {
+            projection = repositoryEvidenceResolver.resolve(insight);
+        } catch (RepositoryEvidenceResolutionException e) {
             return TemporalAssessment.of(
                     insightId,
-                    List.of("Insufficient evidence: no evidence references to evaluate"),
+                    List.of("Insufficient evidence: repository evidence lineage unavailable or inconsistent ("
+                            + e.getReason() + ")"),
                     TemporalAssessment.Conclusion.UNKNOWN,
                     TemporalAssessment.ReasoningOrigin.DETERMINISTIC);
+        }
+
+        boolean legacy = projection.isEmpty();
+        List<String> evidencePaths;
+
+        if (legacy) {
+            // Legacy mode: evaluate genuine evidenceReferences paths (Option E filtered)
+            evidencePaths = legacyRepositoryPaths(insight.getEvidenceReferences());
+            if (evidencePaths.isEmpty()) {
+                return TemporalAssessment.of(
+                        insightId,
+                        List.of("Insufficient evidence: no evidence references to evaluate"),
+                        TemporalAssessment.Conclusion.UNKNOWN,
+                        TemporalAssessment.ReasoningOrigin.DETERMINISTIC);
+            }
+        } else {
+            // Modern mode: use resolved files from projection
+            var resolved = projection.get().resolvedFiles();
+            evidencePaths = resolved.stream()
+                    .map(ResolvedFileEvidence::path)
+                    .toList();
+            if (evidencePaths.isEmpty()) {
+                return TemporalAssessment.of(
+                        insightId,
+                        List.of("Insufficient evidence: no repository evidence resolved from lineage"),
+                        TemporalAssessment.Conclusion.UNKNOWN,
+                        TemporalAssessment.ReasoningOrigin.DETERMINISTIC);
+            }
         }
 
         var analysis = insight.getAnalysis();
@@ -69,7 +107,6 @@ public class TemporalAssessmentServiceImpl implements TemporalAssessmentService 
 
         UUID sourceId = selectedSource.getId();
         UUID projectId = insight.getProject().getId();
-
         String currentKnownRevision = findCurrentKnownRevision(sourceId);
         if (currentKnownRevision == null) {
             return TemporalAssessment.of(
@@ -79,27 +116,27 @@ public class TemporalAssessmentServiceImpl implements TemporalAssessmentService 
                     TemporalAssessment.ReasoningOrigin.DETERMINISTIC);
         }
 
+        // enrichment (corroborating only) — use original evidenceReferences from insight
+        List<String> enrichment = enrichWithCommitHistory(insight, projectId, createdAt(insight),
+                insight.getEvidenceReferences(), sourceId);
+
         List<String> evidence = new ArrayList<>();
         boolean anySuspectedStale = false;
         boolean anyEvaluable = false;
 
-        List<String> enrichment = enrichWithCommitHistory(insight, projectId, createdAt(insight), evidenceReferences, sourceId);
-
-        for (String evidenceRef : evidenceReferences) {
+        for (String path : evidencePaths) {
             try {
-                boolean baselinePresent = repositoryStatePort.isFilePresentAtRevision(
-                        selectedSource, targetRevision, evidenceRef);
-                boolean currentPresent = repositoryStatePort.isFilePresentAtRevision(
-                        selectedSource, currentKnownRevision, evidenceRef);
+                boolean baselinePresent = repositoryStatePort.isFilePresentAtRevision(selectedSource, targetRevision, path);
+                boolean currentPresent = repositoryStatePort.isFilePresentAtRevision(selectedSource, currentKnownRevision, path);
 
                 if (baselinePresent && !currentPresent) {
                     anySuspectedStale = true;
-                    evidence.add("File '" + evidenceRef + "' present at baseline '" + targetRevision
+                    evidence.add("File '" + path + "' present at baseline '" + targetRevision
                             + "' but absent at currentKnownRevision '" + currentKnownRevision + "'");
                 } else if (baselinePresent && currentPresent) {
                     anyEvaluable = true;
                 } else if (!baselinePresent) {
-                    evidence.add("Reference '" + evidenceRef + "' was not present at baseline '" + targetRevision
+                    evidence.add("Reference '" + path + "' was not present at baseline '" + targetRevision
                             + "'; does not prove temporal degradation — skipped");
                 }
             } catch (GitCommandException e) {
@@ -129,8 +166,16 @@ public class TemporalAssessmentServiceImpl implements TemporalAssessmentService 
                     TemporalAssessment.ReasoningOrigin.DETERMINISTIC);
         }
 
-        evidence.add("All " + evidenceReferences.size() + " evidence references verified present at both baseline '"
-                + targetRevision + "' and currentKnownRevision '" + currentKnownRevision + "'");
+        String verdict;
+        if (legacy) {
+            verdict = "All " + evidencePaths.size() + " legacy evidence references verified present at both baseline '"
+                    + targetRevision + "' and currentKnownRevision '" + currentKnownRevision + "'";
+        } else {
+            verdict = "All " + evidencePaths.size() + " resolved repository evidence files verified present at both baseline '"
+                    + targetRevision + "' and currentKnownRevision '" + currentKnownRevision + "'";
+        }
+
+        evidence.add(verdict);
         evidence.addAll(enrichment);
 
         return TemporalAssessment.of(
@@ -138,6 +183,18 @@ public class TemporalAssessmentServiceImpl implements TemporalAssessmentService 
                 evidence,
                 TemporalAssessment.Conclusion.CURRENT,
                 TemporalAssessment.ReasoningOrigin.DETERMINISTIC);
+    }
+
+    private List<String> legacyRepositoryPaths(List<String> evidenceReferences) {
+        if (evidenceReferences == null) {
+            return List.of();
+        }
+        return evidenceReferences.stream()
+                .map(EvidencePathValidator::normalize)
+                .filter(s -> !s.isEmpty())
+                .filter(s -> !EvidencePathValidator.hasNonFileNamespacePrefix(s))
+                .filter(EvidencePathValidator::isValidRelativePath)
+                .toList();
     }
 
     private Instant createdAt(Insight insight) {

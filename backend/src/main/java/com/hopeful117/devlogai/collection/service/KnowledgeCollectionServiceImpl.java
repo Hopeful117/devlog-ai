@@ -21,6 +21,7 @@ import com.hopeful117.devlogai.fact.entity.Fact;
 import com.hopeful117.devlogai.fact.repository.FactRepository;
 import com.hopeful117.devlogai.observation.entity.Observation;
 import com.hopeful117.devlogai.observation.repository.ObservationRepository;
+import com.hopeful117.devlogai.shared.evidence.EvidencePathValidator;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
@@ -224,10 +225,7 @@ public class KnowledgeCollectionServiceImpl implements KnowledgeCollectionServic
     }
 
     private void validateEvidenceReference(String reference) {
-        String normalized = reference.replace('\\', '/');
-        if (normalized.startsWith("/") || normalized.matches("^[A-Za-z]:/.*")
-                || normalized.equals("..") || normalized.startsWith("../")
-                || normalized.contains("/../")) {
+        if (!EvidencePathValidator.isValidRelativePath(reference)) {
             throw new IllegalArgumentException("Fact evidence must be relative to the workspace");
         }
     }
