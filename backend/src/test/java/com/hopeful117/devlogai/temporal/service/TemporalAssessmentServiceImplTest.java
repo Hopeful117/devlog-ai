@@ -11,6 +11,7 @@ import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.entity.SourceType;
+import com.hopeful117.devlogai.repositoryevidence.RepositoryEvidenceResolver;
 import com.hopeful117.devlogai.temporal.domain.TemporalAssessment;
 import com.hopeful117.devlogai.temporal.port.RepositoryStatePort;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,6 +37,8 @@ class TemporalAssessmentServiceImplTest {
     private RepositoryStatePort repositoryStatePort;
     @Mock
     private ProjectCommitRepository projectCommitRepository;
+    @Mock
+    private RepositoryEvidenceResolver repositoryEvidenceResolver;
 
     @InjectMocks
     private TemporalAssessmentServiceImpl service;
@@ -72,6 +75,8 @@ class TemporalAssessmentServiceImplTest {
         activeInsight.setAnalysis(analysis);
         activeInsight.setStatus(InsightStatus.ACTIVE);
         activeInsight.setEvidenceReferences(new ArrayList<>());
+
+        lenient().when(repositoryEvidenceResolver.resolve(any())).thenReturn(Optional.empty());
     }
 
     @Test
