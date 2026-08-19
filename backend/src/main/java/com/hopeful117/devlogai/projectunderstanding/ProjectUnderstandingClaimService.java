@@ -61,7 +61,7 @@ class ProjectUnderstandingClaimService {
                 .intentVersion(prepared.intent().version())
                 .userGuidance(guidance)
                 .status(AnalysisStatus.PENDING)
-                .targetRevision(prepared.targetRevision())
+                .targetRevision(prepared.resolvedRevision())
                 .build();
         return new ProjectUnderstandingClaim(analysisRepository.saveAndFlush(analysis),
                 ProjectUnderstandingOutcome.CREATED);
