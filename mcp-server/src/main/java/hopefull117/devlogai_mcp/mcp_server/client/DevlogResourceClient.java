@@ -1,6 +1,7 @@
 package hopefull117.devlogai_mcp.mcp_server.client;
 
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.service.annotation.GetExchange;
 import org.springframework.web.service.annotation.HttpExchange;
 
@@ -38,4 +39,10 @@ public interface DevlogResourceClient {
     String getCommitContext(
             @PathVariable("repositoryId") UUID repositoryId,
             @PathVariable("commitHash") String commitHash);
+
+    @GetExchange("/project-history/projects/{projectId}/commits/search")
+    String searchProjectHistory(
+            @PathVariable("projectId") UUID projectId,
+            @RequestParam("query") String query,
+            @RequestParam(value = "limit", required = false) Integer limit);
 }
