@@ -22,7 +22,7 @@ public class ProjectKnowledgeContextCollector implements RepositoryContextCollec
     }
 
     @Override public String collectorId() { return "project-knowledge"; }
-    @Override public String collectorVersion() { return "v1"; }
+    @Override public String collectorVersion() { return "v2"; }
 
     @Override
     public List<RepositoryEvidence> collect(ContextRequest request) {
@@ -87,6 +87,63 @@ request.analysisContext().engineeringStories().forEach(story -> {
             }
             if (story.targetCommit() != null) {
                 extractionMetadata.put("targetCommit", story.targetCommit());
+            }
+            result.add(evidence.withExtractionMetadata(extractionMetadata));
+        });
+
+        request.analysisContext().validatedEngineeringEvents().forEach(event -> {
+            List<String> commitReferences = new ArrayList<>();
+            if (event.sourceId() != null && event.baseCommit() != null) {
+                commitReferences.add("git:" + event.sourceId() + ":" + event.baseCommit());
+            }
+            if (event.sourceId() != null && event.targetCommit() != null) {
+                commitReferences.add("git:" + event.sourceId() + ":" + event.targetCommit());
+            }
+            RepositoryEvidence evidence = evidenceFactory.create(metadata(), new EvidenceFactory.EvidenceInput(
+                    RepositoryContextLayer.GIT_HISTORY,
+                    "ENGINEERING_EVENT",
+                    "event:" + event.id(),
+                    event.title() + " — " + Objects.toString(event.summary(), ""),
+                    event.occurredAt(),
+                    commitReferences,
+                    event.sourceId() == null ? null : event.sourceId().toString(),
+                    null,
+                    event.id().toString()),
+                    request.budget().maximumSummaryCharacters());
+            Map<String, String> extractionMetadata = new LinkedHashMap<>(evidence.extractionMetadata());
+            if (event.category() != null) {
+                extractionMetadata.put("category", event.category());
+            }
+            if (event.baseCommit() != null) {
+                extractionMetadata.put("baseCommit", event.baseCommit());
+            }
+            if (event.targetCommit() != null) {
+                extractionMetadata.put("targetCommit", event.targetCommit());
+            }
+            if (event.proposalId() != null) {
+                extractionMetadata.put("proposalId", event.proposalId().toString());
+            }
+            result.add(evidence.withExtractionMetadata(extractionMetadata));
+        });
+
+        request.analysisContext().openChallenges().forEach(challenge -> {
+            RepositoryEvidence evidence = evidenceFactory.create(metadata(), new EvidenceFactory.EvidenceInput(
+                    RepositoryContextLayer.ROADMAP,
+                    "CHALLENGE",
+                    "challenge:" + challenge.id(),
+                    challenge.title() + " — " + Objects.toString(challenge.description(), ""),
+                    challenge.createdAt(),
+                    List.of(),
+                    null,
+                    null,
+                    challenge.id().toString()),
+                    request.budget().maximumSummaryCharacters());
+            Map<String, String> extractionMetadata = new LinkedHashMap<>(evidence.extractionMetadata());
+            if (challenge.status() != null) {
+                extractionMetadata.put("status", challenge.status());
+            }
+            if (challenge.impact() != null) {
+                extractionMetadata.put("impact", challenge.impact());
             }
             result.add(evidence.withExtractionMetadata(extractionMetadata));
         });
