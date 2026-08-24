@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.engineeringcontext.mapper;
 
+import com.hopeful117.devlogai.contracts.engineeringcontext.DevlogResourceUriFactory;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextMetadata;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidence;
@@ -16,10 +17,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
 public class EngineeringContextContractMapper {
+
+    private static final Pattern GIT_COMMIT_REFERENCE =
+            Pattern.compile("^git:[0-9a-fA-F\\-]+:([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$");
 
     private final ProjectContextContractMapper projectContextContractMapper;
 
@@ -28,25 +34,28 @@ public class EngineeringContextContractMapper {
             RepositoryContext repositoryContext,
             String intent
     ) {
+        String projectSlug = projectContext.project().slug();
         return new EngineeringContext(
                 projectContextContractMapper.toContract(projectContext),
                 intent,
-                mapEvidence(repositoryContext),
+                mapEvidence(repositoryContext, projectSlug),
                 mapMetadata(repositoryContext)
         );
     }
 
     private List<EngineeringEvidence> mapEvidence(
-            RepositoryContext repositoryContext
+            RepositoryContext repositoryContext,
+            String projectSlug
     ) {
         return repositoryContext.evidence().stream()
-                .map(evidence -> mapEvidence(evidence, repositoryContext))
+                .map(evidence -> mapEvidence(evidence, repositoryContext, projectSlug))
                 .toList();
     }
 
     private EngineeringEvidence mapEvidence(
             RepositoryEvidence evidence,
-            RepositoryContext repositoryContext
+            RepositoryContext repositoryContext,
+            String projectSlug
     ) {
         var provenance = evidence.provenance();
 
@@ -63,8 +72,47 @@ public class EngineeringContextContractMapper {
                 evidence.relatedReferences(),
                 evidence.extractionMetadata(),
                 mapContent(evidence.content()),
-                mapSymbols(evidence.symbols())
+                mapSymbols(evidence.symbols()),
+                resolveResource(evidence, projectSlug)
         );
+    }
+
+    /**
+     * Deterministic, exact-only mapping between an evidence and the MCP
+     * resource exposing the same artifact (Stories 0088/0089). Anything that
+     * is not an unambiguous correspondence stays null: absence of a resource
+     * is a normal state, never a failure.
+     */
+    private String resolveResource(RepositoryEvidence evidence, String projectSlug) {
+        String identifier = evidence.provenance() == null
+                ? null : evidence.provenance().identifier();
+        try {
+            return switch (evidence.kind()) {
+                case "DECISION" -> DevlogResourceUriFactory.decision(
+                        projectSlug, UUID.fromString(identifier));
+                case "INSIGHT" -> DevlogResourceUriFactory.insight(
+                        projectSlug, UUID.fromString(identifier));
+                case "ENGINEERING_STORY" -> DevlogResourceUriFactory.story(
+                        projectSlug, UUID.fromString(identifier));
+                case "ENGINEERING_EVENT" -> DevlogResourceUriFactory.engineeringEvent(
+                        projectSlug, UUID.fromString(identifier));
+                case "COMMIT" -> commitResource(evidence.reference(), projectSlug);
+                default -> null;
+            };
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    /**
+     * A COMMIT evidence IS the commit itself; its internal reference carries
+     * the SHA exactly once: {@code git:{sourceId}:{sha}}.
+     */
+    private String commitResource(String reference, String projectSlug) {
+        var matcher = GIT_COMMIT_REFERENCE.matcher(
+                reference == null ? "" : reference);
+        if (!matcher.matches()) return null;
+        return DevlogResourceUriFactory.commit(projectSlug, matcher.group(1));
     }
 
     private EngineeringEvidenceContent mapContent(

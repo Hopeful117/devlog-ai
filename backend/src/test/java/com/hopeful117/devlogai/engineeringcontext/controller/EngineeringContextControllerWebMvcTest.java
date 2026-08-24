@@ -71,7 +71,8 @@ class EngineeringContextControllerWebMvcTest extends ControllerWebMvcTestSupport
                         List.of("diff:a1b2c3d4e5f67890abcdef1234567890abcdef12:project-context-inputs-section.html"),
                         Map.of("collectorId", "commit-diff", "collectorVersion", "v1"),
                         null,
-                        null
+                        null,
+                        "devlog://projects/devlog-ai/commits/a1b2c3d4e5f67890abcdef1234567890abcdef12"
                 )
         );
 
@@ -120,6 +121,8 @@ class EngineeringContextControllerWebMvcTest extends ControllerWebMvcTestSupport
                         .value("commit-diff"))
                 .andExpect(jsonPath("$.evidence[0].content").doesNotExist())
                 .andExpect(jsonPath("$.evidence[0].symbols").doesNotExist())
+                .andExpect(jsonPath("$.evidence[0].resource")
+                        .value("devlog://projects/devlog-ai/commits/a1b2c3d4e5f67890abcdef1234567890abcdef12"))
                 .andExpect(jsonPath("$.metadata.candidateCount").value(42))
                 .andExpect(jsonPath("$.metadata.selectedCount").value(15))
                 .andExpect(jsonPath("$.metadata.truncated").value(false))
