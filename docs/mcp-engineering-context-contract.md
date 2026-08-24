@@ -63,6 +63,25 @@ get_engineering_context response (JSON)
 | `extractionMetadata` | `RepositoryEvidence.extractionMetadata()` | `collectorId`/`collectorVersion` + données d'extraction : `resolvedRevision`, `baseCommit`, `targetCommit`, `storyNumber`, `status`, `category`, `proposalId`, `impact`… |
 | `content` | `SelectedFileContentEnricher` → `RepositoryEvidenceContent` | contenu fichier lu, borné ; `null` si non enrichi |
 | `symbols` | `SelectedJavaSymbolEnricher` → `RepositoryEvidenceSymbols` | déclarations Java (CLASS/INTERFACE/RECORD/ENUM/ANNOTATION_DECLARATION/CONSTRUCTOR/METHOD) avec localisation ; `null` si non enrichi |
+| `resource` | `DevlogResourceUriFactory` (devlog-contracts, source unique partagée avec le mcp-server) | URI MCP de l'artefact **lorsque la correspondance est exacte** (`devlog://projects/{slug}/decisions/{id}`, `…/insights/{id}`, `…/stories/{id}`, `…/engineering-events/{id}`, `…/commits/{sha}`) ; `null` sinon — absence normale, jamais une erreur |
+
+### Navigation resource
+
+```text
+get_engineering_context
+        ↓
+EngineeringEvidence.resource      (ex: devlog://projects/devlog-ai/decisions/{uuid})
+        ↓
+resources/read                    (URI utilisable telle quelle)
+        ↓
+full trusted artifact
+```
+
+Règles du mapping (déterministe, sans heuristique) :
+
+- **Adressables** : DECISION, INSIGHT (ACTIVE-only des deux côtés), ENGINEERING_STORY, ENGINEERING_EVENT, COMMIT (SHA extrait de la référence interne `git:{sourceId}:{sha}`).
+- **Volontairement non adressables** (`resource = null`) : CHANGED_FILE (groupe de diffs agrégé ≠ un commit ; ses `relatedReferences` identifient déjà les commits), CHALLENGE, MILESTONE, ARTIFACT, ANALYSIS, FACT/OBSERVATION, evidences de structure repository — aucune Resource correspondante n'existe.
+- Différence avec `relatedReferences` : `resource` désigne **cette evidence** comme artefact lisible ; `relatedReferences` sont des liens de provenance bruts (parents git, analysis source…) non transformés en URIs.
 
 ### EngineeringEvidenceContent
 

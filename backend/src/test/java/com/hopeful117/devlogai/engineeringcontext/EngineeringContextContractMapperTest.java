@@ -21,15 +21,29 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class EngineeringContextContractMapperTest {
+
+    private static final String SLUG = "devlog-ai";
+    private static final java.util.UUID PROJECT_ID =
+            java.util.UUID.fromString("f3d56247-aada-4a76-982b-e6802c0b309c");
+
     private final ProjectContextContractMapper projectContextContractMapper =
             mock(ProjectContextContractMapper.class);
 
     private final EngineeringContextContractMapper mapper =
             new EngineeringContextContractMapper(projectContextContractMapper);
 
+    private ProjectContextSnapshot projectSnapshotWithSlug() {
+        return new ProjectContextSnapshot(
+                new com.hopeful117.devlogai.analysis.context.AnalysisContext.ProjectSnapshot(
+                        PROJECT_ID, SLUG, SLUG, "description",
+                        com.hopeful117.devlogai.project.entity.ProjectStatus.ACTIVE),
+                null, List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of());
+    }
+
     @Test
     void shouldMapEngineeringContextWithEvidenceAndSelectionReason() {
-        ProjectContextSnapshot projectSnapshot = mock(ProjectContextSnapshot.class);
+        ProjectContextSnapshot projectSnapshot = projectSnapshotWithSlug();
 
         var mappedProject = mock(
                 com.hopeful117.devlogai.contracts.projectcontext.ProjectContext.class
@@ -112,7 +126,7 @@ class EngineeringContextContractMapperTest {
 
     @Test
     void shouldMapEnrichmentTemporalAndProvenanceInformation() {
-        ProjectContextSnapshot projectSnapshot = mock(ProjectContextSnapshot.class);
+        ProjectContextSnapshot projectSnapshot = projectSnapshotWithSlug();
         var mappedProject = mock(
                 com.hopeful117.devlogai.contracts.projectcontext.ProjectContext.class
         );
@@ -226,7 +240,7 @@ class EngineeringContextContractMapperTest {
 
     @Test
     void shouldMapMissingInformationAsCleanAbsence() {
-        ProjectContextSnapshot projectSnapshot = mock(ProjectContextSnapshot.class);
+        ProjectContextSnapshot projectSnapshot = projectSnapshotWithSlug();
         var mappedProject = mock(
                 com.hopeful117.devlogai.contracts.projectcontext.ProjectContext.class
         );
@@ -267,6 +281,150 @@ class EngineeringContextContractMapperTest {
         assertThat(mapped.content()).isNull();
         assertThat(mapped.symbols()).isNull();
         assertThat(mapped.selectionReason()).isNull();
+        assertThat(mapped.resource()).isNull();
         assertThat(result.metadata().warnings()).isEmpty();
+    }
+
+    @Test
+    void shouldAttachResourceUriToExactlyAddressableEvidence() {
+        ProjectContextSnapshot projectSnapshot = projectSnapshotWithSlug();
+        var mappedProject = mock(
+                com.hopeful117.devlogai.contracts.projectcontext.ProjectContext.class);
+        when(projectContextContractMapper.toContract(projectSnapshot))
+                .thenReturn(mappedProject);
+
+        var decisionId = java.util.UUID.randomUUID();
+        var insightId = java.util.UUID.randomUUID();
+        var storyId = java.util.UUID.randomUUID();
+        var eventId = java.util.UUID.randomUUID();
+        String sha = "3cd3723206eae38d518eb696a1dd50c0476264d0";
+
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+        when(repositoryContext.evidence()).thenReturn(List.of(
+                evidence("DECISION", decisionId.toString(), null),
+                evidence("INSIGHT", insightId.toString(), null),
+                evidence("ENGINEERING_STORY", storyId.toString(), null),
+                evidence("ENGINEERING_EVENT", eventId.toString(), null),
+                new RepositoryEvidence(
+                        RepositoryContextLayer.GIT_HISTORY, "COMMIT",
+                        "git:" + PROJECT_ID + ":" + sha,
+                        "Fix markdown rendering", Instant.now(),
+                        EvidenceScore.unscored(), List.of(),
+                        new RepositoryEvidence.EvidenceProvenance(
+                                "GIT", PROJECT_ID.toString(), null, null),
+                        java.util.Map.of(), 60, List.of())));
+        when(repositoryContext.selectionDecisions()).thenReturn(java.util.List.of());
+        when(repositoryContext.candidateCount()).thenReturn(5);
+        when(repositoryContext.truncated()).thenReturn(false);
+        when(repositoryContext.usedTokens()).thenReturn(300);
+        when(repositoryContext.contextDigest()).thenReturn("digest");
+        when(repositoryContext.warnings()).thenReturn(java.util.List.of());
+
+        EngineeringContext result =
+                mapper.toContract(projectSnapshot, repositoryContext, "intent");
+
+        assertThat(result.evidence()).hasSize(5);
+        assertThat(result.evidence().get(0).resource())
+                .isEqualTo("devlog://projects/devlog-ai/decisions/" + decisionId);
+        assertThat(result.evidence().get(1).resource())
+                .isEqualTo("devlog://projects/devlog-ai/insights/" + insightId);
+        assertThat(result.evidence().get(2).resource())
+                .isEqualTo("devlog://projects/devlog-ai/stories/" + storyId);
+        assertThat(result.evidence().get(3).resource())
+                .isEqualTo("devlog://projects/devlog-ai/engineering-events/" + eventId);
+        assertThat(result.evidence().get(4).resource())
+                .isEqualTo("devlog://projects/devlog-ai/commits/" + sha);
+    }
+
+    @Test
+    void shouldLeaveNonAddressableEvidenceWithoutResource() {
+        ProjectContextSnapshot projectSnapshot = projectSnapshotWithSlug();
+        var mappedProject = mock(
+                com.hopeful117.devlogai.contracts.projectcontext.ProjectContext.class);
+        when(projectContextContractMapper.toContract(projectSnapshot))
+                .thenReturn(mappedProject);
+
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+        when(repositoryContext.evidence()).thenReturn(List.of(
+                evidence("CHANGED_FILE", "commit-diff:src/App.java", null),
+                evidence("CHALLENGE", java.util.UUID.randomUUID().toString(), null),
+                evidence("MILESTONE", java.util.UUID.randomUUID().toString(), null),
+                evidence("ANALYSIS", java.util.UUID.randomUUID().toString(), null),
+                evidence("ARTIFACT", java.util.UUID.randomUUID().toString(), null),
+                evidence("SOURCE_FILE", "repository-structure:source-file:src/App.java",
+                        "src/App.java")));
+        when(repositoryContext.selectionDecisions()).thenReturn(java.util.List.of());
+        when(repositoryContext.candidateCount()).thenReturn(6);
+        when(repositoryContext.truncated()).thenReturn(false);
+        when(repositoryContext.usedTokens()).thenReturn(360);
+        when(repositoryContext.contextDigest()).thenReturn("digest");
+        when(repositoryContext.warnings()).thenReturn(java.util.List.of());
+
+        EngineeringContext result =
+                mapper.toContract(projectSnapshot, repositoryContext, "intent");
+
+        assertThat(result.evidence())
+                .allSatisfy(e -> assertThat(e.resource()).isNull());
+    }
+
+    @Test
+    void shouldSafelyIgnoreInvalidOrUnexpectedIdentifiers() {
+        ProjectContextSnapshot projectSnapshot = projectSnapshotWithSlug();
+        var mappedProject = mock(
+                com.hopeful117.devlogai.contracts.projectcontext.ProjectContext.class);
+        when(projectContextContractMapper.toContract(projectSnapshot))
+                .thenReturn(mappedProject);
+
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+        when(repositoryContext.evidence()).thenReturn(List.of(
+                evidence("DECISION", "not-a-uuid", null),
+                evidence("INSIGHT", null, null),
+                new RepositoryEvidence(
+                        RepositoryContextLayer.GIT_HISTORY, "COMMIT",
+                        "git:not-a-source:shortsha",
+                        "Weird commit", Instant.now(),
+                        EvidenceScore.unscored(), List.of(),
+                        new RepositoryEvidence.EvidenceProvenance(
+                                "GIT", "not-a-source", null, null),
+                        java.util.Map.of(), 60, List.of()),
+                evidence("UNKNOWN_KIND", java.util.UUID.randomUUID().toString(), null)));
+        when(repositoryContext.selectionDecisions()).thenReturn(java.util.List.of());
+        when(repositoryContext.candidateCount()).thenReturn(4);
+        when(repositoryContext.truncated()).thenReturn(false);
+        when(repositoryContext.usedTokens()).thenReturn(240);
+        when(repositoryContext.contextDigest()).thenReturn("digest");
+        when(repositoryContext.warnings()).thenReturn(java.util.List.of());
+
+        EngineeringContext result =
+                mapper.toContract(projectSnapshot, repositoryContext, "intent");
+
+        assertThat(result.evidence())
+                .allSatisfy(e -> assertThat(e.resource()).isNull());
+    }
+
+    private RepositoryEvidence evidence(
+            String kind, String identifier, String originatingFile) {
+        return new RepositoryEvidence(
+                switch (kind) {
+                    case "DECISION" -> RepositoryContextLayer.ADR;
+                    case "INSIGHT" -> RepositoryContextLayer.VALIDATED_INSIGHT;
+                    case "ENGINEERING_EVENT" -> RepositoryContextLayer.GIT_HISTORY;
+                    case "MILESTONE", "CHALLENGE", "ENGINEERING_STORY" ->
+                            RepositoryContextLayer.ROADMAP;
+                    case "ARTIFACT" -> RepositoryContextLayer.PROJECT_DOCUMENTATION;
+                    case "ANALYSIS" -> RepositoryContextLayer.PREVIOUS_ANALYSIS;
+                    default -> RepositoryContextLayer.RELATED_SOURCE_CODE;
+                },
+                kind,
+                kind.toLowerCase() + ":ref",
+                "summary of " + kind,
+                Instant.parse("2026-08-01T10:00:00Z"),
+                EvidenceScore.unscored(),
+                List.of(),
+                new RepositoryEvidence.EvidenceProvenance(
+                        "CORE_KNOWLEDGE", null, originatingFile, identifier),
+                java.util.Map.of(),
+                60,
+                List.of());
     }
 }

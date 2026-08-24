@@ -66,7 +66,8 @@ class EngineeringContextToolUnitTest {
                         List.of("diff:a1b2c3d4e5f67890abcdef1234567890abcdef12:project-context-inputs-section.html"),
                         Map.of("collectorId", "commit-diff"),
                         null,
-                        null
+                        null,
+                        "devlog://projects/devlog-ai/commits/a1b2c3d4e5f67890abcdef1234567890abcdef12"
                 )
         );
 
@@ -117,6 +118,8 @@ class EngineeringContextToolUnitTest {
         assert result.contains("collectorId") : "JSON should contain collector provenance";
         assert result.contains("warnings") : "JSON should contain warnings";
         assert result.contains("EVIDENCE_SUMMARY_TRUNCATED") : "JSON should contain warning value";
+        assert result.contains("\"resource\":\"devlog://projects/devlog-ai/commits/")
+                : "JSON should contain the resource URI";
 
         // Verify the client was called with correct arguments
         Mockito.verify(devlogProjectContextClient).getEngineeringContext(
