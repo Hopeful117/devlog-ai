@@ -1,8 +1,10 @@
 package com.hopeful117.devlogai.history.controller;
 
+import com.hopeful117.devlogai.contracts.projecthistory.ProjectHistorySearchResult;
 import com.hopeful117.devlogai.history.context.CommitDiffAnalysisContext;
 import com.hopeful117.devlogai.history.dto.HistoryImportResult;
 import com.hopeful117.devlogai.history.dto.ProjectCommitResponse;
+import com.hopeful117.devlogai.history.service.ProjectHistorySearchService;
 import com.hopeful117.devlogai.history.service.ProjectHistoryService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,9 +21,14 @@ import java.util.UUID;
 @RequestMapping("/api/v1/project-history")
 public class ProjectHistoryController {
     private final ProjectHistoryService historyService;
+    private final ProjectHistorySearchService searchService;
 
-    public ProjectHistoryController(ProjectHistoryService historyService) {
+    public ProjectHistoryController(
+            ProjectHistoryService historyService,
+            ProjectHistorySearchService searchService
+    ) {
         this.historyService = historyService;
+        this.searchService = searchService;
     }
 
     @PostMapping("/repositories/{repositoryId}/imports")
@@ -45,5 +52,14 @@ public class ProjectHistoryController {
             @PathVariable String commitHash
     ) {
         return ResponseEntity.ok(historyService.getCommitContext(repositoryId, commitHash));
+    }
+
+    @GetMapping("/projects/{projectId}/commits/search")
+    public ResponseEntity<ProjectHistorySearchResult> searchHistory(
+            @PathVariable UUID projectId,
+            @RequestParam String query,
+            @RequestParam(required = false) Integer limit
+    ) {
+        return ResponseEntity.ok(searchService.search(projectId, query, limit));
     }
 }
