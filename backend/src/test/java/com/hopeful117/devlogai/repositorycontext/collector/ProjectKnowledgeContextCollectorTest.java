@@ -52,7 +52,7 @@ class ProjectKnowledgeContextCollectorTest {
     void shouldReturnCorrectMetadata() {
         var collector = createCollector();
         assertEquals("project-knowledge", collector.collectorId());
-        assertEquals("v1", collector.collectorVersion());
+        assertEquals("v2", collector.collectorVersion());
     }
 
     @Test
@@ -369,6 +369,126 @@ class ProjectKnowledgeContextCollectorTest {
         assertEquals("REGISTERED", evidence.extractionMetadata().get("status"));
         assertNull(evidence.extractionMetadata().get("baseCommit"));
         assertNull(evidence.extractionMetadata().get("targetCommit"));
+    }
+
+    @Test
+    void shouldCollectValidatedEngineeringEventsAsGitHistoryEvidence() {
+        var collector = createCollector();
+        UUID eventId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        UUID proposalId = UUID.randomUUID();
+        Instant occurredAt = Instant.parse("2026-07-01T12:00:00Z");
+        var event = new ProjectContextSnapshot.EngineeringEventSnapshot(
+                eventId, "FEATURE_INTRODUCTION", "Add markdown rendering",
+                "Introduced ngx-markdown renderer for project notes", sourceId,
+                "base-abc123", "target-def456", occurredAt, proposalId);
+
+        var analysisContext = fullAnalysisContext(List.of(), List.of(), List.of(),
+                List.of(), List.of(event), List.of(), List.of());
+        var request = createRequest(analysisContext);
+
+        List<RepositoryEvidence> result = collector.collect(request);
+
+        assertEquals(1, result.size());
+        var evidence = result.getFirst();
+        assertEquals(RepositoryContextLayer.GIT_HISTORY, evidence.layer());
+        assertEquals("ENGINEERING_EVENT", evidence.kind());
+        assertEquals("event:" + eventId, evidence.reference());
+        assertTrue(evidence.summary().contains("Add markdown rendering"));
+        assertTrue(evidence.summary().contains("ngx-markdown renderer"));
+        assertEquals(occurredAt, evidence.occurredAt());
+        assertEquals("CORE_KNOWLEDGE", evidence.provenance().sourceType());
+        assertEquals(sourceId.toString(), evidence.provenance().repositoryLocation());
+        assertEquals(eventId.toString(), evidence.provenance().identifier());
+        assertEquals(List.of(
+                        "git:" + sourceId + ":base-abc123",
+                        "git:" + sourceId + ":target-def456"),
+                evidence.relatedReferences());
+        assertEquals("FEATURE_INTRODUCTION", evidence.extractionMetadata().get("category"));
+        assertEquals("base-abc123", evidence.extractionMetadata().get("baseCommit"));
+        assertEquals("target-def456", evidence.extractionMetadata().get("targetCommit"));
+        assertEquals(proposalId.toString(), evidence.extractionMetadata().get("proposalId"));
+    }
+
+    @Test
+    void shouldCollectEngineeringEventsWithNullCommitsAsCleanAbsence() {
+        var collector = createCollector();
+        UUID eventId = UUID.randomUUID();
+        var event = new ProjectContextSnapshot.EngineeringEventSnapshot(
+                eventId, "BUG_RESOLUTION", "Fix import flow", null,
+                null, null, null, Instant.now(), null);
+
+        var analysisContext = fullAnalysisContext(List.of(), List.of(), List.of(),
+                List.of(), List.of(event), List.of(), List.of());
+        var request = createRequest(analysisContext);
+
+        List<RepositoryEvidence> result = collector.collect(request);
+
+        assertEquals(1, result.size());
+        var evidence = result.getFirst();
+        assertTrue(evidence.relatedReferences().isEmpty());
+        assertNull(evidence.provenance().repositoryLocation());
+        assertFalse(evidence.extractionMetadata().containsKey("baseCommit"));
+        assertFalse(evidence.extractionMetadata().containsKey("targetCommit"));
+        assertFalse(evidence.extractionMetadata().containsKey("proposalId"));
+    }
+
+    @Test
+    void shouldCollectOpenChallengesAsRoadmapEvidence() {
+        var collector = createCollector();
+        UUID challengeId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-06-20T09:00:00Z");
+        var challenge = new ProjectContextSnapshot.ChallengeSnapshot(
+                challengeId, "Slow context pipeline",
+                "Repository synchronization dominates latency",
+                "HIGH", "OPEN", null, createdAt);
+
+        var analysisContext = fullAnalysisContext(List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(challenge), List.of());
+        var request = createRequest(analysisContext);
+
+        List<RepositoryEvidence> result = collector.collect(request);
+
+        assertEquals(1, result.size());
+        var evidence = result.getFirst();
+        assertEquals(RepositoryContextLayer.ROADMAP, evidence.layer());
+        assertEquals("CHALLENGE", evidence.kind());
+        assertEquals("challenge:" + challengeId, evidence.reference());
+        assertTrue(evidence.summary().contains("Slow context pipeline"));
+        assertTrue(evidence.summary().contains("Repository synchronization dominates latency"));
+        assertEquals(createdAt, evidence.occurredAt());
+        assertEquals(challengeId.toString(), evidence.provenance().identifier());
+        assertEquals("CORE_KNOWLEDGE", evidence.provenance().sourceType());
+        assertEquals("OPEN", evidence.extractionMetadata().get("status"));
+        assertEquals("HIGH", evidence.extractionMetadata().get("impact"));
+    }
+
+    private AnalysisContext fullAnalysisContext(
+            List<AnalysisContext.DecisionSnapshot> decisions,
+            List<AnalysisContext.MilestoneSnapshot> milestones,
+            List<AnalysisContext.AnalysisSnapshot> relatedAnalyses,
+            List<AnalysisContext.ArtifactSnapshot> artifacts,
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> engineeringEvents,
+            List<ProjectContextSnapshot.ChallengeSnapshot> openChallenges,
+            List<ProjectContextSnapshot.EngineeringStorySnapshot> stories
+    ) {
+        return new AnalysisContext(
+                null,
+                testAnalysis(),
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                relatedAnalyses,
+                artifacts,
+                decisions,
+                milestones,
+                List.of(),
+                null,
+                engineeringEvents,
+                openChallenges,
+                List.of(),
+                stories);
     }
 
     private void assertEvidence(RepositoryEvidence first, RepositoryContextLayer repositoryContextLayer, String decision, String s) {

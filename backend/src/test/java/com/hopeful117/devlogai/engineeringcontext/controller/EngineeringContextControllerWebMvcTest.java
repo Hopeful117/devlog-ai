@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -65,7 +66,12 @@ class EngineeringContextControllerWebMvcTest extends ControllerWebMvcTestSupport
                         "project-context-inputs-section.html",
                         "a1b2c3d4e5f67890abcdef1234567890abcdef12",
                         95,
-                        "SELECTED_BY_RANK"
+                        "SELECTED_BY_RANK",
+                        Instant.parse("2026-08-20T10:00:00Z"),
+                        List.of("diff:a1b2c3d4e5f67890abcdef1234567890abcdef12:project-context-inputs-section.html"),
+                        Map.of("collectorId", "commit-diff", "collectorVersion", "v1"),
+                        null,
+                        null
                 )
         );
 
@@ -74,7 +80,8 @@ class EngineeringContextControllerWebMvcTest extends ControllerWebMvcTestSupport
                 15,
                 false,
                 2100,
-                "deadbeef1234567890deadbeef1234567890deadbeef"
+                "deadbeef1234567890deadbeef1234567890deadbeef",
+                List.of("EVIDENCE_SUMMARY_TRUNCATED")
         );
 
         var engineeringContext = new EngineeringContext(
@@ -107,9 +114,17 @@ class EngineeringContextControllerWebMvcTest extends ControllerWebMvcTestSupport
                 .andExpect(jsonPath("$.evidence[0].sourceType").value("GIT"))
                 .andExpect(jsonPath("$.evidence[0].relevanceScore").value(95))
                 .andExpect(jsonPath("$.evidence[0].selectionReason").value("SELECTED_BY_RANK"))
+                .andExpect(jsonPath("$.evidence[0].occurredAt").value("2026-08-20T10:00:00Z"))
+                .andExpect(jsonPath("$.evidence[0].relatedReferences.length()").value(1))
+                .andExpect(jsonPath("$.evidence[0].extractionMetadata.collectorId")
+                        .value("commit-diff"))
+                .andExpect(jsonPath("$.evidence[0].content").doesNotExist())
+                .andExpect(jsonPath("$.evidence[0].symbols").doesNotExist())
                 .andExpect(jsonPath("$.metadata.candidateCount").value(42))
                 .andExpect(jsonPath("$.metadata.selectedCount").value(15))
-                .andExpect(jsonPath("$.metadata.truncated").value(false));
+                .andExpect(jsonPath("$.metadata.truncated").value(false))
+                .andExpect(jsonPath("$.metadata.warnings[0]")
+                        .value("EVIDENCE_SUMMARY_TRUNCATED"));
     }
 
     @Test

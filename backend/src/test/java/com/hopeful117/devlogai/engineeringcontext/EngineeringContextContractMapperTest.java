@@ -5,9 +5,15 @@ import com.hopeful117.devlogai.engineeringcontext.mapper.EngineeringContextContr
 import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
 import com.hopeful117.devlogai.projectcontext.mapper.ProjectContextContractMapper;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext.SelectionDecision;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceSymbols;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
+import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -102,5 +108,165 @@ class EngineeringContextContractMapperTest {
         assertThat(result.metadata().usedTokens()).isEqualTo(120);
         assertThat(result.metadata().contextDigest())
                 .isEqualTo("digest-123");
+    }
+
+    @Test
+    void shouldMapEnrichmentTemporalAndProvenanceInformation() {
+        ProjectContextSnapshot projectSnapshot = mock(ProjectContextSnapshot.class);
+        var mappedProject = mock(
+                com.hopeful117.devlogai.contracts.projectcontext.ProjectContext.class
+        );
+        when(projectContextContractMapper.toContract(projectSnapshot))
+                .thenReturn(mappedProject);
+
+        var occurredAt = Instant.parse("2026-08-01T10:15:30Z");
+        var content = new RepositoryEvidenceContent(
+                RepositoryEvidenceContent.Status.TRUNCATED,
+                "class Example {\n",
+                "CONTENT_ENRICHMENT_TRUNCATED",
+                "repository-content-policy", "v1",
+                "9e1c2f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e");
+        var symbols = new RepositoryEvidenceSymbols(
+                RepositoryEvidenceSymbols.Status.EXTRACTED,
+                null,
+                "repository-symbol-policy", "v1",
+                "java-declaration-extractor", "v1",
+                "9e1c2f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e",
+                1, List.of("RANK_1"), false, 1, 1,
+                List.of(new RepositoryEvidenceSymbols.JavaDeclaration(
+                        RepositoryEvidenceSymbols.Kind.METHOD,
+                        "getEngineeringContext",
+                        "EngineeringContextController",
+                        List.of("public"),
+                        "ResponseEntity<EngineeringContext>",
+                        List.of(new RepositoryEvidenceSymbols.Parameter(
+                                "String", "projectSlug")),
+                        List.of("@GetMapping"),
+                        new RepositoryEvidenceSymbols.SourceLocation(15, 4, 19, 5))));
+        RepositoryEvidence evidence = new RepositoryEvidence(
+                RepositoryContextLayer.RELATED_SOURCE_CODE,
+                "SOURCE_FILE",
+                "file:backend/src/main/java/EngineeringContextController.java",
+                "backend/src/main/java/EngineeringContextController.java",
+                occurredAt,
+                EvidenceScore.unscored(),
+                List.of("diff:abc123:backend/src/main/java/EngineeringContextController.java"),
+                new RepositoryEvidence.EvidenceProvenance(
+                        "REPOSITORY_STRUCTURE",
+                        "source-id-1",
+                        "backend/src/main/java/EngineeringContextController.java",
+                        "repository-structure:source-file:backend/src/main/java/EngineeringContextController.java"),
+                java.util.Map.of("resolvedRevision",
+                        "9e1c2f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e"),
+                210,
+                List.of("COLLECTED_NOT_RANKED"),
+                content,
+                symbols);
+
+        SelectionDecision selectionDecision = new SelectionDecision(
+                evidence.reference(), true, "SELECTED_BY_RANK", 88, 210);
+
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+        when(repositoryContext.evidence()).thenReturn(List.of(evidence));
+        when(repositoryContext.selectionDecisions())
+                .thenReturn(List.of(selectionDecision));
+        when(repositoryContext.candidateCount()).thenReturn(9);
+        when(repositoryContext.truncated()).thenReturn(true);
+        when(repositoryContext.usedTokens()).thenReturn(4800);
+        when(repositoryContext.contextDigest()).thenReturn("digest-enriched");
+        when(repositoryContext.warnings()).thenReturn(List.of(
+                "REPOSITORY_CONTEXT_BUDGET_APPLIED",
+                "CONTENT_ENRICHMENT_TRUNCATED"));
+
+        EngineeringContext result =
+                mapper.toContract(projectSnapshot, repositoryContext, "intent");
+
+        assertThat(result.evidence()).hasSize(1);
+        var mapped = result.evidence().getFirst();
+
+        assertThat(mapped.occurredAt()).isEqualTo(occurredAt);
+        assertThat(mapped.relatedReferences()).containsExactly(
+                "diff:abc123:backend/src/main/java/EngineeringContextController.java");
+        assertThat(mapped.extractionMetadata())
+                .containsEntry("resolvedRevision",
+                        "9e1c2f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e");
+
+        assertThat(mapped.content()).isNotNull();
+        assertThat(mapped.content().status()).isEqualTo("TRUNCATED");
+        assertThat(mapped.content().text()).isEqualTo("class Example {\n");
+        assertThat(mapped.content().reason()).isEqualTo("CONTENT_ENRICHMENT_TRUNCATED");
+        assertThat(mapped.content().revision())
+                .isEqualTo("9e1c2f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e");
+
+        assertThat(mapped.symbols()).isNotNull();
+        assertThat(mapped.symbols().status()).isEqualTo("EXTRACTED");
+        assertThat(mapped.symbols().truncated()).isFalse();
+        assertThat(mapped.symbols().returnedSymbolCount()).isEqualTo(1);
+        assertThat(mapped.symbols().extractorId()).isEqualTo("java-declaration-extractor");
+        assertThat(mapped.symbols().revision())
+                .isEqualTo("9e1c2f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e");
+        assertThat(mapped.symbols().declarations()).hasSize(1);
+        var declaration = mapped.symbols().declarations().getFirst();
+        assertThat(declaration.kind()).isEqualTo("METHOD");
+        assertThat(declaration.name()).isEqualTo("getEngineeringContext");
+        assertThat(declaration.owningType()).isEqualTo("EngineeringContextController");
+        assertThat(declaration.modifiers()).containsExactly("public");
+        assertThat(declaration.returnType()).isEqualTo("ResponseEntity<EngineeringContext>");
+        assertThat(declaration.parameters()).hasSize(1);
+        assertThat(declaration.parameters().getFirst().type()).isEqualTo("String");
+        assertThat(declaration.parameters().getFirst().name()).isEqualTo("projectSlug");
+        assertThat(declaration.annotations()).containsExactly("@GetMapping");
+        assertThat(declaration.location().beginLine()).isEqualTo(15);
+
+        assertThat(result.metadata().warnings()).containsExactly(
+                "REPOSITORY_CONTEXT_BUDGET_APPLIED",
+                "CONTENT_ENRICHMENT_TRUNCATED");
+        assertThat(result.metadata().truncated()).isTrue();
+    }
+
+    @Test
+    void shouldMapMissingInformationAsCleanAbsence() {
+        ProjectContextSnapshot projectSnapshot = mock(ProjectContextSnapshot.class);
+        var mappedProject = mock(
+                com.hopeful117.devlogai.contracts.projectcontext.ProjectContext.class
+        );
+        when(projectContextContractMapper.toContract(projectSnapshot))
+                .thenReturn(mappedProject);
+
+        RepositoryEvidence evidence = new RepositoryEvidence(
+                RepositoryContextLayer.GIT_HISTORY,
+                "COMMIT",
+                "git:source-1:abc123",
+                "Fix markdown rendering — 2 files, +40/-12",
+                Instant.parse("2026-07-15T08:00:00Z"),
+                EvidenceScore.unscored(),
+                List.of("git:source-1:parent1"),
+                new RepositoryEvidence.EvidenceProvenance(
+                        "GIT", "source-1", null, null),
+                java.util.Map.of("collectorId", "git-history",
+                        "collectorVersion", "v1"),
+                60,
+                List.of("COLLECTED_NOT_RANKED"));
+
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+        when(repositoryContext.evidence()).thenReturn(List.of(evidence));
+        when(repositoryContext.selectionDecisions()).thenReturn(java.util.List.of());
+        when(repositoryContext.candidateCount()).thenReturn(1);
+        when(repositoryContext.truncated()).thenReturn(false);
+        when(repositoryContext.usedTokens()).thenReturn(60);
+        when(repositoryContext.contextDigest()).thenReturn("digest-minimal");
+        when(repositoryContext.warnings()).thenReturn(java.util.List.of());
+
+        EngineeringContext result =
+                mapper.toContract(projectSnapshot, repositoryContext, "intent");
+
+        var mapped = result.evidence().getFirst();
+        assertThat(mapped.occurredAt())
+                .isEqualTo(Instant.parse("2026-07-15T08:00:00Z"));
+        assertThat(mapped.relatedReferences()).containsExactly("git:source-1:parent1");
+        assertThat(mapped.content()).isNull();
+        assertThat(mapped.symbols()).isNull();
+        assertThat(mapped.selectionReason()).isNull();
+        assertThat(result.metadata().warnings()).isEmpty();
     }
 }
