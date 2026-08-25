@@ -40,6 +40,9 @@ public interface DevlogResourceClient {
             @PathVariable("repositoryId") UUID repositoryId,
             @PathVariable("commitHash") String commitHash);
 
+    @GetExchange("/projects/{projectId}/freshness-checks/summary")
+    String getFreshnessSummary(@PathVariable("projectId") UUID projectId);
+
     @GetExchange("/project-history/projects/{projectId}/commits/search")
     String searchProjectHistory(
             @PathVariable("projectId") UUID projectId,

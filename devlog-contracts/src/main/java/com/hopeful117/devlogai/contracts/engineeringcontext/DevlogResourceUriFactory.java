@@ -12,6 +12,7 @@ import java.util.UUID;
  * devlog://projects/{projectSlug}/stories/{storyId}
  * devlog://projects/{projectSlug}/engineering-events/{eventId}
  * devlog://projects/{projectSlug}/commits/{commitSha}
+ * devlog://projects/{projectSlug}/freshness
  * </pre>
  *
  * Pure deterministic string construction: no I/O, no business logic. Used by
@@ -58,6 +59,14 @@ public final class DevlogResourceUriFactory {
         }
         return PROJECTS + "/" + projectSlug.strip() + "/commits/"
                 + commitSha.toLowerCase();
+    }
+
+    /**
+     * Project freshness projection: per-source observed vs baseline revisions
+     * and their status (read-only view of the last recorded observations).
+     */
+    public static String freshness(String projectSlug) {
+        return PROJECTS + "/" + requireSlug(projectSlug) + "/freshness";
     }
 
     private static String artifact(String projectSlug, String segment, String id) {

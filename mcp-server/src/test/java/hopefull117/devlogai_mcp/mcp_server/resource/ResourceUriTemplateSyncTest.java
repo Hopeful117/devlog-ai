@@ -68,6 +68,13 @@ class ResourceUriTemplateSyncTest {
                 .isEqualTo(DevlogResourceUriFactory.projects());
     }
 
+    @Test
+    void freshnessTemplateMatchesFactory() {
+        assertThat(template(FreshnessResource.class, "getFreshness"))
+                .isEqualTo(DevlogResourceUriFactory.freshness(SLUG)
+                        .replace(SLUG, "{projectSlug}"));
+    }
+
     private String template(Class<?> resourceClass, String methodName) {
         return annotation(resourceClass, methodName).uri();
     }

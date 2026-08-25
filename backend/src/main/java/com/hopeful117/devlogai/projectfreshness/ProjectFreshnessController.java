@@ -24,4 +24,9 @@ public class ProjectFreshnessController {
         return service.latest(projectId, sourceId).map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
+
+    @GetMapping("/summary")
+    public ProjectFreshnessSummary summary(@PathVariable UUID projectId) {
+        return service.summary(projectId);
+    }
 }

@@ -48,6 +48,23 @@ class ProjectFreshnessControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void shouldExposeTheProjectFreshnessSummary() throws Exception {
+        ProjectFreshnessService service = mock(ProjectFreshnessService.class);
+        UUID projectId = UUID.randomUUID();
+        ProjectFreshnessSummary summary = new ProjectFreshnessSummary(
+                ProjectFreshnessSummary.PROJECTION_VERSION, projectId,
+                java.util.List.of(response(projectId, UUID.randomUUID())), 0, false);
+        when(service.summary(projectId)).thenReturn(summary);
+        var mvc = mockMvc(new ProjectFreshnessController(service));
+
+        mvc.perform(get("/api/v1/projects/{id}/freshness-checks/summary", projectId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value("project-freshness-summary-v1"))
+                .andExpect(jsonPath("$.checkedSources[0].status").value("STALE"))
+                .andExpect(jsonPath("$.uncheckedSourceCount").value(0));
+    }
+
     private ProjectFreshnessResponse response(UUID projectId, UUID sourceId) {
         return new ProjectFreshnessResponse(ProjectFreshnessResponse.PROJECTION_VERSION,
                 UUID.randomUUID(), projectId,
