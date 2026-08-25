@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.projectfreshness;
 import com.hopeful117.devlogai.collection.workspace.ResolvedSourceRevision;
 import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.entity.SourceType;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
@@ -54,6 +55,34 @@ class ProjectFreshnessServiceTest {
         var error = assertThrows(SourceRevisionUnavailableException.class,
                 () -> service.check(projectId, sourceId));
         assertFalse(error.getMessage().contains("secret"));
+        verifyNoInteractions(persistence);
+    }
+
+    @Test
+    void shouldRecordExternallyObservedRevisionThroughExistingClassification() {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        Source source = Source.builder().id(sourceId).active(true)
+                .type(SourceType.GIT_REPOSITORY).defaultBranch("main").build();
+        when(projects.existsById(projectId)).thenReturn(true);
+        when(sources.findByIdAndProject_IdAndActiveTrue(sourceId, projectId))
+                .thenReturn(Optional.of(source));
+        when(persistence.save(eq(projectId), eq(sourceId), eq("origin/main"),
+                eq("c".repeat(40)), any())).thenReturn(mock(ProjectFreshnessResponse.class));
+
+        assertNotNull(service.recordObservedRevision(projectId, sourceId, "c".repeat(40)));
+        verifyNoInteractions(workspaces);
+    }
+
+    @Test
+    void shouldRejectObservationsForUnknownSources() {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        when(projects.existsById(projectId)).thenReturn(true);
+        when(sources.findByIdAndProject_IdAndActiveTrue(sourceId, projectId))
+                .thenReturn(Optional.empty());
+        assertThrows(EntityNotFoundException.class,
+                () -> service.recordObservedRevision(projectId, sourceId, "a".repeat(40)));
         verifyNoInteractions(persistence);
     }
 
