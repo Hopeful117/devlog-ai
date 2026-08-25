@@ -93,7 +93,7 @@ class EngineeringContextContractMapperTest {
                 "Investigate why Project Notes Markdown is displayed incorrectly.";
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, intent);
+                mapper.toContract(projectSnapshot, repositoryContext, intent, null);
 
         assertThat(result.project()).isSameAs(mappedProject);
         assertThat(result.intent()).isEqualTo(intent);
@@ -193,7 +193,7 @@ class EngineeringContextContractMapperTest {
                 "CONTENT_ENRICHMENT_TRUNCATED"));
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, "intent");
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", null);
 
         assertThat(result.evidence()).hasSize(1);
         var mapped = result.evidence().getFirst();
@@ -234,7 +234,8 @@ class EngineeringContextContractMapperTest {
 
         assertThat(result.metadata().warnings()).containsExactly(
                 "REPOSITORY_CONTEXT_BUDGET_APPLIED",
-                "CONTENT_ENRICHMENT_TRUNCATED");
+                "CONTENT_ENRICHMENT_TRUNCATED",
+                "PROJECT_CONTEXT_STALE");
         assertThat(result.metadata().truncated()).isTrue();
     }
 
@@ -272,7 +273,7 @@ class EngineeringContextContractMapperTest {
         when(repositoryContext.warnings()).thenReturn(java.util.List.of());
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, "intent");
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", null);
 
         var mapped = result.evidence().getFirst();
         assertThat(mapped.occurredAt())
@@ -321,7 +322,7 @@ class EngineeringContextContractMapperTest {
         when(repositoryContext.warnings()).thenReturn(java.util.List.of());
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, "intent");
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", null);
 
         assertThat(result.evidence()).hasSize(5);
         assertThat(result.evidence().get(0).resource())
@@ -361,7 +362,7 @@ class EngineeringContextContractMapperTest {
         when(repositoryContext.warnings()).thenReturn(java.util.List.of());
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, "intent");
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", null);
 
         assertThat(result.evidence())
                 .allSatisfy(e -> assertThat(e.resource()).isNull());
@@ -396,7 +397,7 @@ class EngineeringContextContractMapperTest {
         when(repositoryContext.warnings()).thenReturn(java.util.List.of());
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, "intent");
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", null);
 
         assertThat(result.evidence())
                 .allSatisfy(e -> assertThat(e.resource()).isNull());
@@ -426,5 +427,140 @@ class EngineeringContextContractMapperTest {
                 java.util.Map.of(),
                 60,
                 List.of());
+    }
+
+
+    // ---- freshness metadata (story 0091 / ADR-062) ----
+
+    private com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary summary(
+            com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse... rows) {
+        return new com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary(
+                "project-freshness-summary-v1", PROJECT_ID, java.util.Arrays.asList(rows),
+                0, false);
+    }
+
+    private com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse row(
+            java.util.UUID sourceId, String name, String observed,
+            String baselineRevision,
+            com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus status) {
+        var source = new com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse.Source(
+                sourceId, name, "main", null, observed);
+        var baseline = baselineRevision == null ? null
+                : new com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse.Baseline(
+                        java.util.UUID.randomUUID(), Instant.now(), baselineRevision);
+        return new com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse(
+                "project-freshness-v1", java.util.UUID.randomUUID(), PROJECT_ID, source,
+                Instant.parse("2026-08-26T10:00:00Z"), status,
+                com.hopeful117.devlogai.projectfreshness.ProjectRefreshGuidance.REFRESH_NOT_NEEDED,
+                baseline,
+                new com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse.ReviewCounts(
+                        0, 0, 0, 0));
+    }
+
+    private RepositoryContext contextWithRevisions(java.util.List<String> revisions) {
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+        java.util.List<RepositoryEvidence> evidence = revisions.stream()
+                .map(revision -> new RepositoryEvidence(
+                        RepositoryContextLayer.RELATED_SOURCE_CODE, "SOURCE_FILE",
+                        "repository-structure:source-file:src/App.java",
+                        "App.java", Instant.now(), EvidenceScore.unscored(), List.of(),
+                        new RepositoryEvidence.EvidenceProvenance(
+                                "REPOSITORY_STRUCTURE", "source-1", "src/App.java",
+                                "repository-structure:source-file:src/App.java"),
+                        java.util.Map.of("resolvedRevision", revision),
+                        60, List.of()))
+                .toList();
+        when(repositoryContext.evidence()).thenReturn(evidence);
+        when(repositoryContext.selectionDecisions()).thenReturn(List.of());
+        when(repositoryContext.candidateCount()).thenReturn(evidence.size());
+        when(repositoryContext.truncated()).thenReturn(false);
+        when(repositoryContext.usedTokens()).thenReturn(60);
+        when(repositoryContext.contextDigest()).thenReturn("digest");
+        when(repositoryContext.warnings()).thenReturn(List.of());
+        return repositoryContext;
+    }
+
+    @Test
+    void shouldDeclareFreshSingleSourceContext() {
+        var sourceId = java.util.UUID.randomUUID();
+        String revision = "a".repeat(40);
+        var repositoryContext = contextWithRevisions(List.of(revision));
+        var freshnessSummary = summary(row(sourceId, "devlog-ai", revision, revision,
+                com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus.CURRENT));
+
+        var result = mapper.toContract(projectSnapshotWithSlug(), repositoryContext,
+                "intent", freshnessSummary);
+
+        var freshness = result.metadata().freshness();
+        assertThat(freshness).isNotNull();
+        assertThat(freshness.status())
+                .isEqualTo(com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextFreshness.STATUS_CURRENT);
+        assertThat(freshness.repositoryRevision()).isEqualTo(revision);
+        assertThat(freshness.contextRevision()).isEqualTo(revision);
+        assertThat(freshness.sources()).hasSize(1);
+        assertThat(result.metadata().warnings())
+                .doesNotContain("PROJECT_CONTEXT_STALE", "PROJECT_CONTEXT_PARTIALLY_FRESH");
+    }
+
+    @Test
+    void shouldWarnWhenServedRevisionDivergesFromKnowledgeBaseline() {
+        var sourceId = java.util.UUID.randomUUID();
+        String baseline = "b".repeat(40);
+        String liveHead = "c".repeat(40);
+        var repositoryContext = contextWithRevisions(List.of(liveHead));
+        var freshnessSummary = summary(row(sourceId, "devlog-ai", baseline, baseline,
+                com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus.CURRENT));
+
+        var result = mapper.toContract(projectSnapshotWithSlug(), repositoryContext,
+                "intent", freshnessSummary);
+
+        var freshness = result.metadata().freshness();
+        assertThat(freshness.status())
+                .isEqualTo(com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextFreshness.STATUS_STALE);
+        assertThat(freshness.repositoryRevision()).isEqualTo(liveHead);
+        assertThat(freshness.contextRevision()).isEqualTo(baseline);
+        assertThat(freshness.sources().getFirst().status())
+                .isEqualTo(com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextFreshness.STATUS_STALE);
+        assertThat(freshness.sources().getFirst().observedRevision()).isEqualTo(liveHead);
+        assertThat(result.metadata().warnings()).contains("PROJECT_CONTEXT_STALE");
+    }
+
+    @Test
+    void shouldReportPartiallyFreshWhenSourcesDisagree() {
+        String liveHead = "d".repeat(40);
+        var repositoryContext = contextWithRevisions(List.of());
+        var freshnessSummary = summary(
+                row(java.util.UUID.randomUUID(), "current-repo", liveHead, liveHead,
+                        com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus.CURRENT),
+                row(java.util.UUID.randomUUID(), "stale-repo", "e".repeat(40), "f".repeat(40),
+                        com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus.STALE));
+
+        var result = mapper.toContract(projectSnapshotWithSlug(), repositoryContext,
+                "intent", freshnessSummary);
+
+        var freshness = result.metadata().freshness();
+        assertThat(freshness.status())
+                .isEqualTo(com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextFreshness.STATUS_PARTIALLY_FRESH);
+        assertThat(freshness.repositoryRevision()).isNull();
+        assertThat(freshness.contextRevision()).isNull();
+        assertThat(freshness.sources()).hasSize(2);
+        assertThat(result.metadata().warnings()).contains(
+                "PROJECT_CONTEXT_STALE", "PROJECT_CONTEXT_PARTIALLY_FRESH");
+    }
+
+    @Test
+    void shouldReportNoBaselineInsteadOfCleanStateWhenOnlyObservationExists() {
+        String liveHead = "1".repeat(40);
+        var repositoryContext = contextWithRevisions(List.of(liveHead));
+
+        var result = mapper.toContract(projectSnapshotWithSlug(), repositoryContext,
+                "intent", null);
+
+        var freshness = result.metadata().freshness();
+        assertThat(freshness.status())
+                .isEqualTo(com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextFreshness.STATUS_NO_BASELINE);
+        assertThat(freshness.repositoryRevision()).isEqualTo(liveHead);
+        assertThat(freshness.contextRevision()).isNull();
+        assertThat(result.metadata().warnings()).contains("PROJECT_CONTEXT_STALE");
     }
 }

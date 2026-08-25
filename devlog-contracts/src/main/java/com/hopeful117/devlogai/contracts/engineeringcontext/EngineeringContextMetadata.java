@@ -9,7 +9,8 @@ public record EngineeringContextMetadata(
         boolean truncated,
         int usedTokens,
         String contextDigest,
-        List<String> warnings
+        List<String> warnings,
+        EngineeringContextFreshness freshness
 ) {
     public EngineeringContextMetadata {
         warnings = warnings == null ? List.of() : List.copyOf(warnings);

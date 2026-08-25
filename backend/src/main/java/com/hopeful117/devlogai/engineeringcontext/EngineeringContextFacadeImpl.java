@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.engineeringcontext.mapper.EngineeringContextContr
 import com.hopeful117.devlogai.project.service.ProjectService;
 import com.hopeful117.devlogai.projectcontext.ProjectContextProvider;
 import com.hopeful117.devlogai.projectcontext.RepositoryContextAdapter;
+import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,7 @@ public class EngineeringContextFacadeImpl implements EngineeringContextFacade {
     private final ProjectService projectService;
     private final ProjectContextProvider projectContextProvider;
     private final RepositoryContextAdapter repositoryContextAdapter;
+    private final ProjectFreshnessService freshnessService;
     private final EngineeringContextContractMapper mapper;
 
     @Override
@@ -34,7 +36,8 @@ public class EngineeringContextFacadeImpl implements EngineeringContextFacade {
         return mapper.toContract(
                 projectContext,
                 repositoryContext,
-                intent
+                intent,
+                freshnessService.summary(projectId)
         );
     }
 }

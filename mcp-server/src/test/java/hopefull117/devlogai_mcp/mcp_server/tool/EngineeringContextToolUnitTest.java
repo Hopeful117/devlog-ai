@@ -77,7 +77,8 @@ class EngineeringContextToolUnitTest {
                 false,
                 2100,
                 "deadbeef1234567890deadbeef1234567890deadbeef",
-                List.of("EVIDENCE_SUMMARY_TRUNCATED")
+                List.of("EVIDENCE_SUMMARY_TRUNCATED"),
+                null
         );
 
         var engineeringContext = new EngineeringContext(
