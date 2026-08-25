@@ -34,6 +34,8 @@ class DevlogResourceUriFactoryTest {
                 .isEqualTo("devlog://projects/devlog-ai/engineering-events/" + ID);
         assertThat(DevlogResourceUriFactory.commit(SLUG, SHA))
                 .isEqualTo("devlog://projects/devlog-ai/commits/" + SHA);
+        assertThat(DevlogResourceUriFactory.freshness(SLUG))
+                .isEqualTo("devlog://projects/devlog-ai/freshness");
     }
 
     @Test

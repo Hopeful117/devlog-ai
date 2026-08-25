@@ -26,6 +26,7 @@ import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import com.hopeful117.devlogai.profile.service.ProjectProfileService;
+import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingOutcome;
 import com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingRequest;
 import com.hopeful117.devlogai.source.entity.Source;
@@ -53,6 +54,7 @@ class ProjectUnderstandingServiceTest {
     @Mock ProjectUnderstandingClaimService claims;
     @Mock AnalysisWorkflowService workflow;
     @Mock AnalysisRepository analyses;
+    @Mock ProjectFreshnessService freshnessService;
     private ProjectUnderstandingService service;
     private UUID projectId;
     private PreparedProjectUnderstanding prepared;
@@ -60,7 +62,8 @@ class ProjectUnderstandingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ProjectUnderstandingService(preparation, claims, workflow, analyses);
+        service = new ProjectUnderstandingService(preparation, claims, workflow, analyses,
+                freshnessService);
         projectId = UUID.randomUUID();
         UUID sourceId = UUID.randomUUID();
         IntentDefinition intent = new IntentDefinition(
@@ -114,6 +117,59 @@ class ProjectUnderstandingServiceTest {
     }
 
     @Test
+    void advancesTheFreshnessCheckpointAfterASuccessfulRefresh() {
+        when(claims.claim(prepared)).thenReturn(
+                new ProjectUnderstandingClaim(analysis, ProjectUnderstandingOutcome.CREATED));
+        analysis.setStatus(AnalysisStatus.IN_PROGRESS);
+        when(analyses.findById(analysis.getId())).thenReturn(Optional.of(analysis));
+
+        service.execute(projectId,
+                new ProjectUnderstandingRequest(prepared.sourceId(), null, null));
+
+        verify(freshnessService).recordObservedBaseline(projectId, prepared.sourceId(),
+                analysis, "abc");
+    }
+
+    @Test
+    void doesNotAdvanceTheCheckpointWhenTheClaimWasReused() {
+        when(claims.claim(prepared)).thenReturn(
+                new ProjectUnderstandingClaim(analysis, ProjectUnderstandingOutcome.REUSED));
+
+        service.execute(projectId,
+                new ProjectUnderstandingRequest(prepared.sourceId(), null, null));
+
+        verifyNoInteractions(freshnessService);
+    }
+
+    @Test
+    void doesNotAdvanceTheCheckpointWhenTheWorkflowFails() {
+        when(claims.claim(prepared)).thenReturn(
+                new ProjectUnderstandingClaim(analysis, ProjectUnderstandingOutcome.CREATED));
+        doThrow(new IllegalStateException("start failed")).when(workflow).start(analysis.getId());
+
+        assertThatThrownBy(() -> service.execute(projectId,
+                new ProjectUnderstandingRequest(prepared.sourceId(), null, null)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verifyNoInteractions(freshnessService);
+    }
+
+    @Test
+    void keepsTheRefreshSuccessfulWhenCheckpointRecordingFails() {
+        when(claims.claim(prepared)).thenReturn(
+                new ProjectUnderstandingClaim(analysis, ProjectUnderstandingOutcome.CREATED));
+        analysis.setStatus(AnalysisStatus.IN_PROGRESS);
+        when(analyses.findById(analysis.getId())).thenReturn(Optional.of(analysis));
+        doThrow(new IllegalStateException("projection down"))
+                .when(freshnessService).recordObservedBaseline(any(), any(), any(), any());
+
+        var response = service.execute(projectId,
+                new ProjectUnderstandingRequest(prepared.sourceId(), null, null));
+
+        assertThat(response.outcome()).isEqualTo(ProjectUnderstandingOutcome.CREATED);
+    }
+
+    @Test
     void marksANewPendingClaimFailedWhenWorkflowCannotStart() {
         when(claims.claim(prepared)).thenReturn(
                 new ProjectUnderstandingClaim(analysis, ProjectUnderstandingOutcome.CREATED));
@@ -160,7 +216,8 @@ class ProjectUnderstandingServiceTest {
                 preparation,
                 claims,
                 realWorkflow,
-                analyses
+                analyses,
+                freshnessService
         );
 
         UUID taskId = UUID.randomUUID();

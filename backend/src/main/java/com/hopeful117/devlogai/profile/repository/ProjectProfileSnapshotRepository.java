@@ -15,10 +15,10 @@ public interface ProjectProfileSnapshotRepository extends JpaRepository<ProjectP
 
     @Query("select profile from ProjectProfileSnapshot profile join fetch profile.analysis analysis " +
             "where profile.project.id = :projectId and analysis.selectedSource.id = :sourceId " +
-            "and analysis.status = com.hopeful117.devlogai.analysis.entity.AnalysisStatus.COMPLETED " +
+            "and analysis.status in (com.hopeful117.devlogai.analysis.entity.AnalysisStatus.COMPLETED, " +
+            "com.hopeful117.devlogai.analysis.entity.AnalysisStatus.IN_PROGRESS) " +
             "and analysis.intentId = 'describe-project' and analysis.intentVersion = 'v1' " +
-            "and analysis.targetRevision is null order by analysis.completedAt desc, " +
-            "analysis.createdAt desc, analysis.id desc")
+            "order by analysis.createdAt desc, analysis.id desc")
     List<ProjectProfileSnapshot> findLatestComparable(
             @Param("projectId") UUID projectId,
             @Param("sourceId") UUID sourceId,

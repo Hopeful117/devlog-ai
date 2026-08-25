@@ -45,6 +45,21 @@ public class ProjectFreshnessService {
         return persistence.latest(projectId, sourceId);
     }
 
+    public ProjectFreshnessResponse recordObservedBaseline(UUID projectId, UUID sourceId,
+            com.hopeful117.devlogai.analysis.entity.Analysis baselineAnalysis,
+            String observedRevision) {
+        if (!projects.existsById(projectId)) throw new EntityNotFoundException("Project", projectId);
+        try {
+            return persistence.recordObservation(projectId, sourceId, baselineAnalysis,
+                    observedRevision, Instant.now());
+        } catch (RuntimeException failure) {
+            if (failure instanceof EntityNotFoundException || failure instanceof IllegalArgumentException) {
+                throw failure;
+            }
+            throw new SourceRevisionUnavailableException(sourceId, failure);
+        }
+    }
+
     public ProjectFreshnessSummary summary(UUID projectId) {
         if (!projects.existsById(projectId)) throw new EntityNotFoundException("Project", projectId);
         List<Source> active = sources.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId);
