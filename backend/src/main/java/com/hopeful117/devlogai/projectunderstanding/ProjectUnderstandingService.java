@@ -3,16 +3,19 @@ package com.hopeful117.devlogai.projectunderstanding;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.analysis.workflow.AnalysisWorkflowService;
+import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingOutcome;
 import com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingRequest;
 import com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingResponse;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ProjectUnderstandingService {
@@ -20,6 +23,7 @@ public class ProjectUnderstandingService {
     private final ProjectUnderstandingClaimService claimService;
     private final AnalysisWorkflowService workflowService;
     private final AnalysisRepository analysisRepository;
+    private final ProjectFreshnessService freshnessService;
 
     public ProjectUnderstandingResponse execute(UUID projectId, ProjectUnderstandingRequest request) {
         PreparedProjectUnderstanding prepared = preparationService.prepare(projectId, request);
@@ -38,10 +42,26 @@ public class ProjectUnderstandingService {
             claimService.failPending(claim.analysis().getId());
             throw failure;
         }
+        recordFreshnessCheckpoint(prepared, claim.analysis());
         UUID analysisId = claim.analysis().getId();
         Analysis current = analysisRepository.findById(analysisId)
                 .orElseThrow(() -> new EntityNotFoundException("Analysis", analysisId));
         return response(current, claim.outcome());
+    }
+
+    private void recordFreshnessCheckpoint(PreparedProjectUnderstanding prepared,
+            Analysis analysis) {
+        String resolvedRevision = prepared.resolvedRevision();
+        if (resolvedRevision == null || prepared.sourceId() == null) {
+            return;
+        }
+        try {
+            freshnessService.recordObservedBaseline(prepared.projectId(), prepared.sourceId(),
+                    analysis, resolvedRevision);
+        } catch (RuntimeException failure) {
+            log.warn("Failed to record freshness checkpoint for source {}: {}",
+                    prepared.sourceId(), failure.getMessage());
+        }
     }
 
     private ProjectUnderstandingResponse response(Analysis analysis,

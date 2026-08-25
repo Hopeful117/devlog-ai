@@ -58,6 +58,40 @@ class ProjectFreshnessPersistenceServiceTest {
         assertTrue(service.latest(projectId, sourceId).isPresent());
     }
 
+    @Test
+    void shouldRecordAnObservedBaselineAsCurrentWithoutProbing() {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).build();
+        Source source = Source.builder().id(sourceId).name("GitHub").defaultBranch("main")
+                .type(SourceType.GIT_REPOSITORY).active(true).build();
+        when(projects.findById(projectId)).thenReturn(Optional.of(project));
+        when(sources.findByIdAndProject_IdAndActiveTrue(sourceId, projectId))
+                .thenReturn(Optional.of(source));
+        when(freshness.findByProjectIdAndSourceId(projectId, sourceId))
+                .thenReturn(Optional.empty());
+        when(freshness.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Instant checkedAt = Instant.parse("2026-08-26T10:00:00Z");
+        var baselineAnalysis = com.hopeful117.devlogai.analysis.entity.Analysis.builder()
+                .id(UUID.randomUUID()).build();
+        ProjectFreshnessResponse saved = service.recordObservation(projectId, sourceId,
+                baselineAnalysis, "A".repeat(40), checkedAt);
+
+        assertEquals(ProjectFreshnessStatus.CURRENT, saved.status());
+        assertEquals(ProjectRefreshGuidance.REFRESH_NOT_NEEDED, saved.guidance());
+        assertEquals("a".repeat(40), saved.source().currentRevision());
+        assertEquals("a".repeat(40), saved.baseline().analyzedRevision());
+        assertEquals(baselineAnalysis.getId(), saved.baseline().analysisId());
+
+        var captor = org.mockito.ArgumentCaptor.forClass(ProjectSourceFreshness.class);
+        verify(freshness).save(captor.capture());
+        ProjectSourceFreshness entity = captor.getValue();
+        assertEquals(ProjectFreshnessStatus.CURRENT, entity.getStatus());
+        assertEquals("origin/main", entity.getRequestedRevision());
+        assertEquals(entity.getCurrentRevision(), entity.getBaselineRevision());
+    }
+
     private ProjectSourceFreshness verifyAndCaptureSavedEntity() {
         var captor = org.mockito.ArgumentCaptor.forClass(ProjectSourceFreshness.class);
         verify(freshness).save(captor.capture());

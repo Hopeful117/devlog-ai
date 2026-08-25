@@ -59,6 +59,35 @@ class ProjectFreshnessPersistenceService {
         return response(freshness.save(entity));
     }
 
+    @Transactional
+    ProjectFreshnessResponse recordObservation(UUID projectId, UUID sourceId,
+            Analysis baselineAnalysis, String observedRevision, Instant checkedAt) {
+        var project = projects.findById(projectId)
+                .orElseThrow(() -> new EntityNotFoundException("Project", projectId));
+        Source source = activeSource(projectId, sourceId);
+        String normalizedCurrent = GitCommitIdentity.normalize(observedRevision)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Observed revision is not a valid commit identity"));
+        ProjectSourceFreshness entity = freshness.findByProjectIdAndSourceId(projectId, sourceId)
+                .orElseGet(() -> ProjectSourceFreshness.builder().id(UUID.randomUUID()).build());
+        entity.setProject(project);
+        entity.setSource(source);
+        entity.setBaselineAnalysis(baselineAnalysis);
+        entity.setStatus(ProjectFreshnessStatus.CURRENT);
+        entity.setGuidance(ProjectRefreshGuidance.REFRESH_NOT_NEEDED);
+        entity.setRequestedRevision(requestedRevisionLabel(source));
+        entity.setCurrentRevision(normalizedCurrent);
+        entity.setBaselineRevision(normalizedCurrent);
+        entity.setCheckedAt(checkedAt);
+        return response(freshness.save(entity));
+    }
+
+    private String requestedRevisionLabel(Source source) {
+        return source.getDefaultBranch() == null || source.getDefaultBranch().isBlank()
+                ? "origin/HEAD"
+                : "origin/" + source.getDefaultBranch();
+    }
+
     @Transactional(readOnly = true)
     Optional<ProjectFreshnessResponse> latest(UUID projectId, UUID sourceId) {
         if (!projects.existsById(projectId)) {
