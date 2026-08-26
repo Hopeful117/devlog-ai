@@ -17,6 +17,12 @@ import java.util.Set;
 
 @Component
 public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
+
+    private static final Set<String> KNOWLEDGE_KINDS = Set.of(
+            "INSIGHT", "ENGINEERING_STORY", "DECISION", "ARTIFACT",
+            "MILESTONE", "CHALLENGE", "ENGINEERING_EVENT", "FACT",
+            "OBSERVATION");
+
     @Override
     public SelectionResult select(List<RepositoryEvidence> ranked, ContextRequest request) {
         Deduplication deduplication = deduplicate(ranked);
@@ -25,6 +31,7 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
         SelectionState state = new SelectionState(kindAllowance(candidates, request, policy));
 
         selectDiverseEvidence(candidates, request, policy, state);
+        selectKnowledgeFloor(candidates, request, policy, state);
         for (RepositoryEvidence candidate : candidates)
             if (!state.selectedReferences.contains(candidate.reference()))
                 selectOrdinary(candidate, request, policy, state);
@@ -54,6 +61,39 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
                 add(candidate, "SELECTED_BY_DIVERSITY", state);
                 represented.add(candidate.layer());
             }
+        }
+    }
+
+    /**
+     * Availability-aware knowledge floors (ADR-063 category-aware
+     * composition): abundant Git evidence must not starve trusted/project
+     * knowledge. Reserves at most ~10% of the item budget (clamped to
+     * [2,8]) for knowledge-kind candidates that clear every existing gate
+     * (relevance, kind share, item and token budgets). Fewer eligible
+     * candidates leave the unused capacity to the ordinary rank pass;
+     * irrelevant knowledge is never selected merely to satisfy a floor.
+     */
+    private void selectKnowledgeFloor(List<RepositoryEvidence> candidates,
+            ContextRequest request, EvidencePrecisionPolicy policy,
+            SelectionState state) {
+        int floor = Math.max(2, Math.min(8,
+                request.budget().maximumEvidenceItems() / 10));
+        int reserved = 0;
+        for (RepositoryEvidence candidate : candidates) {
+            if (reserved >= floor) return;
+            if (!KNOWLEDGE_KINDS.contains(candidate.kind())) continue;
+            if (state.selectedReferences.contains(candidate.reference())) continue;
+            if (candidate.relevanceScore() < policy.minimumRelevanceScore()) continue;
+            if (state.kindCounts.getOrDefault(candidate.kind(), 0)
+                    >= state.kindAllowance
+                    && candidate.relevanceScore() < policy.strongRelevanceScore())
+                continue;
+            if (state.selected.size() >= request.budget().maximumEvidenceItems())
+                return;
+            if (state.usedTokens + candidate.estimatedTokens()
+                    > request.budget().maximumTokens()) return;
+            add(candidate, "SELECTED_BY_CATEGORY_FLOOR", state);
+            reserved++;
         }
     }
 
