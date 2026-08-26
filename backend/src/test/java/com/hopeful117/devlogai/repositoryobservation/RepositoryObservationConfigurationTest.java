@@ -2,7 +2,7 @@ package com.hopeful117.devlogai.repositoryobservation;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.scheduling.annotation.ScheduledAnnotationBeanProcessor;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,19 +19,19 @@ class RepositoryObservationConfigurationTest {
     void enablesSchedulingOnlyWhenObservationIsEnabled() {
         runner.withPropertyValues("devlog.repository-observation.enabled=true")
                 .run(context -> assertThat(context)
-                        .hasSingleBean(ScheduledAnnotationBeanProcessor.class));
+                        .hasSingleBean(ScheduledAnnotationBeanPostProcessor.class));
     }
 
     @Test
     void introducesNoSchedulingWhenDisabled() {
         runner.withPropertyValues("devlog.repository-observation.enabled=false")
                 .run(context -> assertThat(context)
-                        .doesNotHaveBean(ScheduledAnnotationBeanProcessor.class));
+                        .doesNotHaveBean(ScheduledAnnotationBeanPostProcessor.class));
     }
 
     @Test
     void introducesNoSchedulingWhenUnconfigured() {
         runner.run(context -> assertThat(context)
-                .doesNotHaveBean(ScheduledAnnotationBeanProcessor.class));
+                .doesNotHaveBean(ScheduledAnnotationBeanPostProcessor.class));
     }
 }

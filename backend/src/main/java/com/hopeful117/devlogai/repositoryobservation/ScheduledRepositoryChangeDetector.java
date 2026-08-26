@@ -47,7 +47,7 @@ public class ScheduledRepositoryChangeDetector {
     }
 
     private void observeQuietly(Source source) {
-        String previous;
+        String previous = null;
         try {
             UUID projectId = source.getProject().getId();
             previous = previousObservedRevision(projectId, source);

@@ -213,6 +213,22 @@ DevLog AI follows a microservice-oriented architecture based on clear responsibi
 
 The objective is not to maximize the number of services, but to isolate domains with different responsibilities and evolution cycles.
 
+### Automatic Repository Observation (ADR-062)
+
+A scheduled, read-only detector (`ScheduledRepositoryChangeDetector`) observes the current
+immutable HEAD revision of every active Git source via `git ls-remote` and records the
+observation through the freshness checkpoints (`project_source_freshness`). This makes
+freshness become STALE autonomously when a repository changes — without manual freshness
+checks.
+
+Automatic observation DOES NOT mean automatic synchronization: DevLog knowledge intentionally
+remains at its baseline revision (`contextRevision = X`, `repositoryRevision = Y`,
+`freshness = STALE`) until a synchronization/understanding action explicitly advances it.
+STALE is an observation, never a command. Detection can be disabled with
+`devlog.repository-observation.enabled=false`; interval is configurable through
+`devlog.repository-observation.interval`. The probe performs no clone, fetch, checkout or
+reset and shares no state with workspace operations.
+
 ### Engineering Story Agent Projection
 
 The Repository Context Engine retains a rich deterministic domain representation for AI-task
