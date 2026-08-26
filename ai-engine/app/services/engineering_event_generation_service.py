@@ -31,8 +31,12 @@ class EngineeringEventGenerationService:
             try:
                 output = await self._generate(retry, submission.selected_knowledge)
                 prompt = retry
-            except Exception as second:
+            except (ValidationError, EngineeringEventOutputError, ValueError) as second:
                 await self._failure(submission, external_job_id, "INVALID_LLM_OUTPUT", second, retry)
+                return
+            except Exception as provider_failure:
+                await self._failure(submission, external_job_id, "LLM_PROVIDER_ERROR",
+                                    provider_failure, retry)
                 return
         except Exception as error:
             await self._failure(submission, external_job_id, "LLM_PROVIDER_ERROR", error, prompt)
@@ -58,15 +62,27 @@ class EngineeringEventGenerationService:
         seen = set()
         for proposal in output.proposals:
             key = (proposal.category.value, proposal.title.casefold())
-            if key in seen: raise EngineeringEventOutputError("Duplicate Engineering Event proposal")
+            if key in seen:
+                raise EngineeringEventOutputError("Duplicate Engineering Event proposal")
             seen.add(key)
-            if not {str(v) for v in proposal.supporting_fact_ids} <= fact_ids:
-                raise EngineeringEventOutputError("Unknown supportingFactIds")
-            if not {str(v) for v in proposal.supporting_observation_ids} <= observation_ids:
-                raise EngineeringEventOutputError("Unknown supportingObservationIds")
-            if not set(proposal.evidence_references) <= references:
-                raise EngineeringEventOutputError("Unknown evidenceReferences")
+            self._require_subset({str(v) for v in proposal.supporting_fact_ids},
+                                 fact_ids, "supportingFactIds")
+            self._require_subset({str(v) for v in proposal.supporting_observation_ids},
+                                 observation_ids, "supportingObservationIds")
+            unknown_references = set(proposal.evidence_references) - references
+            if unknown_references:
+                raise EngineeringEventOutputError(
+                    f"evidenceReferences contains references absent from the allowed list: "
+                    f"{sorted(unknown_references)}")
         return output
+
+    @staticmethod
+    def _require_subset(referenced: set[str], available: set[str], field_name: str) -> None:
+        unknown = referenced - available
+        if unknown:
+            raise EngineeringEventOutputError(
+                f"{field_name} contains identifiers absent from the corresponding allowed list: "
+                f"{sorted(unknown)}")
 
     async def _failure(self, submission, job_id, code, error, prompt):
         await self.callback.send_result(submission.correlation_id,
