@@ -45,6 +45,35 @@ public class ProjectFreshnessService {
         return persistence.latest(projectId, sourceId);
     }
 
+    /**
+     * Records a repository HEAD observation obtained outside this service
+     * (automatic change detection, ADR-062). The observation is classified
+     * through the existing freshness semantics against the latest comparable
+     * knowledge baseline: detection may advance observedRevision and the
+     * check time — never baselineRevision, never any knowledge state.
+     */
+    public ProjectFreshnessResponse recordObservedRevision(UUID projectId,
+            UUID sourceId, String observedRevision) {
+        if (!projects.existsById(projectId)) throw new EntityNotFoundException("Project", projectId);
+        Source source = sources.findByIdAndProject_IdAndActiveTrue(sourceId, projectId)
+                .orElseThrow(() -> new EntityNotFoundException("Active project Source", sourceId));
+        if (source.getType() != SourceType.GIT_REPOSITORY) {
+            throw new IllegalArgumentException("Project freshness requires an active Git Source");
+        }
+        String requested = source.getDefaultBranch() == null || source.getDefaultBranch().isBlank()
+                ? "origin/HEAD"
+                : "origin/" + source.getDefaultBranch();
+        try {
+            return persistence.save(projectId, sourceId, requested,
+                    observedRevision, Instant.now());
+        } catch (RuntimeException failure) {
+            if (failure instanceof EntityNotFoundException || failure instanceof IllegalArgumentException) {
+                throw failure;
+            }
+            throw new SourceRevisionUnavailableException(sourceId, failure);
+        }
+    }
+
     public ProjectFreshnessResponse recordObservedBaseline(UUID projectId, UUID sourceId,
             com.hopeful117.devlogai.analysis.entity.Analysis baselineAnalysis,
             String observedRevision) {
