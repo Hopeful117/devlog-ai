@@ -16,8 +16,8 @@ public record ProjectFreshnessResponse(
 ) {
     public static final String PROJECTION_VERSION = "project-freshness-v1";
 
-    public record Source(UUID id, String name, String defaultBranch,
-                         String requestedRevision, String currentRevision) { }
+public record Source(UUID id, String name, String defaultBranch,
+                     String requestedRevision, String currentRevision, String ingestedRevision) { }
     public record Baseline(UUID analysisId, Instant completedAt, String analyzedRevision) { }
     public record ReviewCounts(long total, long pending, long accepted, long rejected) { }
 }

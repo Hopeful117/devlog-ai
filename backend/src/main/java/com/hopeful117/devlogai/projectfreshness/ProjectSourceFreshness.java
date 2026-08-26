@@ -33,6 +33,8 @@ class ProjectSourceFreshness {
     private String currentRevision;
     @Column(length = 64)
     private String baselineRevision;
+    @Column(name = "ingested_revision", length = 64)
+    private String ingestedRevision;
     @Column(nullable = false)
     private Instant checkedAt;
 }

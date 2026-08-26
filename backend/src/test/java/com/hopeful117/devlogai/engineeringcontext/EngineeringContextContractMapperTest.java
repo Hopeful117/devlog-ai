@@ -444,7 +444,7 @@ class EngineeringContextContractMapperTest {
             String baselineRevision,
             com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus status) {
         var source = new com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse.Source(
-                sourceId, name, "main", null, observed);
+                sourceId, name, "main", null, observed, null);
         var baseline = baselineRevision == null ? null
                 : new com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse.Baseline(
                         java.util.UUID.randomUUID(), Instant.now(), baselineRevision);

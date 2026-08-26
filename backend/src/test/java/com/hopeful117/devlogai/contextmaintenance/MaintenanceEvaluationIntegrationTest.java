@@ -230,7 +230,7 @@ class MaintenanceEvaluationIntegrationTest {
                 UUID.randomUUID(),
                 projectId,
                 new ProjectFreshnessResponse.Source(
-                        sourceId, sourceName, "main", "origin/main", currentRevision
+                        sourceId, sourceName, "main", "origin/main", currentRevision, null
                 ),
                 Instant.parse("2026-08-14T10:00:00Z"),
                 ProjectFreshnessStatus.STALE,
@@ -255,7 +255,7 @@ class MaintenanceEvaluationIntegrationTest {
                 UUID.randomUUID(),
                 projectId,
                 new ProjectFreshnessResponse.Source(
-                        sourceId, sourceName, "main", "origin/main", revision
+                        sourceId, sourceName, "main", "origin/main", revision, null
                 ),
                 Instant.parse("2026-08-14T10:00:00Z"),
                 ProjectFreshnessStatus.CURRENT,

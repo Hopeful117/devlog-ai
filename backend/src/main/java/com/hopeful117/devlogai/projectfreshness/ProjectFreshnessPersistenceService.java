@@ -39,14 +39,17 @@ class ProjectFreshnessPersistenceService {
                 projectId, sourceId, PageRequest.of(0, 1)).stream().findFirst();
         String rawBaseline = baseline.map(value -> value.getResolvedRevisions()
                         .get(sourceId.toString())).map(String::valueOf).orElse(null);
-        var classification = classifier.classify(baseline.isPresent(),
-                currentRevision, rawBaseline);
         String normalizedCurrent = GitCommitIdentity.normalize(currentRevision)
                 .orElseThrow(() -> new IllegalStateException("Git returned an invalid commit identity"));
         String normalizedBaseline = GitCommitIdentity.normalize(rawBaseline).orElse(null);
         Analysis analysis = baseline.map(ProjectProfileSnapshot::getAnalysis).orElse(null);
         ProjectSourceFreshness entity = freshness.findByProjectIdAndSourceId(projectId, sourceId)
                 .orElseGet(() -> ProjectSourceFreshness.builder().id(UUID.randomUUID()).build());
+        // Observations never mutate ingestion state: only a completed deterministic
+        // synchronization may advance ingestedRevision.
+        String ingested = entity.getIngestedRevision();
+        var classification = classifier.classify(baseline.isPresent(),
+                currentRevision, rawBaseline, ingested);
         entity.setProject(project);
         entity.setSource(source);
         entity.setBaselineAnalysis(analysis);
@@ -55,6 +58,39 @@ class ProjectFreshnessPersistenceService {
         entity.setRequestedRevision(requestedRevision);
         entity.setCurrentRevision(normalizedCurrent);
         entity.setBaselineRevision(normalizedBaseline);
+        entity.setIngestedRevision(ingested);
+        entity.setCheckedAt(checkedAt);
+        return response(freshness.save(entity));
+    }
+
+    /**
+     * Advances the deterministic ingestion checkpoint after a completed
+     * repository synchronization. Never called speculatively: only the sync
+     * pipeline may invoke this, and only after all deterministic SYNC stages
+     * have been persisted successfully.
+     */
+    @Transactional
+    ProjectFreshnessResponse recordIngestedRevision(UUID projectId, UUID sourceId,
+            String ingestedRevision, Instant checkedAt) {
+        if (!projects.existsById(projectId)) {
+            throw new EntityNotFoundException("Project", projectId);
+        }
+        Source source = activeSource(projectId, sourceId);
+        String normalizedIngested = GitCommitIdentity.normalize(ingestedRevision)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Ingested revision is not a valid commit identity"));
+        ProjectSourceFreshness entity = freshness.findByProjectIdAndSourceId(projectId, sourceId)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "Freshness checkpoint for Source", sourceId));
+        Optional<ProjectProfileSnapshot> baseline = profiles.findLatestComparable(
+                projectId, sourceId, PageRequest.of(0, 1)).stream().findFirst();
+        String rawBaseline = baseline.map(value -> value.getResolvedRevisions()
+                        .get(sourceId.toString())).map(String::valueOf).orElse(null);
+        var classification = classifier.classify(baseline.isPresent(),
+                entity.getCurrentRevision(), rawBaseline, normalizedIngested);
+        entity.setStatus(classification.status());
+        entity.setGuidance(classification.guidance());
+        entity.setIngestedRevision(normalizedIngested);
         entity.setCheckedAt(checkedAt);
         return response(freshness.save(entity));
     }
@@ -78,6 +114,7 @@ class ProjectFreshnessPersistenceService {
         entity.setRequestedRevision(requestedRevisionLabel(source));
         entity.setCurrentRevision(normalizedCurrent);
         entity.setBaselineRevision(normalizedCurrent);
+        // Ingestion state is owned by the sync pipeline and intentionally untouched here.
         entity.setCheckedAt(checkedAt);
         return response(freshness.save(entity));
     }
@@ -122,7 +159,7 @@ class ProjectFreshnessPersistenceService {
                 value.getId(), value.getProject().getId(),
                 new ProjectFreshnessResponse.Source(source.getId(), source.getName(),
                         source.getDefaultBranch(), value.getRequestedRevision(),
-                        value.getCurrentRevision()), value.getCheckedAt(), value.getStatus(),
+                        value.getCurrentRevision(), value.getIngestedRevision()), value.getCheckedAt(), value.getStatus(),
                 value.getGuidance(), baseline, counts);
     }
 }

@@ -453,7 +453,7 @@ class MaintenanceEvaluationServiceTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 new ProjectFreshnessResponse.Source(
-                        sourceId, "repo", "main", "origin/main", "a".repeat(40)
+                        sourceId, "repo", "main", "origin/main", "a".repeat(40), null
                 ),
                 Instant.parse("2026-08-14T10:00:00Z"),
                 ProjectFreshnessStatus.STALE,
@@ -473,7 +473,7 @@ class MaintenanceEvaluationServiceTest {
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 new ProjectFreshnessResponse.Source(
-                        sourceId, "repo", "main", "origin/main", "a".repeat(40)
+                        sourceId, "repo", "main", "origin/main", "a".repeat(40), null
                 ),
                 Instant.parse("2026-08-14T10:00:00Z"),
                 ProjectFreshnessStatus.CURRENT,
