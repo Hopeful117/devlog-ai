@@ -23,6 +23,27 @@ class ProjectFreshnessClassifierTest {
     }
 
     @Test
+    void shouldClassifyPartiallyFreshWhenIngestionCaughtUpButKnowledgeBehind() {
+        var classification = classifier.classify(true, A, B, A);
+        assertEquals(ProjectFreshnessStatus.PARTIALLY_FRESH, classification.status());
+        assertEquals(ProjectRefreshGuidance.REFRESH_RECOMMENDED, classification.guidance());
+    }
+
+    @Test
+    void shouldRemainStaleWhenIngestionHasNotCaughtUpWithObservation() {
+        assertEquals(ProjectFreshnessStatus.STALE,
+                classifier.classify(true, A, B, B).status());
+        assertEquals(ProjectFreshnessStatus.STALE,
+                classifier.classify(true, A, B, null).status());
+    }
+
+    @Test
+    void shouldStayCurrentWhenKnowledgeMatchesHeadRegardlessOfIngestion() {
+        assertEquals(ProjectFreshnessStatus.CURRENT,
+                classifier.classify(true, A, A, null).status());
+    }
+
+    @Test
     void shouldAcceptCompleteSha256ButRejectAbbreviations() {
         assertTrue(GitCommitIdentity.normalize("C".repeat(64)).isPresent());
         assertTrue(GitCommitIdentity.normalize("abc123").isEmpty());

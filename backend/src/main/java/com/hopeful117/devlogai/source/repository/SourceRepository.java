@@ -21,4 +21,7 @@ public interface SourceRepository extends JpaRepository<Source, UUID> {
     @EntityGraph(attributePaths = {"project"})
     List<Source> findByTypeAndActiveTrueOrderByProjectIdAscCreatedAtAscIdAsc(
             com.hopeful117.devlogai.source.entity.SourceType type);
+
+    @EntityGraph(attributePaths = {"project"})
+    Optional<Source> findWithProjectById(UUID id);
 }

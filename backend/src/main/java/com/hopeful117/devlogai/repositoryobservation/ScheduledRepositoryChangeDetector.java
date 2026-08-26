@@ -2,6 +2,8 @@ package com.hopeful117.devlogai.repositoryobservation;
 
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
+import com.hopeful117.devlogai.repositorysync.RepositorySyncJob;
+import com.hopeful117.devlogai.repositorysync.RepositorySyncJobRepository;
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.entity.SourceType;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
@@ -23,7 +25,13 @@ import java.util.UUID;
  *
  * <p>Concurrency: fixedDelay guarantees non-overlapping cycles; the default
  * single-thread task scheduler serializes all scheduled work. Single-instance
- * deployment assumed.</p>
+ * deployment assumed.
+ *
+ * <p>After recording an observed revision, if the revision is newer than the
+ * current ingestedRevision, a RepositorySyncJob is created to synchronize
+ * deterministic repository state from the previous ingested revision to the
+ * newly observed revision. The job is persisted; execution is handled by the
+ * sync pipeline outside this observer.</p>
  */
 @Slf4j
 @Component
@@ -33,6 +41,7 @@ public class ScheduledRepositoryChangeDetector {
     private final SourceRepository sources;
     private final ProjectFreshnessService freshnessService;
     private final RepositoryRevisionProbe revisionProbe;
+    private final RepositorySyncJobRepository syncJobRepository;
 
     @Scheduled(
             fixedDelayString = "${devlog.repository-observation.interval:300s}",
@@ -64,12 +73,16 @@ public class ScheduledRepositoryChangeDetector {
                         recorded.status(),
                         recorded.baseline() == null || recorded.baseline().analyzedRevision() == null
                                 ? "none" : recorded.baseline().analyzedRevision()
-                                        .substring(0, Math.min(12, recorded.baseline().analyzedRevision().length())),
+                                                .substring(0, Math.min(12, recorded.baseline().analyzedRevision().length())),
                         recorded.guidance());
             } else {
                 log.debug("Repository revision unchanged for source {}: {} ({})",
                         source.getId(), observed.substring(0, 12), recorded.status());
             }
+            // Scheduling depends on deterministic state being behind — NOT on the
+            // observation having just changed: an unchanged HEAD can still require
+            // synchronization when ingestion never ran or previously failed.
+            scheduleSyncIfBehind(source, projectId, observed);
         } catch (RuntimeException failure) {
             log.warn("Repository HEAD observation failed for source {}; previous "
                             + "checkpoint preserved ({}): {}",
@@ -79,9 +92,42 @@ public class ScheduledRepositoryChangeDetector {
         }
     }
 
+    private void scheduleSyncIfBehind(Source source, UUID projectId, String observed) {
+        String ingested = ingestedRevision(projectId, source);
+        boolean behind = observed != null
+                && (ingested == null || !observed.equalsIgnoreCase(ingested));
+        if (!behind || syncJobRepository.existsBySourceIdAndStatusIn(
+                source.getId(), List.of(RepositorySyncJob.SyncStatus.PENDING,
+                        RepositorySyncJob.SyncStatus.RUNNING))) {
+            return;
+        }
+        boolean initialImport = ingested == null;
+        RepositorySyncJob job = RepositorySyncJob.builder()
+                .project(source.getProject())
+                .source(source)
+                .fromRevision(initialImport ? null : ingested)
+                .toRevision(observed)
+                .reason(initialImport
+                        ? RepositorySyncJob.SyncReason.INITIAL_IMPORT
+                        : RepositorySyncJob.SyncReason.REPOSITORY_CHANGE_DETECTED)
+                .status(RepositorySyncJob.SyncStatus.PENDING)
+                .attempt(0)
+                .build();
+        syncJobRepository.save(job);
+        log.info("Repository sync job scheduled for source {}: {} -> {}",
+                source.getId(),
+                initialImport ? "initial" : ingested.substring(0, Math.min(12, ingested.length())),
+                observed.substring(0, Math.min(12, observed.length())));
+    }
+
     private String previousObservedRevision(UUID projectId, Source source) {
         Optional<ProjectFreshnessResponse> latest = freshnessService.latest(
                 projectId, source.getId());
         return latest.map(response -> response.source().currentRevision()).orElse(null);
+    }
+
+    private String ingestedRevision(UUID projectId, Source source) {
+        Optional<ProjectFreshnessResponse> latest = freshnessService.latest(projectId, source.getId());
+        return latest.map(response -> response.source().ingestedRevision()).orElse(null);
     }
 }

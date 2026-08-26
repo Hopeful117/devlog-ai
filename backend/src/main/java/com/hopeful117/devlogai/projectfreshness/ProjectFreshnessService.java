@@ -74,6 +74,27 @@ public class ProjectFreshnessService {
         }
     }
 
+    /**
+     * Advances the deterministic ingestion checkpoint (ingestedRevision) for a
+     * Source after a completed repository synchronization. This is the ONLY
+     * path through which ingestedRevision may advance; it is invoked by the
+     * sync pipeline exclusively after all deterministic SYNC stages persisted
+     * successfully. Understanding state is never touched here.
+     */
+    public ProjectFreshnessResponse recordIngestedRevision(UUID projectId,
+            UUID sourceId, String ingestedRevision) {
+        if (!projects.existsById(projectId)) throw new EntityNotFoundException("Project", projectId);
+        try {
+            return persistence.recordIngestedRevision(projectId, sourceId,
+                    ingestedRevision, Instant.now());
+        } catch (RuntimeException failure) {
+            if (failure instanceof EntityNotFoundException || failure instanceof IllegalArgumentException) {
+                throw failure;
+            }
+            throw new SourceRevisionUnavailableException(sourceId, failure);
+        }
+    }
+
     public ProjectFreshnessResponse recordObservedBaseline(UUID projectId, UUID sourceId,
             com.hopeful117.devlogai.analysis.entity.Analysis baselineAnalysis,
             String observedRevision) {

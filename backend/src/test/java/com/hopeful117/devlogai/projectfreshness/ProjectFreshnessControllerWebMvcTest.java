@@ -69,7 +69,7 @@ class ProjectFreshnessControllerWebMvcTest extends ControllerWebMvcTestSupport {
         return new ProjectFreshnessResponse(ProjectFreshnessResponse.PROJECTION_VERSION,
                 UUID.randomUUID(), projectId,
                 new ProjectFreshnessResponse.Source(sourceId, "repo", "main",
-                        "origin/main", "a".repeat(40)), Instant.now(),
+                        "origin/main", "a".repeat(40), null), Instant.now(),
                 ProjectFreshnessStatus.STALE, ProjectRefreshGuidance.REFRESH_RECOMMENDED,
                 new ProjectFreshnessResponse.Baseline(UUID.randomUUID(), Instant.now(),
                         "b".repeat(40)), new ProjectFreshnessResponse.ReviewCounts(2, 1, 1, 0));
