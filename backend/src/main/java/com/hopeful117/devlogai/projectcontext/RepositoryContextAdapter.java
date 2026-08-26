@@ -8,13 +8,21 @@ import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
+import com.hopeful117.devlogai.fact.entity.Fact;
+import com.hopeful117.devlogai.fact.repository.FactRepository;
+import com.hopeful117.devlogai.observation.entity.Observation;
+import com.hopeful117.devlogai.observation.repository.ObservationRepository;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.intelligence.IntentTerms;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -36,9 +44,16 @@ public class RepositoryContextAdapter {
     private static final String ENGINEERING_STORY_PREPARATION =
             "engineering-story-preparation";
 
+    private static final int FACT_WINDOW = 200;
+    private static final int OBSERVATION_WINDOW = 200;
+    private static final int MAXIMUM_FACT_CANDIDATES = 8;
+    private static final int MAXIMUM_OBSERVATION_CANDIDATES = 6;
+
     private final ProjectContextProvider projectContextProvider;
     private final RepositoryContextService repositoryContextService;
     private final InsightRepository insightRepository;
+    private final FactRepository factRepository;
+    private final ObservationRepository observationRepository;
 
     public RepositoryContext buildRepositoryContext(
             UUID projectId, String storyDescription) {
@@ -53,7 +68,8 @@ public class RepositoryContextAdapter {
             ProjectContextSnapshot snapshot
     ) {
 
-        AnalysisContext syntheticContext = synthesizeAnalysisContext(projectId, snapshot);
+        AnalysisContext syntheticContext =
+                synthesizeAnalysisContext(projectId, snapshot, storyDescription);
 
         IntentDefinition intent = createIntentDefinition(storyDescription);
 
@@ -69,7 +85,8 @@ public class RepositoryContextAdapter {
 
     private AnalysisContext synthesizeAnalysisContext(
             UUID projectId,
-            ProjectContextSnapshot snapshot) {
+            ProjectContextSnapshot snapshot,
+            String storyDescription) {
 
         AnalysisContext.ProjectSnapshot projectSnapshot =
                 new AnalysisContext.ProjectSnapshot(
@@ -97,8 +114,8 @@ public class RepositoryContextAdapter {
                 projectSnapshot,
                 analysisSnapshot,
                 snapshot.latestProjectProfile(),
-                List.of(),
-                List.of(),
+                boundedFacts(snapshot, storyDescription),
+                boundedObservations(snapshot, storyDescription),
                 snapshot.recentKnowledgeEvents(),
                 snapshot.recentAnalyses(),
                 snapshot.architectureArtifacts(),
@@ -110,6 +127,76 @@ public class RepositoryContextAdapter {
                 snapshot.openChallenges(),
                 snapshot.knowledgeRelations(),
                 snapshot.engineeringStories());
+    }
+
+    /**
+     * Bounded deterministic retrieval of recent Facts from the latest
+     * comparable baseline Analysis (ADR-063: large persisted collections are
+     * bounded BEFORE the candidate pool). Relevant items are chosen by intent-
+     * term overlap over a fixed recent window; identity, provenance and time
+     * are preserved verbatim. No baseline profile means no candidates.
+     */
+    List<AnalysisContext.FactSnapshot> boundedFacts(
+            ProjectContextSnapshot snapshot, String storyDescription) {
+        if (snapshot.latestProjectProfile() == null
+                || snapshot.latestProjectProfile().analysisId() == null) {
+            return List.of();
+        }
+        UUID analysisId = snapshot.latestProjectProfile().analysisId();
+        List<String> terms = IntentTerms.extract(storyDescription);
+        List<Fact> window = factRepository.findByAnalysisIdOrderByDetectedAtDescIdDesc(
+                analysisId, org.springframework.data.domain.PageRequest.of(0, FACT_WINDOW));
+        record Scored(Fact fact, long matches) { }
+        List<Scored> scored = new ArrayList<>();
+        for (Fact fact : window) {
+            long matches = IntentTerms.matches(terms, fact.getContent());
+            if (matches > 0) scored.add(new Scored(fact, matches));
+        }
+        scored.sort(Comparator.comparingLong(Scored::matches).reversed()
+                .thenComparing(scoredEntry -> scoredEntry.fact().getDetectedAt(),
+                        Comparator.nullsLast(Comparator.reverseOrder())));
+        return scored.stream()
+                .limit(MAXIMUM_FACT_CANDIDATES)
+                .map(value -> new AnalysisContext.FactSnapshot(value.fact().getId(),
+                        value.fact().getType(), value.fact().getContent(),
+                        value.fact().getSource(),
+                        List.copyOf(value.fact().getEvidenceReferences()),
+                        value.fact().getDetectedAt()))
+                .toList();
+    }
+
+    /** Bounded Observation counterpart of {@link #boundedFacts}. */
+    List<AnalysisContext.ObservationSnapshot> boundedObservations(
+            ProjectContextSnapshot snapshot, String storyDescription) {
+        if (snapshot.latestProjectProfile() == null
+                || snapshot.latestProjectProfile().analysisId() == null) {
+            return List.of();
+        }
+        UUID analysisId = snapshot.latestProjectProfile().analysisId();
+        List<String> terms = IntentTerms.extract(storyDescription);
+        List<Observation> window =
+                observationRepository.findByAnalysisIdOrderByCreatedAtDescIdDesc(
+                        analysisId, org.springframework.data.domain.PageRequest.of(
+                                0, OBSERVATION_WINDOW));
+        record Scored(Observation observation, long matches) { }
+        List<Scored> scored = new ArrayList<>();
+        for (Observation observation : window) {
+            long matches = IntentTerms.matches(terms, observation.getContent());
+            if (matches > 0) scored.add(new Scored(observation, matches));
+        }
+        scored.sort(Comparator.comparingLong(Scored::matches).reversed()
+                .thenComparing(scoredEntry -> scoredEntry.observation().getCreatedAt(),
+                        Comparator.nullsLast(Comparator.reverseOrder())));
+        return scored.stream()
+                .limit(MAXIMUM_OBSERVATION_CANDIDATES)
+                .map(value -> new AnalysisContext.ObservationSnapshot(
+                        value.observation().getId(), value.observation().getType(),
+                        value.observation().getContent(), null, null,
+                        value.observation().getSupportingFacts() == null ? List.of()
+                                : value.observation().getSupportingFacts().stream()
+                                        .map(fact -> fact.getId()).toList(),
+                        value.observation().getCreatedAt()))
+                .toList();
     }
 
     private IntentDefinition createIntentDefinition(String storyDescription) {
