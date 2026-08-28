@@ -204,14 +204,22 @@
               The rendered prompt and provider request are intentionally not exposed by the Core.
             </p>
           </details>
+        } @else {
+          <p>No AI Task has been created for this Analysis.</p>
+        }
+        @if (analysisId$ | async; as analysisId) {
+          <app-ai-task-selected-evidence-section
+            [analysisId]="analysisId"
+            [newestTask]="tasks.data.length > 0 ? tasks.data[0] : null"
+          />
+        }
+        @if (tasks.data[0]; as task) {
           <app-analysis-insights-section
             [analysisId]="task.analysisId"
             [executionStatus]="task.status"
             [provider]="task.provider"
             [refreshToken]="task.status + ':' + (task.completedAt || '')"
           />
-        } @else {
-          <p>No AI Task has been created for this Analysis.</p>
         }
       }
     }

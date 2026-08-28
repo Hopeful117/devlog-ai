@@ -20,6 +20,7 @@ import { AnalysisDetail, AnalysisDiagnostics, AiTaskDetail } from './analysis.mo
 import { AnalysisService } from './analysis.service';
 import { AnalysisInsightsSection } from '../insights/analysis-insights-section';
 import { LoadingIndicator } from '../../shared/components/loading-indicator';
+import { AiTaskSelectedEvidenceSection } from './ai-task-selected-evidence-section';
 
 type LoadState<T> =
   | { readonly state: 'loading' }
@@ -29,7 +30,15 @@ type LoadState<T> =
 
 @Component({
   selector: 'app-analysis-detail-page',
-  imports: [AsyncPipe, DatePipe, JsonPipe, RouterLink, AnalysisInsightsSection, LoadingIndicator],
+  imports: [
+    AsyncPipe,
+    DatePipe,
+    JsonPipe,
+    RouterLink,
+    AnalysisInsightsSection,
+    AiTaskSelectedEvidenceSection,
+    LoadingIndicator,
+  ],
   templateUrl: './analysis-detail-page.html',
   styleUrl: './analysis-detail-page.scss',
 })
@@ -43,6 +52,7 @@ export class AnalysisDetailPage {
     map((params) => params.get('id') ?? ''),
     shareReplay({ bufferSize: 1, refCount: true }),
   );
+  readonly analysisId$ = this.routeId$;
 
   readonly analysis$: Observable<LoadState<AnalysisDetail>> = this.routeId$.pipe(
     switchMap((id) =>

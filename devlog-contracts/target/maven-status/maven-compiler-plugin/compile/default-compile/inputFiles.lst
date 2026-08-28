@@ -1,5 +1,16 @@
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/engineeringcontext/DevlogResourceUriFactory.java
 /home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringContext.java
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringContextFreshness.java
 /home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringContextMetadata.java
 /home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringEvidence.java
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringEvidenceContent.java
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringEvidenceSymbols.java
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringSymbolDeclaration.java
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringSymbolLocation.java
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/engineeringcontext/EngineeringSymbolParameter.java
 /home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/projectcontext/ProjectContext.java
 /home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/projectcontext/ProjectNote.java
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/projecthistory/ProjectHistoryCommitMatch.java
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/projecthistory/ProjectHistoryMatch.java
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/projecthistory/ProjectHistoryMatchedOn.java
+/home/ludo/Bureau/workspace/devlog-ai/devlog-contracts/src/main/java/com/hopeful117/devlogai/contracts/projecthistory/ProjectHistorySearchResult.java

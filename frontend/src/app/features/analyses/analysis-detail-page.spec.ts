@@ -79,10 +79,28 @@ describe('AnalysisDetailPage', () => {
   const getAnalysis = vi.fn();
   const getDiagnostics = vi.fn();
   const getAiTasksByAnalysis = vi.fn();
+  const getSelectedEvidence = vi.fn();
   beforeEach(async () => {
     vi.useFakeTimers();
     getAnalysis.mockReset().mockReturnValue(of(analysis));
     getDiagnostics.mockReset().mockReturnValue(of(diagnostics('COMPLETED')));
+    getSelectedEvidence.mockReset().mockReturnValue(
+      of({
+        state: 'SNAPSHOT_PENDING',
+        analysisId: 'analysis-id',
+        projectId: 'project-id',
+        task: {
+          id: 'task-id',
+          taskType: 'INSIGHT_GENERATION',
+          status: 'PROCESSING',
+          createdAt: analysis.createdAt,
+        },
+        selectionVersion: null,
+        selectionDigest: null,
+        snapshotMetadata: null,
+        categories: null,
+      }),
+    );
     getAiTasksByAnalysis.mockReset().mockReturnValue(
       of([
         {
@@ -131,6 +149,7 @@ describe('AnalysisDetailPage', () => {
             getAnalysis,
             getDiagnostics,
             getAiTasksByAnalysis,
+            getSelectedEvidence,
             getWarnings: () => of([]),
             getProfile: () =>
               of({
@@ -204,6 +223,19 @@ describe('AnalysisDetailPage', () => {
     expect(fixture.nativeElement.textContent).toContain('<script>alert(1)</script>');
     expect(fixture.nativeElement.querySelector('script')).toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain('LLM_API_KEY');
+  });
+  it('hosts historical supplied evidence before generated Analysis output', async () => {
+    const fixture = TestBed.createComponent(AnalysisDetailPage);
+    fixture.detectChanges();
+    await vi.advanceTimersByTimeAsync(0);
+    fixture.detectChanges();
+    const text = fixture.nativeElement.textContent as string;
+    expect(getSelectedEvidence).toHaveBeenCalledWith('analysis-id');
+    expect(text).toContain('Evidence supplied to the model');
+    expect(text.indexOf('Evidence supplied to the model')).toBeLessThan(
+      text.indexOf('Insight Proposals'),
+    );
+    expect(text).toContain('execution-time evidence selected for the displayed AI Task');
   });
   it('does not manually subscribe', () =>
     expect(AnalysisDetailPage.toString()).not.toContain('.subscribe('));

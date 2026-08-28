@@ -1,0 +1,877 @@
+<section class="selected-evidence panel" aria-labelledby="selected-evidence-title">
+  <header class="evidence-header">
+    <div>
+      <p class="eyebrow">Historical model input</p>
+      <h2 id="selected-evidence-title">Evidence supplied to the model</h2>
+    </div>
+    <span class="snapshot-label">Persisted snapshot</span>
+  </header>
+
+  <p class="scope-note">
+    This is the execution-time evidence selected for the displayed AI Task. It is not current
+    project knowledge or a permanent evidence set for this Analysis.
+  </p>
+
+  @if (view$ | async; as view) {
+    @switch (view.state) {
+      @case ('loading') {
+        <p role="status" class="state-message">Loading persisted selected evidence…</p>
+      }
+      @case ('error') {
+        <div role="alert" class="state-message error">
+          <p>Selected evidence could not be read: {{ view.error.message }}</p>
+          <button type="button" (click)="retry()">Try again</button>
+        </div>
+      }
+      @case ('loaded') {
+        @switch (view.data.state) {
+          @case ('NO_AI_TASK') {
+            <p role="status" class="state-message" data-testid="selected-evidence-no-task">
+              No AI Task exists for this Analysis, so there is no execution-time evidence snapshot.
+            </p>
+          }
+          @case ('SNAPSHOT_PENDING') {
+            <div class="state-message" role="status" data-testid="selected-evidence-pending">
+              <strong>Snapshot pending</strong>
+              <p>
+                Task <code>{{ view.data.task.id }}</code> is {{ view.data.task.status }}. Its
+                selected evidence may still be attached.
+              </p>
+            </div>
+          }
+          @case ('SNAPSHOT_UNAVAILABLE') {
+            <div role="status" class="state-message" data-testid="selected-evidence-unavailable">
+              <strong>Snapshot unavailable</strong>
+              <p>
+                Task <code>{{ view.data.task.id }}</code> reached
+                {{ view.data.task.status }} without a persisted selected-evidence snapshot. Current
+                context is not substituted.
+              </p>
+            </div>
+          }
+          @case ('AVAILABLE') {
+            <div class="snapshot-identity">
+              <dl class="metadata-list">
+                <dt>AI Task</dt>
+                <dd>
+                  <code>{{ view.data.task.id }}</code>
+                </dd>
+                <dt>Task type</dt>
+                <dd>{{ view.data.task.taskType }}</dd>
+                <dt>Task status</dt>
+                <dd>{{ view.data.task.status }}</dd>
+                <dt>Task created</dt>
+                <dd>{{ view.data.task.createdAt | date: 'medium' }}</dd>
+                <dt>Selection version</dt>
+                <dd>{{ view.data.selectionVersion || 'Not recorded' }}</dd>
+                <dt>Selection digest</dt>
+                <dd>
+                  <code>{{ view.data.selectionDigest || 'Not recorded' }}</code>
+                </dd>
+              </dl>
+            </div>
+
+            @if (isGloballyEmpty(view.data.categories)) {
+              <p class="state-message" data-testid="selected-evidence-globally-empty">
+                This evidence snapshot exists but contains no displayable selected evidence.
+                Available audit metadata is retained below.
+              </p>
+            }
+
+            <div class="category-grid" data-testid="selected-evidence-categories">
+              <article class="evidence-category" aria-labelledby="selected-facts-title">
+                <header class="category-heading">
+                  <h3 id="selected-facts-title">Facts</h3>
+                  <span>{{ view.data.categories.facts.count }}</span>
+                </header>
+                @if (view.data.categories.facts.availability === 'NOT_RECORDED') {
+                  <p class="empty-copy">This historical snapshot did not record this category.</p>
+                } @else if (view.data.categories.facts.count === 0) {
+                  <p class="empty-copy">Category recorded; none selected.</p>
+                } @else {
+                  <ul class="evidence-list">
+                    @for (fact of view.data.categories.facts.items; track fact.id ?? $index) {
+                      <li>
+                        <strong>{{ fact.type || 'Fact' }}</strong>
+                        <p>{{ fact.content || 'No content recorded.' }}</p>
+                        <dl class="item-metadata">
+                          <dt>ID</dt>
+                          <dd>
+                            <code>{{ fact.id || 'Not recorded' }}</code>
+                          </dd>
+                          <dt>Source</dt>
+                          <dd>
+                            <code>{{ fact.source || 'Not recorded' }}</code>
+                          </dd>
+                          <dt>Detected</dt>
+                          <dd>
+                            {{
+                              fact.detectedAt ? (fact.detectedAt | date: 'medium') : 'Not recorded'
+                            }}
+                          </dd>
+                        </dl>
+                        @if (fact.evidenceReferences?.length) {
+                          <p class="references">
+                            <span>References</span> {{ fact.evidenceReferences.join(', ') }}
+                          </p>
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
+              </article>
+
+              <article class="evidence-category" aria-labelledby="selected-observations-title">
+                <header class="category-heading">
+                  <h3 id="selected-observations-title">Observations</h3>
+                  <span>{{ view.data.categories.observations.count }}</span>
+                </header>
+                @if (view.data.categories.observations.availability === 'NOT_RECORDED') {
+                  <p class="empty-copy">This historical snapshot did not record this category.</p>
+                } @else if (view.data.categories.observations.count === 0) {
+                  <p class="empty-copy">Category recorded; none selected.</p>
+                } @else {
+                  <ul class="evidence-list">
+                    @for (
+                      observation of view.data.categories.observations.items;
+                      track observation.id ?? $index
+                    ) {
+                      <li>
+                        <strong>{{ observation.type || 'Observation' }}</strong>
+                        <p>{{ observation.content || 'No content recorded.' }}</p>
+                        <dl class="item-metadata">
+                          <dt>ID</dt>
+                          <dd>
+                            <code>{{ observation.id || 'Not recorded' }}</code>
+                          </dd>
+                          <dt>Rule</dt>
+                          <dd>
+                            {{ observation.ruleId || 'Not recorded' }} /
+                            {{ observation.ruleVersion || 'Not recorded' }}
+                          </dd>
+                          <dt>Created</dt>
+                          <dd>
+                            {{
+                              observation.createdAt
+                                ? (observation.createdAt | date: 'medium')
+                                : 'Not recorded'
+                            }}
+                          </dd>
+                        </dl>
+                        @if (observation.supportingFactIds?.length) {
+                          <p class="references">
+                            <span>Supporting Facts</span>
+                            {{ observation.supportingFactIds.join(', ') }}
+                          </p>
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
+              </article>
+
+              <article class="evidence-category" aria-labelledby="selected-insights-title">
+                <header class="category-heading">
+                  <h3 id="selected-insights-title">Prior Insights</h3>
+                  <span>{{ view.data.categories.priorInsights.count }}</span>
+                </header>
+                <p class="category-note">
+                  Pre-existing knowledge supplied as input, not output generated by this execution.
+                </p>
+                @if (view.data.categories.priorInsights.availability === 'NOT_RECORDED') {
+                  <p class="empty-copy">This historical snapshot did not record this category.</p>
+                } @else if (view.data.categories.priorInsights.count === 0) {
+                  <p class="empty-copy">Category recorded; none selected.</p>
+                } @else {
+                  <ul class="evidence-list">
+                    @for (insight of view.data.categories.priorInsights.items; track $index) {
+                      <li>
+                        <strong>{{ insight.title || 'Prior Insight' }}</strong>
+                        <p>{{ insight.content || 'No content recorded.' }}</p>
+                        <p class="references">
+                          <span>Classification</span> {{ insight.type || 'Not recorded' }} ·
+                          {{ insight.severity || 'Not recorded' }}
+                        </p>
+                      </li>
+                    }
+                  </ul>
+                }
+              </article>
+
+              <article class="evidence-category" aria-labelledby="selected-architecture-title">
+                <header class="category-heading">
+                  <h3 id="selected-architecture-title">Architecture Knowledge</h3>
+                  <span>{{ view.data.categories.architectureKnowledge.count }}</span>
+                </header>
+                <p class="category-note">
+                  Pre-existing architecture knowledge supplied to this Analysis.
+                </p>
+                @if (view.data.categories.architectureKnowledge.availability === 'NOT_RECORDED') {
+                  <p class="empty-copy">This historical snapshot did not record this category.</p>
+                } @else if (view.data.categories.architectureKnowledge.count === 0) {
+                  <p class="empty-copy">Category recorded; none selected.</p>
+                } @else {
+                  <ul class="evidence-list">
+                    @for (
+                      knowledge of view.data.categories.architectureKnowledge.items;
+                      track knowledge.insightId ?? $index
+                    ) {
+                      <li>
+                        <strong>{{ knowledge.title || 'Architecture knowledge' }}</strong>
+                        <p>{{ knowledge.content || 'No content recorded.' }}</p>
+                        @if (knowledge.rationale) {
+                          <p>
+                            <span class="field-label">Rationale</span> {{ knowledge.rationale }}
+                          </p>
+                        }
+                        <dl class="item-metadata">
+                          <dt>Insight</dt>
+                          <dd>
+                            <code>{{ knowledge.insightId || 'Not recorded' }}</code>
+                          </dd>
+                          <dt>Proposal</dt>
+                          <dd>
+                            <code>{{ knowledge.proposalId || 'Not recorded' }}</code>
+                          </dd>
+                          <dt>Type</dt>
+                          <dd>
+                            {{ knowledge.normalizedType || 'Not recorded' }} /
+                            {{ knowledge.sourceType || 'Not recorded' }}
+                          </dd>
+                          <dt>Severity</dt>
+                          <dd>{{ knowledge.severity || 'Not recorded' }}</dd>
+                          <dt>Created</dt>
+                          <dd>
+                            {{
+                              knowledge.createdAt
+                                ? (knowledge.createdAt | date: 'medium')
+                                : 'Not recorded'
+                            }}
+                          </dd>
+                        </dl>
+                        @if (knowledge.evidenceReferences?.length) {
+                          <p class="references">
+                            <span>References</span> {{ knowledge.evidenceReferences.join(', ') }}
+                          </p>
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
+              </article>
+
+              <article class="evidence-category" aria-labelledby="selected-events-title">
+                <header class="category-heading">
+                  <h3 id="selected-events-title">Engineering Events</h3>
+                  <span>{{ view.data.categories.engineeringEvents.count }}</span>
+                </header>
+                @if (view.data.categories.engineeringEvents.availability === 'NOT_RECORDED') {
+                  <p class="empty-copy">This historical snapshot did not record this category.</p>
+                } @else if (view.data.categories.engineeringEvents.count === 0) {
+                  <p class="empty-copy">Category recorded; none selected.</p>
+                } @else {
+                  <ul class="evidence-list">
+                    @for (
+                      event of view.data.categories.engineeringEvents.items;
+                      track event.id ?? $index
+                    ) {
+                      <li>
+                        <strong>{{ event.title || 'Engineering Event' }}</strong>
+                        <p>{{ event.summary || 'No summary recorded.' }}</p>
+                        <dl class="item-metadata">
+                          <dt>Category</dt>
+                          <dd>{{ event.category || 'Not recorded' }}</dd>
+                          <dt>Event ID</dt>
+                          <dd>
+                            <code>{{ event.id || 'Not recorded' }}</code>
+                          </dd>
+                          <dt>Source ID</dt>
+                          <dd>
+                            <code>{{ event.sourceId || 'Not recorded' }}</code>
+                          </dd>
+                          <dt>Commit scope</dt>
+                          <dd>
+                            <code
+                              >{{ event.baseCommit || 'Not recorded' }} →
+                              {{ event.targetCommit || 'Not recorded' }}</code
+                            >
+                          </dd>
+                          <dt>Occurred</dt>
+                          <dd>
+                            {{
+                              event.occurredAt
+                                ? (event.occurredAt | date: 'medium')
+                                : 'Not recorded'
+                            }}
+                          </dd>
+                          <dt>Proposal</dt>
+                          <dd>
+                            <code>{{ event.proposalId || 'Not recorded' }}</code>
+                          </dd>
+                        </dl>
+                      </li>
+                    }
+                  </ul>
+                }
+              </article>
+
+              <article class="evidence-category" aria-labelledby="selected-human-context-title">
+                <header class="category-heading">
+                  <h3 id="selected-human-context-title">Human Context</h3>
+                  <span>{{ view.data.categories.humanContext.count }}</span>
+                </header>
+                @if (view.data.categories.humanContext.availability === 'NOT_RECORDED') {
+                  <p class="empty-copy">This historical snapshot did not record this category.</p>
+                } @else if (view.data.categories.humanContext.count === 0) {
+                  <p class="empty-copy">Category recorded; none selected.</p>
+                } @else {
+                  <ul class="evidence-list">
+                    @for (
+                      context of view.data.categories.humanContext.items;
+                      track context.id ?? $index
+                    ) {
+                      <li>
+                        <strong>{{ context.title || 'Human context input' }}</strong>
+                        <pre><code>{{ context.contentMarkdown || 'No content recorded.' }}</code></pre>
+                        <dl class="item-metadata">
+                          <dt>ID</dt>
+                          <dd>
+                            <code>{{ context.id || 'Not recorded' }}</code>
+                          </dd>
+                          <dt>Type / status</dt>
+                          <dd>
+                            {{ context.type || 'Not recorded' }} /
+                            {{ context.status || 'Not recorded' }}
+                          </dd>
+                          <dt>Updated</dt>
+                          <dd>
+                            {{
+                              context.updatedAt
+                                ? (context.updatedAt | date: 'medium')
+                                : 'Not recorded'
+                            }}
+                          </dd>
+                        </dl>
+                      </li>
+                    }
+                  </ul>
+                }
+              </article>
+
+              <article
+                class="evidence-category category-wide"
+                aria-labelledby="selected-evolution-title"
+              >
+                <header class="category-heading">
+                  <h3 id="selected-evolution-title">Evolution Context</h3>
+                  <span>{{ view.data.categories.evolutionContext.count }}</span>
+                </header>
+                @if (view.data.categories.evolutionContext.availability === 'NOT_RECORDED') {
+                  <p class="empty-copy">This historical snapshot did not record this category.</p>
+                } @else if (view.data.categories.evolutionContext.count === 0) {
+                  <p class="empty-copy">Category recorded; none selected.</p>
+                } @else {
+                  @for (evolution of view.data.categories.evolutionContext.items; track $index) {
+                    <dl class="metadata-list">
+                      <dt>Context version</dt>
+                      <dd>{{ evolution.contextVersion || 'Not recorded' }}</dd>
+                      <dt>Project / source</dt>
+                      <dd>
+                        <code
+                          >{{ evolution.projectId || 'Not recorded' }} /
+                          {{ evolution.sourceId || 'Not recorded' }}</code
+                        >
+                      </dd>
+                      <dt>Revision comparison</dt>
+                      <dd>
+                        <code
+                          >{{ evolution.baseCommit || 'Not recorded' }} →
+                          {{ evolution.targetCommit || 'Not recorded' }}</code
+                        >
+                      </dd>
+                      <dt>Policy</dt>
+                      <dd>{{ evolution.comparisonPolicy || 'Not recorded' }}</dd>
+                      <dt>Merge commit</dt>
+                      <dd>
+                        {{
+                          evolution.mergeCommit === null
+                            ? 'Not recorded'
+                            : evolution.mergeCommit
+                              ? 'Yes'
+                              : 'No'
+                        }}
+                      </dd>
+                      <dt>Target committed</dt>
+                      <dd>
+                        {{
+                          evolution.targetCommittedAt
+                            ? (evolution.targetCommittedAt | date: 'medium')
+                            : 'Not recorded'
+                        }}
+                      </dd>
+                    </dl>
+                    @if (evolution.commitDiff; as diff) {
+                      <details>
+                        <summary>Commit diff details</summary>
+                        <dl class="metadata-list">
+                          <dt>Commit</dt>
+                          <dd>
+                            <code>{{ diff.commitHash || 'Not recorded' }}</code>
+                          </dd>
+                          <dt>First parent</dt>
+                          <dd>
+                            <code>{{ diff.firstParentHash || 'Not recorded' }}</code>
+                          </dd>
+                          <dt>Message</dt>
+                          <dd>{{ diff.commitMessage || 'Not recorded' }}</dd>
+                          <dt>Committed</dt>
+                          <dd>
+                            {{
+                              diff.committedAt
+                                ? (diff.committedAt | date: 'medium')
+                                : 'Not recorded'
+                            }}
+                          </dd>
+                          <dt>Root / merge</dt>
+                          <dd>
+                            {{
+                              diff.rootCommit === null
+                                ? 'Not recorded'
+                                : diff.rootCommit
+                                  ? 'root'
+                                  : 'not root'
+                            }}
+                            /
+                            {{
+                              diff.mergeCommit === null
+                                ? 'Not recorded'
+                                : diff.mergeCommit
+                                  ? 'merge'
+                                  : 'not merge'
+                            }}
+                          </dd>
+                          <dt>Truncated</dt>
+                          <dd>
+                            {{
+                              diff.truncated === null
+                                ? 'Not recorded'
+                                : diff.truncated
+                                  ? 'Yes'
+                                  : 'No'
+                            }}
+                          </dd>
+                        </dl>
+                        @if (diff.statistics; as statistics) {
+                          <p>
+                            {{ statistics.filesChanged ?? 'Unknown' }} files · +{{
+                              statistics.insertions ?? 'unknown'
+                            }}
+                            / -{{ statistics.deletions ?? 'unknown' }} ·
+                            {{ statistics.binaryFiles ?? 'unknown' }} binary
+                          </p>
+                        }
+                        @if (diff.changedFiles?.length) {
+                          <h4>Changed files</h4>
+                          <ul class="changed-files">
+                            @for (
+                              file of diff.changedFiles;
+                              track file.evidenceReference ?? $index
+                            ) {
+                              <li>
+                                <code>{{
+                                  file.newPath || file.oldPath || 'Path not recorded'
+                                }}</code>
+                                <span
+                                  >{{ file.changeType || 'Unknown change' }} ·
+                                  {{ file.language || 'Unknown language' }} · +{{
+                                    file.insertions ?? '?'
+                                  }}
+                                  / -{{ file.deletions ?? '?' }}</span
+                                >
+                                @if (file.excludedFromAnalysis) {
+                                  <span
+                                    >Excluded:
+                                    {{ file.exclusionReason || 'reason not recorded' }}</span
+                                  >
+                                }
+                                @if (file.evidenceReference) {
+                                  <span
+                                    ><code>{{ file.evidenceReference }}</code></span
+                                  >
+                                }
+                              </li>
+                            }
+                          </ul>
+                        }
+                        @if (diff.evidenceReferences?.length) {
+                          <p class="references">
+                            <span>Evidence references</span>
+                            {{ diff.evidenceReferences.join(', ') }}
+                          </p>
+                        }
+                        @if (diff.candidateAdrReferences?.length) {
+                          <p class="references">
+                            <span>Candidate ADR references</span>
+                            {{ diff.candidateAdrReferences.join(', ') }}
+                          </p>
+                        }
+                        @if (diff.candidateRoadmapReferences?.length) {
+                          <p class="references">
+                            <span>Candidate roadmap references</span>
+                            {{ diff.candidateRoadmapReferences.join(', ') }}
+                          </p>
+                        }
+                        @if (diff.warnings?.length) {
+                          <p class="references">
+                            <span>Warnings</span> {{ diff.warnings.join(', ') }}
+                          </p>
+                        }
+                      </details>
+                    }
+                  }
+                }
+              </article>
+
+              <article
+                class="evidence-category category-wide"
+                aria-labelledby="selected-repository-title"
+              >
+                <header class="category-heading">
+                  <h3 id="selected-repository-title">Repository Evidence</h3>
+                  <span>{{ view.data.categories.repositoryEvidence.count }}</span>
+                </header>
+                @if (view.data.categories.repositoryEvidence.availability === 'NOT_RECORDED') {
+                  <p class="empty-copy">This historical snapshot did not record this category.</p>
+                } @else if (view.data.categories.repositoryEvidence.count === 0) {
+                  <p class="empty-copy">Category recorded; none selected.</p>
+                } @else {
+                  <ul class="repository-list">
+                    @for (
+                      evidence of view.data.categories.repositoryEvidence.items;
+                      track evidence.reference ?? $index
+                    ) {
+                      <li>
+                        <div class="repository-heading">
+                          <strong>{{ evidence.kind || 'Repository evidence' }}</strong>
+                          <span>{{ evidence.layer || 'Layer not recorded' }}</span>
+                        </div>
+                        <code class="reference">{{
+                          evidence.reference || 'Reference not recorded'
+                        }}</code>
+                        <p>{{ evidence.summary || 'No summary recorded.' }}</p>
+                        @if (evidence.occurredAt) {
+                          <p class="muted">Occurred {{ evidence.occurredAt | date: 'medium' }}</p>
+                        }
+                        @if (evidence.relatedReferences?.length) {
+                          <p class="references">
+                            <span>Related references</span>
+                            {{ evidence.relatedReferences.join(', ') }}
+                          </p>
+                        }
+                        @if (evidence.content; as content) {
+                          <details>
+                            <summary>
+                              Content · {{ content.status || 'status not recorded' }}
+                            </summary>
+                            <dl class="metadata-list">
+                              <dt>Status</dt>
+                              <dd>
+                                <strong>{{ content.status || 'Not recorded' }}</strong>
+                              </dd>
+                              <dt>Reason</dt>
+                              <dd>{{ content.reason || 'Not recorded' }}</dd>
+                              <dt>Revision</dt>
+                              <dd>
+                                <code>{{ content.revision || 'Not recorded' }}</code>
+                              </dd>
+                              <dt>Content policy</dt>
+                              <dd>
+                                {{ content.policyId || 'Not recorded' }} /
+                                {{ content.policyVersion || 'Not recorded' }}
+                              </dd>
+                              <dt>Allocation policy</dt>
+                              <dd>
+                                {{ content.allocationPolicyId || 'Not recorded' }} /
+                                {{ content.allocationPolicyVersion || 'Not recorded' }} · rank
+                                {{ content.allocationRank ?? 'not recorded' }}
+                              </dd>
+                            </dl>
+                            @if (content.text) {
+                              <pre><code>{{ content.text }}</code></pre>
+                            }
+                            @if (
+                              !content.text &&
+                              (content.status === 'SKIPPED' || content.status === 'UNAVAILABLE')
+                            ) {
+                              <p>No repository content was supplied for this item.</p>
+                            }
+                          </details>
+                        }
+                        @if (evidence.symbols; as symbols) {
+                          <details>
+                            <summary>
+                              Symbols · {{ symbols.status || 'status not recorded' }}
+                            </summary>
+                            <dl class="metadata-list">
+                              <dt>Status / reason</dt>
+                              <dd>
+                                {{ symbols.status || 'Not recorded' }} /
+                                {{ symbols.reason || 'Not recorded' }}
+                              </dd>
+                              <dt>Extractor</dt>
+                              <dd>
+                                {{ symbols.extractorId || 'Not recorded' }} /
+                                {{ symbols.extractorVersion || 'Not recorded' }}
+                              </dd>
+                              <dt>Policy</dt>
+                              <dd>
+                                {{ symbols.policyId || 'Not recorded' }} /
+                                {{ symbols.policyVersion || 'Not recorded' }}
+                              </dd>
+                              <dt>Revision</dt>
+                              <dd>
+                                <code>{{ symbols.revision || 'Not recorded' }}</code>
+                              </dd>
+                              <dt>Allocation rank</dt>
+                              <dd>{{ symbols.allocationRank ?? 'Not recorded' }}</dd>
+                              <dt>Returned / available</dt>
+                              <dd>
+                                {{ symbols.returnedSymbolCount ?? 'Unknown' }} /
+                                {{ symbols.availableSymbolCount ?? 'Unknown'
+                                }}{{ symbols.truncated ? ' (truncated)' : '' }}
+                              </dd>
+                            </dl>
+                            @if (symbols.declarations?.length) {
+                              <ul class="symbol-list">
+                                @for (
+                                  declaration of symbols.declarations;
+                                  track declaration.name ?? $index
+                                ) {
+                                  <li>
+                                    <strong
+                                      >{{ declaration.kind || 'Symbol' }}
+                                      {{ declaration.name || 'Unnamed' }}</strong
+                                    >
+                                    <p>
+                                      <code
+                                        >{{ declaration.modifiers?.join(' ') }}
+                                        {{
+                                          declaration.owningType
+                                            ? declaration.owningType + '.'
+                                            : ''
+                                        }}{{ declaration.name || '' }}({{
+                                          declaration.parameters?.length ?? 0
+                                        }}
+                                        parameters){{
+                                          declaration.returnType
+                                            ? ': ' + declaration.returnType
+                                            : ''
+                                        }}</code
+                                      >
+                                    </p>
+                                    @if (declaration.parameters?.length) {
+                                      <p class="references">
+                                        <span>Parameters</span>
+                                        @for (parameter of declaration.parameters; track $index) {
+                                          <code
+                                            >{{ parameter.type || '?' }}
+                                            {{ parameter.name || '?' }}</code
+                                          >
+                                        }
+                                      </p>
+                                    }
+                                    @if (declaration.annotations?.length) {
+                                      <p class="references">
+                                        <span>Annotations</span>
+                                        {{ declaration.annotations.join(', ') }}
+                                      </p>
+                                    }
+                                    @if (declaration.location; as location) {
+                                      <p class="muted">
+                                        Location {{ location.beginLine ?? '?' }}:{{
+                                          location.beginColumn ?? '?'
+                                        }}–{{ location.endLine ?? '?' }}:{{
+                                          location.endColumn ?? '?'
+                                        }}
+                                      </p>
+                                    }
+                                  </li>
+                                }
+                              </ul>
+                            }
+                          </details>
+                        }
+                      </li>
+                    }
+                  </ul>
+                }
+              </article>
+            </div>
+
+            <details class="audit-details">
+              <summary>Snapshot audit metadata</summary>
+              @if (view.data.snapshotMetadata.project; as project) {
+                <h3>Persisted project</h3>
+                <dl class="metadata-list">
+                  <dt>ID</dt>
+                  <dd>
+                    <code>{{ project.id || 'Not recorded' }}</code>
+                  </dd>
+                  <dt>Name / slug</dt>
+                  <dd>
+                    {{ project.name || 'Not recorded' }} / {{ project.slug || 'Not recorded' }}
+                  </dd>
+                  <dt>Status</dt>
+                  <dd>{{ project.status || 'Not recorded' }}</dd>
+                  <dt>Description</dt>
+                  <dd>{{ project.description || 'Not recorded' }}</dd>
+                </dl>
+              }
+              @if (view.data.snapshotMetadata.analysis; as analysis) {
+                <h3>Persisted Analysis</h3>
+                <dl class="metadata-list">
+                  <dt>ID</dt>
+                  <dd>
+                    <code>{{ analysis.id || 'Not recorded' }}</code>
+                  </dd>
+                  <dt>Type / status</dt>
+                  <dd>
+                    {{ analysis.type || 'Not recorded' }} / {{ analysis.status || 'Not recorded' }}
+                  </dd>
+                  <dt>Intent</dt>
+                  <dd>
+                    {{ analysis.intentId || 'Not recorded' }} /
+                    {{ analysis.intentVersion || 'Not recorded' }}
+                  </dd>
+                  <dt>Created</dt>
+                  <dd>
+                    {{
+                      analysis.createdAt ? (analysis.createdAt | date: 'medium') : 'Not recorded'
+                    }}
+                  </dd>
+                  <dt>Started</dt>
+                  <dd>
+                    {{
+                      analysis.startedAt ? (analysis.startedAt | date: 'medium') : 'Not recorded'
+                    }}
+                  </dd>
+                  <dt>Completed</dt>
+                  <dd>
+                    {{
+                      analysis.completedAt
+                        ? (analysis.completedAt | date: 'medium')
+                        : 'Not recorded'
+                    }}
+                  </dd>
+                </dl>
+              }
+              @if (view.data.snapshotMetadata.projectProfile; as profile) {
+                <h3>Selected project profile</h3>
+                <dl class="metadata-list">
+                  <dt>ID</dt>
+                  <dd>
+                    <code>{{ profile.id || 'Not recorded' }}</code>
+                  </dd>
+                  <dt>Project / Analysis</dt>
+                  <dd>
+                    <code
+                      >{{ profile.projectId || 'Not recorded' }} /
+                      {{ profile.analysisId || 'Not recorded' }}</code
+                    >
+                  </dd>
+                  <dt>Profile / renderer</dt>
+                  <dd>
+                    {{ profile.profileVersion || 'Not recorded' }} /
+                    {{ profile.rendererVersion || 'Not recorded' }}
+                  </dd>
+                  <dt>Generated</dt>
+                  <dd>
+                    {{
+                      profile.generatedAt ? (profile.generatedAt | date: 'medium') : 'Not recorded'
+                    }}
+                  </dd>
+                  <dt>Requested revision</dt>
+                  <dd>
+                    <code>{{ profile.requestedRevision || 'Not recorded' }}</code>
+                  </dd>
+                  <dt>Characteristics</dt>
+                  <dd>{{ profile.characteristicCount ?? 'Not recorded' }}</dd>
+                  <dt>Summary</dt>
+                  <dd>{{ profile.deterministicSummary || 'Not recorded' }}</dd>
+                </dl>
+                @if (profile.completeness; as completeness) {
+                  <p>
+                    Completeness {{ completeness.status || 'not recorded' }} ·
+                    {{
+                      completeness.collectionComplete
+                        ? 'collection complete'
+                        : 'collection incomplete or unknown'
+                    }}{{ completeness.truncated ? ' · truncated' : '' }} ·
+                    {{ completeness.warningCount ?? 'unknown' }} warnings ·
+                    {{ completeness.errorCount ?? 'unknown' }} errors ·
+                    {{ completeness.successfulCollectorCount ?? 'unknown' }} successful collectors ·
+                    {{ completeness.collectorsWithWarningsCount ?? 'unknown' }} with warnings ·
+                    {{ completeness.failedCollectorCount ?? 'unknown' }} failed
+                  </p>
+                }
+              }
+              @if (view.data.snapshotMetadata.diagnostics; as diagnostics) {
+                <h3>Collection diagnostics</h3>
+                <p>
+                  {{
+                    diagnostics.collectionComplete
+                      ? 'Collection complete'
+                      : 'Collection incomplete or unknown'
+                  }}{{ diagnostics.truncated ? ' · truncated' : '' }} ·
+                  {{ diagnostics.warningCount ?? 'unknown' }} warnings ·
+                  {{ diagnostics.errorCount ?? 'unknown' }} errors
+                </p>
+              }
+              @if (view.data.snapshotMetadata.selection; as selection) {
+                <h3>Selection metadata</h3>
+                <dl class="metadata-list">
+                  <dt>Version</dt>
+                  <dd>{{ selection.selectionVersion || 'Not recorded' }}</dd>
+                  <dt>Selected / discarded</dt>
+                  <dd>
+                    {{ selection.selectedKnowledgeCount ?? 'Unknown' }} /
+                    {{ selection.discardedKnowledgeCount ?? 'Unknown' }}
+                  </dd>
+                  <dt>Completeness</dt>
+                  <dd>{{ selection.completeness || 'Not recorded' }}</dd>
+                  <dt>Applied rules</dt>
+                  <dd>{{ selection.appliedRules?.join(', ') || 'Not recorded' }}</dd>
+                </dl>
+                @if (selection.knowledgeBudget; as budget) {
+                  <p>
+                    Budget: {{ budget.maximumFacts ?? '?' }} Facts ·
+                    {{ budget.maximumObservations ?? '?' }} Observations ·
+                    {{ budget.maximumInsights ?? '?' }} Insights ·
+                    {{ budget.maximumArchitectureKnowledge ?? '?' }} architecture items ·
+                    {{ budget.maximumRepositoryEvidence ?? '?' }} repository items
+                  </p>
+                }
+              }
+              @if (view.data.snapshotMetadata.repositoryContext; as repository) {
+                <h3>Repository context metadata</h3>
+                <dl class="metadata-list">
+                  <dt>Version / profile</dt>
+                  <dd>
+                    {{ repository.contextVersion || 'Not recorded' }} /
+                    {{ repository.profile || 'Not recorded' }}
+                  </dd>
+                  <dt>Context digest</dt>
+                  <dd>
+                    <code>{{ repository.contextDigest || 'Not recorded' }}</code>
+                  </dd>
+                  <dt>Warnings</dt>
+                  <dd>{{ repository.warnings?.join(', ') || 'None recorded' }}</dd>
+                </dl>
+              }
+            </details>
+          }
+        }
+      }
+    }
+  }
+</section>
