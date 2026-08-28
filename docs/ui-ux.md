@@ -363,6 +363,20 @@ generation is explicit and labelled as a session-local MVP identity, not authent
 layouts stack queue and content while preserving semantic buttons, labels, status text, and live
 regions.
 
+## Analysis Selected Evidence
+
+The Analysis detail page presents **Evidence supplied to the model** between AI execution metadata
+and generated Insight Proposals. This surface is the persisted execution-time selection for the
+identified AI Task, not current project knowledge and not a permanent canonical evidence set for
+the Analysis.
+
+The view preserves separate Facts, Observations, prior Insights, architecture knowledge,
+Engineering Events, human context, evolution context, and repository evidence sections. A recorded
+empty category says none were selected; a missing historical category says it was not recorded.
+No-task, pending-snapshot, unavailable-snapshot, available, loading, and failed-read states remain
+distinct. Long repository content, symbols, revision details, and audit metadata use native
+disclosure controls. Persisted Markdown, source text, and other strings render as escaped plain text.
+
 ## Repository Freshness
 
 The Project Cockpit loads the last successful freshness result without contacting Git and exposes

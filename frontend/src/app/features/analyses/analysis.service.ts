@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../core/config/app-environment';
+import { AiTaskSelectedEvidenceResponse } from './ai-task-selected-evidence.models';
 import {
   AnalysisDetail,
   AnalysisDiagnostics,
@@ -27,6 +28,11 @@ export class AnalysisService {
   getAnalysis(analysisId: string): Observable<AnalysisDetail> {
     return this.http.get<AnalysisDetail>(
       `${this.baseUrl}/analyses/${encodeURIComponent(analysisId)}`,
+    );
+  }
+  getSelectedEvidence(analysisId: string): Observable<AiTaskSelectedEvidenceResponse> {
+    return this.http.get<AiTaskSelectedEvidenceResponse>(
+      `${this.baseUrl}/analyses/${encodeURIComponent(analysisId)}/selected-evidence`,
     );
   }
   createAnalysis(request: CreateAnalysisRequest): Observable<AnalysisDetail> {

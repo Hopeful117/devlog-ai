@@ -3,6 +3,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { APP_ENVIRONMENT } from '../../core/config/app-environment';
 import { CreateAnalysisRequest } from './analysis.models';
+import { AiTaskSelectedEvidenceResponse } from './ai-task-selected-evidence.models';
 import { AnalysisService } from './analysis.service';
 
 describe('AnalysisService', () => {
@@ -65,5 +66,40 @@ describe('AnalysisService', () => {
     expect(launch.request.method).toBe('POST');
     expect(launch.request.body).toBeNull();
     launch.flush({ analysisId: 'analysis-id' });
+  });
+
+  it('loads typed selected evidence from the Analysis-scoped endpoint', () => {
+    const response: AiTaskSelectedEvidenceResponse = {
+      state: 'NO_AI_TASK',
+      analysisId: 'analysis/id',
+      projectId: 'project-id',
+      task: null,
+      selectionVersion: null,
+      selectionDigest: null,
+      snapshotMetadata: null,
+      categories: null,
+    };
+    let actual: AiTaskSelectedEvidenceResponse | undefined;
+
+    service.getSelectedEvidence('analysis/id').subscribe((value) => (actual = value));
+
+    const request = http.expectOne('/api/v1/analyses/analysis%2Fid/selected-evidence');
+    expect(request.request.method).toBe('GET');
+    request.flush(response);
+    expect(actual).toEqual(response);
+  });
+
+  it('propagates selected-evidence read failures', () => {
+    let status: number | undefined;
+    service.getSelectedEvidence('analysis-id').subscribe({
+      error: (error: { readonly status: number }) => (status = error.status),
+    });
+
+    const request = http.expectOne('/api/v1/analyses/analysis-id/selected-evidence');
+    request.flush(
+      { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' },
+      { status: 500, statusText: 'Internal Server Error' },
+    );
+    expect(status).toBe(500);
   });
 });

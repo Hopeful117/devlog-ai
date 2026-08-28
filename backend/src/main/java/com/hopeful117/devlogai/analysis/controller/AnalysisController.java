@@ -4,6 +4,8 @@ import com.hopeful117.devlogai.analysis.dto.request.CreateAnalysisRequest;
 import com.hopeful117.devlogai.analysis.dto.response.AnalysisResponse;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
+import com.hopeful117.devlogai.analysis.evidence.dto.AiTaskSelectedEvidenceResponse;
+import com.hopeful117.devlogai.analysis.evidence.service.AiTaskSelectedEvidenceService;
 import com.hopeful117.devlogai.analysis.service.AnalysisService;
 import com.hopeful117.devlogai.analysis.workflow.AnalysisWorkflowService;
 import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
@@ -27,6 +29,13 @@ public class AnalysisController {
     private final AnalysisService analysisService;
     private final AnalysisWorkflowService analysisWorkflowService;
     private final AnalysisDiagnosticsService analysisDiagnosticsService;
+    private final AiTaskSelectedEvidenceService aiTaskSelectedEvidenceService;
+
+    @GetMapping("/{id}/selected-evidence")
+    public ResponseEntity<AiTaskSelectedEvidenceResponse> getSelectedEvidence(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(aiTaskSelectedEvidenceService.getSelectedEvidence(id));
+    }
 
     @GetMapping("/{id}/diagnostics")
     public ResponseEntity<AnalysisDiagnosticsResponse> getDiagnostics(@PathVariable UUID id) {

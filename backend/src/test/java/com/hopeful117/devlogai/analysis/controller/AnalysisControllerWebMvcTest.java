@@ -1,19 +1,25 @@
 package com.hopeful117.devlogai.analysis.controller;
 
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
+import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.analysis.dto.response.AnalysisResponse;
 import com.hopeful117.devlogai.analysis.dto.request.CreateAnalysisRequest;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
+import com.hopeful117.devlogai.analysis.evidence.dto.AiTaskSelectedEvidenceResponse;
+import com.hopeful117.devlogai.analysis.evidence.dto.AiTaskSelectedEvidenceResponse.TaskIdentity;
+import com.hopeful117.devlogai.analysis.evidence.service.AiTaskSelectedEvidenceService;
 import com.hopeful117.devlogai.analysis.service.AnalysisService;
 import com.hopeful117.devlogai.analysis.workflow.AnalysisWorkflowService;
 import com.hopeful117.devlogai.analysis.workflow.dto.AnalysisWorkflowResult;
 import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
@@ -36,7 +42,9 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         AnalysisService service = mock(AnalysisService.class);
         AnalysisWorkflowService workflow = mock(AnalysisWorkflowService.class);
         AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
-        MockMvc mvc = mockMvc(new AnalysisController(service, workflow, diagnostics));
+        AiTaskSelectedEvidenceService selectedEvidence = mock(AiTaskSelectedEvidenceService.class);
+        MockMvc mvc = mockMvc(new AnalysisController(
+                service, workflow, diagnostics, selectedEvidence));
         UUID id = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
@@ -54,6 +62,12 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
                         taskId, AiTaskStatus.SUBMITTED, correlationId));
         when(diagnostics.getWarnings(id)).thenReturn(List.of());
         when(diagnostics.getContext(id)).thenReturn(java.util.Map.of("analysisId", id.toString()));
+        when(selectedEvidence.getSelectedEvidence(id)).thenReturn(
+                AiTaskSelectedEvidenceResponse.snapshotPending(id, projectId,
+                        new TaskIdentity(taskId,
+                                AiTaskType.INSIGHT_GENERATION,
+                                AiTaskStatus.SUBMITTED,
+                                Instant.parse("2026-08-27T10:00:00Z"))));
 
         mvc.perform(post("/api/v1/analyses").contentType(MediaType.APPLICATION_JSON)
                         .content(("{\"projectId\":\"%s\",\"type\":\"ARCHITECTURE_REVIEW\"," +
@@ -85,6 +99,15 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         mvc.perform(get("/api/v1/analyses/{id}/warnings", id)).andExpect(status().isOk());
         mvc.perform(get("/api/v1/analyses/{id}/context", id))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.analysisId").value(id.toString()));
+        mvc.perform(get("/api/v1/analyses/{id}/selected-evidence", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("SNAPSHOT_PENDING"))
+                .andExpect(jsonPath("$.analysisId").value(id.toString()))
+                .andExpect(jsonPath("$.projectId").value(projectId.toString()))
+                .andExpect(jsonPath("$.task.id").value(taskId.toString()))
+                .andExpect(jsonPath("$.task.taskType").value("INSIGHT_GENERATION"))
+                .andExpect(jsonPath("$.task.status").value("SUBMITTED"));
+        verify(selectedEvidence).getSelectedEvidence(id);
     }
 
     @Test
@@ -92,7 +115,9 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         AnalysisService service = mock(AnalysisService.class);
         AnalysisWorkflowService workflow = mock(AnalysisWorkflowService.class);
         AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
-        MockMvc mvc = mockMvc(new AnalysisController(service, workflow, diagnostics));
+        AiTaskSelectedEvidenceService selectedEvidence = mock(AiTaskSelectedEvidenceService.class);
+        MockMvc mvc = mockMvc(new AnalysisController(
+                service, workflow, diagnostics, selectedEvidence));
         UUID id = UUID.randomUUID();
 
         LinkedHashMap<String, Object> context = new LinkedHashMap<>();
@@ -107,5 +132,22 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 .andExpect(jsonPath("$.analysisId").value(id.toString()))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("\"nullableField\":null")))
                 .andExpect(jsonPath("$.nested.kind").value("context"));
+    }
+
+    @Test
+    void shouldUseExistingNotFoundEnvelopeForMissingSelectedEvidenceAnalysis() throws Exception {
+        AnalysisService service = mock(AnalysisService.class);
+        AnalysisWorkflowService workflow = mock(AnalysisWorkflowService.class);
+        AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
+        AiTaskSelectedEvidenceService selectedEvidence = mock(AiTaskSelectedEvidenceService.class);
+        MockMvc mvc = mockMvc(new AnalysisController(
+                service, workflow, diagnostics, selectedEvidence));
+        UUID id = UUID.randomUUID();
+        when(selectedEvidence.getSelectedEvidence(id))
+                .thenThrow(new EntityNotFoundException("Analysis", id));
+
+        mvc.perform(get("/api/v1/analyses/{id}/selected-evidence", id))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ENTITY_NOT_FOUND"));
     }
 }
