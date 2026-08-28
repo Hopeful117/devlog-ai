@@ -65,9 +65,9 @@ class KnowledgeSelectionServiceImplStatusExclusionTest {
                 "v1", ContextProfile.ARCHITECTURE_REVIEW, List.of(), "v1", List.of(),
                 List.of(), Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
                 0, 0, 0, false, List.of(), List.of(), "digest");
-        when(repositoryContexts.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+        when(repositoryContexts.build(any(), any(), any(), anyList(), anyList())).thenReturn(repoContext);
 
-        var service = new KnowledgeSelectionServiceImpl(diagnostics, insights, mapper, repositoryContexts);
+        var service = new KnowledgeSelectionServiceImpl(diagnostics, insights, mapper, repositoryContexts, 15);
         var context = createContext(projectId, analysisId);
         var intent = new IntentDefinition("architecture-overview", "v1", "Architecture",
                 List.of(), List.of(), Map.of(), "architecture-overview-prompt-v1");
@@ -76,7 +76,7 @@ class KnowledgeSelectionServiceImplStatusExclusionTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Insight>> captor = ArgumentCaptor.forClass(List.class);
-        verify(repositoryContexts).build(any(), any(), any(), captor.capture());
+        verify(repositoryContexts).build(any(), any(), any(), captor.capture(), anyList());
 
         assertEquals(1, result.selectedInsights().size());
         assertEquals(active.getId(), result.selectedInsights().getFirst().id());
@@ -110,9 +110,9 @@ class KnowledgeSelectionServiceImplStatusExclusionTest {
                 "v1", ContextProfile.ARCHITECTURE_REVIEW, List.of(), "v1", List.of(),
                 List.of(), Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
                 0, 0, 0, false, List.of(), List.of(), "digest");
-        when(repositoryContexts.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+        when(repositoryContexts.build(any(), any(), any(), anyList(), anyList())).thenReturn(repoContext);
 
-        var service = new KnowledgeSelectionServiceImpl(diagnostics, insights, mapper, repositoryContexts);
+        var service = new KnowledgeSelectionServiceImpl(diagnostics, insights, mapper, repositoryContexts, 15);
         var context = createContext(projectId, analysisId);
         var intent = new IntentDefinition("architecture-overview", "v1", "Architecture",
                 List.of(), List.of(), Map.of(), "architecture-overview-prompt-v1");
@@ -121,7 +121,7 @@ class KnowledgeSelectionServiceImplStatusExclusionTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Insight>> captor = ArgumentCaptor.forClass(List.class);
-        verify(repositoryContexts).build(any(), any(), any(), captor.capture());
+        verify(repositoryContexts).build(any(), any(), any(), captor.capture(), anyList());
 
         assertTrue(result.selectedInsights().isEmpty(),
                 "no ACTIVE insights — selectedInsights must be empty");
