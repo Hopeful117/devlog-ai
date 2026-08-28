@@ -4,6 +4,9 @@ import { of } from 'rxjs';
 import { ProjectAnalysesSection } from './project-analyses-section';
 import { AnalysisService } from './analysis.service';
 import { IntentCatalogService } from './intent-catalog.service';
+import { IntentDefinition } from './analysis.models';
+import { Source } from './analysis.models';
+import { SourceService } from '../projects/source.service';
 
 const analysis = {
   id: 'analysis-id',
@@ -18,6 +21,7 @@ const analysis = {
   updatedAt: '2026-07-22T10:00:00Z',
   userGuidance: null,
 } as const;
+
 describe('ProjectAnalysesSection', () => {
   const getAnalysesByProject = vi.fn();
   const createAnalysis = vi.fn();
@@ -26,6 +30,29 @@ describe('ProjectAnalysesSection', () => {
     getAnalysesByProject.mockReset().mockReturnValue(of([analysis]));
     createAnalysis.mockReset().mockReturnValue(of(analysis));
     launchAnalysis.mockReset().mockReturnValue(of({ analysisId: analysis.id }));
+    const mockIntents: readonly IntentDefinition[] = [
+      {
+        id: 'describe-project-v1',
+        version: 'v1',
+        objective: 'Understand this project',
+        supportedInsightTypes: [],
+        constraints: [],
+        outputSchema: {},
+        promptTemplate: '...',
+        executionMode: 'GENERIC',
+      },
+      {
+        id: 'generate-readme-v1',
+        version: 'v1',
+        objective: 'Prepare README information',
+        supportedInsightTypes: [],
+        constraints: [],
+        outputSchema: {},
+        promptTemplate: '...',
+        executionMode: 'GENERIC',
+      },
+    ];
+    const mockSources: readonly Source[] = [{ id: 'source-1', name: 'Repo One' }];
     await TestBed.configureTestingModule({
       imports: [ProjectAnalysesSection],
       providers: [
@@ -38,7 +65,8 @@ describe('ProjectAnalysesSection', () => {
             launchAnalysis,
           },
         },
-        { provide: IntentCatalogService, useValue: { getSupportedIntents: () => of([]) } },
+        { provide: IntentCatalogService, useValue: { getSupportedIntents: () => of(mockIntents) } },
+        { provide: SourceService, useValue: { getSourcesByProject: () => of(mockSources) } },
       ],
     }).compileComponents();
   });
@@ -57,7 +85,6 @@ describe('ProjectAnalysesSection', () => {
     fixture.detectChanges();
     fixture.componentInstance.launch({
       projectId: 'project-id',
-      type: 'ARCHITECTURE_REVIEW',
       intentId: 'architecture-overview-v1',
     });
     fixture.detectChanges();

@@ -26,6 +26,11 @@ export interface UserGuidance {
   readonly priorities: readonly string[];
 }
 
+export interface Source {
+  readonly id: string;
+  readonly name: string;
+}
+
 interface AnalysisFields {
   readonly id: string;
   readonly projectId: string;
@@ -45,8 +50,8 @@ export interface AnalysisDetail extends AnalysisFields {}
 
 export interface CreateAnalysisRequest {
   readonly projectId: string;
-  readonly type: LaunchableAnalysisType;
   readonly intentId: string;
+  readonly sourceId?: string;
   readonly targetRevision?: string;
   readonly userGuidance?: UserGuidance;
 }
@@ -69,6 +74,7 @@ export interface IntentDefinition {
   readonly constraints: readonly string[];
   readonly outputSchema: Readonly<Record<string, JsonValue>>;
   readonly promptTemplate: string;
+  readonly executionMode: string;
 }
 
 export interface AiTaskSummary {

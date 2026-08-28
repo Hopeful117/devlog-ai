@@ -42,15 +42,18 @@
       }
     }
     @if (showForm) {
-      @if (intents$ | async; as intents) {
-        @if (intents.state === 'loading') {
-          <p role="status">Loading Intents…</p>
-        } @else if (intents.state === 'error') {
-          <div role="alert" class="error">{{ intents.error.message }}</div>
+      @if (combined$ | async; as combined) {
+        @if (combined.objectives.state === 'loading' || combined.sources.state === 'loading') {
+          <p role="status">Loading objectives and repositories…</p>
+        } @else if (combined.objectives.state === 'error') {
+          <div role="alert" class="error">{{ combined.objectives.error.message }}</div>
+        } @else if (combined.sources.state === 'error') {
+          <div role="alert" class="error">{{ combined.sources.error.message }}</div>
         } @else {
           <app-analysis-form
             [projectId]="projectId"
-            [intents]="intents.data"
+            [objectives]="combined.objectives.data"
+            [sources]="combined.sources.data"
             [submitting]="launchState.state === 'pending'"
             (launch)="launch($event)"
           />
