@@ -77,10 +77,10 @@ class KnowledgeSelectionServiceTest {
                 List.of(), Map.of(),
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                 0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
-        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList()))
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
                 .thenReturn(repositoryContext);
         var service = new KnowledgeSelectionServiceImpl(
-                diagnostics, insights, mapper, repositoryContexts);
+                diagnostics, insights, mapper, repositoryContexts, 15);
 
         SelectedKnowledge first = service.select(context, intent, null);
         SelectedKnowledge second = service.select(context, intent, null);
@@ -163,10 +163,10 @@ class KnowledgeSelectionServiceTest {
                 List.of(), Map.of(),
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                 0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
-        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList()))
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
                 .thenReturn(repositoryContext);
         var service = new KnowledgeSelectionServiceImpl(
-                diagnostics, insights, mapper, repositoryContexts);
+                diagnostics, insights, mapper, repositoryContexts, 15);
 
         SelectedKnowledge result = service.select(context, intent, null);
 
@@ -236,10 +236,10 @@ class KnowledgeSelectionServiceTest {
                 List.of(), Map.of(),
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                 0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
-        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList()))
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
                 .thenReturn(repositoryContext);
         var service = new KnowledgeSelectionServiceImpl(
-                diagnostics, insights, mapper, repositoryContexts);
+                diagnostics, insights, mapper, repositoryContexts, 15);
 
         SelectedKnowledge result = service.select(context, intent, null);
 

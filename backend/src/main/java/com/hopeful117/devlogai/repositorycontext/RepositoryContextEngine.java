@@ -64,7 +64,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
     }
 
     @Override
-    public RepositoryContext build(
+    public List<RepositoryEvidence> retrieveCandidates(
             AnalysisContext context,
             IntentDefinition intent,
             UserGuidance guidance,
@@ -75,6 +75,33 @@ public class RepositoryContextEngine implements RepositoryContextService {
                 context, intent, guidance, validatedInsights, contextPlan, budget);
         List<RepositoryEvidence> candidates = new ArrayList<>();
         collectors.forEach(collector -> candidates.addAll(collector.collect(request)));
+        return candidates;
+    }
+
+    @Override
+    public RepositoryContext build(
+            AnalysisContext context,
+            IntentDefinition intent,
+            UserGuidance guidance,
+            List<Insight> validatedInsights
+    ) {
+        return build(context, intent, guidance, validatedInsights, List.of());
+    }
+
+    @Override
+    public RepositoryContext build(
+            AnalysisContext context,
+            IntentDefinition intent,
+            UserGuidance guidance,
+            List<Insight> validatedInsights,
+            List<RepositoryEvidence> additionalCandidates
+    ) {
+        ContextPlan contextPlan = contextIntelligence.plan(context, intent);
+        ContextRequest request = new ContextRequest(
+                context, intent, guidance, validatedInsights, contextPlan, budget);
+        List<RepositoryEvidence> candidates = new ArrayList<>(retrieveCandidates(
+                context, intent, guidance, validatedInsights));
+        candidates.addAll(additionalCandidates);
         List<RepositoryEvidence> ranked = ranker.rank(candidates, request);
         EvidenceSelector.SelectionResult pathSelection = selector.select(ranked, request);
         SelectedJavaSymbolEnricher.EnrichmentResult symbolEnrichment =

@@ -43,7 +43,7 @@ class KnowledgeSelectionServiceAdditionalTest {
 
     private KnowledgeSelectionServiceImpl createService() {
         return new KnowledgeSelectionServiceImpl(diagnosticRepository, insightRepository,
-                objectMapper, repositoryContextService);
+                objectMapper, repositoryContextService, 15);
     }
 
     private IntentDefinition architectureIntent() {
@@ -85,7 +85,7 @@ class KnowledgeSelectionServiceAdditionalTest {
                 "v1", null, List.of(), "v1", List.of(), List.of(),
                 Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
                 0, 0, 0, false, List.of(), List.of(), "digest");
-        when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+        when(repositoryContextService.build(any(), any(), any(), anyList(), anyList())).thenReturn(repoContext);
     }
 
     @Test
@@ -163,7 +163,7 @@ class KnowledgeSelectionServiceAdditionalTest {
                 "v1", null, List.of(), "v1", List.of(), List.of(),
                 Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
                 0, 0, 0, false, List.of(), List.of(), "digest");
-        when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+        when(repositoryContextService.build(any(), any(), any(), anyList(), anyList())).thenReturn(repoContext);
 
         List<Insight> insights = new ArrayList<>();
         for (int i = 0; i < 7; i++) {
@@ -205,7 +205,7 @@ class KnowledgeSelectionServiceAdditionalTest {
                 "v1", null, List.of(), "v1", List.of(), List.of(),
                 Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
                 0, 0, 0, false, List.of(), List.of(), "digest");
-        when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+        when(repositoryContextService.build(any(), any(), any(), anyList(), anyList())).thenReturn(repoContext);
 
         Insight active = Insight.builder()
                 .id(UUID.randomUUID())
@@ -231,7 +231,7 @@ class KnowledgeSelectionServiceAdditionalTest {
         assertEquals(1, result.selectedInsights().size());
         assertEquals(1, result.existingArchitectureKnowledge().size());
         verify(repositoryContextService).build(
-                any(), any(), any(), insightsCaptor.capture());
+                any(), any(), any(), insightsCaptor.capture(), anyList());
         assertEquals(1, insightsCaptor.getValue().size());
         assertEquals(InsightStatus.ACTIVE, insightsCaptor.getValue().getFirst().getStatus());
     }
@@ -252,7 +252,7 @@ class KnowledgeSelectionServiceAdditionalTest {
                 "v1", null, List.of(), "v1", List.of(), List.of(),
                 Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
                 0, 0, 0, false, List.of(), List.of(), "digest");
-        when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+        when(repositoryContextService.build(any(), any(), any(), anyList(), anyList())).thenReturn(repoContext);
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
                 context.project().id(), List.of(InsightStatus.ACTIVE)))
                 .thenReturn(List.of());
@@ -266,7 +266,7 @@ class KnowledgeSelectionServiceAdditionalTest {
         assertEquals(0, result.existingArchitectureKnowledge().size());
         assertNotNull(result.selectionDigest());
         verify(repositoryContextService).build(
-                any(), any(), any(), insightsCaptor.capture());
+                any(), any(), any(), insightsCaptor.capture(), anyList());
         assertEquals(0, insightsCaptor.getValue().size());
     }
 
@@ -361,7 +361,7 @@ class KnowledgeSelectionServiceAdditionalTest {
                 "v1", null, List.of(), "v1", List.of(), List.of(),
                 Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
                 0, 0, 0, false, List.of(), List.of(), "digest");
-        when(repositoryContextService.build(any(), any(), any(), anyList())).thenReturn(repoContext);
+        when(repositoryContextService.build(any(), any(), any(), anyList(), anyList())).thenReturn(repoContext);
         when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.empty());
         IntentDefinition intent = architectureIntent();
 
