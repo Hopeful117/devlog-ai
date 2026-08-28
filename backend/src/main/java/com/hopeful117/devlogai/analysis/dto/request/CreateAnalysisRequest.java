@@ -18,7 +18,7 @@ public class CreateAnalysisRequest {
     @NotNull
     private UUID projectId;
 
-    @NotNull
+    // Made optional for legacy compatibility; must match derived type if present
     private AnalysisType type;
 
     @NotBlank
@@ -26,6 +26,9 @@ public class CreateAnalysisRequest {
 
     @Size(max = 255)
     private String targetRevision;
+
+    // Added for repository scope; conditional
+    private UUID sourceId;
 
     @Valid
     private UserGuidance userGuidance;

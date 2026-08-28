@@ -53,7 +53,6 @@ describe('AnalysisService', () => {
   it('creates and distinctly launches an Analysis', () => {
     const body: CreateAnalysisRequest = {
       projectId: 'project-id',
-      type: 'ARCHITECTURE_REVIEW',
       intentId: 'architecture-overview-v1',
     };
     service.createAnalysis(body).subscribe();
