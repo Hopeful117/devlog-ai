@@ -1,13 +1,11 @@
-import { Component, EventEmitter, Input, Output, OnInit } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { CreateAnalysisRequest, Source, UserGuidance } from './analysis.models';
-
-interface Objective {
-  readonly label: string;
-  readonly description: string;
-  readonly intentId: string;
-  readonly scope: 'PROJECT_SCOPE' | 'REPOSITORY_SCOPE';
-}
+import {
+  CreateAnalysisRequest,
+  IntentDefinition,
+  LaunchableAnalysisType,
+  UserGuidance,
+} from './analysis.models';
 
 @Component({
   selector: 'app-analysis-form',
@@ -15,16 +13,19 @@ interface Objective {
   templateUrl: './analysis-form.html',
   styleUrl: './analysis-form.scss',
 })
-export class AnalysisForm implements OnInit {
+export class AnalysisForm {
   @Input({ required: true }) projectId = '';
-  @Input({ required: true }) objectives: readonly Objective[] = [];
-  @Input({ required: true }) sources: readonly Source[] = [];
+  @Input({ required: true }) intents: readonly IntentDefinition[] = [];
   @Input() submitting = false;
   @Output() readonly launch = new EventEmitter<CreateAnalysisRequest>();
 
+  readonly types: readonly LaunchableAnalysisType[] = ['ARCHITECTURE_REVIEW', 'PROJECT_EVOLUTION'];
   readonly form = new FormGroup({
-    objective: new FormControl<string>('', { nonNullable: true, validators: Validators.required }),
-    sourceId: new FormControl<string | null>(null),
+    type: new FormControl<LaunchableAnalysisType>('ARCHITECTURE_REVIEW', {
+      nonNullable: true,
+      validators: Validators.required,
+    }),
+    intentKey: new FormControl('', { nonNullable: true, validators: Validators.required }),
     targetRevision: new FormControl('', {
       nonNullable: true,
       validators: Validators.maxLength(255),
@@ -43,32 +44,10 @@ export class AnalysisForm implements OnInit {
     priorities: new FormControl('', { nonNullable: true }),
   });
 
-  get selectedObjective(): Objective | undefined {
-    return this.objectives.find((obj) => obj.intentId === this.form.controls.objective.value);
-  }
-
-  get isRepositoryScope(): boolean {
-    return this.selectedObjective?.scope === 'REPOSITORY_SCOPE';
-  }
-
-  get isProjectScope(): boolean {
-    return this.selectedObjective?.scope === 'PROJECT_SCOPE';
-  }
-
-  ngOnInit(): void {
-    // Auto-select sole source for repository scope if only one source
-    this.form.controls.objective.valueChanges.subscribe((objectiveId) => {
-      const obj = this.objectives.find((o) => o.intentId === objectiveId);
-      if (obj && obj.scope === 'REPOSITORY_SCOPE') {
-        if (this.sources.length === 1) {
-          this.form.controls.sourceId.setValue(this.sources[0].id);
-        } else {
-          this.form.controls.sourceId.setValue(null);
-        }
-      } else {
-        this.form.controls.sourceId.setValue(null);
-      }
-    });
+  get selectedIntent(): IntentDefinition | undefined {
+    return this.intents.find(
+      (intent) => `${intent.id}-${intent.version}` === this.form.controls.intentKey.value,
+    );
   }
 
   submit(): void {
@@ -76,9 +55,8 @@ export class AnalysisForm implements OnInit {
       .split('\n')
       .map((item) => item.trim())
       .filter(Boolean);
-    if (priorities.length > 10 || priorities.some((item) => item.length > 300)) {
+    if (priorities.length > 10 || priorities.some((item) => item.length > 300))
       this.form.controls.priorities.setErrors({ priorities: true });
-    }
     if (this.form.invalid || this.submitting) {
       this.form.markAllAsTouched();
       return;
@@ -96,11 +74,10 @@ export class AnalysisForm implements OnInit {
     const hasGuidance = Object.values(guidance).some((entry) =>
       Array.isArray(entry) ? entry.length > 0 : entry !== null,
     );
-
     const request: CreateAnalysisRequest = {
       projectId: this.projectId,
-      intentId: value.objective,
-      sourceId: value.sourceId || undefined,
+      type: value.type,
+      intentId: value.intentKey,
     };
     const revision = value.targetRevision.trim();
     this.launch.emit({

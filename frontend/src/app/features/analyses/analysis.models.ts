@@ -26,11 +26,6 @@ export interface UserGuidance {
   readonly priorities: readonly string[];
 }
 
-export interface Source {
-  readonly id: string;
-  readonly name: string;
-}
-
 interface AnalysisFields {
   readonly id: string;
   readonly projectId: string;
@@ -50,8 +45,8 @@ export interface AnalysisDetail extends AnalysisFields {}
 
 export interface CreateAnalysisRequest {
   readonly projectId: string;
+  readonly type: LaunchableAnalysisType;
   readonly intentId: string;
-  readonly sourceId?: string;
   readonly targetRevision?: string;
   readonly userGuidance?: UserGuidance;
 }
@@ -74,7 +69,6 @@ export interface IntentDefinition {
   readonly constraints: readonly string[];
   readonly outputSchema: Readonly<Record<string, JsonValue>>;
   readonly promptTemplate: string;
-  readonly executionMode: string;
 }
 
 export interface AiTaskSummary {
@@ -215,4 +209,120 @@ export interface ProjectProfile {
   readonly deterministicSummary: string;
   readonly sourceObservations: readonly Readonly<Record<string, JsonValue>>[];
   readonly characteristicCount: number;
+}
+
+export type ProposalStatus = 'PROPOSED' | 'ACCEPTED' | 'REJECTED';
+export type ProposalType =
+  'INSIGHT' | 'ENGINEERING_DECISION' | 'ENGINEERING_EVENT' | 'CHALLENGE' | 'DOCUMENTATION';
+export type InsightType =
+  'ARCHITECTURE' | 'DOCUMENTATION' | 'DECISION' | 'ROADMAP' | 'STORY' | 'INSIGHT';
+export type InsightSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
+export type DeliverableType =
+  | 'PROJECT_DESCRIPTION'
+  | 'README'
+  | 'ARCHITECTURE_SUMMARY'
+  | 'PORTFOLIO_DESCRIPTION'
+  | 'TECHNICAL_SUMMARY'
+  | 'BLOG_ARTICLE';
+
+export interface AnalysisResult {
+  readonly analysis: {
+    readonly id: string;
+    readonly projectId: string;
+    readonly objective: string;
+    readonly scope: 'PROJECT_SCOPE' | 'REPOSITORY_SCOPE';
+    readonly intentId: string;
+    readonly intentVersion: string;
+    readonly status: AnalysisStatus;
+    readonly startedAt: string | null;
+    readonly completedAt: string | null;
+    readonly durationSeconds: number | null;
+    readonly sourcesAnalyzed: readonly string[];
+    readonly targetRevision: string | null;
+    readonly repositoryName: string | null;
+  };
+  readonly execution: {
+    readonly success: boolean | null;
+    readonly failureCode: string | null;
+    readonly failureMessage: string | null;
+  };
+  readonly proposals: {
+    readonly total: number;
+    readonly byStatus: Readonly<Record<string, number>>;
+    readonly byType: Readonly<Record<string, number>>;
+    readonly items: readonly ProposalSummary[];
+  };
+  readonly insights: {
+    readonly total: number;
+    readonly items: readonly InsightSummary[];
+  };
+  readonly deliverables: {
+    readonly total: number;
+    readonly items: readonly DeliverableSummary[];
+  };
+  readonly evidence: {
+    readonly facts: EvidenceCategory;
+    readonly observations: EvidenceCategory;
+    readonly priorInsights: EvidenceCategory;
+    readonly architectureKnowledge: EvidenceCategory;
+    readonly engineeringEvents: EvidenceCategory;
+    readonly humanContext: EvidenceCategory;
+    readonly evolutionContext: EvidenceCategory;
+    readonly repositoryEvidence: EvidenceCategory;
+  };
+  readonly nextActions: readonly NextAction[];
+}
+
+export interface ProposalSummary {
+  readonly id: string;
+  readonly type: ProposalType;
+  readonly status: ProposalStatus;
+  readonly confidence: number | null;
+  readonly title: string;
+  readonly summary: string;
+  readonly evidencePreview: readonly string[];
+  readonly proposalId: string;
+}
+
+export interface InsightSummary {
+  readonly id: string;
+  readonly type: InsightType;
+  readonly severity: InsightSeverity;
+  readonly title: string;
+  readonly content: string;
+  readonly rationale: string;
+  readonly confidence: number | null;
+  readonly evidenceReferences: readonly string[];
+  readonly insightId: string;
+}
+
+export interface DeliverableSummary {
+  readonly id: string;
+  readonly type: DeliverableType;
+  readonly title: string;
+  readonly audience: string;
+  readonly status: string;
+  readonly generatedAt: string;
+  readonly sourceInsights: readonly string[];
+  readonly deliverableId: string;
+}
+
+export interface EvidenceCategory {
+  readonly count: number;
+  readonly items: readonly EvidenceItem[];
+}
+
+export interface EvidenceItem {
+  readonly layer: string;
+  readonly kind: string;
+  readonly reference: string;
+  readonly summary: string;
+  readonly occurredAt: string;
+  readonly relatedReferences: readonly string[];
+}
+
+export interface NextAction {
+  readonly action: string;
+  readonly label: string;
+  readonly available: boolean;
 }

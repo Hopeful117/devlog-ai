@@ -1,0 +1,63 @@
+.analysis-detail {
+  max-width: var(--content-max-width);
+}
+.analysis-card {
+  margin-top: 2rem;
+  padding: var(--space-lg);
+}
+.heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+}
+dt {
+  font-weight: 600;
+}
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.error {
+  padding: 0.75rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+}
+pre {
+  max-height: 32rem;
+  overflow: auto;
+  padding: 1rem;
+  background: #09111f;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pipeline {
+  display: grid;
+  gap: 0.4rem;
+  padding-left: 1.35rem;
+}
+.pipeline li {
+  padding: 0.55rem 0.75rem;
+  border-left: 2px solid var(--accent);
+  background: rgb(77 141 255 / 0.06);
+}
+button {
+  padding: 0.4rem 0.7rem;
+}
+details {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-elevated);
+}
+summary {
+  cursor: pointer;
+  color: var(--accent-hover);
+  font-weight: 650;
+}

@@ -2,69 +2,44 @@
   <div class="form-heading">
     <p class="eyebrow">AI execution</p>
     <h3 id="execution-title">Run a grounded Analysis</h3>
-    <p>Choose an engineering objective, then optionally refine it with structured guidance.</p>
+    <p>Choose a Core-supported Intent, then optionally refine it with structured guidance.</p>
   </div>
-  <section class="form-card" aria-labelledby="objective-card-title">
-    <h4 id="objective-card-title">Engineering objective</h4>
-    <label for="objective">Objective</label>
-    <select id="objective" formControlName="objective">
-      <option value="">Choose an objective</option>
-      @for (obj of objectives; track obj.intentId) {
-        <option [value]="obj.intentId">{{ obj.label }}</option>
+  <section class="form-card" aria-labelledby="intent-card-title">
+    <h4 id="intent-card-title">Intent and revision</h4>
+    <label for="analysis-type">Analysis type</label>
+    <select id="analysis-type" formControlName="type">
+      @for (type of types; track type) {
+        <option [value]="type">{{ type }}</option>
       }
     </select>
-    @if (form.controls.objective.touched && form.controls.objective.invalid) {
-      <p class="field-error">Objective is required.</p>
+
+    <label for="intent">Intent</label>
+    <select id="intent" formControlName="intentKey">
+      <option value="">Choose an Intent</option>
+      @for (intent of intents; track intent.id + intent.version) {
+        <option [value]="intent.id + '-' + intent.version">
+          {{ intent.id }} / {{ intent.version }} — {{ intent.objective }}
+        </option>
+      }
+    </select>
+    @if (form.controls.intentKey.touched && form.controls.intentKey.invalid) {
+      <p class="field-error">Intent is required.</p>
     }
-    @if (selectedObjective; as obj) {
-      <div class="objective-summary">
-        <p>{{ obj.description }}</p>
-        <span
-          class="scope-badge"
-          [class.project-scope]="isProjectScope"
-          [class.repository-scope]="isRepositoryScope"
-        >
-          Scope: {{ isProjectScope ? 'Entire Project' : 'Single Repository' }}
-        </span>
+    @if (selectedIntent; as intent) {
+      <div class="intent-summary">
+        <strong>{{ intent.objective }}</strong>
+        <span>{{ intent.id }}/{{ intent.version }} · {{ intent.promptTemplate }}</span>
+        <span>May propose: {{ intent.supportedInsightTypes.join(', ') }}</span>
       </div>
     }
 
-    @if (isRepositoryScope) {
-      <div class="repository-controls">
-        <label for="source">Repository</label>
-        <select id="source" formControlName="sourceId" [disabled]="sources.length === 0">
-          @if (sources.length === 0) {
-            <option value="">No active Git repositories available</option>
-          } @else {
-            <option value="">Choose a repository</option>
-            @for (src of sources; track src.id) {
-              <option [value]="src.id">{{ src.name }}</option>
-            }
-          }
-        </select>
-        @if (form.controls.sourceId.touched && form.controls.sourceId.invalid) {
-          <p class="field-error">Repository is required.</p>
-        }
-        @if (sources.length === 1) {
-          <p class="auto-selected">Auto-selected the only active repository.</p>
-        }
-
-        <label for="target-revision"
-          >Target revision <span>(optional branch, tag, or SHA)</span></label
-        >
-        <input id="target-revision" formControlName="targetRevision" maxlength="255" />
-      </div>
-    } @else if (isProjectScope) {
-      <div class="project-scope-info">
-        <p>This objective analyzes the entire project across all active repositories.</p>
-        <p>Revision is not applicable; each repository will be analyzed at its default revision.</p>
-      </div>
-    }
+    <label for="target-revision">Target revision <span>(optional branch, tag, or SHA)</span></label>
+    <input id="target-revision" formControlName="targetRevision" maxlength="255" />
   </section>
 
   <fieldset class="form-card">
     <legend>Optional User Guidance</legend>
-    <p>Guidance refines the selected objective; it does not replace it.</p>
+    <p>Guidance refines the selected Intent; it does not replace it.</p>
     <label for="focus">Focus</label
     ><textarea id="focus" formControlName="focus" maxlength="500"></textarea>
     <label for="audience">Audience</label

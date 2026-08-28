@@ -2,6 +2,7 @@ import { Component, Input } from '@angular/core';
 
 @Component({
   selector: 'app-loading-indicator',
+  standalone: true,
   template: `
     <div class="loading-indicator" role="status" aria-live="polite">
       <span class="spinner" aria-hidden="true"></span>
