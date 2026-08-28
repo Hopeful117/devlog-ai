@@ -9,8 +9,10 @@ import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
-import lombok.RequiredArgsConstructor;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
@@ -20,7 +22,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.*;
 
 @Service
-@RequiredArgsConstructor
 public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService {
     static final String VERSION = "knowledge-selection-v4";
     private static final String BUILD = "BUILD";
@@ -31,11 +32,27 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
             "INFRASTRUCTURE_DESCRIPTION", "API_DESCRIPTION");
     static final SelectedKnowledge.KnowledgeBudget BUDGET =
             new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 5, 60);
+    static final String COMMIT_DIFF_LAYER = "COMMIT_DIFF";
 
     private final AnalysisExecutionDiagnosticRepository diagnosticRepository;
     private final InsightRepository insightRepository;
     private final ObjectMapper objectMapper;
     private final RepositoryContextService repositoryContextService;
+    private final int maximumPromotedCommitDiffCandidates;
+
+    public KnowledgeSelectionServiceImpl(
+            AnalysisExecutionDiagnosticRepository diagnosticRepository,
+            InsightRepository insightRepository,
+            ObjectMapper objectMapper,
+            RepositoryContextService repositoryContextService,
+            @Value("${devlog.analysis.commit-diff-promotion.max-items:15}") int maximumPromotedCommitDiffCandidates
+    ) {
+        this.diagnosticRepository = diagnosticRepository;
+        this.insightRepository = insightRepository;
+        this.objectMapper = objectMapper;
+        this.repositoryContextService = repositoryContextService;
+        this.maximumPromotedCommitDiffCandidates = maximumPromotedCommitDiffCandidates;
+    }
 
     @Override
     public SelectedKnowledge select(AnalysisContext context, IntentDefinition intent,
@@ -78,8 +95,10 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 selectExistingArchitectureKnowledge(intent, insightCandidates);
         var engineeringEvents = context.validatedEngineeringEvents().stream().limit(10).toList();
         var humanContextInputs = context.humanContextInputs().stream().limit(5).toList();
-        RepositoryContext repositoryContext = repositoryContextService.build(
+        List<RepositoryEvidence> promotedCommitDiff = promoteCommitDiffCandidates(
                 context, intent, guidance, insightCandidates);
+        RepositoryContext repositoryContext = repositoryContextService.build(
+                context, intent, guidance, insightCandidates, promotedCommitDiff);
         AnalysisExecutionDiagnostic diagnostic = diagnosticRepository.findById(context.analysis().id())
                 .orElseThrow(() -> new IllegalStateException(
                         "Mandatory analysis diagnostics are unavailable"));
@@ -302,6 +321,31 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 insight.getEvidenceReferences(),
                 insight.getCreatedAt()
         );
+    }
+
+    /**
+     * Analysis consumer-specific composition (ADR-063): retrieves pre-composition
+     * candidates via the shared retrieval primitive, filters for per-file
+     * COMMIT_DIFF evidence, deduplicates by reference, and bounds the result
+     * deterministically.
+     */
+    private List<RepositoryEvidence> promoteCommitDiffCandidates(
+            AnalysisContext context,
+            IntentDefinition intent,
+            UserGuidance guidance,
+            List<Insight> insightCandidates
+    ) {
+        List<RepositoryEvidence> allCandidates = repositoryContextService.retrieveCandidates(
+                context, intent, guidance, insightCandidates);
+        Set<String> seenReferences = new LinkedHashSet<>();
+        List<RepositoryEvidence> promoted = new ArrayList<>();
+        for (RepositoryEvidence candidate : allCandidates) {
+            if (promoted.size() >= maximumPromotedCommitDiffCandidates) break;
+            if (candidate.layer() != RepositoryContextLayer.COMMIT_DIFF) continue;
+            if (!seenReferences.add(candidate.reference())) continue;
+            promoted.add(candidate);
+        }
+        return promoted;
     }
 
     private String digest(AnalysisContext context, DigestComponents selected) {
