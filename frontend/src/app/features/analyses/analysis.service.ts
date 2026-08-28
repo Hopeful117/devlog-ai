@@ -6,6 +6,7 @@ import { AiTaskSelectedEvidenceResponse } from './ai-task-selected-evidence.mode
 import {
   AnalysisDetail,
   AnalysisDiagnostics,
+  AnalysisResult,
   AnalysisSummary,
   AnalysisWorkflowResult,
   AiTaskDetail,
@@ -67,6 +68,12 @@ export class AnalysisService {
   getProfile(analysisId: string): Observable<ProjectProfile> {
     return this.http.get<ProjectProfile>(
       `${this.baseUrl}/analyses/${encodeURIComponent(analysisId)}/profile`,
+    );
+  }
+
+  getResult(analysisId: string): Observable<AnalysisResult> {
+    return this.http.get<AnalysisResult>(
+      `${this.baseUrl}/analyses/${encodeURIComponent(analysisId)}/result`,
     );
   }
 }
