@@ -212,10 +212,18 @@ export interface ProjectProfile {
 }
 
 export type ProposalStatus = 'PROPOSED' | 'ACCEPTED' | 'REJECTED';
-export type ProposalType = 'INSIGHT' | 'ENGINEERING_DECISION' | 'ENGINEERING_EVENT' | 'CHALLENGE' | 'DOCUMENTATION';
-export type InsightType = 'ARCHITECTURE' | 'DOCUMENTATION' | 'DECISION' | 'ROADMAP' | 'STORY' | 'INSIGHT';
+export type ProposalType =
+  'INSIGHT' | 'ENGINEERING_DECISION' | 'ENGINEERING_EVENT' | 'CHALLENGE' | 'DOCUMENTATION';
+export type InsightType =
+  'ARCHITECTURE' | 'DOCUMENTATION' | 'DECISION' | 'ROADMAP' | 'STORY' | 'INSIGHT';
 export type InsightSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
-export type DeliverableType = 'PROJECT_DESCRIPTION' | 'README' | 'ARCHITECTURE_SUMMARY' | 'PORTFOLIO_DESCRIPTION' | 'TECHNICAL_SUMMARY' | 'BLOG_ARTICLE';
+export type DeliverableType =
+  | 'PROJECT_DESCRIPTION'
+  | 'README'
+  | 'ARCHITECTURE_SUMMARY'
+  | 'PORTFOLIO_DESCRIPTION'
+  | 'TECHNICAL_SUMMARY'
+  | 'BLOG_ARTICLE';
 
 export interface AnalysisResult {
   readonly analysis: {

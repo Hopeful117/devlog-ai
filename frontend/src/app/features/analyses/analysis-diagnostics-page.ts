@@ -80,9 +80,7 @@ export class AnalysisDiagnosticsPage {
           timer(0, this.intervalMs).pipe(
             exhaustMap(() =>
               this.service.getDiagnostics(id).pipe(
-                map(
-                  (data) => ({ state: 'loaded' as const, data }),
-                ),
+                map((data) => ({ state: 'loaded' as const, data })),
                 catchError((error: unknown) =>
                   of({ state: 'error' as const, error: toRequestError(error, 'diagnostics') }),
                 ),
