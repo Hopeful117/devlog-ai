@@ -11,6 +11,8 @@ public record DecisionResponse(
 
         UUID projectId,
 
+        UUID proposalId,
+
         String title,
 
         String context,

@@ -11,7 +11,24 @@ async function loadRouteComponent(path: string): Promise<{ readonly name: string
   return loaded as { readonly name: string };
 }
 
+async function loadStandaloneRouteComponent(
+  path: string,
+): Promise<{ readonly name: string } | undefined> {
+  const route = routes.find((candidate) => candidate.path === path);
+  if (!route?.loadComponent) return undefined;
+  const loaded = await route.loadComponent();
+  if (loaded && typeof loaded === 'object' && 'default' in loaded) {
+    return loaded.default as { readonly name: string };
+  }
+  return loaded as { readonly name: string };
+}
+
 describe('app.routes', () => {
+  it('routes /decisions/:id to the DecisionDetailPage', async () => {
+    const component = await loadStandaloneRouteComponent('decisions/:id');
+    expect(component?.name.endsWith('DecisionDetailPage')).toBe(true);
+  });
+
   it('routes /analyses/:id/result to the canonical AnalysisResultPage', async () => {
     const component = await loadRouteComponent('result');
     expect(component?.name.endsWith('AnalysisResultPage')).toBe(true);

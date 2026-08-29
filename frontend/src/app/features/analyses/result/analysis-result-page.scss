@@ -67,6 +67,16 @@
   color: var(--text-muted);
 }
 
+.trusted-artifact-link {
+  display: inline-flex;
+  margin-top: 0.75rem;
+}
+
+.trusted-artifact-unavailable {
+  margin-top: 0.75rem;
+  color: var(--warning);
+}
+
 .action-list {
   display: grid;
   gap: 0.75rem;

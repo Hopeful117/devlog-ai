@@ -43,6 +43,7 @@ const completedResult: AnalysisResult = {
         summary: 'The service boundary has grown too broad.',
         evidencePreview: ['Fact#12345678'],
         proposalId: 'proposal-1',
+        trustedArtifact: null,
       },
       {
         id: 'proposal-2',
@@ -53,6 +54,12 @@ const completedResult: AnalysisResult = {
         summary: 'The endpoint remains active after migration.',
         evidencePreview: ['Observation#12345678'],
         proposalId: 'proposal-2',
+        trustedArtifact: {
+          id: 'insight-1',
+          type: 'INSIGHT',
+          availability: 'AVAILABLE',
+          detailAvailable: true,
+        },
       },
     ],
   },
@@ -180,6 +187,119 @@ describe('AnalysisResultPage', () => {
     expect(links).toContain('View proposal');
     expect(links).not.toContain('View decision');
     expect(links).not.toContain('View engineering event');
+  });
+
+  it('does not render a trusted-artifact action for a PROPOSED proposal', async () => {
+    const fixture = await render();
+    const cards = fixture.nativeElement.querySelectorAll('.card');
+    expect(cards[0]?.textContent).toContain('Review proposal');
+    expect(cards[0]?.textContent).not.toContain('View insight');
+  });
+
+  it('renders Insight trusted-artifact navigation when the backend exposes it', async () => {
+    const fixture = await render();
+    expect(fixture.nativeElement.textContent).toContain('View insight');
+  });
+
+  it('renders Decision trusted-artifact navigation when the backend exposes it', async () => {
+    getResult.mockReturnValue(
+      of({
+        ...completedResult,
+        proposals: {
+          ...completedResult.proposals,
+          items: [
+            {
+              id: 'proposal-2',
+              type: 'ENGINEERING_DECISION',
+              status: 'ACCEPTED',
+              confidence: 0.85,
+              title: 'Retire deprecated endpoint',
+              summary: 'The endpoint remains active after migration.',
+              evidencePreview: ['Observation#12345678'],
+              proposalId: 'proposal-2',
+              trustedArtifact: {
+                id: 'decision-1',
+                type: 'DECISION',
+                availability: 'AVAILABLE',
+                detailAvailable: true,
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    const fixture = await render();
+    expect(fixture.nativeElement.textContent).toContain('View decision');
+  });
+
+  it('renders Engineering Event trusted-artifact navigation when the backend exposes it', async () => {
+    getResult.mockReturnValue(
+      of({
+        ...completedResult,
+        proposals: {
+          ...completedResult.proposals,
+          items: [
+            {
+              id: 'proposal-2',
+              type: 'ENGINEERING_EVENT',
+              status: 'ACCEPTED',
+              confidence: 0.85,
+              title: 'Retire deprecated endpoint',
+              summary: 'The endpoint remains active after migration.',
+              evidencePreview: ['Observation#12345678'],
+              proposalId: 'proposal-2',
+              trustedArtifact: {
+                id: 'event-1',
+                type: 'ENGINEERING_EVENT',
+                availability: 'AVAILABLE',
+                detailAvailable: true,
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    const fixture = await render();
+    expect(fixture.nativeElement.textContent).toContain('View engineering event');
+  });
+
+  it('renders an unavailable trusted-artifact state without a fabricated link', async () => {
+    getResult.mockReturnValue(
+      of({
+        ...completedResult,
+        proposals: {
+          ...completedResult.proposals,
+          items: [
+            {
+              id: 'proposal-2',
+              type: 'ENGINEERING_DECISION',
+              status: 'ACCEPTED',
+              confidence: 0.85,
+              title: 'Retire deprecated endpoint',
+              summary: 'The endpoint remains active after migration.',
+              evidencePreview: ['Observation#12345678'],
+              proposalId: 'proposal-2',
+              trustedArtifact: {
+                id: null,
+                type: 'DECISION',
+                availability: 'UNAVAILABLE',
+                detailAvailable: false,
+              },
+            },
+          ],
+        },
+      }),
+    );
+
+    const fixture = await render();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.textContent).toContain('Trusted Decision unavailable');
+    const links = Array.from(element.querySelectorAll('a')).map((anchor) =>
+      anchor.textContent?.trim(),
+    );
+    expect(links).not.toContain('View decision');
   });
 
   it('renders the failed result state', async () => {

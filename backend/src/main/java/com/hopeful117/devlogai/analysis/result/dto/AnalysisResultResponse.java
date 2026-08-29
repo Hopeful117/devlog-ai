@@ -187,7 +187,26 @@ public record AnalysisResultResponse(
             String title,
             String summary,
             List<String> evidencePreview,
-            UUID proposalId
+            UUID proposalId,
+            TrustedArtifact trustedArtifact
+    ) {}
+
+    public enum TrustedArtifactType {
+        INSIGHT,
+        DECISION,
+        ENGINEERING_EVENT
+    }
+
+    public enum TrustedArtifactAvailability {
+        AVAILABLE,
+        UNAVAILABLE
+    }
+
+    public record TrustedArtifact(
+            UUID id,
+            TrustedArtifactType type,
+            TrustedArtifactAvailability availability,
+            boolean detailAvailable
     ) {}
 
     public record InsightsSection(

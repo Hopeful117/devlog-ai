@@ -6,10 +6,12 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
+import com.hopeful117.devlogai.decision.repository.DecisionRepository;
 import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
 import com.hopeful117.devlogai.proposal.entity.ProposalType;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
+import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightStatus;
@@ -44,6 +46,8 @@ public class AnalysisResultQueryServiceImpl implements AnalysisResultQueryServic
     private final AiTaskRepository aiTaskRepository;
     private final ValidatableProposalRepository proposalRepository;
     private final InsightRepository insightRepository;
+    private final DecisionRepository decisionRepository;
+    private final EngineeringEventRepository engineeringEventRepository;
     private final GeneratedDeliverableRepository deliverableRepository;
     private final SourceRepository sourceRepository;
     private final AiTaskSelectedEvidenceService selectedEvidenceService;
@@ -150,13 +154,19 @@ public class AnalysisResultQueryServiceImpl implements AnalysisResultQueryServic
         List<ValidatableProposal> proposals = proposalRepository.findByAnalysisId(analysis.getId());
         // Sort by createdAt desc
         proposals.sort(Comparator.comparing(ValidatableProposal::getCreatedAt).reversed());
-        return proposals.stream()
+        List<ValidatableProposal> visibleProposals = proposals.stream()
                 .filter(p -> p.getStatus() == ProposalStatus.PROPOSED || p.getStatus() == ProposalStatus.ACCEPTED)
-                .map(this::mapProposal)
+                .toList();
+        TrustedArtifactLookup trustedArtifacts = resolveTrustedArtifacts(visibleProposals);
+        return visibleProposals.stream()
+                .map(proposal -> mapProposal(proposal, trustedArtifacts))
                 .collect(Collectors.toList());
     }
 
-    private AnalysisResultResponse.ProposalSummary mapProposal(ValidatableProposal proposal) {
+    private AnalysisResultResponse.ProposalSummary mapProposal(
+            ValidatableProposal proposal,
+            TrustedArtifactLookup trustedArtifacts
+    ) {
         String title = extractTitle(proposal.getPayload());
         String summary = extractSummary(proposal.getPayload());
         List<String> evidencePreview = buildEvidencePreview(proposal);
@@ -169,7 +179,94 @@ public class AnalysisResultQueryServiceImpl implements AnalysisResultQueryServic
                 title,
                 summary,
                 evidencePreview,
-                proposal.getId()
+                proposal.getId(),
+                trustedArtifactFor(proposal, trustedArtifacts)
+        );
+    }
+
+    private TrustedArtifactLookup resolveTrustedArtifacts(List<ValidatableProposal> proposals) {
+        Map<ProposalType, List<UUID>> proposalIdsByType = proposals.stream()
+                .filter(proposal -> proposal.getStatus() == ProposalStatus.ACCEPTED)
+                .filter(proposal -> trustedArtifactTypeFor(proposal.getType()) != null)
+                .collect(Collectors.groupingBy(
+                        ValidatableProposal::getType,
+                        Collectors.mapping(ValidatableProposal::getId, Collectors.toList())
+                ));
+
+        Map<UUID, AnalysisResultResponse.TrustedArtifact> artifactsByProposalId = new HashMap<>();
+
+        List<UUID> insightProposalIds = proposalIdsByType.getOrDefault(ProposalType.INSIGHT, List.of());
+        if (!insightProposalIds.isEmpty()) {
+            insightRepository.findByProposalIdIn(insightProposalIds).forEach(insight -> artifactsByProposalId.put(
+                    insight.getProposal().getId(),
+                    availableTrustedArtifact(insight.getId(), AnalysisResultResponse.TrustedArtifactType.INSIGHT)
+            ));
+        }
+
+        List<UUID> decisionProposalIds = proposalIdsByType.getOrDefault(ProposalType.ENGINEERING_DECISION, List.of());
+        if (!decisionProposalIds.isEmpty()) {
+            decisionRepository.findByProposalIdIn(decisionProposalIds).forEach(decision -> artifactsByProposalId.put(
+                    decision.getProposal().getId(),
+                    availableTrustedArtifact(decision.getId(), AnalysisResultResponse.TrustedArtifactType.DECISION)
+            ));
+        }
+
+        List<UUID> eventProposalIds = proposalIdsByType.getOrDefault(ProposalType.ENGINEERING_EVENT, List.of());
+        if (!eventProposalIds.isEmpty()) {
+            engineeringEventRepository.findByProposalIdIn(eventProposalIds).forEach(event -> artifactsByProposalId.put(
+                    event.getProposal().getId(),
+                    availableTrustedArtifact(
+                            event.getId(),
+                            AnalysisResultResponse.TrustedArtifactType.ENGINEERING_EVENT
+                    )
+            ));
+        }
+
+        return new TrustedArtifactLookup(artifactsByProposalId);
+    }
+
+    private AnalysisResultResponse.TrustedArtifact trustedArtifactFor(
+            ValidatableProposal proposal,
+            TrustedArtifactLookup trustedArtifacts
+    ) {
+        if (proposal.getStatus() != ProposalStatus.ACCEPTED) {
+            return null;
+        }
+
+        AnalysisResultResponse.TrustedArtifactType type = trustedArtifactTypeFor(proposal.getType());
+        if (type == null) {
+            return null;
+        }
+
+        return trustedArtifacts.byProposalId.getOrDefault(
+                proposal.getId(),
+                new AnalysisResultResponse.TrustedArtifact(
+                        null,
+                        type,
+                        AnalysisResultResponse.TrustedArtifactAvailability.UNAVAILABLE,
+                        false
+                )
+        );
+    }
+
+    private AnalysisResultResponse.TrustedArtifactType trustedArtifactTypeFor(ProposalType proposalType) {
+        return switch (proposalType) {
+            case INSIGHT -> AnalysisResultResponse.TrustedArtifactType.INSIGHT;
+            case ENGINEERING_DECISION -> AnalysisResultResponse.TrustedArtifactType.DECISION;
+            case ENGINEERING_EVENT -> AnalysisResultResponse.TrustedArtifactType.ENGINEERING_EVENT;
+            default -> null;
+        };
+    }
+
+    private AnalysisResultResponse.TrustedArtifact availableTrustedArtifact(
+            UUID id,
+            AnalysisResultResponse.TrustedArtifactType type
+    ) {
+        return new AnalysisResultResponse.TrustedArtifact(
+                id,
+                type,
+                AnalysisResultResponse.TrustedArtifactAvailability.AVAILABLE,
+                true
         );
     }
 
@@ -387,5 +484,10 @@ public class AnalysisResultQueryServiceImpl implements AnalysisResultQueryServic
             }
         }
         return "Analysis execution failed";
+    }
+
+    private record TrustedArtifactLookup(
+            Map<UUID, AnalysisResultResponse.TrustedArtifact> byProposalId
+    ) {
     }
 }

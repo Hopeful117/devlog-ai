@@ -153,6 +153,17 @@
                     <a [routerLink]="['/proposals', proposal.proposalId]">
                       {{ proposalActionLabel(proposal) }}
                     </a>
+                    @if (proposal.trustedArtifact; as trustedArtifact) {
+                      @if (trustedArtifactRoute(trustedArtifact); as route) {
+                        <a class="trusted-artifact-link" [routerLink]="route">
+                          {{ trustedArtifactActionLabel(trustedArtifact) }}
+                        </a>
+                      } @else {
+                        <p class="trusted-artifact-unavailable" role="status">
+                          {{ trustedArtifactUnavailableLabel(trustedArtifact) }}
+                        </p>
+                      }
+                    }
                   </article>
                 }
               </div>
