@@ -86,18 +86,35 @@ export const routes: Routes = [
       ),
   },
   {
-    path: 'analyses/:id/proposal-review',
-    loadComponent: () =>
-      import('./features/insights/proposal-review-page').then(
-        (module) => module.ProposalReviewPage,
-      ),
-  },
-  {
     path: 'analyses/:id',
-    loadComponent: () =>
-      import('./features/analyses/analysis-detail-page').then(
-        (module) => module.AnalysisDetailPage,
-      ),
+    children: [
+      {
+        path: 'proposal-review',
+        loadComponent: () =>
+          import('./features/insights/proposal-review-page').then(
+            (module) => module.ProposalReviewPage,
+          ),
+      },
+      {
+        path: 'result',
+        loadComponent: () =>
+          import('./features/analyses/result/analysis-result-page').then(
+            (module) => module.AnalysisResultPage,
+          ),
+      },
+      {
+        path: 'diagnostics',
+        loadComponent: () =>
+          import('./features/analyses/analysis-diagnostics-page').then(
+            (module) => module.AnalysisDiagnosticsPage,
+          ),
+      },
+      {
+        path: '',
+        pathMatch: 'full',
+        redirectTo: 'result',
+      },
+    ],
   },
   {
     path: 'insights',

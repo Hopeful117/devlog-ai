@@ -28,6 +28,7 @@ describe('AnalysisService', () => {
   it('uses the Java Core list, detail, diagnostics and resource endpoints', () => {
     service.getAnalysesByProject('project-id').subscribe();
     service.getAnalysis('analysis-id').subscribe();
+    service.getResult('analysis-id').subscribe();
     service.getDiagnostics('analysis-id').subscribe();
     service.getWarnings('analysis-id').subscribe();
     service.getContext('analysis-id').subscribe();
@@ -36,6 +37,7 @@ describe('AnalysisService', () => {
     for (const url of [
       '/api/v1/analyses/project/project-id',
       '/api/v1/analyses/analysis-id',
+      '/api/v1/analyses/analysis-id/result',
       '/api/v1/analyses/analysis-id/diagnostics',
       '/api/v1/analyses/analysis-id/warnings',
       '/api/v1/analyses/analysis-id/context',

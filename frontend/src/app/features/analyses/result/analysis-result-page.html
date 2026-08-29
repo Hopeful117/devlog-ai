@@ -1,0 +1,300 @@
+<section class="analysis-result" aria-labelledby="analysis-result-title">
+  <a class="back-link" routerLink="/projects">← Back to Projects</a>
+
+  @if (view$ | async; as view) {
+    @switch (view.state) {
+      @case ('loading') {
+        <div class="panel state-panel">
+          <p class="eyebrow">Canonical Analysis Result</p>
+          <h1 id="analysis-result-title">Loading Analysis result…</h1>
+          <p>The product view is waiting for the latest canonical Analysis result.</p>
+        </div>
+      }
+      @case ('not-found') {
+        <div class="panel state-panel" role="alert">
+          <h1 id="analysis-result-title">Analysis result not found</h1>
+          <p>The requested Analysis could not be found.</p>
+        </div>
+      }
+      @case ('error') {
+        <div class="panel state-panel" role="alert">
+          <h1 id="analysis-result-title">Analysis result unavailable</h1>
+          <p>{{ view.error.message }}</p>
+        </div>
+      }
+      @case ('loaded') {
+        <header class="page-header panel hero" data-testid="analysis-result-header">
+          <div>
+            <p class="eyebrow">Canonical Analysis Result</p>
+            <h1 id="analysis-result-title">{{ view.data.analysis.objective }}</h1>
+            <p>{{ scopeLabel(view.data) }}</p>
+          </div>
+          <div class="header-meta">
+            <span
+              class="badge"
+              [class.badge--success]="view.data.execution.success === true"
+              [class.badge--danger]="view.data.execution.success === false"
+              [class.badge--info]="view.data.execution.success === null"
+            >
+              {{ view.data.analysis.status }}
+            </span>
+            <dl class="metadata-list">
+              <dt>Duration</dt>
+              <dd>
+                {{
+                  view.data.analysis.durationSeconds !== null
+                    ? (view.data.analysis.durationSeconds | number: '1.0-0') + 's'
+                    : 'In progress'
+                }}
+              </dd>
+              <dt>Intent</dt>
+              <dd>{{ view.data.analysis.intentId }}/{{ view.data.analysis.intentVersion }}</dd>
+              <dt>Sources</dt>
+              <dd>{{ view.data.analysis.sourcesAnalyzed.join(', ') || 'None recorded' }}</dd>
+            </dl>
+          </div>
+        </header>
+
+        @if (view.data.execution.success === null) {
+          <section class="panel state-panel" data-testid="analysis-result-in-progress">
+            <h2>Analysis in progress</h2>
+            <p>
+              This product view will refresh from the canonical result endpoint until the Analysis
+              reaches a final state.
+            </p>
+            <p>
+              For technical investigation while execution is still running, use
+              <a [routerLink]="['/analyses', view.data.analysis.id, 'diagnostics']">Diagnostics</a>.
+            </p>
+          </section>
+        } @else if (view.data.execution.success === false) {
+          <section class="panel state-panel" data-testid="analysis-result-failed">
+            <h2>Analysis failed</h2>
+            <p>
+              {{ view.data.execution.failureCode || 'ANALYSIS_FAILED' }}:
+              {{ view.data.execution.failureMessage || 'Analysis execution failed.' }}
+            </p>
+            <a [routerLink]="['/analyses', view.data.analysis.id, 'diagnostics']"
+              >View diagnostics</a
+            >
+          </section>
+
+          @if (view.data.nextActions.length > 0) {
+            <section class="panel">
+              <h2>Next actions</h2>
+              <ul class="action-list">
+                @for (action of view.data.nextActions; track action.action) {
+                  <li>
+                    @if (nextActionRoute(action, view.data.analysis.id); as route) {
+                      <a [routerLink]="route">{{ action.label }}</a>
+                    } @else {
+                      <span>{{ action.label }}</span>
+                    }
+                  </li>
+                }
+              </ul>
+            </section>
+          }
+        } @else {
+          <section class="panel" data-testid="analysis-result-proposals">
+            <div class="section-heading">
+              <div>
+                <h2>Proposals</h2>
+                <p>
+                  {{ view.data.proposals.total }} proposal{{
+                    view.data.proposals.total === 1 ? '' : 's'
+                  }}
+                  in the canonical result.
+                </p>
+              </div>
+              <a [routerLink]="['/analyses', view.data.analysis.id, 'proposal-review']"
+                >View proposal review</a
+              >
+            </div>
+            @if (view.data.proposals.items.length > 0) {
+              <div class="card-grid">
+                @for (
+                  proposal of view.data.proposals.items;
+                  track trackProposal($index, proposal)
+                ) {
+                  <article class="panel card">
+                    <div class="card-heading">
+                      <span class="badge badge--info">{{ proposal.type }}</span>
+                      <span
+                        class="badge"
+                        [class.badge--warning]="proposal.status === 'PROPOSED'"
+                        [class.badge--success]="proposal.status === 'ACCEPTED'"
+                      >
+                        {{ proposal.status }}
+                      </span>
+                    </div>
+                    <h3>{{ proposal.title }}</h3>
+                    <p>{{ proposal.summary || 'No summary provided.' }}</p>
+                    <dl class="metadata-list compact-list">
+                      <dt>Confidence</dt>
+                      <dd>
+                        {{
+                          proposal.confidence !== null
+                            ? (proposal.confidence | number: '1.0-2')
+                            : 'Not provided'
+                        }}
+                      </dd>
+                    </dl>
+                    <h4>Evidence preview</h4>
+                    <ul>
+                      @for (item of proposal.evidencePreview; track item) {
+                        <li>
+                          <code>{{ item }}</code>
+                        </li>
+                      } @empty {
+                        <li>No evidence preview recorded.</li>
+                      }
+                    </ul>
+                    <a [routerLink]="['/proposals', proposal.proposalId]">
+                      {{ proposalActionLabel(proposal) }}
+                    </a>
+                  </article>
+                }
+              </div>
+            } @else {
+              <p>No proposals were generated for this Analysis.</p>
+            }
+          </section>
+
+          <section class="panel" data-testid="analysis-result-insights">
+            <div class="section-heading">
+              <div>
+                <h2>Validated insights</h2>
+                <p>
+                  {{ view.data.insights.total }} validated insight{{
+                    view.data.insights.total === 1 ? '' : 's'
+                  }}
+                  from this Analysis.
+                </p>
+              </div>
+              <a routerLink="/insights">View all insights</a>
+            </div>
+            @if (view.data.insights.items.length > 0) {
+              <div class="card-grid">
+                @for (insight of view.data.insights.items; track insight.id) {
+                  <article class="panel card">
+                    <div class="card-heading">
+                      <span class="badge badge--info">{{ insight.type }}</span>
+                      <span
+                        class="badge"
+                        [class.badge--danger]="insight.severity === 'CRITICAL'"
+                        [class.badge--warning]="insight.severity === 'WARNING'"
+                        [class.badge--success]="insight.severity === 'INFO'"
+                      >
+                        {{ insight.severity }}
+                      </span>
+                    </div>
+                    <h3>{{ insight.title }}</h3>
+                    <p>{{ insight.content }}</p>
+                    @if (insight.rationale) {
+                      <p class="supporting-copy">{{ insight.rationale }}</p>
+                    }
+                    <a [routerLink]="['/insights', insight.id]">View insight</a>
+                  </article>
+                }
+              </div>
+            } @else {
+              <p>No validated insights are available for this Analysis.</p>
+            }
+          </section>
+
+          <section class="panel" data-testid="analysis-result-deliverables">
+            <div class="section-heading">
+              <div>
+                <h2>Generated deliverables</h2>
+                <p>
+                  {{ view.data.deliverables.total }} deliverable{{
+                    view.data.deliverables.total === 1 ? '' : 's'
+                  }}
+                  generated from this Analysis.
+                </p>
+              </div>
+            </div>
+            @if (view.data.deliverables.items.length > 0) {
+              <div class="card-grid">
+                @for (deliverable of view.data.deliverables.items; track deliverable.id) {
+                  <article class="panel card">
+                    <span class="badge badge--info">{{ deliverable.type }}</span>
+                    <h3>{{ deliverable.title }}</h3>
+                    <p>{{ deliverable.audience }} · {{ deliverable.status }}</p>
+                    <p class="supporting-copy">
+                      Generated {{ deliverable.generatedAt | date: 'medium' }}
+                    </p>
+                    <a [routerLink]="['/deliverables', deliverable.id]">View deliverable</a>
+                  </article>
+                }
+              </div>
+            } @else {
+              <p>No deliverables have been generated for this Analysis.</p>
+            }
+          </section>
+
+          <section class="panel" data-testid="analysis-result-evidence">
+            <div class="section-heading">
+              <div>
+                <h2>Supporting evidence</h2>
+                <p>Curated evidence from the backend Analysis result projection.</p>
+              </div>
+              <a [routerLink]="['/analyses', view.data.analysis.id, 'diagnostics']"
+                >Open diagnostics</a
+              >
+            </div>
+            <div class="evidence-grid">
+              @for (category of evidenceCategories(view.data); track category.key) {
+                <article class="panel evidence-card">
+                  <h3>{{ category.label }}</h3>
+                  <p>
+                    {{ category.value.count }} item{{ category.value.count === 1 ? '' : 's' }}
+                    recorded.
+                  </p>
+                  <ul>
+                    @for (item of category.value.items; track item.reference + item.kind) {
+                      <li>
+                        <strong>{{ item.kind }}</strong>
+                        <p>{{ item.summary }}</p>
+                        <code>{{ item.reference }}</code>
+                      </li>
+                    } @empty {
+                      <li>No curated items in this category.</li>
+                    }
+                  </ul>
+                </article>
+              }
+            </div>
+          </section>
+
+          <section class="panel" data-testid="analysis-result-next-actions">
+            <h2>Next actions</h2>
+            @if (view.data.nextActions.length > 0) {
+              <ul class="action-list">
+                @for (action of view.data.nextActions; track action.action) {
+                  <li>
+                    @if (nextActionRoute(action, view.data.analysis.id); as route) {
+                      <a [routerLink]="route">{{ action.label }}</a>
+                    } @else {
+                      <span>{{ action.label }}</span>
+                    }
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p>No immediate next actions are available.</p>
+            }
+
+            @if (showDeliverableAction(view.data)) {
+              <app-analysis-deliverable-panel
+                [projectId]="view.data.analysis.projectId"
+                [analysisId]="view.data.analysis.id"
+              />
+            }
+          </section>
+        }
+      }
+    }
+  }
+</section>
