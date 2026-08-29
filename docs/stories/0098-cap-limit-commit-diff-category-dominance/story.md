@@ -2,7 +2,7 @@
 
 ## Status
 
-**DESIGNED**
+**RESUME-READY** (post-Story 0102 revalidation confirmed)
 
 ## Priority
 
@@ -162,3 +162,56 @@ unused floor capacity from Story 0095).
 - Unit tests: ceiling enforcement in `BudgetedDiverseEvidenceSelectorTest`
 - Five-intent benchmark: `curl localhost:18080/api/v1/projects/devlog-ai/engineering-context?intent=<intent>`
 - Manual inspection: verify selected evidence includes non-COMMIT_DIFF categories
+
+---
+
+## Post-Story 0102 Revalidation (2026-08-29)
+
+### Revalidation Context
+
+Story 0098 was designed before Stories 0099-0102. This revalidation confirms whether
+the original problem, root cause, and solution remain valid after those Stories merged.
+
+### Repository State
+
+- HEAD: `e4925ab` (main, post-Story 0102 merge)
+- Selection architecture files: **zero changes** since Story 0098 design (`e07b0b0`)
+- `EvidencePrecisionPolicy`: 4 fields, no `maximumCategorySharePct`
+- `BudgetedDiverseEvidenceSelector`: no ceiling enforcement
+- `DeterministicContextIntelligence`: ENGINEERING_STORY_PRECISION has `(50, 35, 25, 75)`
+
+### Benchmark Results (post-0102)
+
+| Intent | COMMIT_DIFF | GIT_HISTORY | Other | Total |
+|---|---|---|---|---|
+| describe-project-v1 | 44 (73.3%) | 9 (15.0%) | 7 (11.7%) | 60 |
+| architecture-overview-v1 | 45 (75.0%) | 8 (13.3%) | 7 (11.7%) | 60 |
+| analyze-engineering-decision-v1 | 45 (75.0%) | 8 (13.3%) | 7 (11.7%) | 60 |
+
+COMMIT_DIFF dominance has **worsened** from 70-72% to 73-75%.
+
+### Root Cause Confirmation
+
+- Strong relevance bypass: COMMIT_DIFF items score ≥ 75 (HISTORICAL_RELEVANCE=100,
+  CONFIDENCE=100, ARCHITECTURAL_RELEVANCE=80)
+- kindAllowance=15 (soft cap) is bypassed by strong relevance
+- No ceiling exists to cap total COMMIT_DIFF
+- Knowledge floor working: 7 knowledge items (11.7%)
+
+### Bottleneck Revalidation
+
+**CATEGORY_SELECTION remains the primary bottleneck.** Story 0098's proposed ceiling
+(`maximumCategorySharePct=20`, capping each kind at 12 items) is still the correct
+solution.
+
+### Disposition
+
+**RESUME-READY.** All assumptions valid. No architecture changes require plan revision.
+Implementation can proceed as designed.
+
+## Human Approval
+
+- `STORY_0098_REVALIDATION = APPROVED`
+- `STORY_0098_HUMAN_IMPLEMENTATION_REVIEW = APPROVED`
+- `HUMAN_IMPLEMENTATION_REVIEW = APPROVED`
+- `history-v1` ceiling-only policy extension: **HUMAN APPROVED**

@@ -129,7 +129,7 @@ class DeterministicEvidenceRankerTest {
     }
 
     private EvidencePrecisionPolicy precision() {
-        return new EvidencePrecisionPolicy("test", "v1", 50, 0, 25, 75);
+        return new EvidencePrecisionPolicy("test", "v1", 50, 0, 25, 100, 75);
     }
 
     private RepositoryEvidence evidence(

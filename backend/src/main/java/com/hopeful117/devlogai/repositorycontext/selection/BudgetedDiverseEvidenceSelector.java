@@ -28,7 +28,9 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
         Deduplication deduplication = deduplicate(ranked);
         List<RepositoryEvidence> candidates = deduplication.unique();
         EvidencePrecisionPolicy policy = request.contextPlan().precisionPolicy();
-        SelectionState state = new SelectionState(kindAllowance(candidates, request, policy));
+        SelectionState state = new SelectionState(
+                kindAllowance(candidates, request, policy),
+                maximumCategoryItems(request, policy));
 
         selectDiverseEvidence(candidates, request, policy, state);
         selectKnowledgeFloor(candidates, request, policy, state);
@@ -84,9 +86,9 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
             if (!KNOWLEDGE_KINDS.contains(candidate.kind())) continue;
             if (state.selectedReferences.contains(candidate.reference())) continue;
             if (candidate.relevanceScore() < policy.minimumRelevanceScore()) continue;
-            if (state.kindCounts.getOrDefault(candidate.kind(), 0)
-                    >= state.kindAllowance
-                    && candidate.relevanceScore() < policy.strongRelevanceScore())
+            if (!categoryEligible(candidate, policy, state))
+                continue;
+            if (categoryCeilingReached(candidate, state))
                 continue;
             if (state.selected.size() >= request.budget().maximumEvidenceItems())
                 return;
@@ -104,6 +106,10 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
             return;
         }
         if (!categoryEligible(candidate, policy, state)) {
+            state.reasons.put(candidate.reference(), "CATEGORY_CONCENTRATION_LIMIT");
+            return;
+        }
+        if (categoryCeilingReached(candidate, state)) {
             state.reasons.put(candidate.reference(), "CATEGORY_CONCENTRATION_LIMIT");
             return;
         }
@@ -126,6 +132,12 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
             EvidencePrecisionPolicy policy, SelectionState state) {
         return state.kindCounts.getOrDefault(candidate.kind(), 0) < state.kindAllowance
                 || candidate.relevanceScore() >= policy.strongRelevanceScore();
+    }
+
+    private boolean categoryCeilingReached(RepositoryEvidence candidate,
+            SelectionState state) {
+        return state.kindCounts.getOrDefault(candidate.kind(), 0)
+                >= state.maximumCategoryItems;
     }
 
     private boolean fits(RepositoryEvidence candidate, SelectionState state,
@@ -159,6 +171,13 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
                 capacity * policy.maximumKindSharePercentage() / 100.0));
     }
 
+    private int maximumCategoryItems(ContextRequest request, EvidencePrecisionPolicy policy) {
+        int budget = request.budget().maximumEvidenceItems();
+        if (budget == 0) return 0;
+        return Math.max(1, (int) Math.ceil(
+                budget * policy.maximumCategorySharePercentage() / 100.0));
+    }
+
     private Deduplication deduplicate(List<RepositoryEvidence> ranked) {
         Map<String, RepositoryEvidence> unique = new LinkedHashMap<>();
         List<RepositoryEvidence> duplicates = new ArrayList<>();
@@ -177,14 +196,16 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
 
     private static final class SelectionState {
         private final int kindAllowance;
+        private final int maximumCategoryItems;
         private final List<RepositoryEvidence> selected = new ArrayList<>();
         private final Set<String> selectedReferences = new HashSet<>();
         private final Map<String, Integer> kindCounts = new HashMap<>();
         private final Map<String, String> reasons = new HashMap<>();
         private int usedTokens;
 
-        private SelectionState(int kindAllowance) {
+        private SelectionState(int kindAllowance, int maximumCategoryItems) {
             this.kindAllowance = kindAllowance;
+            this.maximumCategoryItems = maximumCategoryItems;
         }
     }
 }

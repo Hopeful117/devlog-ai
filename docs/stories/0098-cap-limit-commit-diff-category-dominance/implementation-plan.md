@@ -2,7 +2,12 @@
 
 ## Status
 
-**DESIGNED**
+**IMPLEMENTED_AWAITING_HUMAN_MERGE**
+
+## Human Approval
+
+- `HUMAN_IMPLEMENTATION_REVIEW = APPROVED`
+- `history-v1` ceiling-only policy extension = HUMAN APPROVED
 
 ## Summary
 
