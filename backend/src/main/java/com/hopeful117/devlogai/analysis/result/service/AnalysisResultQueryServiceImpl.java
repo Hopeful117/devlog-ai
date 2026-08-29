@@ -106,7 +106,7 @@ public class AnalysisResultQueryServiceImpl implements AnalysisResultQueryServic
     private String resolveScope(IntentDefinition intent) {
         if (intent == null) return "PROJECT_SCOPE";
         return switch (intent.id()) {
-            case "generate-readme-v1" -> "REPOSITORY_SCOPE";
+            case "generate-readme" -> "REPOSITORY_SCOPE";
             default -> "PROJECT_SCOPE";
         };
     }
@@ -364,67 +364,176 @@ public class AnalysisResultQueryServiceImpl implements AnalysisResultQueryServic
     private AnalysisResultResponse.EvidenceCategorySection curateCategory(
             AiTaskSelectedEvidenceResponse.FactsSection section
     ) {
-        return curateCategory(section.availability(), section.count(), section.items());
+        if (section.availability() == AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED || section.items() == null) {
+            return new AnalysisResultResponse.EvidenceCategorySection(0, List.of());
+        }
+        List<AnalysisResultResponse.EvidenceItem> items = section.items().stream()
+                .limit(EVIDENCE_PREVIEW_LIMIT)
+                .map(fact -> new AnalysisResultResponse.EvidenceItem(
+                        "FACT",
+                        fact.type(),
+                        "fact:" + fact.id(),
+                        fact.content(),
+                        fact.detectedAt(),
+                        fact.evidenceReferences() != null ? fact.evidenceReferences() : List.of()
+                ))
+                .collect(Collectors.toList());
+        return new AnalysisResultResponse.EvidenceCategorySection(section.count(), items);
     }
 
     private AnalysisResultResponse.EvidenceCategorySection curateCategory(
             AiTaskSelectedEvidenceResponse.ObservationsSection section
     ) {
-        return curateCategory(section.availability(), section.count(), section.items());
+        if (section.availability() == AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED || section.items() == null) {
+            return new AnalysisResultResponse.EvidenceCategorySection(0, List.of());
+        }
+        List<AnalysisResultResponse.EvidenceItem> items = section.items().stream()
+                .limit(EVIDENCE_PREVIEW_LIMIT)
+                .map(obs -> new AnalysisResultResponse.EvidenceItem(
+                        "OBSERVATION",
+                        obs.ruleId(),
+                        "observation:" + obs.id(),
+                        obs.content(),
+                        obs.createdAt(),
+                        obs.supportingFactIds() != null
+                                ? obs.supportingFactIds().stream().map(id -> "fact:" + id).collect(Collectors.toList())
+                                : List.of()
+                ))
+                .collect(Collectors.toList());
+        return new AnalysisResultResponse.EvidenceCategorySection(section.count(), items);
     }
 
     private AnalysisResultResponse.EvidenceCategorySection curateCategory(
             AiTaskSelectedEvidenceResponse.PriorInsightsSection section
     ) {
-        return curateCategory(section.availability(), section.count(), section.items());
+        if (section.availability() == AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED || section.items() == null) {
+            return new AnalysisResultResponse.EvidenceCategorySection(0, List.of());
+        }
+        List<AnalysisResultResponse.EvidenceItem> items = section.items().stream()
+                .limit(EVIDENCE_PREVIEW_LIMIT)
+                .map(insight -> new AnalysisResultResponse.EvidenceItem(
+                        "VALIDATED_INSIGHT",
+                        insight.severity(),
+                        insight.type(),
+                        insight.content(),
+                        null,
+                        List.of()
+                ))
+                .collect(Collectors.toList());
+        return new AnalysisResultResponse.EvidenceCategorySection(section.count(), items);
     }
 
     private AnalysisResultResponse.EvidenceCategorySection curateCategory(
             AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection section
     ) {
-        return curateCategory(section.availability(), section.count(), section.items());
+        if (section.availability() == AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED || section.items() == null) {
+            return new AnalysisResultResponse.EvidenceCategorySection(0, List.of());
+        }
+        List<AnalysisResultResponse.EvidenceItem> items = section.items().stream()
+                .limit(EVIDENCE_PREVIEW_LIMIT)
+                .map(ak -> new AnalysisResultResponse.EvidenceItem(
+                        "VALIDATED_INSIGHT",
+                        ak.normalizedType(),
+                        "insight:" + ak.insightId(),
+                        ak.title(),
+                        ak.createdAt(),
+                        ak.evidenceReferences() != null ? ak.evidenceReferences() : List.of()
+                ))
+                .collect(Collectors.toList());
+        return new AnalysisResultResponse.EvidenceCategorySection(section.count(), items);
     }
 
     private AnalysisResultResponse.EvidenceCategorySection curateCategory(
             AiTaskSelectedEvidenceResponse.EngineeringEventsSection section
     ) {
-        return curateCategory(section.availability(), section.count(), section.items());
+        if (section.availability() == AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED || section.items() == null) {
+            return new AnalysisResultResponse.EvidenceCategorySection(0, List.of());
+        }
+        List<AnalysisResultResponse.EvidenceItem> items = section.items().stream()
+                .limit(EVIDENCE_PREVIEW_LIMIT)
+                .map(event -> {
+                    List<String> relatedRefs = new ArrayList<>();
+                    if (event.sourceId() != null) {
+                        if (event.baseCommit() != null) {
+                            relatedRefs.add("git:" + event.sourceId() + ":" + event.baseCommit());
+                        }
+                        if (event.targetCommit() != null) {
+                            relatedRefs.add("git:" + event.sourceId() + ":" + event.targetCommit());
+                        }
+                    }
+                    return new AnalysisResultResponse.EvidenceItem(
+                            "COMMIT_DIFF",
+                            event.category(),
+                            "event:" + event.id(),
+                            event.title(),
+                            event.occurredAt(),
+                            relatedRefs
+                    );
+                })
+                .collect(Collectors.toList());
+        return new AnalysisResultResponse.EvidenceCategorySection(section.count(), items);
     }
 
     private AnalysisResultResponse.EvidenceCategorySection curateCategory(
             AiTaskSelectedEvidenceResponse.HumanContextSection section
     ) {
-        return curateCategory(section.availability(), section.count(), section.items());
+        if (section.availability() == AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED || section.items() == null) {
+            return new AnalysisResultResponse.EvidenceCategorySection(0, List.of());
+        }
+        List<AnalysisResultResponse.EvidenceItem> items = section.items().stream()
+                .limit(EVIDENCE_PREVIEW_LIMIT)
+                .map(human -> new AnalysisResultResponse.EvidenceItem(
+                        "PROJECT_DOCUMENTATION",
+                        human.type(),
+                        "human:" + human.id(),
+                        human.title(),
+                        human.updatedAt(),
+                        List.of()
+                ))
+                .collect(Collectors.toList());
+        return new AnalysisResultResponse.EvidenceCategorySection(section.count(), items);
     }
 
     private AnalysisResultResponse.EvidenceCategorySection curateCategory(
             AiTaskSelectedEvidenceResponse.EvolutionContextSection section
     ) {
-        return curateCategory(section.availability(), section.count(), section.items());
+        if (section.availability() == AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED || section.items() == null) {
+            return new AnalysisResultResponse.EvidenceCategorySection(0, List.of());
+        }
+        List<AnalysisResultResponse.EvidenceItem> items = section.items().stream()
+                .limit(EVIDENCE_PREVIEW_LIMIT)
+                .map(evo -> new AnalysisResultResponse.EvidenceItem(
+                        "COMMIT_DIFF",
+                        evo.comparisonPolicy(),
+                        "evolution:" + evo.sourceId(),
+                        evo.commitDiff() != null ? evo.commitDiff().commitMessage() : "",
+                        evo.targetCommittedAt(),
+                        evo.commitDiff() != null && evo.commitDiff().evidenceReferences() != null
+                                ? evo.commitDiff().evidenceReferences()
+                                : List.of()
+                ))
+                .collect(Collectors.toList());
+        return new AnalysisResultResponse.EvidenceCategorySection(section.count(), items);
     }
 
     private AnalysisResultResponse.EvidenceCategorySection curateCategory(
             AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection section
     ) {
-        return curateCategory(section.availability(), section.count(), section.items());
-    }
-
-    private AnalysisResultResponse.EvidenceCategorySection curateCategory(
-            AiTaskSelectedEvidenceResponse.Availability availability,
-            int count,
-            List<?> items
-    ) {
-        if (availability == AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED || items == null) {
+        if (section.availability() == AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED || section.items() == null) {
             return new AnalysisResultResponse.EvidenceCategorySection(0, List.of());
         }
-
-        @SuppressWarnings("unchecked")
-        List<AnalysisResultResponse.EvidenceItem> evidenceItems = (List<AnalysisResultResponse.EvidenceItem>) items;
-        List<AnalysisResultResponse.EvidenceItem> limited = evidenceItems.stream()
+        List<AnalysisResultResponse.EvidenceItem> items = section.items().stream()
                 .limit(EVIDENCE_PREVIEW_LIMIT)
+                .map(repo -> new AnalysisResultResponse.EvidenceItem(
+                        repo.layer(),
+                        repo.kind(),
+                        repo.reference(),
+                        repo.summary(),
+                        repo.occurredAt(),
+                        repo.relatedReferences() != null ? repo.relatedReferences() : List.of()
+                ))
                 .collect(Collectors.toList());
-
-        return new AnalysisResultResponse.EvidenceCategorySection(count, limited);
+        return new AnalysisResultResponse.EvidenceCategorySection(section.count(), items);
     }
 
     private List<AnalysisResultResponse.NextAction> buildNextActions(Analysis analysis,

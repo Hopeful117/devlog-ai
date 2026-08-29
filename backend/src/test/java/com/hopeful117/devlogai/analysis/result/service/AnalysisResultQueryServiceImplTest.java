@@ -3,6 +3,8 @@ package com.hopeful117.devlogai.analysis.result.service;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
+import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
+import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.analysis.result.dto.AnalysisResultResponse;
 import com.hopeful117.devlogai.analysis.evidence.dto.AiTaskSelectedEvidenceResponse;
@@ -27,6 +29,8 @@ import com.hopeful117.devlogai.proposal.entity.ProposalType;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -190,5 +194,605 @@ class AnalysisResultQueryServiceImplTest {
                 .filter(item -> item.proposalId().equals(proposalId))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    // --- Regression B RED tests: evidence composition through getResult() ---
+
+    private void stubMinimalCompletedAnalysis(UUID analysisId, UUID projectId) {
+        Analysis analysis = analysis(analysisId, projectId);
+        when(analysisRepository.findById(analysisId)).thenReturn(Optional.of(analysis));
+        when(intentCatalog.resolve("architecture-overview", "v1"))
+                .thenReturn(new IntentDefinition("architecture-overview", "v1", "Understand the system", List.of(), List.of(), Map.of(), "prompt"));
+        when(proposalRepository.findByAnalysisId(analysisId)).thenReturn(new ArrayList<>(List.of()));
+        when(insightRepository.findByAnalysisIdOrderByCreatedAtDesc(analysisId)).thenReturn(List.of());
+        when(deliverableRepository.findByAnalysisIdOrderByGeneratedAtDesc(analysisId)).thenReturn(List.of());
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId)).thenReturn(List.of());
+    }
+
+    private AiTaskSelectedEvidenceResponse.TaskIdentity minimalTaskIdentity() {
+        return new AiTaskSelectedEvidenceResponse.TaskIdentity(
+                UUID.randomUUID(), AiTaskType.INSIGHT_GENERATION, AiTaskStatus.COMPLETED, Instant.now());
+    }
+
+    private AiTaskSelectedEvidenceResponse.SnapshotMetadata minimalSnapshotMetadata() {
+        return new AiTaskSelectedEvidenceResponse.SnapshotMetadata(
+                null, null, null, null, null, null);
+    }
+
+    @Test
+    void shouldMapFactItemsToEvidenceItemsWithCorrectSemanticFields() {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        stubMinimalCompletedAnalysis(analysisId, projectId);
+
+        UUID factId = UUID.randomUUID();
+        Instant detectedAt = Instant.parse("2026-08-27T10:00:00Z");
+        AiTaskSelectedEvidenceResponse.FactItem factItem = new AiTaskSelectedEvidenceResponse.FactItem(
+                factId, "SOURCE_DIRECTORY_PRESENT", "Source directory src/main/java exists", "src/main/java",
+                List.of("diff:abc123:src/main/java"), detectedAt);
+
+        AiTaskSelectedEvidenceResponse available = AiTaskSelectedEvidenceResponse.available(
+                analysisId, projectId, minimalTaskIdentity(), "v1", "digest",
+                new AiTaskSelectedEvidenceResponse.ProjectedSnapshot(
+                        minimalSnapshotMetadata(),
+                        new AiTaskSelectedEvidenceResponse.Categories(
+                                new AiTaskSelectedEvidenceResponse.FactsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.RECORDED, 1, List.of(factItem)),
+                                new AiTaskSelectedEvidenceResponse.ObservationsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.PriorInsightsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EngineeringEventsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.HumanContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EvolutionContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of())
+                        )
+                )
+        );
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(available);
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        AnalysisResultResponse.EvidenceCategorySection facts = result.evidence().facts();
+        assertEquals(1, facts.count());
+        assertEquals(1, facts.items().size());
+
+        AnalysisResultResponse.EvidenceItem item = facts.items().get(0);
+        assertEquals("FACT", item.layer());
+        assertEquals("SOURCE_DIRECTORY_PRESENT", item.kind());
+        assertEquals("fact:" + factId, item.reference());
+        assertEquals("Source directory src/main/java exists", item.summary());
+        assertEquals(detectedAt, item.occurredAt());
+        assertEquals(List.of("diff:abc123:src/main/java"), item.relatedReferences());
+    }
+
+    @Test
+    void shouldMapObservationItemsToEvidenceItemsWithCorrectSemanticFields() {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        stubMinimalCompletedAnalysis(analysisId, projectId);
+
+        UUID obsId = UUID.randomUUID();
+        UUID factId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-08-27T10:05:00Z");
+        AiTaskSelectedEvidenceResponse.ObservationItem obsItem = new AiTaskSelectedEvidenceResponse.ObservationItem(
+                obsId, "PATTERN_DETECTED", "Module coupling detected", "OBS-001", "1.0",
+                List.of(factId), createdAt);
+
+        AiTaskSelectedEvidenceResponse available = AiTaskSelectedEvidenceResponse.available(
+                analysisId, projectId, minimalTaskIdentity(), "v1", "digest",
+                new AiTaskSelectedEvidenceResponse.ProjectedSnapshot(
+                        minimalSnapshotMetadata(),
+                        new AiTaskSelectedEvidenceResponse.Categories(
+                                new AiTaskSelectedEvidenceResponse.FactsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ObservationsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.RECORDED, 1, List.of(obsItem)),
+                                new AiTaskSelectedEvidenceResponse.PriorInsightsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EngineeringEventsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.HumanContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EvolutionContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of())
+                        )
+                )
+        );
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(available);
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        AnalysisResultResponse.EvidenceCategorySection observations = result.evidence().observations();
+        assertEquals(1, observations.count());
+        assertEquals(1, observations.items().size());
+
+        AnalysisResultResponse.EvidenceItem item = observations.items().get(0);
+        assertEquals("OBSERVATION", item.layer());
+        assertEquals("OBS-001", item.kind());
+        assertEquals("observation:" + obsId, item.reference());
+        assertEquals("Module coupling detected", item.summary());
+        assertEquals(createdAt, item.occurredAt());
+        assertEquals(List.of("fact:" + factId), item.relatedReferences());
+    }
+
+    @Test
+    void shouldMapPriorInsightItemsToEvidenceItemsWithCorrectSemanticFields() {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        stubMinimalCompletedAnalysis(analysisId, projectId);
+
+        AiTaskSelectedEvidenceResponse.PriorInsightItem insightItem =
+                new AiTaskSelectedEvidenceResponse.PriorInsightItem(
+                        "ARCHITECTURE", "WARNING", "Monolith scaling risk", "The monolith may face scaling issues");
+
+        AiTaskSelectedEvidenceResponse available = AiTaskSelectedEvidenceResponse.available(
+                analysisId, projectId, minimalTaskIdentity(), "v1", "digest",
+                new AiTaskSelectedEvidenceResponse.ProjectedSnapshot(
+                        minimalSnapshotMetadata(),
+                        new AiTaskSelectedEvidenceResponse.Categories(
+                                new AiTaskSelectedEvidenceResponse.FactsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ObservationsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.PriorInsightsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.RECORDED, 1, List.of(insightItem)),
+                                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EngineeringEventsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.HumanContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EvolutionContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of())
+                        )
+                )
+        );
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(available);
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        AnalysisResultResponse.EvidenceCategorySection priorInsights = result.evidence().priorInsights();
+        assertEquals(1, priorInsights.count());
+        assertEquals(1, priorInsights.items().size());
+
+        AnalysisResultResponse.EvidenceItem item = priorInsights.items().get(0);
+        assertEquals("VALIDATED_INSIGHT", item.layer());
+        assertEquals("WARNING", item.kind());
+        assertEquals("ARCHITECTURE", item.reference());
+        assertEquals("The monolith may face scaling issues", item.summary());
+        assertNull(item.occurredAt());
+        assertEquals(List.of(), item.relatedReferences());
+    }
+
+    @Test
+    void shouldMapArchitectureKnowledgeItemsToEvidenceItemsWithCorrectSemanticFields() {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        stubMinimalCompletedAnalysis(analysisId, projectId);
+
+        UUID insightId = UUID.randomUUID();
+        Instant createdAt = Instant.parse("2026-08-27T09:00:00Z");
+        AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeItem akItem =
+                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeItem(
+                        insightId, UUID.randomUUID(), "MODULE_BOUNDARY", "WARNING",
+                        "SOURCE_ANALYSIS", "Module boundary weakened", "Content about module boundary",
+                        "Rationale for the insight", List.of("diff:abc:file.java"), createdAt);
+
+        AiTaskSelectedEvidenceResponse available = AiTaskSelectedEvidenceResponse.available(
+                analysisId, projectId, minimalTaskIdentity(), "v1", "digest",
+                new AiTaskSelectedEvidenceResponse.ProjectedSnapshot(
+                        minimalSnapshotMetadata(),
+                        new AiTaskSelectedEvidenceResponse.Categories(
+                                new AiTaskSelectedEvidenceResponse.FactsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ObservationsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.PriorInsightsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.RECORDED, 1, List.of(akItem)),
+                                new AiTaskSelectedEvidenceResponse.EngineeringEventsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.HumanContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EvolutionContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of())
+                        )
+                )
+        );
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(available);
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        AnalysisResultResponse.EvidenceCategorySection ak = result.evidence().architectureKnowledge();
+        assertEquals(1, ak.count());
+        assertEquals(1, ak.items().size());
+
+        AnalysisResultResponse.EvidenceItem item = ak.items().get(0);
+        assertEquals("VALIDATED_INSIGHT", item.layer());
+        assertEquals("MODULE_BOUNDARY", item.kind());
+        assertEquals("insight:" + insightId, item.reference());
+        assertEquals("Module boundary weakened", item.summary());
+        assertEquals(createdAt, item.occurredAt());
+        assertEquals(List.of("diff:abc:file.java"), item.relatedReferences());
+    }
+
+    @Test
+    void shouldMapEngineeringEventItemsToEvidenceItemsWithCorrectSemanticFields() {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        stubMinimalCompletedAnalysis(analysisId, projectId);
+
+        UUID eventId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        Instant occurredAt = Instant.parse("2026-08-27T11:00:00Z");
+        AiTaskSelectedEvidenceResponse.EngineeringEventItem eventItem =
+                new AiTaskSelectedEvidenceResponse.EngineeringEventItem(
+                        eventId, "FEATURE", "Added auth module", "Implemented JWT authentication",
+                        sourceId, "abc123", "def456", occurredAt, null);
+
+        AiTaskSelectedEvidenceResponse available = AiTaskSelectedEvidenceResponse.available(
+                analysisId, projectId, minimalTaskIdentity(), "v1", "digest",
+                new AiTaskSelectedEvidenceResponse.ProjectedSnapshot(
+                        minimalSnapshotMetadata(),
+                        new AiTaskSelectedEvidenceResponse.Categories(
+                                new AiTaskSelectedEvidenceResponse.FactsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ObservationsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.PriorInsightsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EngineeringEventsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.RECORDED, 1, List.of(eventItem)),
+                                new AiTaskSelectedEvidenceResponse.HumanContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EvolutionContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of())
+                        )
+                )
+        );
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(available);
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        AnalysisResultResponse.EvidenceCategorySection events = result.evidence().engineeringEvents();
+        assertEquals(1, events.count());
+        assertEquals(1, events.items().size());
+
+        AnalysisResultResponse.EvidenceItem item = events.items().get(0);
+        assertEquals("COMMIT_DIFF", item.layer());
+        assertEquals("FEATURE", item.kind());
+        assertEquals("event:" + eventId, item.reference());
+        assertEquals("Added auth module", item.summary());
+        assertEquals(occurredAt, item.occurredAt());
+        assertEquals(List.of(
+                "git:" + sourceId + ":abc123",
+                "git:" + sourceId + ":def456"), item.relatedReferences());
+    }
+
+    @Test
+    void shouldMapHumanContextItemsToEvidenceItemsWithCorrectSemanticFields() {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        stubMinimalCompletedAnalysis(analysisId, projectId);
+
+        UUID humanId = UUID.randomUUID();
+        Instant updatedAt = Instant.parse("2026-08-27T12:00:00Z");
+        AiTaskSelectedEvidenceResponse.HumanContextItem humanItem =
+                new AiTaskSelectedEvidenceResponse.HumanContextItem(
+                        humanId, "ADR", "Use hexagonal architecture", "# ADR\nWe decided to use hexagonal...",
+                        "ACCEPTED", updatedAt);
+
+        AiTaskSelectedEvidenceResponse available = AiTaskSelectedEvidenceResponse.available(
+                analysisId, projectId, minimalTaskIdentity(), "v1", "digest",
+                new AiTaskSelectedEvidenceResponse.ProjectedSnapshot(
+                        minimalSnapshotMetadata(),
+                        new AiTaskSelectedEvidenceResponse.Categories(
+                                new AiTaskSelectedEvidenceResponse.FactsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ObservationsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.PriorInsightsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EngineeringEventsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.HumanContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.RECORDED, 1, List.of(humanItem)),
+                                new AiTaskSelectedEvidenceResponse.EvolutionContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of())
+                        )
+                )
+        );
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(available);
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        AnalysisResultResponse.EvidenceCategorySection humanCtx = result.evidence().humanContext();
+        assertEquals(1, humanCtx.count());
+        assertEquals(1, humanCtx.items().size());
+
+        AnalysisResultResponse.EvidenceItem item = humanCtx.items().get(0);
+        assertEquals("PROJECT_DOCUMENTATION", item.layer());
+        assertEquals("ADR", item.kind());
+        assertEquals("human:" + humanId, item.reference());
+        assertEquals("Use hexagonal architecture", item.summary());
+        assertEquals(updatedAt, item.occurredAt());
+        assertEquals(List.of(), item.relatedReferences());
+    }
+
+    @Test
+    void shouldMapEvolutionContextItemsToEvidenceItemsWithCorrectSemanticFields() {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        stubMinimalCompletedAnalysis(analysisId, projectId);
+
+        UUID sourceId = UUID.randomUUID();
+        Instant targetCommittedAt = Instant.parse("2026-08-27T13:00:00Z");
+        AiTaskSelectedEvidenceResponse.CommitDiff commitDiff = new AiTaskSelectedEvidenceResponse.CommitDiff(
+                projectId, sourceId, "abc123def", null, List.of(), false, false,
+                "Refactored service layer", targetCommittedAt,
+                List.of(), new AiTaskSelectedEvidenceResponse.DiffStatistics(3, 50, 20, 0),
+                List.of(), List.of(), List.of("diff:abc123def:src/Svc.java"), false, List.of());
+
+        AiTaskSelectedEvidenceResponse.EvolutionContextItem evoItem =
+                new AiTaskSelectedEvidenceResponse.EvolutionContextItem(
+                        "1.0", projectId, sourceId, "base123", "abc123def",
+                        "FULL", false, targetCommittedAt, commitDiff);
+
+        AiTaskSelectedEvidenceResponse available = AiTaskSelectedEvidenceResponse.available(
+                analysisId, projectId, minimalTaskIdentity(), "v1", "digest",
+                new AiTaskSelectedEvidenceResponse.ProjectedSnapshot(
+                        minimalSnapshotMetadata(),
+                        new AiTaskSelectedEvidenceResponse.Categories(
+                                new AiTaskSelectedEvidenceResponse.FactsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ObservationsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.PriorInsightsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EngineeringEventsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.HumanContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EvolutionContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.RECORDED, 1, List.of(evoItem)),
+                                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of())
+                        )
+                )
+        );
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(available);
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        AnalysisResultResponse.EvidenceCategorySection evo = result.evidence().evolutionContext();
+        assertEquals(1, evo.count());
+        assertEquals(1, evo.items().size());
+
+        AnalysisResultResponse.EvidenceItem item = evo.items().get(0);
+        assertEquals("COMMIT_DIFF", item.layer());
+        assertEquals("FULL", item.kind());
+        assertEquals("evolution:" + sourceId, item.reference());
+        assertEquals("Refactored service layer", item.summary());
+        assertEquals(targetCommittedAt, item.occurredAt());
+        assertEquals(List.of("diff:abc123def:src/Svc.java"), item.relatedReferences());
+    }
+
+    @Test
+    void shouldMapRepositoryEvidenceItemsToEvidenceItemsWithCorrectSemanticFields() {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        stubMinimalCompletedAnalysis(analysisId, projectId);
+
+        Instant occurredAt = Instant.parse("2026-08-27T14:00:00Z");
+        AiTaskSelectedEvidenceResponse.RepositoryEvidenceItem repoItem =
+                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceItem(
+                        "COMMIT_DIFF", "CHANGED_FILE", "diff:abc:src/App.java",
+                        "MODIFIED src/App.java (+10/-5)", occurredAt,
+                        List.of("git:src1:abc"), null, null);
+
+        AiTaskSelectedEvidenceResponse available = AiTaskSelectedEvidenceResponse.available(
+                analysisId, projectId, minimalTaskIdentity(), "v1", "digest",
+                new AiTaskSelectedEvidenceResponse.ProjectedSnapshot(
+                        minimalSnapshotMetadata(),
+                        new AiTaskSelectedEvidenceResponse.Categories(
+                                new AiTaskSelectedEvidenceResponse.FactsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ObservationsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.PriorInsightsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EngineeringEventsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.HumanContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EvolutionContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.RECORDED, 1, List.of(repoItem))
+                        )
+                )
+        );
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(available);
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        AnalysisResultResponse.EvidenceCategorySection repo = result.evidence().repositoryEvidence();
+        assertEquals(1, repo.count());
+        assertEquals(1, repo.items().size());
+
+        AnalysisResultResponse.EvidenceItem item = repo.items().get(0);
+        assertEquals("COMMIT_DIFF", item.layer());
+        assertEquals("CHANGED_FILE", item.kind());
+        assertEquals("diff:abc:src/App.java", item.reference());
+        assertEquals("MODIFIED src/App.java (+10/-5)", item.summary());
+        assertEquals(occurredAt, item.occurredAt());
+        assertEquals(List.of("git:src1:abc"), item.relatedReferences());
+    }
+
+    @Test
+    void shouldSerializeCanonicalResultWithFactItemsViaJackson() throws Exception {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        stubMinimalCompletedAnalysis(analysisId, projectId);
+
+        UUID factId1 = UUID.randomUUID();
+        UUID factId2 = UUID.randomUUID();
+        UUID factId3 = UUID.randomUUID();
+        Instant detectedAt = Instant.parse("2026-08-27T10:00:00Z");
+
+        AiTaskSelectedEvidenceResponse.FactItem fact1 = new AiTaskSelectedEvidenceResponse.FactItem(
+                factId1, "SOURCE_DIRECTORY_PRESENT", "Source directory src/main/java exists", "src/main/java",
+                List.of("diff:abc:src/main/java"), detectedAt);
+        AiTaskSelectedEvidenceResponse.FactItem fact2 = new AiTaskSelectedEvidenceResponse.FactItem(
+                factId2, "CONFIG_FILE_FOUND", "Found pom.xml", "pom.xml",
+                List.of(), detectedAt);
+        AiTaskSelectedEvidenceResponse.FactItem fact3 = new AiTaskSelectedEvidenceResponse.FactItem(
+                factId3, "TEST_DIRECTORY_PRESENT", "Test directory src/test/java exists", "src/test/java",
+                List.of(), detectedAt);
+
+        AiTaskSelectedEvidenceResponse available = AiTaskSelectedEvidenceResponse.available(
+                analysisId, projectId, minimalTaskIdentity(), "v1", "digest",
+                new AiTaskSelectedEvidenceResponse.ProjectedSnapshot(
+                        minimalSnapshotMetadata(),
+                        new AiTaskSelectedEvidenceResponse.Categories(
+                                new AiTaskSelectedEvidenceResponse.FactsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.RECORDED, 3, List.of(fact1, fact2, fact3)),
+                                new AiTaskSelectedEvidenceResponse.ObservationsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.PriorInsightsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EngineeringEventsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.HumanContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EvolutionContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of())
+                        )
+                )
+        );
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(available);
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        String json = objectMapper.writeValueAsString(result);
+
+        assertNotNull(json);
+        assertTrue(json.contains("SOURCE_DIRECTORY_PRESENT"));
+        assertTrue(json.contains("CONFIG_FILE_FOUND"));
+        assertTrue(json.contains("TEST_DIRECTORY_PRESENT"));
+
+        AnalysisResultResponse deserialized = objectMapper.readValue(json, AnalysisResultResponse.class);
+        assertEquals(3, deserialized.evidence().facts().count());
+        assertEquals(3, deserialized.evidence().facts().items().size());
+    }
+
+    @Test
+    void shouldRespectEvidencePreviewLimit() {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        stubMinimalCompletedAnalysis(analysisId, projectId);
+
+        List<AiTaskSelectedEvidenceResponse.FactItem> facts = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            facts.add(new AiTaskSelectedEvidenceResponse.FactItem(
+                    UUID.randomUUID(), "TYPE_" + i, "Fact " + i, "source" + i,
+                    List.of(), Instant.now()));
+        }
+
+        AiTaskSelectedEvidenceResponse available = AiTaskSelectedEvidenceResponse.available(
+                analysisId, projectId, minimalTaskIdentity(), "v1", "digest",
+                new AiTaskSelectedEvidenceResponse.ProjectedSnapshot(
+                        minimalSnapshotMetadata(),
+                        new AiTaskSelectedEvidenceResponse.Categories(
+                                new AiTaskSelectedEvidenceResponse.FactsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.RECORDED, 8, facts),
+                                new AiTaskSelectedEvidenceResponse.ObservationsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.PriorInsightsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.ArchitectureKnowledgeSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EngineeringEventsSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.HumanContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.EvolutionContextSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of()),
+                                new AiTaskSelectedEvidenceResponse.RepositoryEvidenceSection(
+                                        AiTaskSelectedEvidenceResponse.Availability.NOT_RECORDED, 0, List.of())
+                        )
+                )
+        );
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(available);
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        AnalysisResultResponse.EvidenceCategorySection factsSection = result.evidence().facts();
+        assertEquals(8, factsSection.count());
+        assertEquals(5, factsSection.items().size());
+    }
+
+    // --- Canonical result scope projection test ---
+
+    @Test
+    void getResult_withGenerateReadmeIntent_setsRepositoryScope() {
+        UUID analysisId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        Analysis analysis = new Analysis();
+        Project project = new Project();
+        project.setId(projectId);
+        analysis.setId(analysisId);
+        analysis.setProject(project);
+        analysis.setIntentId("generate-readme");
+        analysis.setIntentVersion("v1");
+        analysis.setStatus(AnalysisStatus.COMPLETED);
+        analysis.setStartedAt(Instant.parse("2026-07-22T10:00:00Z"));
+        analysis.setCompletedAt(Instant.parse("2026-07-22T10:01:00Z"));
+
+        when(analysisRepository.findById(analysisId)).thenReturn(Optional.of(analysis));
+        when(intentCatalog.resolve("generate-readme", "v1"))
+                .thenReturn(new IntentDefinition("generate-readme", "v1", "Generate README",
+                        List.of(), List.of(), Map.of(), "generate-readme-prompt-v1"));
+        when(proposalRepository.findByAnalysisId(analysisId)).thenReturn(new ArrayList<>());
+        when(selectedEvidenceService.getSelectedEvidence(analysisId)).thenReturn(
+                AiTaskSelectedEvidenceResponse.noAiTask(analysisId, projectId));
+
+        AnalysisResultResponse result = service.getResult(analysisId);
+
+        assertEquals("REPOSITORY_SCOPE", result.analysis().scope());
     }
 }

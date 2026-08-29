@@ -15,6 +15,11 @@ import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
+import com.hopeful117.devlogai.source.entity.Source;
+import com.hopeful117.devlogai.source.entity.SourceType;
+import com.hopeful117.devlogai.source.repository.SourceRepository;
+import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
+import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,6 +53,12 @@ class AnalysisServiceTest {
 
     @Mock
     ObjectMapper objectMapper;
+
+    @Mock
+    SourceRepository sourceRepository;
+
+    @Mock
+    WorkspaceManager workspaceManager;
 
     @InjectMocks
     AnalysisServiceImpl analysisService;
@@ -405,5 +416,147 @@ class AnalysisServiceTest {
 
         verify(analysisMapper)
                 .toResponse(analysis);
+    }
+
+    // --- Backend launch contract protection tests (GREEN immediately) ---
+
+    @Test
+    void shouldRejectMismatchedTypeOnCreate() {
+        UUID projectId = UUID.randomUUID();
+        CreateAnalysisRequest request = new CreateAnalysisRequest();
+        request.setProjectId(projectId);
+        request.setType(AnalysisType.PROJECT_EVOLUTION);
+        request.setIntentId("describe-project-v1");
+
+        Project project = new Project();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(intentCatalog.resolve("describe-project-v1"))
+                .thenReturn(new IntentDefinition("describe-project", "v1", "Describe",
+                        List.of(), List.of(), Map.of(), "prompt"));
+
+        assertThrows(IllegalArgumentException.class, () -> analysisService.create(request));
+        verify(analysisRepository, never()).save(any(Analysis.class));
+    }
+
+    @Test
+    void shouldDeriveArchitectureReviewWhenTypeIsOmitted() {
+        UUID projectId = UUID.randomUUID();
+        CreateAnalysisRequest request = new CreateAnalysisRequest();
+        request.setProjectId(projectId);
+        request.setType(null);
+        request.setIntentId("describe-project-v1");
+        request.setUserGuidance(new UserGuidance(
+                "architecture", "developers", "detailed", "technical",
+                "internal documentation", List.of("Docker first")));
+
+        Project project = new Project();
+        Analysis analysis = new Analysis();
+        analysis.setStatus(AnalysisStatus.IN_PROGRESS);
+        AnalysisResponse response = mock(AnalysisResponse.class);
+
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(intentCatalog.resolve("describe-project-v1"))
+                .thenReturn(new IntentDefinition("describe-project", "v1", "Describe",
+                        List.of(), List.of(), Map.of(), "prompt"));
+        when(analysisMapper.toEntity(request)).thenReturn(analysis);
+        when(objectMapper.convertValue(any(UserGuidance.class), eq(Map.class))).thenReturn(Map.of());
+        when(analysisRepository.save(analysis)).thenReturn(analysis);
+        when(analysisMapper.toResponse(analysis)).thenReturn(response);
+
+        AnalysisResponse result = analysisService.create(request);
+
+        assertNotNull(result);
+        assertEquals(AnalysisType.ARCHITECTURE_REVIEW, analysis.getType());
+    }
+
+    @Test
+    void shouldAcceptExplicitArchitectureReviewTypeOnCreate() {
+        UUID projectId = UUID.randomUUID();
+        CreateAnalysisRequest request = new CreateAnalysisRequest();
+        request.setProjectId(projectId);
+        request.setType(AnalysisType.ARCHITECTURE_REVIEW);
+        request.setIntentId("describe-project-v1");
+        request.setUserGuidance(new UserGuidance(
+                "architecture", "developers", "detailed", "technical",
+                "internal documentation", List.of("Docker first")));
+
+        Project project = new Project();
+        Analysis analysis = new Analysis();
+        analysis.setStatus(AnalysisStatus.IN_PROGRESS);
+        AnalysisResponse response = mock(AnalysisResponse.class);
+
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(intentCatalog.resolve("describe-project-v1"))
+                .thenReturn(new IntentDefinition("describe-project", "v1", "Describe",
+                        List.of(), List.of(), Map.of(), "prompt"));
+        when(analysisMapper.toEntity(request)).thenReturn(analysis);
+        when(objectMapper.convertValue(any(UserGuidance.class), eq(Map.class))).thenReturn(Map.of());
+        when(analysisRepository.save(analysis)).thenReturn(analysis);
+        when(analysisMapper.toResponse(analysis)).thenReturn(response);
+
+        AnalysisResponse result = analysisService.create(request);
+
+        assertNotNull(result);
+        assertEquals(AnalysisType.ARCHITECTURE_REVIEW, analysis.getType());
+    }
+
+    // --- Repository-scope service tests (RED before correction, GREEN after) ---
+
+    @Test
+    void create_withRepositoryScopedIntentAndValidSource_persistsRepositoryScopeAnalysis() {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        CreateAnalysisRequest request = new CreateAnalysisRequest();
+        request.setProjectId(projectId);
+        request.setIntentId("generate-readme-v1");
+        request.setSourceId(sourceId);
+
+        Project project = new Project();
+        project.setId(projectId);
+        Analysis analysis = new Analysis();
+        AnalysisResponse response = mock(AnalysisResponse.class);
+        Source source = new Source();
+        source.setId(sourceId);
+        source.setName("test-repo");
+        source.setType(SourceType.GIT_REPOSITORY);
+        SynchronizedWorkspace workspace = mock(SynchronizedWorkspace.class);
+
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(intentCatalog.resolve("generate-readme-v1"))
+                .thenReturn(new IntentDefinition("generate-readme", "v1", "Generate README",
+                        List.of(), List.of(), Map.of(), "generate-readme-prompt-v1"));
+        when(sourceRepository.findByIdAndProject_IdAndActiveTrue(sourceId, projectId))
+                .thenReturn(Optional.of(source));
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
+        when(workspace.resolvedRevision()).thenReturn("abc123");
+        when(analysisMapper.toEntity(request)).thenReturn(analysis);
+        when(analysisRepository.save(analysis)).thenReturn(analysis);
+        when(analysisMapper.toResponse(analysis)).thenReturn(response);
+
+        AnalysisResponse result = analysisService.create(request);
+
+        assertNotNull(result);
+        assertEquals("generate-readme", analysis.getIntentId());
+        assertEquals("v1", analysis.getIntentVersion());
+        assertNotNull(analysis.getSelectedSource());
+        assertEquals(sourceId, analysis.getSelectedSource().getId());
+    }
+
+    @Test
+    void create_withRepositoryScopedIntentAndNoSource_throws() {
+        UUID projectId = UUID.randomUUID();
+        CreateAnalysisRequest request = new CreateAnalysisRequest();
+        request.setProjectId(projectId);
+        request.setIntentId("generate-readme-v1");
+        request.setSourceId(null);
+
+        Project project = new Project();
+        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+        when(intentCatalog.resolve("generate-readme-v1"))
+                .thenReturn(new IntentDefinition("generate-readme", "v1", "Generate README",
+                        List.of(), List.of(), Map.of(), "generate-readme-prompt-v1"));
+
+        assertThrows(IllegalArgumentException.class, () -> analysisService.create(request));
+        verify(analysisRepository, never()).save(any(Analysis.class));
     }
 }

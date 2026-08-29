@@ -8,7 +8,6 @@ export type AnalysisType =
   | 'TECHNICAL_DEBT'
   | 'SECURITY_REVIEW'
   | 'DOCUMENTATION_REVIEW';
-export type LaunchableAnalysisType = 'ARCHITECTURE_REVIEW' | 'PROJECT_EVOLUTION';
 export type AiTaskStatus = 'CREATED' | 'SUBMITTED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 export type AiTaskType =
   | 'DECISION_PROPOSAL_GENERATION'
@@ -16,6 +15,11 @@ export type AiTaskType =
   | 'INSIGHT_GENERATION'
   | 'DOCUMENTATION_GENERATION'
   | 'CHALLENGE_PROPOSAL_GENERATION';
+
+export interface Source {
+  readonly id: string;
+  readonly name: string;
+}
 
 export interface UserGuidance {
   readonly focus: string | null;
@@ -45,8 +49,8 @@ export interface AnalysisDetail extends AnalysisFields {}
 
 export interface CreateAnalysisRequest {
   readonly projectId: string;
-  readonly type: LaunchableAnalysisType;
   readonly intentId: string;
+  readonly sourceId?: string;
   readonly targetRevision?: string;
   readonly userGuidance?: UserGuidance;
 }
@@ -69,6 +73,7 @@ export interface IntentDefinition {
   readonly constraints: readonly string[];
   readonly outputSchema: Readonly<Record<string, JsonValue>>;
   readonly promptTemplate: string;
+  readonly executionMode: string;
 }
 
 export interface AiTaskSummary {

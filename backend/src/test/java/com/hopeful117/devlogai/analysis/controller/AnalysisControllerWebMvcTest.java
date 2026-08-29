@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -35,6 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import com.hopeful117.devlogai.analysis.diagnostics.service.AnalysisDiagnosticsService;
+import com.hopeful117.devlogai.shared.exception.handler.GlobalExceptionHandler;
+import com.hopeful117.devlogai.shared.logging.CorrelationIdFilter;
 
 class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
 
@@ -110,6 +113,58 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 .andExpect(jsonPath("$.task.taskType").value("INSIGHT_GENERATION"))
                 .andExpect(jsonPath("$.task.status").value("SUBMITTED"));
         verify(selectedEvidence).getSelectedEvidence(id);
+    }
+
+    // --- Repository-scope HTTP creation tests ---
+
+    @Test
+    void create_withRepositoryScopedIntentAndValidSource_returns201() throws Exception {
+        AnalysisService service = mock(AnalysisService.class);
+        AnalysisWorkflowService workflow = mock(AnalysisWorkflowService.class);
+        AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
+        AiTaskSelectedEvidenceService selectedEvidence = mock(AiTaskSelectedEvidenceService.class);
+        AnalysisResultQueryService resultQuery = mock(AnalysisResultQueryService.class);
+        MockMvc mvc = mockMvc(new AnalysisController(
+                service, workflow, diagnostics, selectedEvidence, resultQuery));
+
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        UUID id = UUID.randomUUID();
+        AnalysisResponse response = new AnalysisResponse(id, projectId,
+                AnalysisType.ARCHITECTURE_REVIEW, AnalysisStatus.PENDING, null, null, null, null);
+        when(service.create(any())).thenReturn(response);
+
+        mvc.perform(post("/api/v1/analyses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(("{\"projectId\":\"%s\",\"intentId\":\"generate-readme-v1\"," +
+                                "\"sourceId\":\"%s\"}").formatted(projectId, sourceId)))
+                .andExpect(status().isCreated());
+
+        ArgumentCaptor<CreateAnalysisRequest> request = ArgumentCaptor.forClass(CreateAnalysisRequest.class);
+        verify(service).create(request.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("generate-readme-v1", request.getValue().getIntentId());
+        org.junit.jupiter.api.Assertions.assertEquals(sourceId, request.getValue().getSourceId());
+    }
+
+    @Test
+    void create_withRepositoryScopedIntentAndNoSource_returns500() throws Exception {
+        AnalysisService service = mock(AnalysisService.class);
+        AnalysisWorkflowService workflow = mock(AnalysisWorkflowService.class);
+        AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
+        AiTaskSelectedEvidenceService selectedEvidence = mock(AiTaskSelectedEvidenceService.class);
+        AnalysisResultQueryService resultQuery = mock(AnalysisResultQueryService.class);
+        MockMvc mvc = mockMvc(new AnalysisController(
+                service, workflow, diagnostics, selectedEvidence, resultQuery));
+
+        UUID projectId = UUID.randomUUID();
+        when(service.create(any()))
+                .thenThrow(new IllegalArgumentException("Source is required for repository-scoped objectives"));
+
+        mvc.perform(post("/api/v1/analyses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(("{\"projectId\":\"%s\",\"intentId\":\"generate-readme-v1\"}")
+                                .formatted(projectId)))
+                .andExpect(status().isInternalServerError());
     }
 
     @Test

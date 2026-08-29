@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 import { ProjectAnalysesSection } from './project-analyses-section';
 import { AnalysisService } from './analysis.service';
 import { IntentCatalogService } from './intent-catalog.service';
+import { SourceService } from '../projects/source.service';
 
 const analysis = {
   id: 'analysis-id',
@@ -22,10 +23,12 @@ describe('ProjectAnalysesSection', () => {
   const getAnalysesByProject = vi.fn();
   const createAnalysis = vi.fn();
   const launchAnalysis = vi.fn();
+  const getSourcesByProject = vi.fn();
   beforeEach(async () => {
     getAnalysesByProject.mockReset().mockReturnValue(of([analysis]));
     createAnalysis.mockReset().mockReturnValue(of(analysis));
     launchAnalysis.mockReset().mockReturnValue(of({ analysisId: analysis.id }));
+    getSourcesByProject.mockReset().mockReturnValue(of([]));
     await TestBed.configureTestingModule({
       imports: [ProjectAnalysesSection],
       providers: [
@@ -39,6 +42,7 @@ describe('ProjectAnalysesSection', () => {
           },
         },
         { provide: IntentCatalogService, useValue: { getSupportedIntents: () => of([]) } },
+        { provide: SourceService, useValue: { getSourcesByProject } },
       ],
     }).compileComponents();
   });
@@ -57,7 +61,6 @@ describe('ProjectAnalysesSection', () => {
     fixture.detectChanges();
     fixture.componentInstance.launch({
       projectId: 'project-id',
-      type: 'ARCHITECTURE_REVIEW',
       intentId: 'architecture-overview-v1',
     });
     fixture.detectChanges();
@@ -69,4 +72,101 @@ describe('ProjectAnalysesSection', () => {
   });
   it('does not manually subscribe', () =>
     expect(ProjectAnalysesSection.toString()).not.toContain('.subscribe('));
+});
+
+const genericIntents = [
+  {
+    id: 'describe-project',
+    version: 'v1',
+    executionMode: 'GENERIC',
+    objective: 'Describe the project',
+    supportedInsightTypes: [],
+    constraints: [],
+    outputSchema: {},
+    promptTemplate: '',
+  },
+  {
+    id: 'generate-readme',
+    version: 'v1',
+    executionMode: 'GENERIC',
+    objective: 'Generate README',
+    supportedInsightTypes: [],
+    constraints: [],
+    outputSchema: {},
+    promptTemplate: '',
+  },
+  {
+    id: 'architecture-overview',
+    version: 'v1',
+    executionMode: 'GENERIC',
+    objective: 'Architecture overview',
+    supportedInsightTypes: [],
+    constraints: [],
+    outputSchema: {},
+    promptTemplate: '',
+  },
+  {
+    id: 'analyze-engineering-decision',
+    version: 'v1',
+    executionMode: 'GENERIC',
+    objective: 'Analyze decisions',
+    supportedInsightTypes: [],
+    constraints: [],
+    outputSchema: {},
+    promptTemplate: '',
+  },
+  {
+    id: 'analyze-engineering-event',
+    version: 'v1',
+    executionMode: 'DEDICATED_ENGINEERING_EVENT',
+    objective: 'Engineering events',
+    supportedInsightTypes: [],
+    constraints: [],
+    outputSchema: {},
+    promptTemplate: '',
+  },
+];
+
+describe('ProjectAnalysesSection — objective mapping contract', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [ProjectAnalysesSection],
+      providers: [
+        provideRouter([]),
+        {
+          provide: AnalysisService,
+          useValue: {
+            getAnalysesByProject: vi.fn().mockReturnValue(of([analysis])),
+            createAnalysis: vi.fn().mockReturnValue(of(analysis)),
+            launchAnalysis: vi.fn().mockReturnValue(of({ analysisId: analysis.id })),
+          },
+        },
+        {
+          provide: IntentCatalogService,
+          useValue: { getSupportedIntents: () => of(genericIntents) },
+        },
+        {
+          provide: SourceService,
+          useValue: { getSourcesByProject: vi.fn().mockReturnValue(of([])) },
+        },
+      ],
+    }).compileComponents();
+  });
+
+  it('RED: maps 4 generic intents to objectives via versioned key', async () => {
+    const fixture = TestBed.createComponent(ProjectAnalysesSection);
+    fixture.componentInstance.projectId = 'project-id';
+    fixture.componentInstance.showForm = true;
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const select = fixture.nativeElement.querySelector('select');
+    expect(select).not.toBeNull();
+    const options = Array.from(select.querySelectorAll('option')) as Element[];
+    const labels = options.map((o) => o.textContent?.trim());
+    expect(labels).toContain('Understand this project');
+    expect(labels).toContain('Prepare README information');
+    expect(labels).toContain('Review the architecture');
+    expect(labels).toContain('Analyze engineering decisions');
+  });
 });
