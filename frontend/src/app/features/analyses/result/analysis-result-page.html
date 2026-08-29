@@ -48,9 +48,7 @@
                 }}
               </dd>
               <dt>Intent</dt>
-              <dd>
-                {{ view.data.analysis.intentId }}/{{ view.data.analysis.intentVersion }}
-              </dd>
+              <dd>{{ view.data.analysis.intentId }}/{{ view.data.analysis.intentVersion }}</dd>
               <dt>Sources</dt>
               <dd>{{ view.data.analysis.sourcesAnalyzed.join(', ') || 'None recorded' }}</dd>
             </dl>
@@ -76,7 +74,9 @@
               {{ view.data.execution.failureCode || 'ANALYSIS_FAILED' }}:
               {{ view.data.execution.failureMessage || 'Analysis execution failed.' }}
             </p>
-            <a [routerLink]="['/analyses', view.data.analysis.id, 'diagnostics']">View diagnostics</a>
+            <a [routerLink]="['/analyses', view.data.analysis.id, 'diagnostics']"
+              >View diagnostics</a
+            >
           </section>
 
           @if (view.data.nextActions.length > 0) {
@@ -100,13 +100,23 @@
             <div class="section-heading">
               <div>
                 <h2>Proposals</h2>
-                <p>{{ view.data.proposals.total }} proposal{{ view.data.proposals.total === 1 ? '' : 's' }} in the canonical result.</p>
+                <p>
+                  {{ view.data.proposals.total }} proposal{{
+                    view.data.proposals.total === 1 ? '' : 's'
+                  }}
+                  in the canonical result.
+                </p>
               </div>
-              <a [routerLink]="['/analyses', view.data.analysis.id, 'proposal-review']">View proposal review</a>
+              <a [routerLink]="['/analyses', view.data.analysis.id, 'proposal-review']"
+                >View proposal review</a
+              >
             </div>
             @if (view.data.proposals.items.length > 0) {
               <div class="card-grid">
-                @for (proposal of view.data.proposals.items; track trackProposal($index, proposal)) {
+                @for (
+                  proposal of view.data.proposals.items;
+                  track trackProposal($index, proposal)
+                ) {
                   <article class="panel card">
                     <div class="card-heading">
                       <span class="badge badge--info">{{ proposal.type }}</span>
@@ -122,12 +132,20 @@
                     <p>{{ proposal.summary || 'No summary provided.' }}</p>
                     <dl class="metadata-list compact-list">
                       <dt>Confidence</dt>
-                      <dd>{{ proposal.confidence !== null ? (proposal.confidence | number: '1.0-2') : 'Not provided' }}</dd>
+                      <dd>
+                        {{
+                          proposal.confidence !== null
+                            ? (proposal.confidence | number: '1.0-2')
+                            : 'Not provided'
+                        }}
+                      </dd>
                     </dl>
                     <h4>Evidence preview</h4>
                     <ul>
                       @for (item of proposal.evidencePreview; track item) {
-                        <li><code>{{ item }}</code></li>
+                        <li>
+                          <code>{{ item }}</code>
+                        </li>
                       } @empty {
                         <li>No evidence preview recorded.</li>
                       }
@@ -147,7 +165,12 @@
             <div class="section-heading">
               <div>
                 <h2>Validated insights</h2>
-                <p>{{ view.data.insights.total }} validated insight{{ view.data.insights.total === 1 ? '' : 's' }} from this Analysis.</p>
+                <p>
+                  {{ view.data.insights.total }} validated insight{{
+                    view.data.insights.total === 1 ? '' : 's'
+                  }}
+                  from this Analysis.
+                </p>
               </div>
               <a routerLink="/insights">View all insights</a>
             </div>
@@ -184,7 +207,12 @@
             <div class="section-heading">
               <div>
                 <h2>Generated deliverables</h2>
-                <p>{{ view.data.deliverables.total }} deliverable{{ view.data.deliverables.total === 1 ? '' : 's' }} generated from this Analysis.</p>
+                <p>
+                  {{ view.data.deliverables.total }} deliverable{{
+                    view.data.deliverables.total === 1 ? '' : 's'
+                  }}
+                  generated from this Analysis.
+                </p>
               </div>
             </div>
             @if (view.data.deliverables.items.length > 0) {
@@ -212,13 +240,18 @@
                 <h2>Supporting evidence</h2>
                 <p>Curated evidence from the backend Analysis result projection.</p>
               </div>
-              <a [routerLink]="['/analyses', view.data.analysis.id, 'diagnostics']">Open diagnostics</a>
+              <a [routerLink]="['/analyses', view.data.analysis.id, 'diagnostics']"
+                >Open diagnostics</a
+              >
             </div>
             <div class="evidence-grid">
               @for (category of evidenceCategories(view.data); track category.key) {
                 <article class="panel evidence-card">
                   <h3>{{ category.label }}</h3>
-                  <p>{{ category.value.count }} item{{ category.value.count === 1 ? '' : 's' }} recorded.</p>
+                  <p>
+                    {{ category.value.count }} item{{ category.value.count === 1 ? '' : 's' }}
+                    recorded.
+                  </p>
                   <ul>
                     @for (item of category.value.items; track item.reference + item.kind) {
                       <li>

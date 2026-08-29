@@ -88,7 +88,19 @@ const completedResult: AnalysisResult = {
     ],
   },
   evidence: {
-    facts: { count: 3, items: [{ layer: 'FACT', kind: 'CODE', reference: 'pom.xml:1', summary: 'Build declaration', occurredAt: '2026-07-22T10:00:00Z', relatedReferences: [] }] },
+    facts: {
+      count: 3,
+      items: [
+        {
+          layer: 'FACT',
+          kind: 'CODE',
+          reference: 'pom.xml:1',
+          summary: 'Build declaration',
+          occurredAt: '2026-07-22T10:00:00Z',
+          relatedReferences: [],
+        },
+      ],
+    },
     observations: { count: 1, items: [] },
     priorInsights: { count: 0, items: [] },
     architectureKnowledge: { count: 0, items: [] },
@@ -160,7 +172,9 @@ describe('AnalysisResultPage', () => {
   it('preserves proposal navigation without trusted-artifact links', async () => {
     const fixture = await render();
     const element = fixture.nativeElement as HTMLElement;
-    const links = Array.from(element.querySelectorAll('a')).map((anchor) => anchor.textContent?.trim());
+    const links = Array.from(element.querySelectorAll('a')).map((anchor) =>
+      anchor.textContent?.trim(),
+    );
 
     expect(links).toContain('Review proposal');
     expect(links).toContain('View proposal');
@@ -173,7 +187,11 @@ describe('AnalysisResultPage', () => {
       of({
         ...completedResult,
         analysis: { ...completedResult.analysis, status: 'FAILED' },
-        execution: { success: false, failureCode: 'ANALYSIS_FAILED', failureMessage: 'Pipeline stopped' },
+        execution: {
+          success: false,
+          failureCode: 'ANALYSIS_FAILED',
+          failureMessage: 'Pipeline stopped',
+        },
         proposals: { total: 0, byStatus: {}, byType: {}, items: [] },
         insights: { total: 0, items: [] },
         deliverables: { total: 0, items: [] },
@@ -199,7 +217,12 @@ describe('AnalysisResultPage', () => {
 
     first.next({
       ...completedResult,
-      analysis: { ...completedResult.analysis, status: 'IN_PROGRESS', completedAt: null, durationSeconds: null },
+      analysis: {
+        ...completedResult.analysis,
+        status: 'IN_PROGRESS',
+        completedAt: null,
+        durationSeconds: null,
+      },
       execution: { success: null, failureCode: null, failureMessage: null },
       proposals: { total: 0, byStatus: {}, byType: {}, items: [] },
       insights: { total: 0, items: [] },
@@ -220,7 +243,11 @@ describe('AnalysisResultPage', () => {
       of({
         ...completedResult,
         analysis: { ...completedResult.analysis, status: 'FAILED' },
-        execution: { success: false, failureCode: 'ANALYSIS_FAILED', failureMessage: 'Pipeline stopped' },
+        execution: {
+          success: false,
+          failureCode: 'ANALYSIS_FAILED',
+          failureMessage: 'Pipeline stopped',
+        },
         proposals: { total: 0, byStatus: {}, byType: {}, items: [] },
         insights: { total: 0, items: [] },
         deliverables: { total: 0, items: [] },

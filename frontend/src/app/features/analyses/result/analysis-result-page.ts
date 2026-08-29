@@ -78,7 +78,9 @@ export class AnalysisResultPage {
     return proposal.status === 'PROPOSED' ? 'Review proposal' : 'View proposal';
   }
 
-  evidenceCategories(result: AnalysisResult): readonly { key: string; label: string; value: EvidenceCategory }[] {
+  evidenceCategories(
+    result: AnalysisResult,
+  ): readonly { key: string; label: string; value: EvidenceCategory }[] {
     return [
       { key: 'facts', label: 'Facts', value: result.evidence.facts },
       { key: 'observations', label: 'Observations', value: result.evidence.observations },
@@ -94,7 +96,11 @@ export class AnalysisResultPage {
         value: result.evidence.engineeringEvents,
       },
       { key: 'humanContext', label: 'Human Context', value: result.evidence.humanContext },
-      { key: 'evolutionContext', label: 'Evolution Context', value: result.evidence.evolutionContext },
+      {
+        key: 'evolutionContext',
+        label: 'Evolution Context',
+        value: result.evidence.evolutionContext,
+      },
       {
         key: 'repositoryEvidence',
         label: 'Repository Evidence',
