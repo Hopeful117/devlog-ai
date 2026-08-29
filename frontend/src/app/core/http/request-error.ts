@@ -35,6 +35,7 @@ export function toRequestError(
     | 'diagnostics'
     | 'proposal'
     | 'insight'
+    | 'decision'
     | 'deliverable' = 'project',
 ): RequestError {
   if (error instanceof HttpErrorResponse) {

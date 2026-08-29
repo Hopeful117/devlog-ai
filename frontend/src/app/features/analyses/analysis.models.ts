@@ -282,6 +282,17 @@ export interface ProposalSummary {
   readonly summary: string;
   readonly evidencePreview: readonly string[];
   readonly proposalId: string;
+  readonly trustedArtifact: TrustedArtifact | null;
+}
+
+export type TrustedArtifactType = 'INSIGHT' | 'DECISION' | 'ENGINEERING_EVENT';
+export type TrustedArtifactAvailability = 'AVAILABLE' | 'UNAVAILABLE';
+
+export interface TrustedArtifact {
+  readonly id: string | null;
+  readonly type: TrustedArtifactType;
+  readonly availability: TrustedArtifactAvailability;
+  readonly detailAvailable: boolean;
 }
 
 export interface InsightSummary {

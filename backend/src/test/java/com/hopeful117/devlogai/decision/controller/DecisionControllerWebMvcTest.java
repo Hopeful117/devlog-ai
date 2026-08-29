@@ -27,7 +27,8 @@ class DecisionControllerWebMvcTest extends ControllerWebMvcTestSupport {
         MockMvc mvc = mockMvc(new DecisionController(service));
         UUID id = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
-        DecisionResponse response = new DecisionResponse(id, projectId, "Use REST", "context",
+        UUID proposalId = UUID.randomUUID();
+        DecisionResponse response = new DecisionResponse(id, projectId, proposalId, "Use REST", "context",
                 "REST", "simple", null, null, null);
         when(service.create(any())).thenReturn(response);
         when(service.getById(id)).thenReturn(response);
@@ -41,7 +42,9 @@ class DecisionControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/v1/decisions/" + id));
         mvc.perform(get("/api/v1/decisions/{id}", id))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.choice").value("REST"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.choice").value("REST"))
+                .andExpect(jsonPath("$.proposalId").value(proposalId.toString()));
         mvc.perform(get("/api/v1/decisions/project/{id}", projectId))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[0].projectId").value(projectId.toString()));
     }

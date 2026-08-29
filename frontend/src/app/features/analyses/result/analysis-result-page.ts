@@ -16,7 +16,13 @@ import {
 import { APP_ENVIRONMENT } from '../../../core/config/app-environment';
 import { RequestError, toRequestError } from '../../../core/http/request-error';
 import { AnalysisDeliverablePanel } from '../../deliverables/analysis-deliverable-panel';
-import { AnalysisResult, EvidenceCategory, NextAction, ProposalSummary } from '../analysis.models';
+import {
+  AnalysisResult,
+  EvidenceCategory,
+  NextAction,
+  ProposalSummary,
+  TrustedArtifact,
+} from '../analysis.models';
 import { AnalysisService } from '../analysis.service';
 
 type LoadState<T> =
@@ -76,6 +82,47 @@ export class AnalysisResultPage {
 
   proposalActionLabel(proposal: ProposalSummary): string {
     return proposal.status === 'PROPOSED' ? 'Review proposal' : 'View proposal';
+  }
+
+  trustedArtifactActionLabel(trustedArtifact: TrustedArtifact): string {
+    switch (trustedArtifact.type) {
+      case 'INSIGHT':
+        return 'View insight';
+      case 'DECISION':
+        return 'View decision';
+      case 'ENGINEERING_EVENT':
+        return 'View engineering event';
+    }
+  }
+
+  trustedArtifactRoute(trustedArtifact: TrustedArtifact): readonly string[] | null {
+    if (
+      trustedArtifact.availability !== 'AVAILABLE' ||
+      !trustedArtifact.detailAvailable ||
+      !trustedArtifact.id
+    ) {
+      return null;
+    }
+
+    switch (trustedArtifact.type) {
+      case 'INSIGHT':
+        return ['/insights', trustedArtifact.id];
+      case 'DECISION':
+        return ['/decisions', trustedArtifact.id];
+      case 'ENGINEERING_EVENT':
+        return ['/engineering-events', trustedArtifact.id];
+    }
+  }
+
+  trustedArtifactUnavailableLabel(trustedArtifact: TrustedArtifact): string {
+    switch (trustedArtifact.type) {
+      case 'INSIGHT':
+        return 'Trusted Insight unavailable';
+      case 'DECISION':
+        return 'Trusted Decision unavailable';
+      case 'ENGINEERING_EVENT':
+        return 'Trusted Engineering Event unavailable';
+    }
   }
 
   evidenceCategories(

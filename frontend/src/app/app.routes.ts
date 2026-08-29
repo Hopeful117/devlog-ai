@@ -79,6 +79,13 @@ export const routes: Routes = [
     ],
   },
   {
+    path: 'decisions/:id',
+    loadComponent: () =>
+      import('./features/decisions/decision-detail-page').then(
+        (module) => module.DecisionDetailPage,
+      ),
+  },
+  {
     path: 'engineering-events/:id',
     loadComponent: () =>
       import('./features/engineering-events/engineering-event-detail-page').then(

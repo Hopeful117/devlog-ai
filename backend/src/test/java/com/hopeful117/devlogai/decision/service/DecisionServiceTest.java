@@ -58,6 +58,7 @@ class DecisionServiceTest {
                 new DecisionResponse(
                         UUID.randomUUID(),
                         projectId,
+                        null,
                         "Adoption de MapStruct",
                         "Les mappings manuels deviennent difficiles.",
                         "Utiliser MapStruct",
@@ -141,6 +142,7 @@ class DecisionServiceTest {
                 new DecisionResponse(
                         UUID.randomUUID(),
                         projectId,
+                        null,
                         "Architecture choice",
                         "Context",
                         "Choice",
@@ -182,6 +184,7 @@ class DecisionServiceTest {
                 new DecisionResponse(
                         id,
                         UUID.randomUUID(),
+                        null,
                         "Choice",
                         "Context",
                         "Decision",
@@ -259,6 +262,7 @@ class DecisionServiceTest {
                 new DecisionResponse(
                         id,
                         UUID.randomUUID(),
+                        null,
                         "New Title",
                         "New Context",
                         "New Choice",

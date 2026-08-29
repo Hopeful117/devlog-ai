@@ -91,6 +91,28 @@ class DecisionPromotionProvenancePostgresIntegrationTest {
                 "unlinked proposal has no promoted Decision");
     }
 
+    @Test
+    void findByProposalIdInReturnsPromotedDecisionsInBatch() {
+        UUID project = UUID.randomUUID();
+        insertProject(project, "Decision batch query project", "decision-batch-query-project");
+        UUID analysis = insertAnalysis(project, "ARCHITECTURE_REVIEW");
+        UUID proposalA = insertProposal(project, analysis, "ENGINEERING_DECISION");
+        UUID proposalB = insertProposal(project, analysis, "ENGINEERING_DECISION");
+
+        UUID decisionA = UUID.randomUUID();
+        UUID decisionB = UUID.randomUUID();
+        insertDecision(project, proposalA, decisionA);
+        insertDecision(project, proposalB, decisionB);
+
+        List<Decision> found = decisionRepository.findByProposalIdIn(List.of(proposalA, proposalB));
+
+        assertEquals(2, found.size());
+        assertEquals(
+                List.of(decisionA, decisionB).stream().sorted().toList(),
+                found.stream().map(Decision::getId).sorted().toList()
+        );
+    }
+
     private void insertProject(UUID id, String name, String slug) {
         jdbc.update("""
                 insert into projects (id, name, slug, description, status, created_at, updated_at)

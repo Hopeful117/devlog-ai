@@ -10,6 +10,7 @@ import org.mapstruct.Mapping;
 public interface DecisionMapper {
 
     @Mapping(target = "projectId", source = "project.id")
+    @Mapping(target = "proposalId", source = "proposal.id")
     DecisionResponse toResponse(Decision decision);
 
 
