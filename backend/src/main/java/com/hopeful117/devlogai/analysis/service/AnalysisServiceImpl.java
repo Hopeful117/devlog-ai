@@ -60,7 +60,7 @@ public class AnalysisServiceImpl implements AnalysisService {
 
         // Determine scope from intent
         String intentId = intent.id();
-        boolean isRepositoryScope = "generate-readme-v1".equals(intentId);
+        boolean isRepositoryScope = "generate-readme".equals(intentId);
         boolean isProjectScope = !isRepositoryScope;
 
         // Validate scope-specific fields
