@@ -618,7 +618,7 @@ class Story0097CommitDiffReconnectionTest {
     }
 
     private ContextPlan contextPlan() {
-        var policy = new EvidencePrecisionPolicy("test", "v1", 50, 0, 25, 75);
+        var policy = new EvidencePrecisionPolicy("test", "v1", 50, 0, 25, 100, 75);
         var profile = new ContextProfileDefinition("test",
                 ContextProfile.ENGINEERING_STORY, "v1", Map.of(),
                 List.of(RepositoryContextLayer.RELATED_SOURCE_CODE), 1, 100, policy);

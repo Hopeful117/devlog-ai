@@ -64,13 +64,13 @@ class RepositoryContextServiceTest {
                 fact(FactType.TECHNOLOGY, "Spring Boot application", "backend/pom.xml"),
                 fact(FactType.README_PRESENT, "README updated", "README.md")));
 
-        RepositoryContext first = service.build(context, intent(), null, List.of());
-        RepositoryContext second = service.build(context, intent(), null, List.of());
+        RepositoryContext first = service.build(context, uncappedIntent(), null, List.of());
+        RepositoryContext second = service.build(context, uncappedIntent(), null, List.of());
 
         assertEquals(first, second);
         assertFalse(first.truncated());
         assertEquals(ContextProfile.ARCHITECTURE_REVIEW, first.profile());
-        assertEquals(List.of("architecture-v1", "history-v1"),
+        assertEquals(List.of("architecture-v1"),
                 first.activeProfileKeys());
         assertEquals("context-intelligence-v2", first.contextPlanVersion());
         assertTrue(first.selectedByLayer().containsKey(RepositoryContextLayer.CURRENT_ANALYSIS));
@@ -125,7 +125,7 @@ class RepositoryContextServiceTest {
                 fact(FactType.TECHNOLOGY, "two", "two.java"),
                 fact(FactType.TECHNOLOGY, "three", "three.java")));
 
-        RepositoryContext result = service.build(context, intent(), null, List.of());
+        RepositoryContext result = service.build(context, uncappedIntent(), null, List.of());
 
         assertEquals(2, result.evidence().size());
         assertTrue(result.truncated());
@@ -318,6 +318,13 @@ class RepositoryContextServiceTest {
                 List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
                 Map.of("type", "object"), "architecture-overview-prompt-v1",
                 List.of("architecture-v1", "history-v1"));
+    }
+
+    private IntentDefinition uncappedIntent() {
+        return new IntentDefinition("architecture-overview", "v1", "Describe architecture",
+                List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
+                Map.of("type", "object"), "architecture-overview-prompt-v1",
+                List.of("architecture-v1"));
     }
 
     private IntentDefinition engineeringStoryIntent() {

@@ -16,9 +16,12 @@ import java.util.Map;
 @Component
 public class DeterministicContextIntelligence implements ContextIntelligence {
     static final String PLAN_VERSION = "context-intelligence-v2";
+    private static final EvidencePrecisionPolicy ANALYSIS_CATEGORY_BALANCE =
+            new EvidencePrecisionPolicy("analysis-category-balance", "v1",
+                    100, 0, 100, 20, 101);
     private static final EvidencePrecisionPolicy ENGINEERING_STORY_PRECISION =
             new EvidencePrecisionPolicy("engineering-story-precision", "v1",
-                    50, 35, 25, 75);
+                    50, 35, 25, 20, 75);
     private static final String HISTORY_PROFILE = "history-v1";
     private static final Map<String, ContextProfileDefinition> PROFILES = profiles();
 
@@ -49,6 +52,7 @@ public class DeterministicContextIntelligence implements ContextIntelligence {
                 "PRECISION_BOUNDS:common=" + precision.maximumCommonTermPercentage()
                         + ",minimum=" + precision.minimumRelevanceScore()
                         + ",kind-share=" + precision.maximumKindSharePercentage()
+                        + ",category-share=" + precision.maximumCategorySharePercentage()
                         + ",strong=" + precision.strongRelevanceScore()));
     }
 
@@ -93,7 +97,8 @@ public class DeterministicContextIntelligence implements ContextIntelligence {
                 List.of(RepositoryContextLayer.GIT_HISTORY,
                         RepositoryContextLayer.COMMIT_DIFF,
                         RepositoryContextLayer.ROADMAP,
-                        RepositoryContextLayer.PREVIOUS_ANALYSIS), 3, 90));
+                        RepositoryContextLayer.PREVIOUS_ANALYSIS), 3, 90,
+                ANALYSIS_CATEGORY_BALANCE));
         register(result, profile("documentation-v1", ContextProfile.DOCUMENTATION,
                 weights(35, 10, 5, 10, 30, 10),
                 List.of(RepositoryContextLayer.PROJECT_DOCUMENTATION,

@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,7 +37,7 @@ class BudgetedDiverseEvidenceSelectorTest {
         addCategory(ranked, "insight", "INSIGHT", 4, 64);
         ranked.add(evidence("weak", "DOCUMENT", 20));
         ContextRequest request = request(60, 6000,
-                new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 75));
+                new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 100, 75));
 
         EvidenceSelector.SelectionResult result = selector.select(ranked, request);
 
@@ -90,7 +91,7 @@ class BudgetedDiverseEvidenceSelectorTest {
 
         EvidenceSelector.SelectionResult result = selector.select(ranked,
                 request(20, 1000,
-                        new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 75)));
+                        new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 100, 75)));
 
         assertEquals(3, result.selected().stream()
                 .filter(value -> value.kind().equals("TEST_FILE")).count());
@@ -144,5 +145,111 @@ class BudgetedDiverseEvidenceSelectorTest {
                 List.of(), new RepositoryEvidence.EvidenceProvenance(
                 "DETERMINISTIC_EXTRACTION", "repository", reference, reference),
                 Map.of(), tokens, List.of());
+    }
+
+    @Test
+    void ceilingEnforcementPreventsCategoryDominance() {
+        List<RepositoryEvidence> ranked = new ArrayList<>();
+        for (int i = 0; i < 50; i++)
+            ranked.add(evidence("commit-" + i, "COMMIT_DIFF", 90 - i / 3));
+        addCategory(ranked, "git", "GIT_HISTORY", 10, 80);
+        addCategory(ranked, "insight", "INSIGHT", 5, 70);
+        addCategory(ranked, "adr", "DECISION", 3, 65);
+        ContextRequest request = request(60, 6000,
+                new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 20, 75));
+
+        EvidenceSelector.SelectionResult result = selector.select(ranked, request);
+
+        long commitDiffCount = result.selected().stream()
+                .filter(v -> v.kind().equals("COMMIT_DIFF")).count();
+        assertTrue(commitDiffCount <= 12,
+                "COMMIT_DIFF should be capped at 20% of 60 = 12, was " + commitDiffCount);
+    }
+
+    @Test
+    void strongRelevanceCannotBypassCategoryCeiling() {
+        List<RepositoryEvidence> ranked = new ArrayList<>();
+        for (int i = 0; i < 30; i++)
+            ranked.add(evidence("commit-strong-" + i, "COMMIT_DIFF", 95));
+        addCategory(ranked, "git", "GIT_HISTORY", 10, 80);
+        addCategory(ranked, "insight", "INSIGHT", 8, 70);
+        addCategory(ranked, "adr", "DECISION", 5, 65);
+        ContextRequest request = request(60, 6000,
+                new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 20, 75));
+
+        EvidenceSelector.SelectionResult result = selector.select(ranked, request);
+
+        long commitDiffCount = result.selected().stream()
+                .filter(v -> v.kind().equals("COMMIT_DIFF")).count();
+        assertTrue(commitDiffCount <= 12,
+                "Strong relevance COMMIT_DIFF (score >= 75) should not bypass ceiling, was " + commitDiffCount);
+    }
+
+    @Test
+    void knowledgeFloorPreservedWithCeiling() {
+        List<RepositoryEvidence> ranked = new ArrayList<>();
+        for (int i = 0; i < 50; i++)
+            ranked.add(evidence("commit-" + i, "COMMIT_DIFF", 90 - i / 3));
+        addCategory(ranked, "fact", "FACT", 10, 70);
+        addCategory(ranked, "insight", "INSIGHT", 10, 65);
+        ContextRequest request = request(60, 6000,
+                new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 20, 75));
+
+        EvidenceSelector.SelectionResult result = selector.select(ranked, request);
+
+        long knowledgeCount = result.selected().stream()
+                .filter(v -> Set.of("INSIGHT", "FACT", "DECISION", "ARTIFACT",
+                        "MILESTONE", "CHALLENGE", "ENGINEERING_EVENT", "OBSERVATION")
+                        .contains(v.kind())).count();
+        assertTrue(knowledgeCount >= 2,
+                "Knowledge floor should reserve at least 2 slots, was " + knowledgeCount);
+    }
+
+    @Test
+    void globalBudgetFilledWhenDiverseEvidenceExists() {
+        List<RepositoryEvidence> ranked = new ArrayList<>();
+        for (int i = 0; i < 12; i++)
+            ranked.add(evidence("commit-" + i, "COMMIT_DIFF", 90 - i));
+        for (int i = 0; i < 15; i++)
+            ranked.add(evidence("git-" + i, "GIT_HISTORY", 85 - i));
+        for (int i = 0; i < 15; i++)
+            ranked.add(evidence("insight-" + i, "INSIGHT", 75 - i));
+        for (int i = 0; i < 10; i++)
+            ranked.add(evidence("adr-" + i, "DECISION", 70 - i));
+        for (int i = 0; i < 10; i++)
+            ranked.add(evidence("source-" + i, "SOURCE_FILE", 65 - i));
+        for (int i = 0; i < 10; i++)
+            ranked.add(evidence("config-" + i, "CONFIG_FILE", 60 - i));
+        ContextRequest request = request(60, 6000,
+                new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 20, 75));
+
+        EvidenceSelector.SelectionResult result = selector.select(ranked, request);
+
+        assertEquals(60, result.selected().size(),
+                "Global budget should be filled when diverse evidence exists");
+    }
+
+    @Test
+    void sparseCategoriesAllowRedistribution() {
+        List<RepositoryEvidence> ranked = new ArrayList<>();
+        for (int i = 0; i < 12; i++)
+            ranked.add(evidence("commit-" + i, "COMMIT_DIFF", 90 - i));
+        for (int i = 0; i < 50; i++)
+            ranked.add(evidence("git-" + i, "GIT_HISTORY", 85 - i));
+        ContextRequest request = request(60, 6000,
+                new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 20, 75));
+
+        EvidenceSelector.SelectionResult result = selector.select(ranked, request);
+
+        long commitDiffCount = result.selected().stream()
+                .filter(v -> v.kind().equals("COMMIT_DIFF")).count();
+        long gitHistoryCount = result.selected().stream()
+                .filter(v -> v.kind().equals("GIT_HISTORY")).count();
+        assertEquals(12, commitDiffCount,
+                "COMMIT_DIFF should be capped at 12");
+        assertEquals(12, gitHistoryCount,
+                "Sparse categories remain capped when no other eligible kinds exist");
+        assertEquals(24, result.selected().size(),
+                "Hard ceilings limit total selection when diversity is insufficient");
     }
 }

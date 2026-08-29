@@ -24,7 +24,7 @@ class KnowledgeFloorSelectionTest {
             new BudgetedDiverseEvidenceSelector();
 
     private static final EvidencePrecisionPolicy POLICY =
-            new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 75);
+            new EvidencePrecisionPolicy("test", "v1", 50, 35, 25, 100, 75);
 
     @Test
     void abundantGitEvidenceCannotStarveRelevantTrustedKnowledge() {

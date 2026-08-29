@@ -41,6 +41,8 @@ class DeterministicContextIntelligenceTest {
         assertEquals(3, plan.minimumDiverseLayers());
         assertEquals(EvidencePrecisionPolicy.UNRESTRICTED.maximumKindSharePercentage(),
                 plan.precisionPolicy().maximumKindSharePercentage());
+        assertEquals(20,
+                plan.precisionPolicy().maximumCategorySharePercentage());
     }
 
     @Test
@@ -85,6 +87,7 @@ class DeterministicContextIntelligenceTest {
         assertEquals("engineering-story-precision:v1",
                 plan.precisionPolicy().key());
         assertEquals(25, plan.precisionPolicy().maximumKindSharePercentage());
+        assertEquals(20, plan.precisionPolicy().maximumCategorySharePercentage());
         assertEquals(35, plan.precisionPolicy().minimumRelevanceScore());
         assertTrue(plan.explanations().stream().anyMatch(
                 value -> value.startsWith("PRECISION_POLICY:")));
