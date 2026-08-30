@@ -12,6 +12,7 @@ import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
+import com.hopeful117.devlogai.knowledge.selection.SemanticSectionComposer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,7 +106,7 @@ class RestAIEngineClientTest {
     }
 
     @Test
-    void shouldNotSerializeSelectedInsightIdentifiersInSubmissionPayload() {
+    void shouldPreserveSelectedInsightIdentifiersInSubmissionPayload() {
         UUID correlationId = UUID.randomUUID();
         UUID analysisId = UUID.randomUUID();
         Instant acceptedAt = Instant.parse("2026-07-21T18:00:00Z");
@@ -115,7 +116,7 @@ class RestAIEngineClientTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.selectedKnowledge.selectedInsights[0].title").value("Controllers"))
-                .andExpect(jsonPath("$.selectedKnowledge.selectedInsights[0].id").doesNotExist())
+                .andExpect(jsonPath("$.selectedKnowledge.selectedInsights[0].id").isNotEmpty())
                 .andExpect(jsonPath("$.selectedKnowledge.selectedInsights[0].analysisId").doesNotExist())
                 .andRespond(withStatus(HttpStatus.ACCEPTED)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -201,7 +202,7 @@ class RestAIEngineClientTest {
                         new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 5, 60), "COMPLETE"),
                 "a".repeat(64));
         Map<String, Object> projectedKnowledge =
-                new SelectedKnowledgePromptProjectionService(new ObjectMapper()).toMap(selected);
+                new SelectedKnowledgePromptProjectionService(new ObjectMapper(), new SemanticSectionComposer()).toMap(selected);
         return new PromptRequest(correlationId, correlationId, analysisId, UUID.randomUUID(),
                 AiTaskType.INSIGHT_GENERATION, intent, null,
                 projectedKnowledge, intent.outputSchema(), Map.of());
@@ -236,7 +237,7 @@ class RestAIEngineClientTest {
                         new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 5, 60), "COMPLETE"),
                 "a".repeat(64));
         Map<String, Object> projectedKnowledge =
-                new SelectedKnowledgePromptProjectionService(new ObjectMapper()).toMap(selected);
+                new SelectedKnowledgePromptProjectionService(new ObjectMapper(), new SemanticSectionComposer()).toMap(selected);
         return new PromptRequest(correlationId, correlationId, analysisId, UUID.randomUUID(),
                 AiTaskType.INSIGHT_GENERATION, intent, null,
                 projectedKnowledge, intent.outputSchema(), Map.of());

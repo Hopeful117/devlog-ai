@@ -46,7 +46,7 @@ class SelectedKnowledgePromptProjectionServiceTest {
             );
 
     private final SelectedKnowledgePromptProjectionService service =
-            new SelectedKnowledgePromptProjectionService(new ObjectMapper());
+            new SelectedKnowledgePromptProjectionService(new ObjectMapper(), new SemanticSectionComposer());
 
     @Test
     void shouldCompactRepositoryContextForPromptPayload() {
@@ -80,7 +80,7 @@ class SelectedKnowledgePromptProjectionServiceTest {
     }
 
     @Test
-    void shouldOmitSelectedInsightIdentifiersFromPromptPayload() {
+    void shouldPreserveInsightIdentifiersInPromptPayload() {
         UUID insightId = UUID.randomUUID();
         UUID sourceAnalysisId = UUID.randomUUID();
         SelectedKnowledge selectedKnowledge = selectedKnowledge(
@@ -106,7 +106,7 @@ class SelectedKnowledgePromptProjectionServiceTest {
         assertEquals("ARCHITECTURAL", projectedInsight.get("type"));
         assertEquals("INFO", projectedInsight.get("severity"));
         assertEquals("Controllers", projectedInsight.get("title"));
-        assertFalse(projectedInsight.containsKey("id"));
+        assertEquals(insightId.toString(), projectedInsight.get("id"));
         assertFalse(projectedInsight.containsKey("analysisId"));
     }
 
@@ -483,5 +483,66 @@ class SelectedKnowledgePromptProjectionServiceTest {
 
     private UUID uuid(String value) {
         return UUID.fromString(value);
+    }
+
+    @Test
+    void shouldIncludeSemanticSectionsInProjectedMap() {
+        SelectedKnowledge selectedKnowledge = selectedKnowledge(
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                null,
+                profile());
+
+        Map<String, Object> projected = service.toMap(selectedKnowledge);
+
+        assertTrue(projected.containsKey("semanticSections"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections =
+                (List<Map<String, Object>>) projected.get("semanticSections");
+        assertNotNull(sections);
+    }
+
+    @Test
+    void shouldProduceSemanticSectionsWithContentWhenFactsPresent() {
+        UUID factId = UUID.randomUUID();
+        SelectedKnowledge selectedKnowledge = selectedKnowledgeWithFacts(
+                List.of(new AnalysisContext.FactSnapshot(
+                        factId, com.hopeful117.devlogai.fact.entity.FactType.DOCKERFILE_PRESENT,
+                        "Dockerfile detected", "test", List.of(), Instant.EPOCH)));
+
+        Map<String, Object> projected = service.toMap(selectedKnowledge);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections =
+                (List<Map<String, Object>>) projected.get("semanticSections");
+        assertNotNull(sections);
+        assertFalse(sections.isEmpty());
+        boolean hasArchitecture = sections.stream()
+                .anyMatch(s -> "ARCHITECTURE".equals(s.get("sectionId")));
+        assertTrue(hasArchitecture);
+    }
+
+    private SelectedKnowledge selectedKnowledgeWithFacts(
+            List<AnalysisContext.FactSnapshot> facts) {
+        return new SelectedKnowledge(
+                new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "DevLog", "devlog-ai",
+                        "desc", ProjectStatus.ACTIVE),
+                null,
+                profile(),
+                List.of(),
+                facts,
+                DIAGNOSTICS,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                null,
+                null,
+                METADATA,
+                "a".repeat(64)
+        );
     }
 }

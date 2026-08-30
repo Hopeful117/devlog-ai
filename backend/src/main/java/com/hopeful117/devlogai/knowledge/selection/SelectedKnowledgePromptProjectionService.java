@@ -25,9 +25,12 @@ public class SelectedKnowledgePromptProjectionService {
     static final int MAX_RELATIONSHIP_HIGHLIGHTS = 20;
 
     private final ObjectMapper objectMapper;
+    private final SemanticSectionComposer semanticSectionComposer;
 
-    public SelectedKnowledgePromptProjectionService(ObjectMapper objectMapper) {
+    public SelectedKnowledgePromptProjectionService(ObjectMapper objectMapper,
+            SemanticSectionComposer semanticSectionComposer) {
         this.objectMapper = objectMapper;
+        this.semanticSectionComposer = semanticSectionComposer;
     }
 
     public Map<String, Object> toMap(SelectedKnowledge selectedKnowledge) {
@@ -50,6 +53,7 @@ public class SelectedKnowledgePromptProjectionService {
                 selectedKnowledge.selectedEngineeringEvents(),
                 selectedKnowledge.selectedHumanContextInputs(),
                 buildRelationshipHighlights(selectedKnowledge),
+                semanticSectionComposer.compose(selectedKnowledge),
                 projectRepositoryContext(selectedKnowledge.repositoryContext()),
                 selectedKnowledge.evolutionContext(),
                 selectedKnowledge.selectionMetadata(),
@@ -114,6 +118,7 @@ public class SelectedKnowledgePromptProjectionService {
 
     private PromptInsightSnapshot projectInsight(SelectedKnowledge.InsightSnapshot insight) {
         return new PromptInsightSnapshot(
+                insight.id(),
                 insight.type(),
                 insight.severity(),
                 insight.title(),
@@ -194,6 +199,7 @@ public class SelectedKnowledgePromptProjectionService {
             List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.HumanContextInputSnapshot>
                     selectedHumanContextInputs,
             List<PromptRelationshipHighlight> relationshipHighlights,
+            List<SemanticSection.PromptSemanticSection> semanticSections,
             PromptRepositoryContext repositoryContext,
             AnalysisContext.EvolutionContext evolutionContext,
             SelectedKnowledge.SelectionMetadata selectionMetadata,
@@ -201,6 +207,7 @@ public class SelectedKnowledgePromptProjectionService {
     ) { }
 
     record PromptInsightSnapshot(
+            java.util.UUID id,
             Object type,
             Object severity,
             String title,
