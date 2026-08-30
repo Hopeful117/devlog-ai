@@ -1,7 +1,9 @@
 package com.hopeful117.devlogai.knowledge.selection;
 
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
+import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
@@ -10,12 +12,17 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class SelectedKnowledgePromptProjectionService {
+    static final int MAX_RELATIONSHIP_HIGHLIGHTS = 20;
 
     private final ObjectMapper objectMapper;
 
@@ -42,11 +49,67 @@ public class SelectedKnowledgePromptProjectionService {
                 selectedKnowledge.existingArchitectureKnowledge(),
                 selectedKnowledge.selectedEngineeringEvents(),
                 selectedKnowledge.selectedHumanContextInputs(),
+                buildRelationshipHighlights(selectedKnowledge),
                 projectRepositoryContext(selectedKnowledge.repositoryContext()),
                 selectedKnowledge.evolutionContext(),
                 selectedKnowledge.selectionMetadata(),
                 selectedKnowledge.selectionDigest()
         );
+    }
+
+    private List<PromptRelationshipHighlight> buildRelationshipHighlights(
+            SelectedKnowledge selectedKnowledge) {
+        Set<UUID> selectedInsightIds = new HashSet<>(selectedKnowledge.selectedInsights().stream()
+                .map(SelectedKnowledge.InsightSnapshot::id)
+                .toList());
+        Set<UUID> selectedEngineeringEventIds = new HashSet<>(selectedKnowledge
+                .selectedEngineeringEvents().stream()
+                .map(ProjectContextSnapshot.EngineeringEventSnapshot::id)
+                .toList());
+        Comparator<ProjectContextSnapshot.KnowledgeRelationSnapshot> ordering = Comparator
+                .comparing((ProjectContextSnapshot.KnowledgeRelationSnapshot relation) -> relation.relationType().name())
+                .thenComparing(relation -> relation.sourceEntityType().name())
+                .thenComparing(relation -> relation.sourceEntityId().toString())
+                .thenComparing(relation -> relation.targetEntityType().name())
+                .thenComparing(relation -> relation.targetEntityId().toString())
+                .thenComparing(relation -> relation.id().toString());
+        return selectedKnowledge.knowledgeRelations().stream()
+                .filter(relation -> isPolicyAEligible(relation, selectedInsightIds,
+                        selectedEngineeringEventIds))
+                .sorted(ordering)
+                .limit(MAX_RELATIONSHIP_HIGHLIGHTS)
+                .map(relation -> new PromptRelationshipHighlight(
+                        relation.relationType().name(),
+                        new PromptRelationshipEndpoint(relation.sourceEntityType().name(),
+                                relation.sourceEntityId().toString()),
+                        new PromptRelationshipEndpoint(relation.targetEntityType().name(),
+                                relation.targetEntityId().toString())
+                ))
+                .toList();
+    }
+
+    private boolean isPolicyAEligible(
+            ProjectContextSnapshot.KnowledgeRelationSnapshot relation,
+            Set<UUID> selectedInsightIds,
+            Set<UUID> selectedEngineeringEventIds
+    ) {
+        return isSelectedProjectedEndpoint(relation.sourceEntityType(), relation.sourceEntityId(),
+                selectedInsightIds, selectedEngineeringEventIds)
+                && isSelectedProjectedEndpoint(relation.targetEntityType(), relation.targetEntityId(),
+                selectedInsightIds, selectedEngineeringEventIds);
+    }
+
+    private boolean isSelectedProjectedEndpoint(
+            EntityType entityType,
+            UUID entityId,
+            Set<UUID> selectedInsightIds,
+            Set<UUID> selectedEngineeringEventIds
+    ) {
+        return switch (entityType) {
+            case INSIGHT -> selectedInsightIds.contains(entityId);
+            case ENGINEERING_EVENT -> selectedEngineeringEventIds.contains(entityId);
+            case DECISION, CHALLENGE -> false;
+        };
     }
 
     private PromptInsightSnapshot projectInsight(SelectedKnowledge.InsightSnapshot insight) {
@@ -130,6 +193,7 @@ public class SelectedKnowledgePromptProjectionService {
                     selectedEngineeringEvents,
             List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.HumanContextInputSnapshot>
                     selectedHumanContextInputs,
+            List<PromptRelationshipHighlight> relationshipHighlights,
             PromptRepositoryContext repositoryContext,
             AnalysisContext.EvolutionContext evolutionContext,
             SelectedKnowledge.SelectionMetadata selectionMetadata,
@@ -141,6 +205,17 @@ public class SelectedKnowledgePromptProjectionService {
             Object severity,
             String title,
             String content
+    ) { }
+
+    record PromptRelationshipHighlight(
+            String relationType,
+            PromptRelationshipEndpoint source,
+            PromptRelationshipEndpoint target
+    ) { }
+
+    record PromptRelationshipEndpoint(
+            String entityType,
+            String entityId
     ) { }
 
     record PromptRepositoryContext(
