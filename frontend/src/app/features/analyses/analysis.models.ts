@@ -288,6 +288,16 @@ export interface ProposalSummary {
   readonly evidencePreview: readonly string[];
   readonly proposalId: string;
   readonly trustedArtifact: TrustedArtifact | null;
+  readonly rationale: string | null;
+  readonly insightType: string | null;
+  readonly deltaType: string | null;
+  readonly context: string | null;
+  readonly choice: string | null;
+  readonly consequences: string | null;
+  readonly category: string | null;
+  readonly significance: string | null;
+  readonly supportingFactIds: readonly string[];
+  readonly supportingObservationIds: readonly string[];
 }
 
 export type TrustedArtifactType = 'INSIGHT' | 'DECISION' | 'ENGINEERING_EVENT';

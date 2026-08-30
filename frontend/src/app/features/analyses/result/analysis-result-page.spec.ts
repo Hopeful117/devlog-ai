@@ -44,6 +44,16 @@ const completedResult: AnalysisResult = {
         evidencePreview: ['Fact#12345678'],
         proposalId: 'proposal-1',
         trustedArtifact: null,
+        rationale: 'Because the service handles multiple concerns',
+        insightType: 'ARCHITECTURE',
+        deltaType: 'NEW_INFORMATION',
+        context: null,
+        choice: null,
+        consequences: null,
+        category: null,
+        significance: null,
+        supportingFactIds: ['fact-1', 'fact-2'],
+        supportingObservationIds: ['observation-1'],
       },
       {
         id: 'proposal-2',
@@ -60,6 +70,16 @@ const completedResult: AnalysisResult = {
           availability: 'AVAILABLE',
           detailAvailable: true,
         },
+        rationale: 'The endpoint is no longer called by any client',
+        insightType: 'CODE_QUALITY',
+        deltaType: 'CONFIRMATION',
+        context: null,
+        choice: null,
+        consequences: null,
+        category: null,
+        significance: null,
+        supportingFactIds: ['fact-3'],
+        supportingObservationIds: [],
       },
     ],
   },
@@ -174,6 +194,101 @@ describe('AnalysisResultPage', () => {
     expect(text).toContain('Break up a large service');
     expect(text).toContain('Layering drift');
     expect(text).toContain('Architecture summary');
+    expect(text).toContain('Supporting facts');
+    expect(text).toContain('Supporting observations');
+  });
+
+  it('renders insight-specific supporting grounding counts', async () => {
+    const fixture = await render();
+    const text = fixture.nativeElement.textContent as string;
+
+    expect(text).toContain('Rationale');
+    expect(text).toContain('Insight type');
+    expect(text).toContain('Delta type');
+    expect(text).toContain('Supporting facts');
+    expect(text).toContain('Supporting observations');
+    expect(text).toContain('2');
+    expect(text).toContain('1');
+  });
+
+  it('renders engineering decision grounding as unavailable', async () => {
+    getResult.mockReturnValue(
+      of({
+        ...completedResult,
+        proposals: {
+          ...completedResult.proposals,
+          items: [
+            {
+              id: 'proposal-decision',
+              type: 'ENGINEERING_DECISION',
+              status: 'PROPOSED',
+              confidence: 1,
+              title: 'Use Spring Boot controllers',
+              summary: '',
+              evidencePreview: [],
+              proposalId: 'proposal-decision',
+              trustedArtifact: null,
+              rationale: 'Consistent integration point',
+              insightType: null,
+              deltaType: null,
+              context: 'External communication goes through REST',
+              choice: 'Keep Spring MVC controllers',
+              consequences: 'API discipline remains required',
+              category: null,
+              significance: null,
+              supportingFactIds: [],
+              supportingObservationIds: [],
+            },
+          ],
+        },
+      }),
+    );
+
+    const fixture = await render();
+    expect(fixture.nativeElement.textContent).toContain('Grounding not available for decisions');
+  });
+
+  it('renders engineering event supporting grounding counts', async () => {
+    getResult.mockReturnValue(
+      of({
+        ...completedResult,
+        proposals: {
+          ...completedResult.proposals,
+          items: [
+            {
+              id: 'proposal-event',
+              type: 'ENGINEERING_EVENT',
+              status: 'PROPOSED',
+              confidence: 0.8,
+              title: 'Schema migration completed',
+              summary: 'Database migrated to v2',
+              evidencePreview: ['Fact#12345678'],
+              proposalId: 'proposal-event',
+              trustedArtifact: null,
+              rationale: null,
+              insightType: null,
+              deltaType: null,
+              context: null,
+              choice: null,
+              consequences: null,
+              category: 'SCHEMA_CHANGE',
+              significance: 'HIGH',
+              supportingFactIds: ['fact-1'],
+              supportingObservationIds: ['observation-1', 'observation-2'],
+            },
+          ],
+        },
+      }),
+    );
+
+    const fixture = await render();
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Category');
+    expect(text).toContain('Significance');
+    expect(text).toContain('Supporting facts');
+    expect(text).toContain('Supporting observations');
+    expect(text).toContain('1');
+    expect(text).toContain('2');
   });
 
   it('preserves proposal navigation without trusted-artifact links', async () => {
@@ -255,6 +370,16 @@ describe('AnalysisResultPage', () => {
                 availability: 'AVAILABLE',
                 detailAvailable: true,
               },
+              rationale: null,
+              insightType: null,
+              deltaType: null,
+              context: null,
+              choice: null,
+              consequences: null,
+              category: 'DEPLOYMENT',
+              significance: 'MEDIUM',
+              supportingFactIds: ['fact-1'],
+              supportingObservationIds: ['observation-1'],
             },
           ],
         },

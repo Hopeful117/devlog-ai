@@ -163,25 +163,13 @@ public class AnalysisResultQueryServiceImpl implements AnalysisResultQueryServic
                 .collect(Collectors.toList());
     }
 
+    private static final ProposalSummaryMapper proposalSummaryMapper = new ProposalSummaryMapper();
+
     private AnalysisResultResponse.ProposalSummary mapProposal(
             ValidatableProposal proposal,
             TrustedArtifactLookup trustedArtifacts
     ) {
-        String title = extractTitle(proposal.getPayload());
-        String summary = extractSummary(proposal.getPayload());
-        List<String> evidencePreview = buildEvidencePreview(proposal);
-
-        return new AnalysisResultResponse.ProposalSummary(
-                proposal.getId(),
-                proposal.getType(),
-                proposal.getStatus(),
-                proposal.getConfidence() != null ? proposal.getConfidence().doubleValue() : null,
-                title,
-                summary,
-                evidencePreview,
-                proposal.getId(),
-                trustedArtifactFor(proposal, trustedArtifacts)
-        );
+        return proposalSummaryMapper.mapToSummary(proposal, trustedArtifactFor(proposal, trustedArtifacts));
     }
 
     private TrustedArtifactLookup resolveTrustedArtifacts(List<ValidatableProposal> proposals) {
@@ -268,33 +256,6 @@ public class AnalysisResultQueryServiceImpl implements AnalysisResultQueryServic
                 AnalysisResultResponse.TrustedArtifactAvailability.AVAILABLE,
                 true
         );
-    }
-
-    private String extractTitle(Map<String, Object> payload) {
-        if (payload == null) return "Untitled proposal";
-        Object title = payload.get("title");
-        return title instanceof String ? (String) title : "Untitled proposal";
-    }
-
-    private String extractSummary(Map<String, Object> payload) {
-        if (payload == null) return "";
-        Object summary = payload.get("summary");
-        return summary instanceof String ? (String) summary : "";
-    }
-
-    private List<String> buildEvidencePreview(ValidatableProposal proposal) {
-        List<String> preview = new ArrayList<>();
-        if (proposal.getSupportingFactIds() != null) {
-            for (UUID factId : proposal.getSupportingFactIds().stream().limit(3).toList()) {
-                preview.add("Fact#" + factId.toString().substring(0, 8));
-            }
-        }
-        if (proposal.getSupportingObservationIds() != null) {
-            for (UUID obsId : proposal.getSupportingObservationIds().stream().limit(2).toList()) {
-                preview.add("Observation#" + obsId.toString().substring(0, 8));
-            }
-        }
-        return preview;
     }
 
     private List<AnalysisResultResponse.InsightSummary> buildInsights(Analysis analysis) {

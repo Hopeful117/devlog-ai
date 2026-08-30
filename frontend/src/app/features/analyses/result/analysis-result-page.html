@@ -150,6 +150,46 @@
                         <li>No evidence preview recorded.</li>
                       }
                     </ul>
+                    @if (proposal.type === 'INSIGHT') {
+                      <dl class="metadata-list compact-list">
+                        <dt>Rationale</dt>
+                        <dd>{{ proposal.rationale || 'Not provided' }}</dd>
+                        <dt>Insight type</dt>
+                        <dd>{{ proposal.insightType || 'Not provided' }}</dd>
+                        <dt>Delta type</dt>
+                        <dd>{{ proposal.deltaType || 'Not provided' }}</dd>
+                        <dt>Supporting facts</dt>
+                        <dd>{{ proposal.supportingFactIds.length }}</dd>
+                        <dt>Supporting observations</dt>
+                        <dd>{{ proposal.supportingObservationIds.length }}</dd>
+                      </dl>
+                    }
+                    @if (proposal.type === 'ENGINEERING_DECISION') {
+                      <dl class="metadata-list compact-list">
+                        <dt>Rationale</dt>
+                        <dd>{{ proposal.rationale || 'Not provided' }}</dd>
+                        <dt>Context</dt>
+                        <dd>{{ proposal.context || 'Not provided' }}</dd>
+                        <dt>Choice</dt>
+                        <dd>{{ proposal.choice || 'Not provided' }}</dd>
+                        <dt>Consequences</dt>
+                        <dd>{{ proposal.consequences || 'Not provided' }}</dd>
+                        <dt>Grounding</dt>
+                        <dd>Grounding not available for decisions</dd>
+                      </dl>
+                    }
+                    @if (proposal.type === 'ENGINEERING_EVENT') {
+                      <dl class="metadata-list compact-list">
+                        <dt>Category</dt>
+                        <dd>{{ proposal.category || 'Not provided' }}</dd>
+                        <dt>Significance</dt>
+                        <dd>{{ proposal.significance || 'Not provided' }}</dd>
+                        <dt>Supporting facts</dt>
+                        <dd>{{ proposal.supportingFactIds.length }}</dd>
+                        <dt>Supporting observations</dt>
+                        <dd>{{ proposal.supportingObservationIds.length }}</dd>
+                      </dl>
+                    }
                     <a [routerLink]="['/proposals', proposal.proposalId]">
                       {{ proposalActionLabel(proposal) }}
                     </a>
