@@ -8,6 +8,7 @@ import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
+import com.hopeful117.devlogai.knowledge.selection.SemanticSectionComposer;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
@@ -69,7 +70,7 @@ class RestAIEngineClientIntegrationTest {
                     new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0),
                     List.of(), null, null, null);
             var projectedKnowledge =
-                    new SelectedKnowledgePromptProjectionService(new ObjectMapper()).toMap(knowledge);
+                    new SelectedKnowledgePromptProjectionService(new ObjectMapper(), new SemanticSectionComposer()).toMap(knowledge);
 
             PromptRequest request = new PromptRequest(
                     UUID.randomUUID(),

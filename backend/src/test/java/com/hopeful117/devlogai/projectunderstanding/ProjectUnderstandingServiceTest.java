@@ -25,6 +25,7 @@ import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
+import com.hopeful117.devlogai.knowledge.selection.SemanticSectionComposer;
 import com.hopeful117.devlogai.profile.service.ProjectProfileService;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingOutcome;
@@ -195,7 +196,7 @@ class ProjectUnderstandingServiceTest {
         AIEngineClient aiEngineClient = mock(AIEngineClient.class);
         KnowledgeSelectionService knowledgeSelectionService = mock(KnowledgeSelectionService.class);
         SelectedKnowledgePromptProjectionService promptProjectionService =
-                new SelectedKnowledgePromptProjectionService(new ObjectMapper());
+                new SelectedKnowledgePromptProjectionService(new ObjectMapper(), new SemanticSectionComposer());
         SelectedKnowledge selectedKnowledge = mock(SelectedKnowledge.class);
         AnalysisAiTaskTypeResolver resolver = new AnalysisAiTaskTypeResolver();
 
