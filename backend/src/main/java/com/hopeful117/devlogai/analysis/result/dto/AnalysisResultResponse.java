@@ -188,7 +188,17 @@ public record AnalysisResultResponse(
             String summary,
             List<String> evidencePreview,
             UUID proposalId,
-            TrustedArtifact trustedArtifact
+            TrustedArtifact trustedArtifact,
+            String rationale,
+            String insightType,
+            String deltaType,
+            String context,
+            String choice,
+            String consequences,
+            String category,
+            String significance,
+            List<UUID> supportingFactIds,
+            List<UUID> supportingObservationIds
     ) {}
 
     public enum TrustedArtifactType {
