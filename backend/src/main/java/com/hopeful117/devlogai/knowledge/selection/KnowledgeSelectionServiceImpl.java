@@ -95,6 +95,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 selectExistingArchitectureKnowledge(intent, insightCandidates);
         var engineeringEvents = context.validatedEngineeringEvents().stream().limit(10).toList();
         var humanContextInputs = context.humanContextInputs().stream().limit(5).toList();
+        var knowledgeRelations = context.knowledgeRelations();
         List<RepositoryEvidence> promotedCommitDiff = promoteCommitDiffCandidates(
                 context, intent, guidance, insightCandidates);
         RepositoryContext repositoryContext = repositoryContextService.build(
@@ -107,26 +108,27 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 diagnostic.getWarningCount(), diagnostic.getErrorCount());
         int candidates = context.observations().size() + context.facts().size()
                 + insightCandidates.size() + context.validatedEngineeringEvents().size()
-                + repositoryContext.candidateCount();
+                + context.knowledgeRelations().size() + repositoryContext.candidateCount();
         int selected = 1 + observations.size() + facts.size() + insights.size()
                 + existingArchitectureKnowledge.size()
                 + engineeringEvents.size() + humanContextInputs.size()
-                + repositoryContext.evidence().size() + 1
+                + knowledgeRelations.size() + repositoryContext.evidence().size() + 1
                 + (context.evolutionContext() == null ? 0 : 1);
         var metadata = new SelectedKnowledge.SelectionMetadata(
                 VERSION,
                 List.of("REPOSITORY_FIRST_LAYERING", "INTENT_SPECIFIC_RANKING",
                         "USER_GUIDANCE_KEYWORD_BOOST", "STABLE_TYPE_AND_ID_ORDER",
                         "DUPLICATE_FACT_CONTENT_ELIMINATION", "OBSERVATION_FACT_CLOSURE",
-                        "KNOWLEDGE_BUDGET",
-                        "EVOLUTION_CONTEXT_REQUIRED"),
+                        "KNOWLEDGE_BUDGET", "EVOLUTION_CONTEXT_REQUIRED",
+                        "KNOWLEDGE_RELATION_PRESERVATION"),
                 selected, Math.max(0, candidates + 2 - selected), BUDGET,
                 diagnostic.isCollectionComplete() ? "COMPLETE" : "PARTIAL");
         String digest = digest(context, new DigestComponents(observations, facts, diagnostics,
-                insights, existingArchitectureKnowledge, engineeringEvents, repositoryContext, metadata));
+                insights, existingArchitectureKnowledge, engineeringEvents, knowledgeRelations,
+                repositoryContext, metadata));
         return new SelectedKnowledge(context.project(), context.analysis(), context.projectProfile(),
                 observations, facts, diagnostics, insights, existingArchitectureKnowledge,
-                engineeringEvents, humanContextInputs, repositoryContext,
+                engineeringEvents, humanContextInputs, knowledgeRelations, repositoryContext,
                 context.evolutionContext(), metadata, digest);
     }
 
@@ -353,12 +355,14 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                            Object selectedFacts, Object diagnostic, Object selectedInsights,
                            Object existingArchitectureKnowledge,
                            Object selectedEngineeringEvents,
+                           Object knowledgeRelations,
                            Object repositoryContext, Object evolutionContext, Object selectionMetadata) { }
         byte[] serialized = objectMapper.writeValueAsString(new DigestInput(
                 context.project(), context.analysis(), context.projectProfile(), selected.observations(),
                 selected.facts(), selected.diagnostics(), selected.insights(),
                 selected.existingArchitectureKnowledge(), selected.engineeringEvents(),
-                selected.repositoryContext(), context.evolutionContext(), selected.metadata()))
+                selected.knowledgeRelations(), selected.repositoryContext(), context.evolutionContext(),
+                selected.metadata()))
                 .getBytes(StandardCharsets.UTF_8);
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(serialized));
@@ -375,6 +379,8 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
             List<SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot> existingArchitectureKnowledge,
             List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
                     engineeringEvents,
+            List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.KnowledgeRelationSnapshot>
+                    knowledgeRelations,
             RepositoryContext repositoryContext,
             SelectedKnowledge.SelectionMetadata metadata) { }
 

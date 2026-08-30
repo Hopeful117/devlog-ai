@@ -10,9 +10,12 @@ import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.intent.model.InsightType;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
+import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
 import com.hopeful117.devlogai.observation.entity.ObservationType;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
+import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
 import com.hopeful117.devlogai.repositorycontext.ContextProfile;
@@ -50,8 +53,8 @@ class KnowledgeSelectionServiceTest {
         when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
 
         List<AnalysisContext.FactSnapshot> facts = new ArrayList<>();
-        facts.add(fact(FactType.OTHER, "duplicate"));
-        facts.add(fact(FactType.OTHER, "duplicate"));
+        facts.add(fact(FactType.SPRING_BOOT_DETECTED, "duplicate"));
+        facts.add(fact(FactType.SPRING_BOOT_DETECTED, "duplicate"));
         for (int index = 0; index < 45; index++) {
             facts.add(fact(index == 0 ? FactType.DOCKERFILE_PRESENT : FactType.OTHER,
                     "fact-" + index));
@@ -250,5 +253,88 @@ class KnowledgeSelectionServiceTest {
                 .flatMap(observation -> observation.supportingFactIds().stream())
                 .allMatch(factId -> result.selectedFacts().stream()
                         .anyMatch(fact -> fact.id().equals(factId))));
+    }
+
+    @Test
+    void shouldPreserveCanonicalKnowledgeRelationsWithoutPolicyAFiltering() {
+        var diagnostics = mock(AnalysisExecutionDiagnosticRepository.class);
+        var insights = mock(InsightRepository.class);
+        var mapper = mock(ObjectMapper.class);
+        var repositoryContexts = mock(RepositoryContextService.class);
+        UUID projectId = UUID.randomUUID();
+        UUID analysisId = UUID.randomUUID();
+        UUID insightId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID decisionId = UUID.randomUUID();
+        UUID challengeId = UUID.randomUUID();
+        AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
+                .analysisId(analysisId).collectionComplete(true).warningCount(0).build();
+        when(diagnostics.findById(analysisId)).thenReturn(Optional.of(diagnostic));
+        when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
+        when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
+
+        List<ProjectContextSnapshot.KnowledgeRelationSnapshot> knowledgeRelations = List.of(
+                relation(EntityType.INSIGHT, insightId, EntityType.ENGINEERING_EVENT, eventId,
+                        KnowledgeRelationType.RELATES_TO),
+                relation(EntityType.INSIGHT, insightId, EntityType.DECISION, decisionId,
+                        KnowledgeRelationType.ADDRESSES),
+                relation(EntityType.CHALLENGE, challengeId, EntityType.ENGINEERING_EVENT, eventId,
+                        KnowledgeRelationType.CAUSED_BY),
+                relation(EntityType.DECISION, decisionId, EntityType.CHALLENGE, challengeId,
+                        KnowledgeRelationType.INFORMED_BY));
+        AnalysisContext context = new AnalysisContext(
+                new AnalysisContext.ProjectSnapshot(projectId, "Project", "project", null,
+                        ProjectStatus.ACTIVE),
+                new AnalysisContext.AnalysisSnapshot(analysisId, AnalysisType.ARCHITECTURE_REVIEW,
+                        "architecture-overview", "v1", AnalysisStatus.IN_PROGRESS,
+                        Instant.EPOCH, null, Instant.EPOCH),
+                mock(ProjectProfileResponse.class),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                null,
+                List.of(),
+                List.of(),
+                knowledgeRelations,
+                List.of(),
+                List.of());
+        IntentDefinition intent = new IntentDefinition("architecture-overview", "v1", "Architecture",
+                List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
+                Map.of("type", "object"), "architecture-overview-prompt-v1");
+        RepositoryContext repositoryContext = new RepositoryContext(
+                "repository-context-engine-v1", ContextProfile.ARCHITECTURE_REVIEW,
+                List.of("architecture-v1", "history-v1"),
+                "context-intelligence-v1", List.of("test"),
+                List.of(), Map.of(),
+                new RepositoryContext.ContextBudget(60, 500, 20, 6000),
+                0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
+                .thenReturn(repositoryContext);
+        var service = new KnowledgeSelectionServiceImpl(
+                diagnostics, insights, mapper, repositoryContexts, 15);
+
+        SelectedKnowledge result = service.select(context, intent, null);
+
+        assertEquals(knowledgeRelations, result.knowledgeRelations());
+        assertTrue(result.selectionMetadata().appliedRules()
+                .contains("KNOWLEDGE_RELATION_PRESERVATION"));
+    }
+
+    private ProjectContextSnapshot.KnowledgeRelationSnapshot relation(
+            EntityType sourceType,
+            UUID sourceId,
+            EntityType targetType,
+            UUID targetId,
+            KnowledgeRelationType relationType
+    ) {
+        return new ProjectContextSnapshot.KnowledgeRelationSnapshot(
+                UUID.randomUUID(), sourceType, sourceId, targetType, targetId,
+                relationType, relationType.name(), Instant.EPOCH);
     }
 }

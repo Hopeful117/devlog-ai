@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
+import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 
 import java.time.Instant;
@@ -23,6 +24,7 @@ public record SelectedKnowledge(
                 selectedEngineeringEvents,
         List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.HumanContextInputSnapshot>
                 selectedHumanContextInputs,
+        List<ProjectContextSnapshot.KnowledgeRelationSnapshot> knowledgeRelations,
         RepositoryContext repositoryContext,
         AnalysisContext.EvolutionContext evolutionContext,
         SelectionMetadata selectionMetadata,
@@ -35,6 +37,7 @@ public record SelectedKnowledge(
         existingArchitectureKnowledge = List.copyOf(existingArchitectureKnowledge);
         selectedEngineeringEvents = List.copyOf(selectedEngineeringEvents);
         selectedHumanContextInputs = List.copyOf(selectedHumanContextInputs);
+        knowledgeRelations = List.copyOf(knowledgeRelations);
     }
 
     public SelectedKnowledge(AnalysisContext.ProjectSnapshot project,
@@ -44,8 +47,31 @@ public record SelectedKnowledge(
             List<InsightSnapshot> selectedInsights, RepositoryContext repositoryContext,
             SelectionMetadata selectionMetadata, String selectionDigest) {
         this(project, analysis, projectProfile, selectedObservations, selectedFacts, diagnostics,
-                selectedInsights, List.of(), List.of(), List.of(), repositoryContext, null,
+                selectedInsights, List.of(), List.of(), List.of(), List.of(), repositoryContext, null,
                 selectionMetadata, selectionDigest);
+    }
+
+    public SelectedKnowledge(
+            AnalysisContext.ProjectSnapshot project,
+            AnalysisContext.AnalysisSnapshot analysis,
+            ProjectProfileResponse projectProfile,
+            List<AnalysisContext.ObservationSnapshot> selectedObservations,
+            List<AnalysisContext.FactSnapshot> selectedFacts,
+            DiagnosticSnapshot diagnostics,
+            List<InsightSnapshot> selectedInsights,
+            List<ExistingArchitectureKnowledgeSnapshot> existingArchitectureKnowledge,
+            List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
+                    selectedEngineeringEvents,
+            List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.HumanContextInputSnapshot>
+                    selectedHumanContextInputs,
+            RepositoryContext repositoryContext,
+            AnalysisContext.EvolutionContext evolutionContext,
+            SelectionMetadata selectionMetadata,
+            String selectionDigest
+    ) {
+        this(project, analysis, projectProfile, selectedObservations, selectedFacts, diagnostics,
+                selectedInsights, existingArchitectureKnowledge, selectedEngineeringEvents,
+                selectedHumanContextInputs, List.of(), repositoryContext, evolutionContext, selectionMetadata, selectionDigest);
     }
 
     public SelectedKnowledge(
@@ -66,7 +92,7 @@ public record SelectedKnowledge(
     ) {
         this(project, analysis, projectProfile, selectedObservations, selectedFacts, diagnostics,
                 selectedInsights, existingArchitectureKnowledge, selectedEngineeringEvents,
-                List.of(), repositoryContext, evolutionContext, selectionMetadata, selectionDigest);
+                List.of(), List.of(), repositoryContext, evolutionContext, selectionMetadata, selectionDigest);
     }
 
     public record DiagnosticSnapshot(boolean collectionComplete, boolean truncated,
