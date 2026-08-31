@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 
 
@@ -36,6 +37,64 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class KnowledgeSelectionServiceTest {
+
+    @Test
+    void shouldSelectSameOrderedFactSemanticsAcrossAnalysisUuidPermutations() {
+        var diagnostics = mock(AnalysisExecutionDiagnosticRepository.class);
+        var insights = mock(InsightRepository.class);
+        var mapper = mock(ObjectMapper.class);
+        var repositoryContexts = mock(RepositoryContextService.class);
+        var service = new KnowledgeSelectionServiceImpl(
+                diagnostics, insights, mapper, repositoryContexts, 15);
+        IntentDefinition intent = new IntentDefinition("architecture-overview", "v1", "Architecture",
+                List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
+                Map.of("type", "object"), "architecture-overview-prompt-v1");
+        List<UUID> ids = IntStream.range(0, 45)
+                .mapToObj(index -> new UUID(0, index + 1L))
+                .toList();
+        List<List<String>> semanticSelections = new ArrayList<>();
+
+        for (int permutation = 0; permutation < 5; permutation++) {
+            UUID projectId = UUID.randomUUID();
+            UUID analysisId = UUID.randomUUID();
+            List<AnalysisContext.FactSnapshot> facts = new ArrayList<>();
+            for (int index = 0; index < 45; index++) {
+                facts.add(new AnalysisContext.FactSnapshot(
+                        ids.get((index + permutation * 7) % ids.size()),
+                        FactType.OTHER,
+                        "fact-" + String.format("%02d", index),
+                        "test-source",
+                        List.of("docs/fact-" + String.format("%02d", index) + ".md"),
+                        Instant.EPOCH));
+            }
+            AnalysisContext context = new AnalysisContext(
+                    new AnalysisContext.ProjectSnapshot(projectId, "Project", "project", null,
+                            ProjectStatus.ACTIVE),
+                    new AnalysisContext.AnalysisSnapshot(analysisId, AnalysisType.ARCHITECTURE_REVIEW,
+                            "architecture-overview", "v1", AnalysisStatus.IN_PROGRESS,
+                            Instant.EPOCH, null, Instant.EPOCH),
+                    mock(ProjectProfileResponse.class), facts, List.of(),
+                    List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+            when(diagnostics.findById(analysisId)).thenReturn(Optional.of(
+                    AnalysisExecutionDiagnostic.builder()
+                            .analysisId(analysisId).collectionComplete(true).build()));
+            when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                    projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
+            when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
+                    .thenReturn(emptyRepositoryContext());
+            when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
+
+            semanticSelections.add(service.select(context, intent, null).selectedFacts().stream()
+                    .map(this::semanticSelectionKey)
+                    .toList());
+        }
+
+        assertEquals(5, semanticSelections.size());
+        assertTrue(semanticSelections.stream().allMatch(semanticSelections.getFirst()::equals),
+                () -> "Persistence UUID permutations changed selected Fact semantics: "
+                        + semanticSelections);
+        assertEquals(40, semanticSelections.getFirst().size());
+    }
 
     @Test
     void shouldDeterministicallyRankDeduplicateBudgetAndDigestSelection() {
@@ -109,6 +168,21 @@ class KnowledgeSelectionServiceTest {
     private AnalysisContext.FactSnapshot fact(FactType type, String content) {
         return new AnalysisContext.FactSnapshot(UUID.randomUUID(), type, content, "test",
                 List.of("README.md"), Instant.EPOCH);
+    }
+
+    private String semanticSelectionKey(AnalysisContext.FactSnapshot fact) {
+        return fact.type() + "|" + fact.source() + "|" + fact.content() + "|"
+                + String.join(",", fact.evidenceReferences());
+    }
+
+    private RepositoryContext emptyRepositoryContext() {
+        return new RepositoryContext(
+                "repository-context-engine-v1", ContextProfile.ARCHITECTURE_REVIEW,
+                List.of("architecture-v1", "history-v1"),
+                "context-intelligence-v1", List.of("test"),
+                List.of(), Map.of(),
+                new RepositoryContext.ContextBudget(60, 500, 20, 6000),
+                0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
     }
 
     private AnalysisContext.ObservationSnapshot observation(ObservationType type) {
