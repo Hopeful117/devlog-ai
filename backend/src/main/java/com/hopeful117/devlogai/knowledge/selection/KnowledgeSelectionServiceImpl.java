@@ -71,7 +71,10 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 .comparingInt((AnalysisContext.FactSnapshot value) ->
                         factScore(intent.id(), value) + guidanceScore(guidance, value.type() + " " + value.content())).reversed()
                 .thenComparing(value -> value.type().name())
-                .thenComparing(value -> value.id().toString());
+                .thenComparing(AnalysisContext.FactSnapshot::source)
+                .thenComparing(AnalysisContext.FactSnapshot::content)
+                .thenComparing(value -> value.evidenceReferences().stream().sorted().toList(),
+                        this::compareEvidenceReferences);
 
         List<AnalysisContext.ObservationSnapshot> rankedObservations = context.observations().stream()
                 .sorted(observationOrder).distinct().toList();
@@ -117,7 +120,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
         var metadata = new SelectedKnowledge.SelectionMetadata(
                 VERSION,
                 List.of("REPOSITORY_FIRST_LAYERING", "INTENT_SPECIFIC_RANKING",
-                        "USER_GUIDANCE_KEYWORD_BOOST", "STABLE_TYPE_AND_ID_ORDER",
+                        "USER_GUIDANCE_KEYWORD_BOOST", "STABLE_TYPE_AND_SEMANTIC_ORDER",
                         "DUPLICATE_FACT_CONTENT_ELIMINATION", "OBSERVATION_FACT_CLOSURE",
                         "KNOWLEDGE_BUDGET", "EVOLUTION_CONTEXT_REQUIRED",
                         "KNOWLEDGE_RELATION_PRESERVATION"),
@@ -278,6 +281,14 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
 
     private String factContentKey(AnalysisContext.FactSnapshot fact) {
         return fact.type() + "\u0000" + fact.content();
+    }
+
+    private int compareEvidenceReferences(List<String> left, List<String> right) {
+        for (int index = 0; index < Math.min(left.size(), right.size()); index++) {
+            int comparison = left.get(index).compareTo(right.get(index));
+            if (comparison != 0) return comparison;
+        }
+        return Integer.compare(left.size(), right.size());
     }
 
     private SelectedKnowledge.InsightSnapshot toInsight(Insight insight) {
