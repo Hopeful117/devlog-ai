@@ -257,3 +257,118 @@ async def test_decision_task_dispatches_to_decision_service_not_stub() -> None:
     assert len(decision_service.calls) == 1
     assert decision_service.calls[0][0] is request
     assert callback.results == []
+
+
+def test_decision_prompt_includes_shared_context_utilization_contract() -> None:
+    prompt = EngineeringDecisionPromptBuilder().build(submission())
+
+    assert "Base project-specific conclusions on the supplied project context" in prompt.user_message
+    assert "Generic model knowledge must not be used as evidence" in prompt.user_message
+    assert "Semantic Sections are semantic indexes" in prompt.user_message
+    assert "Do not double-count" in prompt.user_message
+    assert "Do not produce one proposal per section" in prompt.user_message
+    assert "Do not infer causality, historical motivation, or developer intent" in prompt.user_message
+
+
+def test_decision_prompt_requires_project_specific_decision_reconstruction() -> None:
+    prompt = EngineeringDecisionPromptBuilder().build(submission())
+
+    assert "Look first for explicit decision evidence or genuinely independent convergent signals" in prompt.user_message
+    assert "Primary perspectives: DECISIONS, HISTORY, REPOSITORY_CHANGES, VALIDATED_KNOWLEDGE" in prompt.user_message
+    assert "Technology usage alone is not sufficient" in prompt.user_message
+
+
+def test_decision_prompt_has_positive_emission_gate() -> None:
+    """RED: positive emission gate - must emit only when explicit decision evidence OR strong independent convergence"""
+    prompt = EngineeringDecisionPromptBuilder().build(submission())
+
+    # Positive gate: must determine concrete project-specific choice is supported
+    assert "Emission gate: emit a decision only when" in prompt.user_message
+    assert "concrete project-specific engineering choice" in prompt.user_message
+    assert "engineering decision" in prompt.user_message.lower()
+
+    # Explicit evidence path
+    assert "explicit decision evidence" in prompt.user_message.lower()
+
+    # Strong convergence path requires independent signals
+    assert "independent" in prompt.user_message.lower()
+    assert "convergent" in prompt.user_message.lower()
+
+
+def test_decision_prompt_defines_strong_convergence_with_independence() -> None:
+    """RED: strong convergence must mean independent decision signals, not repeated implementation-state"""
+    prompt = EngineeringDecisionPromptBuilder().build(submission())
+
+    # Strong convergence = independent decision signals, not repeated implementation-state observations
+    assert "independent" in prompt.user_message.lower()
+    assert "convergent" in prompt.user_message.lower()
+    assert "independent" in prompt.user_message.lower()
+    assert "implementation state" in prompt.user_message.lower()
+    assert "same underlying implementation state" in prompt.user_message.lower()
+
+
+def test_decision_prompt_has_evidence_independence_rule() -> None:
+    """RED: evidence independence rule - repeated implementation-state observations are not independent evidence"""
+    prompt = EngineeringDecisionPromptBuilder().build(submission())
+
+    # Evidence independence rule
+    assert "independent" in prompt.user_message.lower()
+    assert "evidence" in prompt.user_message.lower()
+    assert "implementation state" in prompt.user_message.lower()
+    assert "not count as independent" in prompt.user_message.lower()
+
+
+def test_decision_prompt_distinguishes_implementation_state_from_decision_evidence() -> None:
+    """RED: must distinguish implementation state from decision evidence"""
+    prompt = EngineeringDecisionPromptBuilder().build(submission())
+
+    assert "implementation" in prompt.user_message.lower()
+    assert "state" in prompt.user_message.lower()
+    assert "decision" in prompt.user_message.lower()
+    assert "evidence" in prompt.user_message.lower()
+    # Must explicitly say implementation state is not decision evidence
+    assert "not sufficient" in prompt.user_message.lower()
+
+
+def test_decision_prompt_has_negative_emission_gate() -> None:
+    """RED: negative gate - technology presence, implementation evidence, repeated observations are insufficient"""
+    prompt = EngineeringDecisionPromptBuilder().build(submission())
+
+    # Negative gate: technology presence alone is not sufficient
+    assert "technology" in prompt.user_message.lower()
+    assert "presence" in prompt.user_message.lower()
+    assert "not sufficient" in prompt.user_message.lower()
+
+    # Must not combine with generic knowledge
+    assert "generic" in prompt.user_message.lower()
+    assert "knowledge" in prompt.user_message.lower()
+    assert "rationale" in prompt.user_message.lower()
+
+
+def test_decision_prompt_has_rationale_eligibility_rule() -> None:
+    """RED: rationale must be supported, generic knowledge cannot be used as project rationale"""
+    prompt = EngineeringDecisionPromptBuilder().build(submission())
+
+    assert "rationale" in prompt.user_message.lower()
+    assert "supported" in prompt.user_message.lower()
+    assert "generic" in prompt.user_message.lower()
+    assert "knowledge" in prompt.user_message.lower()
+    assert "rationale" in prompt.user_message.lower()
+
+
+def test_decision_prompt_has_selectivity_principle() -> None:
+    """RED: selectivity - prefer fewer well-supported over broad speculative coverage"""
+    prompt = EngineeringDecisionPromptBuilder().build(submission())
+
+    assert "fewer" in prompt.user_message.lower()
+    assert "well-supported" in prompt.user_message.lower()
+    assert "speculative" in prompt.user_message.lower()
+
+
+def test_decision_prompt_preserves_zero_decision_validity() -> None:
+    """RED: zero proposals must remain legitimate when no decision is supported"""
+    prompt = EngineeringDecisionPromptBuilder().build(submission())
+
+    assert "zero" in prompt.user_message.lower()
+    assert "valid" in prompt.user_message.lower()
+    assert "legitimate" in prompt.user_message.lower() or "acceptable" in prompt.user_message.lower()

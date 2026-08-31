@@ -176,3 +176,56 @@ def test_architecture_prompt_includes_existing_trusted_architecture_knowledge() 
     assert 'deltaType "ENRICHES"' in prompt.user_message
     assert "omit targetInsightId completely" in prompt.user_message
     assert "Never emit targetInsightId for NEW proposals" in prompt.user_message
+
+
+def test_shared_contract_explains_semantic_sections_as_indexes_without_double_counting() -> None:
+    knowledge = selected_knowledge()
+    knowledge["semanticSections"] = [
+        {
+            "sectionId": "ARCHITECTURE",
+            "sectionTitle": "Architecture",
+            "items": [{"itemType": "FACT", "itemId": "f1", "label": "SPRING_BOOT_DETECTED"}],
+        }
+    ]
+
+    prompt = InsightPromptBuilder().build(prompt_request(knowledge=knowledge))
+
+    assert "Semantic Sections are semantic indexes" in prompt.user_message
+    assert "Canonical selected content contains the actual engineering information" in prompt.user_message
+    assert "does not create new evidence" in prompt.user_message
+    assert "Do not double-count" in prompt.user_message
+    assert "Do not produce one proposal per section" in prompt.user_message
+
+
+def test_shared_contract_prefers_project_evidence_and_conservative_causality() -> None:
+    prompt = InsightPromptBuilder().build(prompt_request())
+
+    assert "Base project-specific conclusions on the supplied project context" in prompt.user_message
+    assert "Generic model knowledge must not be used as evidence" in prompt.user_message
+    assert "Prefer project-specific evidence over generic framework assumptions" in prompt.user_message
+    assert "Do not infer causality, historical motivation, or developer intent" in prompt.user_message
+    assert "remain conservative rather than inventing certainty" in prompt.user_message
+
+
+def test_describe_project_guidance_requests_project_defining_cross_section_synthesis() -> None:
+    prompt = InsightPromptBuilder().build(prompt_request())
+
+    assert "Identify project-defining characteristics" in prompt.user_message
+    assert "PROJECT_STATE, ARCHITECTURE, and VALIDATED_KNOWLEDGE" in prompt.user_message
+    assert "Use HISTORY, REPOSITORY_CHANGES, HUMAN_CONTEXT, and DECISIONS only when they materially improve project understanding" in prompt.user_message
+    assert "Distinguish the stable current state from historical evolution" in prompt.user_message
+    assert "avoid enumerating every detectable characteristic" in prompt.user_message
+
+
+def test_architecture_prompt_preserves_delta_only_semantics_with_section_emphasis() -> None:
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_intent(),
+            knowledge=selected_knowledge(existing_architecture_knowledge=[]),
+        )
+    )
+
+    assert "Treat ARCHITECTURE and VALIDATED_KNOWLEDGE as the primary perspectives" in prompt.user_message
+    assert "Use HISTORY, REPOSITORY_CHANGES, and PROJECT_STATE only when they materially support" in prompt.user_message
+    assert "Do not rediscover already-trusted architecture as NEW" in prompt.user_message
+    assert "return an empty proposals array" in prompt.user_message
