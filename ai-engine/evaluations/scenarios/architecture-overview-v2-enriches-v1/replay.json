@@ -1,0 +1,57 @@
+{
+  "scenarioId": "architecture-overview-v2-enriches-v1",
+  "scenarioVersion": "1.0.0",
+  "output": {
+    "proposals": [
+      {
+        "insightType": "ARCHITECTURE_DESCRIPTION",
+        "title": "Configured relationship between application services",
+        "summary": "The container composition adds a declared startup dependency and configured HTTP reference from backend to ai-engine.",
+        "rationale": "This directional configuration materially enriches the existing containerization description without asserting successful runtime communication.",
+        "deltaType": "ENRICHES",
+        "targetInsightId": "00000000-0000-0000-0000-000000000301",
+        "confidence": 0.93,
+        "supportingFactIds": [
+          "00000000-0000-0000-0000-000000000101",
+          "00000000-0000-0000-0000-000000000102"
+        ],
+        "supportingObservationIds": [
+          "00000000-0000-0000-0000-000000000201"
+        ],
+        "evidenceReferences": [
+          "docker-compose.yml"
+        ]
+      }
+    ],
+    "synthesis": {
+      "title": "Controlled service composition",
+      "sections": [
+        {
+          "name": "Configured relationship",
+          "content": "The composition declares that backend starts after ai-engine and configures backend with an HTTP service reference to ai-engine. This establishes startup ordering and configured reachability only."
+        }
+      ],
+      "deltaConclusion": "DELTAS_PROPOSED",
+      "groundingReferences": [
+        "docker-compose.yml"
+      ]
+    }
+  },
+  "capture": {
+    "repositoryRevision": "2e849641cf74361d7703e4b3f53609b9c5b3e83e",
+    "capturedAt": "2026-09-02T00:00:00Z",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "promptVersion": "architecture-overview-prompt-v2",
+    "promptContentDigest": "56a42fa219834c3f15ef969d5ce5ce192238f96a0bad73c264785a0e7535cec6",
+    "schemaDigest": "99be8c6a4b15516cb45b81049288c6ed28965516c04c3ed8c4ad046302c3a7fd"
+  },
+  "qualitativeGrounding": {
+    "status": "REVIEWED",
+    "unsupportedMaterialClaims": 0,
+    "contradictedMaterialClaims": 0,
+    "plausibleButUnprovenMaterialClaims": 0,
+    "limitedNonCriticalImprecision": false,
+    "notes": "Reviewed as limited to declared startup dependency, configured service reachability, and the explicit HTTP scheme. It does not assert successful runtime communication, API invocation, data exchange, network reliability, or post-start operational dependency."
+  }
+}
