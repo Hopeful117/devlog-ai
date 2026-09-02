@@ -43,6 +43,18 @@ public class IntentCatalog {
                         InsightType.INFRASTRUCTURE_DESCRIPTION, InsightType.API_DESCRIPTION),
                 "architecture-overview-prompt-v1"));
         register(result, new IntentDefinition(
+                "architecture-overview", "v2",
+                "Provide a current-state architecture synthesis and detect meaningful architecture deltas.",
+                ProposalType.INSIGHT, IntentExecutionMode.GENERIC,
+                List.of(InsightType.ARCHITECTURE_DESCRIPTION, InsightType.TECHNOLOGY_DESCRIPTION,
+                        InsightType.INFRASTRUCTURE_DESCRIPTION, InsightType.API_DESCRIPTION),
+                List.of("Utiliser uniquement AnalysisContext.",
+                        "Produire une synthèse de l'architecture actuelle ancrée dans le contexte sélectionné.",
+                        "Ne proposer que les deltas d'architecture réellement nouveaux ou enrichissants.",
+                        "Ne jamais présenter une proposition comme une connaissance validée."),
+                synthesisOutputContract(), "architecture-overview-prompt-v2",
+                List.of("architecture-v1", HISTORY_PROFILE)));
+        register(result, new IntentDefinition(
                 "analyze-engineering-event", "v1",
                 "Proposer des Engineering Events fondés sur un commit et son premier parent.",
                 ProposalType.ENGINEERING_EVENT, IntentExecutionMode.DEDICATED_ENGINEERING_EVENT,
@@ -122,6 +134,27 @@ register(result, new IntentDefinition(
                 "schemaVersion", "engineering-decision-proposal-v1",
                 "requiredProposalFields", List.of("title", "context", "choice",
                         "rationale", "consequences"));
+    }
+
+    private static Map<String, Object> synthesisOutputContract() {
+        return Map.of(
+                "type", "object",
+                "structured", true,
+                "hasSynthesis", true,
+                "root", "proposals",
+                "minimumProposalCount", 0, "maximumProposalCount", 10,
+                "allowedInsightTypes", List.of(
+                        InsightType.ARCHITECTURE_DESCRIPTION.name(),
+                        InsightType.TECHNOLOGY_DESCRIPTION.name(),
+                        InsightType.INFRASTRUCTURE_DESCRIPTION.name(),
+                        InsightType.API_DESCRIPTION.name()),
+                "allowedDeltaTypes", List.of("NEW", "ENRICHES"),
+                "requiredProposalFields", List.of(
+                        "insightType", "title", "summary", "rationale", "confidence",
+                        "deltaType",
+                        "supportingFactIds", "supportingObservationIds", "evidenceReferences"),
+                "requiredSynthesisFields", List.of(
+                        "title", "sections", "deltaConclusion", "groundingReferences"));
     }
 
     private static void register(Map<String, IntentDefinition> target, IntentDefinition intent) {

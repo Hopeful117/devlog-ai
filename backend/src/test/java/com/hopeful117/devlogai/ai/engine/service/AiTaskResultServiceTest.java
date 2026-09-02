@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.ai.engine.service;
 
+import tools.jackson.databind.ObjectMapper;
 import com.hopeful117.devlogai.ai.engine.dto.*;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException;
@@ -27,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -53,6 +55,9 @@ class AiTaskResultServiceTest {
 
     @Mock
     private AiProposalContractValidator proposalContractValidator;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private AiTaskResultServiceImpl service;
@@ -245,6 +250,178 @@ class AiTaskResultServiceTest {
         verify(aiTaskRepository, never()).save(any());
     }
 
+    @Test
+    void shouldPersistSynthesisWhenPresent() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("architecture-overview");
+        task.setIntentVersion("v2");
+        task.setSelectedKnowledgeSnapshot(Map.of(
+                "selectedFacts", List.of(Map.of(
+                        "evidenceReferences", List.of("src/main.java:10")))));
+        AnalysisSynthesisResult synthesis = new AnalysisSynthesisResult(
+                "Architecture Overview",
+                List.of(new AnalysisSynthesisResult.SynthesisSection("Components", "REST API")),
+                AnalysisSynthesisResult.ArchitectureDeltaConclusion.NO_MATERIAL_DELTA,
+                List.of("src/main.java:10")
+        );
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.now(), List.of(), null, promptMetadata(), synthesis);
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+        when(factRepository.findAllById(any())).thenReturn(List.of());
+        when(observationRepository.findAllById(any())).thenReturn(List.of());
+        when(proposalRepository.countByAiTaskId(task.getId())).thenReturn(0L);
+        when(objectMapper.convertValue(any(), eq(java.util.Map.class)))
+                .thenReturn(java.util.Map.of("title", "Architecture Overview"));
+
+        AiTaskResultAcknowledgement result = service.handle(correlationId, request);
+
+        assertTrue(result.acknowledged());
+        assertEquals(AiTaskStatus.COMPLETED, task.getStatus());
+        assertNotNull(task.getSynthesisSnapshot());
+        assertEquals("Architecture Overview", task.getSynthesisSnapshot().get("title"));
+        verify(aiTaskRepository).save(task);
+    }
+
+    @Test
+    void shouldRejectV2CompletionWithoutSynthesis() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("architecture-overview");
+        task.setIntentVersion("v2");
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.now(), List.of(), null, promptMetadata(), null);
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+
+        InvalidAiTaskResultException ex = assertThrows(
+                InvalidAiTaskResultException.class,
+                () -> service.handle(correlationId, request)
+        );
+        assertTrue(ex.getMessage().contains("synthesis"));
+        verify(proposalRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void shouldRejectSynthesisWithBlankTitle() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("architecture-overview");
+        task.setIntentVersion("v2");
+        AnalysisSynthesisResult synthesis = new AnalysisSynthesisResult(
+                "  ",
+                List.of(new AnalysisSynthesisResult.SynthesisSection("Components", "REST API")),
+                AnalysisSynthesisResult.ArchitectureDeltaConclusion.NO_MATERIAL_DELTA,
+                List.of()
+        );
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.now(), List.of(), null, promptMetadata(), synthesis);
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+
+        InvalidAiTaskResultException ex = assertThrows(
+                InvalidAiTaskResultException.class,
+                () -> service.handle(correlationId, request)
+        );
+        assertTrue(ex.getMessage().contains("blank"));
+        verify(proposalRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void shouldRejectSynthesisWithEmptySections() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("architecture-overview");
+        task.setIntentVersion("v2");
+        AnalysisSynthesisResult synthesis = new AnalysisSynthesisResult(
+                "Architecture",
+                List.of(),
+                AnalysisSynthesisResult.ArchitectureDeltaConclusion.NO_MATERIAL_DELTA,
+                List.of()
+        );
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.now(), List.of(), null, promptMetadata(), synthesis);
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+
+        InvalidAiTaskResultException ex = assertThrows(
+                InvalidAiTaskResultException.class,
+                () -> service.handle(correlationId, request)
+        );
+        assertTrue(ex.getMessage().contains("section"));
+        verify(proposalRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void shouldValidateSynthesisGroundingBeforePersistence() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("architecture-overview");
+        task.setIntentVersion("v2");
+        task.setSelectedKnowledgeSnapshot(Map.of(
+                "selectedFacts", List.of(Map.of(
+                        "evidenceReferences", List.of("allowed.java:1")))));
+        AnalysisSynthesisResult synthesis = new AnalysisSynthesisResult(
+                "Architecture",
+                List.of(new AnalysisSynthesisResult.SynthesisSection("Components", "REST API")),
+                AnalysisSynthesisResult.ArchitectureDeltaConclusion.NO_MATERIAL_DELTA,
+                List.of("invented.java:1")
+        );
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+
+        service.handle(
+                correlationId,
+                new AiTaskResultRequest(correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                        Instant.now(), List.of(), null, promptMetadata(), synthesis));
+
+        verify(proposalContractValidator).validateSynthesis(task, synthesis, false);
+    }
+
+    @Test
+    void shouldRejectSynthesisForV1Intent() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("architecture-overview");
+        task.setIntentVersion("v1");
+        AnalysisSynthesisResult synthesis = new AnalysisSynthesisResult(
+                "Architecture",
+                List.of(new AnalysisSynthesisResult.SynthesisSection("Components", "REST API")),
+                AnalysisSynthesisResult.ArchitectureDeltaConclusion.NO_MATERIAL_DELTA,
+                List.of()
+        );
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+
+        assertThrows(InvalidAiTaskResultException.class, () -> service.handle(
+                correlationId,
+                new AiTaskResultRequest(correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                        Instant.now(), List.of(), null, promptMetadata(), synthesis)));
+    }
+
+    @Test
+    void shouldRejectTerminalV2TaskThatHasNoPersistedSynthesis() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.COMPLETED);
+        task.setIntentId("architecture-overview");
+        task.setIntentVersion("v2");
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+
+        AiTaskResultConflictException error = assertThrows(
+                AiTaskResultConflictException.class,
+                () -> service.handle(correlationId, completedRequest(
+                        correlationId, Instant.now(), List.of())));
+
+        assertEquals("AI_TASK_INVALID_TERMINAL_RESULT", error.getCode());
+        verifyNoInteractions(analysisRepository);
+    }
+
     private AiTask task(UUID correlationId, AiTaskStatus status) {
         Project project = Project.builder().id(UUID.randomUUID()).build();
         Analysis analysis = Analysis.builder()
@@ -272,7 +449,8 @@ class AiTaskResultServiceTest {
                 completedAt,
                 proposals,
                 null,
-                promptMetadata()
+                promptMetadata(),
+                null
         );
     }
 

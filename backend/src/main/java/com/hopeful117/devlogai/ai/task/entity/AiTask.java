@@ -93,6 +93,10 @@ public class AiTask {
     @Column(nullable = false, updatable = false, columnDefinition = "jsonb")
     private Map<String, Object> contextSnapshot;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "synthesis_snapshot", columnDefinition = "jsonb")
+    private Map<String, Object> synthesisSnapshot;
+
     @Column(length = 255)
     private String externalJobId;
 

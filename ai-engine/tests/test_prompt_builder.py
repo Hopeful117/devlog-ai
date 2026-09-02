@@ -1,10 +1,17 @@
 import pytest
 import hashlib
 
-from app.prompts.insight import InsightPromptBuilder, UnsupportedPromptTemplateError
+from app.prompts.insight import (
+    ArchitectureKnowledgeRetryCandidate,
+    InsightPromptBuilder,
+    RelationshipRetryContext,
+    UncoveredRelationshipRetryItem,
+    UnsupportedPromptTemplateError,
+)
 from app.schemas.ai_task import UserGuidance
 from tests.intent_fixtures import (
     architecture_overview_intent,
+    architecture_overview_v2_intent,
     prompt_request,
     selected_knowledge,
 )
@@ -103,6 +110,41 @@ def test_corrective_prompt_is_new_deterministic_prompt() -> None:
     assert "invalid insight type" in retry.user_message
     assert retry.content_digest != original.content_digest
     assert retry.prompt_id != original.prompt_id
+
+
+def test_relationship_retry_guidance_is_dynamic_deterministic_and_non_prescriptive() -> None:
+    builder = InsightPromptBuilder()
+    original = builder.build(prompt_request())
+    context = RelationshipRetryContext(
+        relationships=(UncoveredRelationshipRetryItem(
+            "SERVICE_DEPENDENCY",
+            "orders",
+            "payments",
+            ("compose.yaml",),
+        ),),
+        candidates=(ArchitectureKnowledgeRetryCandidate(
+            "9b913083-b318-43ba-a420-c67adcd1cf72",
+            "Container orchestration",
+            "The system uses container orchestration.",
+        ),),
+    )
+
+    first = builder.corrective_retry(original, ValueError("missing delta"), context)
+    second = builder.corrective_retry(original, ValueError("missing delta"), context)
+    retry = first.user_message.split("CORRECTIVE RETRY", 1)[1]
+
+    assert first == second
+    assert '"direction":"orders -> payments"' in retry
+    assert "compose.yaml" in retry
+    assert "Container orchestration" in retry
+    assert "genuinely new architecture knowledge" in retry
+    assert "extends or refines supplied trusted architecture knowledge" in retry
+    assert "Choose the classification from the evidence" in retry
+    assert "use ENRICHES" not in retry
+    assert "must be ENRICHES" not in retry
+    assert "backend" not in retry
+    assert "ai-engine" not in retry
+    assert "Project Containerization with Docker and Docker Compose" not in retry
 
 
 def test_unknown_prompt_template_is_rejected_without_fallback() -> None:
@@ -229,3 +271,231 @@ def test_architecture_prompt_preserves_delta_only_semantics_with_section_emphasi
     assert "Use HISTORY, REPOSITORY_CHANGES, and PROJECT_STATE only when they materially support" in prompt.user_message
     assert "Do not rediscover already-trusted architecture as NEW" in prompt.user_message
     assert "return an empty proposals array" in prompt.user_message
+
+
+# ---- architecture-overview-v2 synthesis behavior tests ----
+
+def test_v2_synthesis_requires_cross_evidence_integration() -> None:
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    assert "reason across" in prompt.user_message.lower()
+    assert "inventory" in prompt.user_message.lower()
+    assert "relate" in prompt.user_message.lower()
+    assert "boundaries" in prompt.user_message.lower()
+
+
+def test_v2_synthesis_discourages_evidence_enumeration_in_prose() -> None:
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    assert "Do not list Fact IDs" in prompt.user_message
+    assert "groundingReferences" in prompt.user_message
+
+
+def test_v2_synthesis_enforces_conservative_grounding() -> None:
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    assert "Never invent a relationship" in prompt.user_message
+    assert "omit the unsupported relationship" in prompt.user_message
+
+
+def test_v2_synthesis_prefers_synthesis_prose_over_inventory() -> None:
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    assert "SYNTHESIS OBJECTIVE" in prompt.user_message
+    assert "integrated mental model" in prompt.user_message
+    assert "backend module" not in prompt.user_message
+    assert "ai-engine service" not in prompt.user_message
+    assert "NO_MATERIAL_DELTA" in prompt.user_message
+    assert "ordering dependency is not" in prompt.user_message
+    assert "quality attributes" in prompt.user_message
+    assert "material ENRICHES delta" in prompt.user_message
+
+
+def test_v1_architecture_unchanged() -> None:
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_intent(),
+            knowledge=selected_knowledge(existing_architecture_knowledge=[]),
+        )
+    )
+    assert "SYNTHESIS OBJECTIVE" not in prompt.user_message
+    assert "reason across" not in prompt.user_message.lower()
+    assert "Treat ARCHITECTURE and VALIDATED_KNOWLEDGE" in prompt.user_message
+
+
+def test_v2_delta_contract_preserved() -> None:
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    assert "deltaType" in prompt.user_message
+    assert "NEW" in prompt.user_message
+    assert "ENRICHES" in prompt.user_message
+    assert "return an empty proposals array" in prompt.user_message
+
+
+# ---- Grounding-aware synthesis contract tests (Post-0109 corrective) ----
+
+def test_v2_grounding_contract_distinguishes_configured_vs_proven() -> None:
+    """The grounding contract must distinguish configured from proven runtime behavior."""
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    assert "observed or configured relationship" in prompt.user_message
+    assert "plausible architectural interpretation" in prompt.user_message
+    assert "proven runtime behavior" in prompt.user_message
+
+
+def test_v2_grounding_contract_forbids_semantic_strengthening() -> None:
+    """The grounding contract must forbid upgrading configuration into runtime communication."""
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    assert "must not be upgraded into" in prompt.user_message
+    assert "runtime communication" in prompt.user_message
+    assert "API usage" in prompt.user_message
+    assert "data flow" in prompt.user_message
+    assert "network behavior" in prompt.user_message
+    assert "operational dependency" in prompt.user_message
+
+
+def test_v2_grounding_contract_prefers_narrower_claim() -> None:
+    """The grounding contract must instruct the model to prefer narrower supported claims."""
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    assert "narrower evidence-supported statement" in prompt.user_message
+    assert "broader plausible architectural interpretation" in prompt.user_message
+
+
+def test_v2_grounding_contract_forbids_plausible_as_fact() -> None:
+    """The grounding contract must prevent presenting plausible inference as project fact."""
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    assert "Do not present plausible inference as project fact" in prompt.user_message
+
+
+def test_v2_grounding_contract_preserves_existing_instructions() -> None:
+    """The grounding contract must preserve existing synthesis instructions."""
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    # Preserve existing instructions
+    assert "Never invent a relationship" in prompt.user_message
+    assert "omit the unsupported relationship" in prompt.user_message
+    assert "ordering dependency is not" in prompt.user_message
+    assert "quality attributes" in prompt.user_message
+    assert "material ENRICHES delta" in prompt.user_message
+    # Preserve synthesis objective
+    assert "SYNTHESIS OBJECTIVE" in prompt.user_message
+    assert "integrated mental model" in prompt.user_message
+
+
+def test_v2_grounding_contract_is_generic_not_benchmark_specific() -> None:
+    """The grounding contract must not contain benchmark-specific terms."""
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    # Must not contain benchmark-specific terms
+    assert "backend" not in prompt.user_message.lower().split("synthesis objective")[1]
+    assert "ai-engine" not in prompt.user_message.lower().split("synthesis objective")[1]
+    assert "depends_on" not in prompt.user_message.lower().split("synthesis objective")[1]
+    assert "ENV_REFERENCE" not in prompt.user_message.lower().split("synthesis objective")[1]
+
+
+def test_v2_grounding_contract_preserves_combined_evidence_reasoning() -> None:
+    """The grounding contract must allow combining independent selected evidence."""
+    prompt = InsightPromptBuilder().build(
+        prompt_request(
+            intent=architecture_overview_v2_intent(),
+            knowledge=selected_knowledge(
+                existing_architecture_knowledge=[
+                    {"insightId": "aaa", "title": "T", "content": "C", "sourceType": "ARCHITECTURE_DESCRIPTION"}
+                ]
+            ),
+        )
+    )
+    # The contract should allow combining evidence
+    assert "selected evidence" in prompt.user_message.lower()
+    assert "combined" in prompt.user_message.lower() or "jointly" in prompt.user_message.lower() or "multiple" in prompt.user_message.lower()

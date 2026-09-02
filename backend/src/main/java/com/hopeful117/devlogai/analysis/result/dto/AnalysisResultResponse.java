@@ -20,6 +20,7 @@ public record AnalysisResultResponse(
         InsightsSection insights,
         DeliverablesSection deliverables,
         EvidenceSection evidence,
+        SynthesisSection synthesis,
         List<NextAction> nextActions
 ) {
     // COMPLETED analysis factory
@@ -29,6 +30,7 @@ public record AnalysisResultResponse(
             List<InsightSummary> insights,
             List<DeliverableSummary> deliverables,
             EvidenceSection evidence,
+            SynthesisSection synthesis,
             List<NextAction> nextActions
     ) {
         return new AnalysisResultResponse(
@@ -38,6 +40,7 @@ public record AnalysisResultResponse(
                 insightsSection(insights),
                 deliverablesSection(deliverables),
                 evidence,
+                synthesis,
                 nextActions
         );
     }
@@ -55,6 +58,7 @@ public record AnalysisResultResponse(
                 emptyInsights(),
                 emptyDeliverables(),
                 emptyEvidence(),
+                null,
                 List.of(new NextAction("VIEW_DIAGNOSTICS", "View diagnostics", true))
         );
     }
@@ -68,6 +72,7 @@ public record AnalysisResultResponse(
                 emptyInsights(),
                 emptyDeliverables(),
                 emptyEvidence(),
+                null,
                 List.of()
         );
     }
@@ -84,6 +89,7 @@ public record AnalysisResultResponse(
                 emptyInsights(),
                 emptyDeliverables(),
                 evidence,
+                null,
                 List.of()
         );
     }
@@ -281,5 +287,17 @@ public record AnalysisResultResponse(
             String action,
             String label,
             boolean available
+    ) {}
+
+    public record SynthesisSection(
+            String title,
+            List<SynthesisItem> items,
+            String deltaConclusion,
+            List<String> groundingReferences
+    ) {}
+
+    public record SynthesisItem(
+            String name,
+            String content
     ) {}
 }

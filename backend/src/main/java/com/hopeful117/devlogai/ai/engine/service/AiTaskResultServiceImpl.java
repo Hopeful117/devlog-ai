@@ -1,5 +1,6 @@
 package com.hopeful117.devlogai.ai.engine.service;
 
+import tools.jackson.databind.ObjectMapper;
 import com.hopeful117.devlogai.ai.engine.dto.*;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException;
@@ -35,6 +36,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
     private final ObservationRepository observationRepository;
     private final AnalysisRepository analysisRepository;
     private final AiProposalContractValidator proposalContractValidator;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -52,6 +54,15 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         validateExternalJobId(task, request.externalJobId());
 
         if (isTerminal(task.getStatus())) {
+            if (task.getStatus() == AiTaskStatus.COMPLETED
+                    && isSynthesisIntent(task)
+                    && task.getSynthesisSnapshot() == null) {
+                throw new AiTaskResultConflictException(
+                        "AI_TASK_INVALID_TERMINAL_RESULT",
+                        task.getStatus(),
+                        "Architecture Overview v2 completed without its mandatory synthesis."
+                );
+            }
             if (!task.getStatus().name().equals(request.status().name())) {
                 throw new AiTaskResultConflictException(
                         "AI_TASK_TERMINAL_CONFLICT",
@@ -99,13 +110,15 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
 
         validateReferences(task, request.proposals());
         proposalContractValidator.validate(task, request.proposals());
+        validateSynthesis(task, request);
         applyPromptExecution(task, request.promptExecution());
+        persistSynthesis(task, request.synthesis());
         proposalRepository.saveAll(toProposals(task, request.proposals()));
         completeTask(task, request.completedAt());
         aiTaskRepository.save(task);
         finishAnalysis(task, AnalysisStatus.COMPLETED, request.completedAt());
-        log.info("AI task completed correlationId={} proposalCount={}",
-                correlationId, request.proposals().size());
+        log.info("AI task completed correlationId={} proposalCount={} hasSynthesis={}",
+                correlationId, request.proposals().size(), request.synthesis() != null);
         return acknowledgement(task, false);
     }
 
@@ -172,6 +185,55 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         log.info("Persisting Prompt metadata taskId={} promptVersion={} promptDigest={} provider={} model={}",
                 task.getId(), metadata.promptVersion(), metadata.promptContentDigest(),
                 metadata.provider(), metadata.modelIdentifier());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void persistSynthesis(AiTask task, AnalysisSynthesisResult synthesis) {
+        if (synthesis == null) {
+            return;
+        }
+        Map<String, Object> snapshot = objectMapper.convertValue(synthesis, Map.class);
+        task.setSynthesisSnapshot(snapshot);
+        log.info("Persisting synthesis snapshot taskId={} title={}", task.getId(), synthesis.title());
+    }
+
+    private void validateSynthesis(AiTask task, AiTaskResultRequest request) {
+        if (request.status() != AiTaskResultStatus.COMPLETED) {
+            return;
+        }
+        boolean synthesisIntent = isSynthesisIntent(task);
+        if (synthesisIntent && request.synthesis() == null) {
+            throw new InvalidAiTaskResultException(
+                    "Architecture Overview v2 callback must include synthesis"
+            );
+        }
+        if (!synthesisIntent && request.synthesis() != null) {
+            throw new InvalidAiTaskResultException(
+                    "Synthesis is not allowed for this Intent version"
+            );
+        }
+        if (request.synthesis() != null) {
+            if (request.synthesis().title() == null || request.synthesis().title().isBlank()) {
+                throw new InvalidAiTaskResultException("Synthesis title must not be blank");
+            }
+            if (request.synthesis().sections() == null || request.synthesis().sections().isEmpty()) {
+                throw new InvalidAiTaskResultException("Synthesis must have at least one section");
+            }
+            boolean hasDeltas = !request.proposals().isEmpty();
+            boolean declaresDeltas = request.synthesis().deltaConclusion()
+                    == AnalysisSynthesisResult.ArchitectureDeltaConclusion.DELTAS_PROPOSED;
+            if (hasDeltas != declaresDeltas) {
+                throw new InvalidAiTaskResultException(
+                        "Synthesis delta conclusion must match whether proposals are present"
+                );
+            }
+            proposalContractValidator.validateSynthesis(task, request.synthesis(), hasDeltas);
+        }
+    }
+
+    private boolean isSynthesisIntent(AiTask task) {
+        return "architecture-overview".equals(task.getIntentId())
+                && "v2".equals(task.getIntentVersion());
     }
 
     private void validateReferences(

@@ -10,6 +10,12 @@ class KnowledgeDeltaType(str, Enum):
     ENRICHES = "ENRICHES"
 
 
+class ArchitectureDeltaConclusion(str, Enum):
+    NO_MATERIAL_DELTA = "NO_MATERIAL_DELTA"
+    DELTAS_PROPOSED = "DELTAS_PROPOSED"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+
+
 class InsightOutputModel(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -18,14 +24,26 @@ class InsightOutputModel(BaseModel):
     )
 
 
+class SynthesisSectionOutput(InsightOutputModel):
+    name: str = Field(min_length=1, max_length=255)
+    content: str = Field(min_length=1, max_length=10000)
+
+
+class AnalysisSynthesisOutput(InsightOutputModel):
+    title: str = Field(min_length=1, max_length=500)
+    sections: list[SynthesisSectionOutput] = Field(min_length=1, max_length=20)
+    delta_conclusion: ArchitectureDeltaConclusion = Field(alias="deltaConclusion")
+    grounding_references: list[str] = Field(
+        default_factory=list, alias="groundingReferences"
+    )
+
+
 class InsightProposalOutput(InsightOutputModel):
     insight_type: InsightType = Field(alias="insightType")
     title: str = Field(min_length=1, max_length=255)
     summary: str = Field(min_length=1, max_length=5000)
     rationale: str = Field(min_length=1, max_length=5000)
-    delta_type: KnowledgeDeltaType = Field(
-        default=KnowledgeDeltaType.NEW, alias="deltaType"
-    )
+    delta_type: KnowledgeDeltaType = Field(alias="deltaType")
     target_insight_id: UUID | None = Field(default=None, alias="targetInsightId")
     confidence: float = Field(ge=0.0, le=1.0)
     supporting_fact_ids: list[UUID] = Field(alias="supportingFactIds")
@@ -52,3 +70,4 @@ class InsightProposalOutput(InsightOutputModel):
 
 class InsightGenerationOutput(InsightOutputModel):
     proposals: list[InsightProposalOutput] = Field(max_length=20)
+    synthesis: AnalysisSynthesisOutput | None = Field(default=None)

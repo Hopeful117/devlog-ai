@@ -14,11 +14,12 @@ public record AiTaskResultRequest(
         @NotNull Instant completedAt,
         @NotNull List<@Valid AiProposalResult> proposals,
         @Valid AiTaskResultError error,
-        @Valid PromptExecutionMetadata promptExecution
+        @Valid PromptExecutionMetadata promptExecution,
+        @Valid AnalysisSynthesisResult synthesis
 ) {
     public AiTaskResultRequest(UUID correlationId, String externalJobId,
                                AiTaskResultStatus status, Instant completedAt,
                                List<AiProposalResult> proposals, AiTaskResultError error) {
-        this(correlationId, externalJobId, status, completedAt, proposals, error, null);
+        this(correlationId, externalJobId, status, completedAt, proposals, error, null, null);
     }
 }
