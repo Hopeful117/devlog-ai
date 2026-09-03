@@ -44,6 +44,45 @@ def architecture_overview_intent() -> IntentDefinition:
     )
 
 
+def architecture_overview_v2_intent() -> IntentDefinition:
+    return IntentDefinition(
+        id="architecture-overview",
+        version="v2",
+        objective="Provide a current-state architecture synthesis and detect meaningful architecture deltas.",
+        supported_insight_types=[
+            InsightType.ARCHITECTURE_DESCRIPTION,
+            InsightType.TECHNOLOGY_DESCRIPTION,
+            InsightType.INFRASTRUCTURE_DESCRIPTION,
+            InsightType.API_DESCRIPTION,
+        ],
+        constraints=[
+            "Use only AnalysisContext.",
+            "Produce a current-state architecture synthesis anchored in the selected context.",
+            "Only propose architecture deltas that are genuinely new or enriching.",
+            "Never present a proposal as validated knowledge.",
+        ],
+        output_schema={
+            "type": "object", "structured": True, "hasSynthesis": True,
+            "root": "proposals", "minimumProposalCount": 0, "maximumProposalCount": 10,
+            "allowedInsightTypes": [
+                "ARCHITECTURE_DESCRIPTION", "TECHNOLOGY_DESCRIPTION",
+                "INFRASTRUCTURE_DESCRIPTION", "API_DESCRIPTION",
+            ],
+            "allowedDeltaTypes": ["NEW", "ENRICHES"],
+            "requiredProposalFields": [
+                "insightType", "title", "summary", "rationale", "confidence",
+                "deltaType", "supportingFactIds", "supportingObservationIds",
+                "evidenceReferences",
+            ],
+            "requiredSynthesisFields": [
+                "title", "sections", "deltaConclusion", "groundingReferences"
+            ],
+        },
+        prompt_template="architecture-overview-prompt-v2",
+        context_profiles=["architecture-v1", "history-v1"],
+    )
+
+
 def selected_knowledge(
     *, facts: list[object] | None = None, observations: list[object] | None = None,
     analysis_id: object | None = None,

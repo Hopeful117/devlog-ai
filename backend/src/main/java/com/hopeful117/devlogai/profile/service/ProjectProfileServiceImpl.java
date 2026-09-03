@@ -124,6 +124,8 @@ public class ProjectProfileServiceImpl implements ProjectProfileService {
             case MULTI_MODULE_BUILD -> List.of(
                     mapping(ProfileCategory.BUILD, "MULTI_MODULE_BUILD", "Build multi-module", "Le système de build déclare plusieurs modules."),
                     mapping(ProfileCategory.ARCHITECTURE, "MULTI_MODULE_ARCHITECTURE", "Architecture multi-module", "Le projet est structuré en plusieurs modules de build."));
+            case ARCHITECTURE_MODULARIZATION -> List.of(
+                    mapping(ProfileCategory.ARCHITECTURE, "DOCKER_SERVICE_WIRING", "Services Docker interconnectés", "Le projet définit plusieurs services Docker Compose avec des références inter-services."));
             default -> throw new IllegalArgumentException("Unsupported Observation type for profile v1: " + type);
         };
     }

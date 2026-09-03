@@ -264,4 +264,24 @@ class AiTaskServiceTest {
         verify(aiTaskRepository, never()).save(any());
         verifyNoInteractions(aiTaskMapper);
     }
+
+    @Test
+    void shouldRequireV2ArchitectureOverviewToCompleteThroughCallback() {
+        UUID id = UUID.randomUUID();
+        AiTask task = AiTask.builder()
+                .status(AiTaskStatus.PROCESSING)
+                .intentId("architecture-overview")
+                .intentVersion("v2")
+                .build();
+        when(aiTaskRepository.findById(id)).thenReturn(Optional.of(task));
+
+        ConflictException exception = assertThrows(
+                ConflictException.class,
+                () -> aiTaskService.complete(id)
+        );
+
+        assertTrue(exception.getMessage().contains("result callback"));
+        assertEquals(AiTaskStatus.PROCESSING, task.getStatus());
+        verify(aiTaskRepository, never()).save(any());
+    }
 }

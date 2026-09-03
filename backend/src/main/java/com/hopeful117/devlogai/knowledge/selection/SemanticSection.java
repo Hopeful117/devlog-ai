@@ -106,6 +106,8 @@ public final class SemanticSection {
         putFact(map, FactType.DOCKERFILE_PRESENT, SectionId.ARCHITECTURE, SectionId.PROJECT_STATE);
         putFact(map, FactType.DOCKER_COMPOSE_PRESENT, SectionId.ARCHITECTURE, SectionId.PROJECT_STATE);
         putFact(map, FactType.DOCKER_SERVICE_DECLARED, SectionId.ARCHITECTURE);
+        putFact(map, FactType.DOCKER_SERVICE_DEPENDS_ON, SectionId.ARCHITECTURE);
+        putFact(map, FactType.DOCKER_SERVICE_ENV_REFERENCE, SectionId.ARCHITECTURE);
         putFact(map, FactType.DOCKER_MULTI_STAGE_BUILD_PRESENT, SectionId.ARCHITECTURE);
         putFact(map, FactType.DOCKER_NON_ROOT_USER_DECLARED, SectionId.ARCHITECTURE);
         putFact(map, FactType.DOCKER_HEALTHCHECK_DECLARED, SectionId.ARCHITECTURE);

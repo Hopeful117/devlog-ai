@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.proposal import AiTaskResultStatus, ProposalType
+from app.schemas.insight import ArchitectureDeltaConclusion
 
 
 class ResultContractModel(BaseModel):
@@ -20,6 +21,20 @@ class AiProposalResult(ResultContractModel):
         alias="supportingObservationIds"
     )
     evidence_references: list[str] = Field(alias="evidenceReferences")
+
+
+class SynthesisSectionResult(ResultContractModel):
+    name: str = Field(min_length=1, max_length=255)
+    content: str = Field(min_length=1, max_length=10000)
+
+
+class AnalysisSynthesisResult(ResultContractModel):
+    title: str = Field(min_length=1, max_length=500)
+    sections: list[SynthesisSectionResult] = Field(min_length=1, max_length=20)
+    delta_conclusion: ArchitectureDeltaConclusion = Field(alias="deltaConclusion")
+    grounding_references: list[str] = Field(
+        default_factory=list, alias="groundingReferences"
+    )
 
 
 class AiTaskResultError(ResultContractModel):
@@ -45,6 +60,7 @@ class AiTaskResultRequest(ResultContractModel):
     prompt_execution: PromptExecutionMetadata | None = Field(
         default=None, alias="promptExecution"
     )
+    synthesis: AnalysisSynthesisResult | None = Field(default=None)
 
 
 class AiTaskResultAcknowledgement(ResultContractModel):

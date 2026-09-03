@@ -1,0 +1,228 @@
+{
+  "scenarioId": "architecture-overview-v2-enriches-v1",
+  "scenarioVersion": "1.0.0",
+  "intent": {
+    "id": "architecture-overview",
+    "version": "v2"
+  },
+  "promptRequest": {
+    "requestId": "00000000-0000-0000-0000-000000000001",
+    "correlationId": "00000000-0000-0000-0000-000000000002",
+    "analysisId": "00000000-0000-0000-0000-000000000003",
+    "aiTaskId": "00000000-0000-0000-0000-000000000004",
+    "taskType": "INSIGHT_GENERATION",
+    "intent": {
+      "id": "architecture-overview",
+      "version": "v2",
+      "objective": "Provide a current-state architecture synthesis and detect meaningful architecture deltas.",
+      "outputProposalType": "INSIGHT",
+      "executionMode": "GENERIC",
+      "supportedInsightTypes": [
+        "ARCHITECTURE_DESCRIPTION",
+        "TECHNOLOGY_DESCRIPTION",
+        "INFRASTRUCTURE_DESCRIPTION",
+        "API_DESCRIPTION"
+      ],
+      "constraints": [
+        "Use only AnalysisContext.",
+        "Produce a current-state architecture synthesis anchored in the selected context.",
+        "Only propose architecture deltas that are genuinely new or enriching.",
+        "Never present a proposal as validated knowledge."
+      ],
+      "outputSchema": {
+        "type": "object",
+        "structured": true,
+        "hasSynthesis": true,
+        "root": "proposals",
+        "minimumProposalCount": 0,
+        "maximumProposalCount": 10,
+        "allowedInsightTypes": [
+          "ARCHITECTURE_DESCRIPTION",
+          "TECHNOLOGY_DESCRIPTION",
+          "INFRASTRUCTURE_DESCRIPTION",
+          "API_DESCRIPTION"
+        ],
+        "allowedDeltaTypes": [
+          "NEW",
+          "ENRICHES"
+        ],
+        "requiredProposalFields": [
+          "insightType",
+          "title",
+          "summary",
+          "rationale",
+          "confidence",
+          "deltaType",
+          "supportingFactIds",
+          "supportingObservationIds",
+          "evidenceReferences"
+        ],
+        "requiredSynthesisFields": [
+          "title",
+          "sections",
+          "deltaConclusion",
+          "groundingReferences"
+        ]
+      },
+      "promptTemplate": "architecture-overview-prompt-v2",
+      "contextProfiles": [
+        "architecture-v1",
+        "history-v1"
+      ]
+    },
+    "userGuidance": null,
+    "selectedKnowledge": {
+      "project": {
+        "id": "00000000-0000-0000-0000-000000000005",
+        "name": "controlled-project"
+      },
+      "analysis": {
+        "id": "00000000-0000-0000-0000-000000000003"
+      },
+      "projectProfile": {
+        "id": "00000000-0000-0000-0000-000000000006",
+        "profileVersion": "v1"
+      },
+      "selectedFacts": [
+        {
+          "id": "00000000-0000-0000-0000-000000000101",
+          "type": "DOCKER_SERVICE_DEPENDS_ON",
+          "content": "from=backend,to=ai-engine",
+          "evidenceReferences": [
+            "docker-compose.yml"
+          ]
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000102",
+          "type": "DOCKER_SERVICE_ENV_REFERENCE",
+          "content": "from=backend,to=ai-engine,source=environment,url=http://ai-engine:8000",
+          "evidenceReferences": [
+            "docker-compose.yml"
+          ]
+        }
+      ],
+      "selectedObservations": [
+        {
+          "id": "00000000-0000-0000-0000-000000000201",
+          "type": "ARCHITECTURE_MODULARIZATION",
+          "content": "The controlled deployment defines multiple services with declared startup and configuration references.",
+          "supportingFactIds": [
+            "00000000-0000-0000-0000-000000000101",
+            "00000000-0000-0000-0000-000000000102"
+          ]
+        }
+      ],
+      "diagnostics": {
+        "collectionComplete": true,
+        "truncated": false,
+        "warningCount": 0,
+        "errorCount": 0
+      },
+      "selectedInsights": [],
+      "existingArchitectureKnowledge": [
+        {
+          "insightId": "00000000-0000-0000-0000-000000000301",
+          "title": "Project containerization",
+          "content": "The project uses containers coordinated through a composition file.",
+          "sourceType": "ARCHITECTURE_DESCRIPTION"
+        }
+      ],
+      "repositoryContext": {
+        "contextVersion": "repository-context-engine-v1",
+        "profile": "PROJECT_STATE",
+        "evidence": [],
+        "usedTokens": 0,
+        "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "selectedEngineeringEvents": [],
+      "selectedHumanContextInputs": [],
+      "knowledgeRelations": [],
+      "evolutionContext": null,
+      "selectionMetadata": {
+        "selectionVersion": "knowledge-selection-v4"
+      },
+      "selectionDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "expectedOutputContract": {
+      "type": "object",
+      "structured": true,
+      "hasSynthesis": true,
+      "root": "proposals",
+      "minimumProposalCount": 0,
+      "maximumProposalCount": 10,
+      "allowedInsightTypes": [
+        "ARCHITECTURE_DESCRIPTION",
+        "TECHNOLOGY_DESCRIPTION",
+        "INFRASTRUCTURE_DESCRIPTION",
+        "API_DESCRIPTION"
+      ],
+      "allowedDeltaTypes": [
+        "NEW",
+        "ENRICHES"
+      ],
+      "requiredProposalFields": [
+        "insightType",
+        "title",
+        "summary",
+        "rationale",
+        "confidence",
+        "deltaType",
+        "supportingFactIds",
+        "supportingObservationIds",
+        "evidenceReferences"
+      ],
+      "requiredSynthesisFields": [
+        "title",
+        "sections",
+        "deltaConclusion",
+        "groundingReferences"
+      ]
+    },
+    "metadata": {
+      "source": "canonical-evaluation-fixture"
+    }
+  },
+  "requiredSelectedInputs": [
+    {
+      "kind": "FACT",
+      "id": "00000000-0000-0000-0000-000000000101"
+    },
+    {
+      "kind": "FACT",
+      "id": "00000000-0000-0000-0000-000000000102"
+    },
+    {
+      "kind": "OBSERVATION",
+      "id": "00000000-0000-0000-0000-000000000201"
+    }
+  ],
+  "expectation": {
+    "expectedDelta": "ENRICHES",
+    "expectedTargetId": "00000000-0000-0000-0000-000000000301",
+    "allowedFactIds": [
+      "00000000-0000-0000-0000-000000000101",
+      "00000000-0000-0000-0000-000000000102"
+    ],
+    "allowedObservationIds": [
+      "00000000-0000-0000-0000-000000000201"
+    ],
+    "allowedEvidenceReferences": [
+      "docker-compose.yml"
+    ],
+    "qualitativeGroundingRequired": true
+  },
+  "gate": {
+    "requiredRuns": 1,
+    "minimumStrong": 1,
+    "maximumIncorrectDelta": 0,
+    "maximumIncorrectTarget": 0,
+    "maximumTrustViolations": 0,
+    "maximumExecutionFailures": 0
+  },
+  "reproducibility": {
+    "repositoryRevision": "2e849641cf74361d7703e4b3f53609b9c5b3e83e",
+    "promptVersion": "architecture-overview-prompt-v2",
+    "promptContentDigest": "56a42fa219834c3f15ef969d5ce5ce192238f96a0bad73c264785a0e7535cec6",
+    "schemaDigest": "99be8c6a4b15516cb45b81049288c6ed28965516c04c3ed8c4ad046302c3a7fd"
+  }
+}

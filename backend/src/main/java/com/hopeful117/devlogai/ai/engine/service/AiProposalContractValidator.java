@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.ai.engine.service;
 
 import com.hopeful117.devlogai.ai.engine.dto.AiProposalResult;
+import com.hopeful117.devlogai.ai.engine.dto.AnalysisSynthesisResult;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.intent.model.InsightType;
@@ -10,6 +11,8 @@ import com.hopeful117.devlogai.proposal.entity.ProposalType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
@@ -26,6 +29,14 @@ class AiProposalContractValidator {
             "title", "context", "choice", "rationale");
     private static final Set<String> DECISION_FIELDS_FULL = Set.of(
             "title", "context", "choice", "rationale", "consequences");
+    private static final Pattern RELATIONSHIP_KEY_VALUE_PATTERN = Pattern.compile(
+            "(?:^|,)\\s*from=([^,\\s]+)\\s*,\\s*to=([^,\\s]+)(?:,|$)",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern RELATIONSHIP_ARROW_PATTERN = Pattern.compile(
+            "(?<![A-Za-z0-9_.-])([A-Za-z0-9_.-]+)\\s*(?:->|→)\\s*"
+                    + "([A-Za-z0-9_.-]+)(?![A-Za-z0-9_.-])");
+    private static final List<String> RELATIONSHIP_KNOWLEDGE_FIELDS = List.of(
+            "title", "content", "summary", "rationale");
     private final IntentCatalog intents;
 
     void validate(AiTask task, List<AiProposalResult> proposals) {
@@ -54,6 +65,99 @@ class AiProposalContractValidator {
             } else if (proposal.type() == ProposalType.ENGINEERING_DECISION) {
                 validateDecision(proposal);
             }
+        }
+    }
+
+    void validateSynthesis(AiTask task, AnalysisSynthesisResult synthesis, boolean hasDeltas) {
+        Set<String> allowedReferences = new LinkedHashSet<>();
+        collectReferences(task.getSelectedKnowledgeSnapshot(), allowedReferences);
+        collectStringIds(task.getSelectedKnowledgeSnapshot(), "selectedFacts", allowedReferences);
+        collectStringIds(task.getSelectedKnowledgeSnapshot(), "selectedObservations", allowedReferences);
+        collectSelectedIdentifiers(task.getSelectedKnowledgeSnapshot(), allowedReferences);
+        if (!allowedReferences.containsAll(synthesis.groundingReferences())) {
+            fail("Synthesis grounding references must exist in selected knowledge");
+        }
+        if (!hasDeltas && hasUncoveredRelationship(task.getSelectedKnowledgeSnapshot())) {
+            fail("An explicit selected component relationship absent from existing architecture "
+                    + "knowledge requires an architecture delta proposal");
+        }
+    }
+
+    private boolean hasUncoveredRelationship(Object value) {
+        if (!(value instanceof Map<?, ?> snapshot)) return false;
+        Set<Relationship> existingRelationships = existingRelationships(
+                snapshot.get("existingArchitectureKnowledge"));
+        Object selectedFacts = snapshot.get("selectedFacts");
+        if (!(selectedFacts instanceof List<?> facts)) return false;
+        for (Object item : facts) {
+            if (!(item instanceof Map<?, ?> fact)
+                    || !(fact.get("content") instanceof String content)) continue;
+            Optional<Relationship> relationship = selectedRelationship(content);
+            if (relationship.isPresent()
+                    && !existingRelationships.contains(relationship.get())) return true;
+        }
+        return false;
+    }
+
+    private Optional<Relationship> selectedRelationship(String content) {
+        Matcher matcher = RELATIONSHIP_KEY_VALUE_PATTERN.matcher(content);
+        return matcher.find() ? Optional.of(relationship(matcher)) : Optional.empty();
+    }
+
+    private Set<Relationship> existingRelationships(Object value) {
+        Set<Relationship> relationships = new LinkedHashSet<>();
+        if (!(value instanceof List<?> knowledgeItems)) return relationships;
+        for (Object item : knowledgeItems) {
+            if (!(item instanceof Map<?, ?> knowledge)) continue;
+            for (String field : RELATIONSHIP_KNOWLEDGE_FIELDS) {
+                if (!(knowledge.get(field) instanceof String text)) continue;
+                collectRelationships(text, RELATIONSHIP_KEY_VALUE_PATTERN, relationships);
+                collectRelationships(text, RELATIONSHIP_ARROW_PATTERN, relationships);
+            }
+        }
+        return relationships;
+    }
+
+    private void collectRelationships(String text, Pattern pattern,
+            Set<Relationship> relationships) {
+        Matcher matcher = pattern.matcher(text);
+        while (matcher.find()) relationships.add(relationship(matcher));
+    }
+
+    private Relationship relationship(Matcher matcher) {
+        return new Relationship(
+                matcher.group(1).toLowerCase(Locale.ROOT),
+                matcher.group(2).toLowerCase(Locale.ROOT));
+    }
+
+    private record Relationship(String source, String target) { }
+
+    private void collectSelectedIdentifiers(Object value, Set<String> result) {
+        if (value instanceof Map<?, ?> map) {
+            for (String key : List.of("id", "insightId")) {
+                Object identifier = map.get(key);
+                if (identifier != null) {
+                    try {
+                        result.add(UUID.fromString(identifier.toString()).toString());
+                    } catch (IllegalArgumentException ignored) {
+                        // Invalid selected identifiers cannot authorize output.
+                    }
+                }
+            }
+            map.values().forEach(nested -> collectSelectedIdentifiers(nested, result));
+        } else if (value instanceof List<?> list) {
+            list.forEach(nested -> collectSelectedIdentifiers(nested, result));
+        }
+    }
+
+    private void collectStringIds(Object value, String collectionName, Set<String> result) {
+        if (!(value instanceof Map<?, ?> map)) return;
+        Object collection = map.get(collectionName);
+        if (!(collection instanceof List<?> list)) return;
+        for (Object item : list) {
+            if (!(item instanceof Map<?, ?> entry)) continue;
+            Object id = entry.get("id");
+            if (id != null) result.add(id.toString());
         }
     }
 

@@ -4,15 +4,25 @@ import com.hopeful117.devlogai.fact.entity.FactType;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 @ConditionalOnProperty(prefix = "devlog.collection.collectors.docker",
         name = "enabled", havingValue = "true", matchIfMissing = true)
 public class DockerCollector extends AbstractFileCollector {
-    private static final String VERSION = "docker-v1";
+    private static final String VERSION = "docker-v2";
     private static final String PATH_METADATA_PREFIX = "path=";
+    private static final Pattern URL_HOST = Pattern.compile(
+            "(?:[a-z][a-z0-9+.-]*:)+//([a-zA-Z0-9_.-]+)");
+    private static final Pattern VARIABLE_DEFAULT = Pattern.compile(
+            "\\$\\{[A-Za-z_][A-Za-z0-9_]*(?::-|-)([^}]+)}");
+    private static final Pattern HOST_WITH_OPTIONAL_PORT = Pattern.compile(
+            "^([a-zA-Z0-9_.-]+)(?::[0-9]+)?(?:/.*)?$");
 
     public DockerCollector(SecureRepositoryScanner scanner, CollectorLimits limits) {
         super(scanner, limits);
@@ -76,16 +86,180 @@ public class DockerCollector extends AbstractFileCollector {
     private void parseCompose(RepositoryFile file, FactAccumulator facts) {
         facts.add(FactType.DOCKER_COMPOSE_PRESENT,
                 PATH_METADATA_PREFIX + file.relativePath(), file.relativePath());
+        List<String> lines = file.content().lines().toList();
+        Set<String> serviceNames = new LinkedHashSet<>();
         ComposeSection section = ComposeSection.NONE;
-        for (String line : file.content().lines().toList()) {
+        int entryIndent = -1;
+        for (String line : lines) {
             String content = withoutComment(line).stripTrailing();
-            if (isTopLevel(content)) section = topLevelSection(content);
-            String entry = composeEntry(content);
-            if (entry != null) addComposeEntry(file, facts, section, entry);
+            if (isTopLevel(content)) {
+                section = topLevelSection(content);
+                entryIndent = -1;
+            }
+            if (section == ComposeSection.SERVICES) {
+                String serviceEntry = composeEntry(content, entryIndent);
+                if (serviceEntry != null) {
+                    entryIndent = leadingWhitespace(content);
+                    serviceNames.add(serviceEntry);
+                    facts.add(FactType.DOCKER_SERVICE_DECLARED,
+                            "service=" + serviceEntry, file.relativePath());
+                }
+            } else if (section == ComposeSection.VOLUMES) {
+                String entry = composeEntry(content, entryIndent);
+                if (entry != null) {
+                    entryIndent = leadingWhitespace(content);
+                    facts.add(FactType.DOCKER_VOLUME_DECLARED,
+                            "volume=" + entry, file.relativePath());
+                }
+            }
             if (content.stripLeading().equals("healthcheck:")) facts.add(
                     FactType.DOCKER_HEALTHCHECK_DECLARED,
-                    "composeHealthcheck=true", file.relativePath());
+                     "composeHealthcheck=true", file.relativePath());
         }
+        parseServiceWiring(lines, serviceNames, file, facts);
+    }
+
+    private void parseServiceWiring(List<String> lines, Set<String> serviceNames,
+            RepositoryFile file, FactAccumulator facts) {
+        ComposeSection section = ComposeSection.NONE;
+        String currentService = null;
+        int serviceIndent = -1;
+        int dependsOnIndent = -1;
+        int environmentIndent = -1;
+        for (String line : lines) {
+            String content = withoutComment(line).stripTrailing();
+            if (isTopLevel(content)) {
+                section = topLevelSection(content);
+                currentService = null;
+                serviceIndent = -1;
+                dependsOnIndent = -1;
+                environmentIndent = -1;
+            }
+            if (section != ComposeSection.SERVICES) continue;
+
+            String serviceEntry = composeEntry(content, serviceIndent);
+            if (serviceEntry != null) {
+                serviceIndent = leadingWhitespace(content);
+                currentService = serviceEntry;
+                dependsOnIndent = -1;
+                environmentIndent = -1;
+                continue;
+            }
+            if (currentService == null || content.isBlank()) continue;
+
+            int indent = leadingWhitespace(content);
+            String stripped = content.stripLeading();
+            if (dependsOnIndent >= 0 && indent <= dependsOnIndent) dependsOnIndent = -1;
+            if (environmentIndent >= 0 && indent <= environmentIndent) environmentIndent = -1;
+
+            if (stripped.startsWith("depends_on:")) {
+                dependsOnIndent = indent;
+                addInlineDependsOn(stripped.substring("depends_on:".length()), currentService,
+                        serviceNames, file, facts);
+                continue;
+            }
+            if (stripped.equals("environment:")) {
+                environmentIndent = indent;
+                continue;
+            }
+            if (dependsOnIndent >= 0) {
+                addDependsOn(stripped, currentService, serviceNames, file, facts);
+            }
+            if (environmentIndent >= 0) {
+                detectServiceReference(stripped, currentService, serviceNames, file, facts);
+            }
+        }
+    }
+
+    private void addInlineDependsOn(String value, String currentService, Set<String> serviceNames,
+            RepositoryFile file, FactAccumulator facts) {
+        String trimmed = value.trim();
+        if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+            for (String target : trimmed.substring(1, trimmed.length() - 1).split(",")) {
+                addRelationshipFact(FactType.DOCKER_SERVICE_DEPENDS_ON, currentService,
+                        unquote(target.trim()), serviceNames, file, facts);
+            }
+        } else if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+            Matcher keyMatcher = Pattern.compile("(?:^|,)\\s*['\"]?([a-zA-Z0-9_.-]+)['\"]?\\s*:")
+                    .matcher(trimmed.substring(1, trimmed.length() - 1));
+            while (keyMatcher.find()) {
+                addRelationshipFact(FactType.DOCKER_SERVICE_DEPENDS_ON, currentService,
+                        keyMatcher.group(1), serviceNames, file, facts);
+            }
+        }
+    }
+
+    private void addDependsOn(String value, String currentService, Set<String> serviceNames,
+            RepositoryFile file, FactAccumulator facts) {
+        String target = value;
+        if (target.startsWith("- ")) target = target.substring(2).trim();
+        if (target.endsWith(":")) target = target.substring(0, target.length() - 1).trim();
+        addRelationshipFact(FactType.DOCKER_SERVICE_DEPENDS_ON, currentService,
+                unquote(target), serviceNames, file, facts);
+    }
+
+    private void detectServiceReference(String value, String currentService, Set<String> serviceNames,
+            RepositoryFile file, FactAccumulator facts) {
+        String environmentValue = environmentValue(value);
+        if (environmentValue == null) return;
+        Matcher urlMatcher = URL_HOST.matcher(environmentValue);
+        while (urlMatcher.find()) {
+            String host = urlMatcher.group(1);
+            addRelationshipFact(FactType.DOCKER_SERVICE_ENV_REFERENCE, currentService,
+                    host, serviceNames, "source=environment", file, facts);
+        }
+        Matcher defaultMatcher = VARIABLE_DEFAULT.matcher(environmentValue);
+        while (defaultMatcher.find()) {
+            addHostValue(defaultMatcher.group(1), currentService, serviceNames, file, facts);
+        }
+        if (!urlMatcher.reset().find() && !defaultMatcher.reset().find()) {
+            addHostValue(environmentValue, currentService, serviceNames, file, facts);
+        }
+    }
+
+    private String environmentValue(String value) {
+        String candidate = value;
+        if (candidate.startsWith("- ")) candidate = candidate.substring(2).trim();
+        int equals = candidate.indexOf('=');
+        int colon = candidate.indexOf(':');
+        int separator = equals >= 0 && (colon < 0 || equals < colon) ? equals : colon;
+        if (separator < 0 || separator == candidate.length() - 1) return null;
+        return unquote(candidate.substring(separator + 1).trim());
+    }
+
+    private void addHostValue(String value, String currentService, Set<String> serviceNames,
+            RepositoryFile file, FactAccumulator facts) {
+        Matcher matcher = HOST_WITH_OPTIONAL_PORT.matcher(unquote(value.trim()));
+        if (!matcher.matches()) return;
+        addRelationshipFact(FactType.DOCKER_SERVICE_ENV_REFERENCE, currentService,
+                matcher.group(1), serviceNames, "source=environment", file, facts);
+    }
+
+    private void addRelationshipFact(FactType type, String source, String target,
+            Set<String> serviceNames, RepositoryFile file, FactAccumulator facts) {
+        addRelationshipFact(type, source, target, serviceNames, null, file, facts);
+    }
+
+    private void addRelationshipFact(FactType type, String source, String target,
+            Set<String> serviceNames, String detail, RepositoryFile file, FactAccumulator facts) {
+        if (target == null || target.equals(source) || !serviceNames.contains(target)) return;
+        String content = "from=" + source + ",to=" + target;
+        if (detail != null) content += "," + detail;
+        facts.add(type, content, file.relativePath());
+    }
+
+    private int leadingWhitespace(String value) {
+        int count = 0;
+        while (count < value.length() && Character.isWhitespace(value.charAt(count))) count++;
+        return count;
+    }
+
+    private String unquote(String value) {
+        if (value.length() >= 2 && ((value.startsWith("\"") && value.endsWith("\""))
+                || (value.startsWith("'") && value.endsWith("'")))) {
+            return value.substring(1, value.length() - 1);
+        }
+        return value;
     }
 
     private boolean isTopLevel(String line) {
@@ -98,27 +272,17 @@ public class DockerCollector extends AbstractFileCollector {
         return ComposeSection.NONE;
     }
 
-    private String composeEntry(String line) {
-        if (!line.startsWith("  ") || line.startsWith("   ")) return null;
-        String candidate = line.substring(2);
+    private String composeEntry(String line, int expectedIndent) {
+        int indent = leadingWhitespace(line);
+        if (indent == 0 || (expectedIndent >= 0 && indent != expectedIndent)) return null;
+        String candidate = line.substring(indent);
         if (!candidate.endsWith(":")) return null;
-        String name = candidate.substring(0, candidate.length() - 1);
+        String name = unquote(candidate.substring(0, candidate.length() - 1).trim());
         return name.chars().allMatch(this::isComposeNameCharacter) ? name : null;
     }
 
     private boolean isComposeNameCharacter(int value) {
         return Character.isLetterOrDigit(value) || value == '_' || value == '.' || value == '-';
-    }
-
-    private void addComposeEntry(RepositoryFile file, FactAccumulator facts,
-            ComposeSection section, String entry) {
-        if (section == ComposeSection.SERVICES) {
-            facts.add(FactType.DOCKER_SERVICE_DECLARED,
-                    "service=" + entry, file.relativePath());
-        } else if (section == ComposeSection.VOLUMES) {
-            facts.add(FactType.DOCKER_VOLUME_DECLARED,
-                    "volume=" + entry, file.relativePath());
-        }
     }
 
     private String safeToken(String value) {

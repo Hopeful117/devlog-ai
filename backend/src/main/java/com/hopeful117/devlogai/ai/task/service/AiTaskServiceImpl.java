@@ -195,6 +195,13 @@ public class AiTaskServiceImpl implements AiTaskService {
         AiTask task = findTask(id);
         requireStatus(task, AiTaskStatus.PROCESSING, AiTaskStatus.COMPLETED);
 
+        if ("architecture-overview".equals(task.getIntentId())
+                && "v2".equals(task.getIntentVersion())) {
+            throw new ConflictException(
+                    "Architecture Overview v2 must complete through the AI result callback"
+            );
+        }
+
         task.setStatus(AiTaskStatus.COMPLETED);
         task.setCompletedAt(Instant.now());
 

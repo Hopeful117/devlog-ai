@@ -77,9 +77,10 @@ public class AnalysisResultQueryServiceImpl implements AnalysisResultQueryServic
         List<AnalysisResultResponse.InsightSummary> insights = buildInsights(analysis);
         List<AnalysisResultResponse.DeliverableSummary> deliverables = buildDeliverables(analysis);
         AnalysisResultResponse.EvidenceSection evidence = buildEvidence(analysis);
+        AnalysisResultResponse.SynthesisSection synthesis = buildSynthesis(analysis);
         List<AnalysisResultResponse.NextAction> nextActions = buildNextActions(analysis, proposals, insights);
 
-        return AnalysisResultResponse.completed(header, proposals, insights, deliverables, evidence, nextActions);
+        return AnalysisResultResponse.completed(header, proposals, insights, deliverables, evidence, synthesis, nextActions);
     }
 
     private AnalysisResultResponse buildFailedResult(Analysis analysis) {
@@ -495,6 +496,47 @@ public class AnalysisResultQueryServiceImpl implements AnalysisResultQueryServic
                 ))
                 .collect(Collectors.toList());
         return new AnalysisResultResponse.EvidenceCategorySection(section.count(), items);
+    }
+
+    @SuppressWarnings("unchecked")
+    private AnalysisResultResponse.SynthesisSection buildSynthesis(Analysis analysis) {
+        List<AiTask> aiTasks = aiTaskRepository.findByAnalysisIdOrderByCreatedAtDescIdDesc(analysis.getId());
+        for (AiTask task : aiTasks) {
+            Map<String, Object> snapshot = task.getSynthesisSnapshot();
+            if (snapshot == null) {
+                continue;
+            }
+            String title = (String) snapshot.get("title");
+            List<AnalysisResultResponse.SynthesisItem> items = new ArrayList<>();
+            Object sectionsObj = snapshot.get("sections");
+            if (sectionsObj instanceof List<?> sectionsList) {
+                for (Object sectionObj : sectionsList) {
+                    if (sectionObj instanceof Map<?, ?> sectionMap) {
+                        String name = (String) sectionMap.get("name");
+                        String content = (String) sectionMap.get("content");
+                        if (name != null && content != null) {
+                            items.add(new AnalysisResultResponse.SynthesisItem(name, content));
+                        }
+                    }
+                }
+            }
+            List<String> groundingReferences = new ArrayList<>();
+            Object refsObj = snapshot.get("groundingReferences");
+            if (refsObj instanceof List<?> refsList) {
+                for (Object ref : refsList) {
+                    if (ref instanceof String s) {
+                        groundingReferences.add(s);
+                    }
+                }
+            }
+            return new AnalysisResultResponse.SynthesisSection(
+                    title != null ? title : "Architecture Overview",
+                    items,
+                    (String) snapshot.get("deltaConclusion"),
+                    groundingReferences
+            );
+        }
+        return null;
     }
 
     private List<AnalysisResultResponse.NextAction> buildNextActions(Analysis analysis,
