@@ -15,7 +15,8 @@ public record EngineeringEvidence(
         java.util.Map<String, String> extractionMetadata,
         EngineeringEvidenceContent content,
         EngineeringEvidenceSymbols symbols,
-        String resource
+        String resource,
+        TrustTier trustTier
 ) {
     public EngineeringEvidence {
         relatedReferences = relatedReferences == null

@@ -9,6 +9,9 @@ import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class EngineeringContextFacadeImpl implements EngineeringContextFacade {
@@ -19,7 +22,12 @@ public class EngineeringContextFacadeImpl implements EngineeringContextFacade {
     private final EngineeringContextContractMapper mapper;
 
     @Override
-    public EngineeringContext getEngineeringContext(String projectSlug, String intent) {
+    public EngineeringContext getEngineeringContext(
+            String projectSlug,
+            String intent,
+            List<String> files,
+            UUID storyId
+    ) {
         var project = projectService.getBySlug(projectSlug);
         var projectId = project.getId();
 
@@ -30,13 +38,17 @@ public class EngineeringContextFacadeImpl implements EngineeringContextFacade {
                 repositoryContextAdapter.buildRepositoryContext(
                         projectId,
                         intent,
-                        projectContext
+                        projectContext,
+                        files,
+                        storyId
                 );
 
         return mapper.toContract(
                 projectContext,
                 repositoryContext,
                 intent,
+                files,
+                storyId,
                 freshnessService.summary(projectId)
         );
     }
