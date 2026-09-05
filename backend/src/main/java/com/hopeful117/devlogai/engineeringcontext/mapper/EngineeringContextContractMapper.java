@@ -10,6 +10,9 @@ import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidenceS
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringSymbolDeclaration;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringSymbolLocation;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringSymbolParameter;
+import com.hopeful117.devlogai.contracts.engineeringcontext.ContextSection;
+import com.hopeful117.devlogai.contracts.engineeringcontext.ContextRequestEcho;
+import com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier;
 import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
 import com.hopeful117.devlogai.projectcontext.mapper.ProjectContextContractMapper;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse;
@@ -20,12 +23,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -44,24 +50,201 @@ public class EngineeringContextContractMapper {
             ProjectContextSnapshot projectContext,
             RepositoryContext repositoryContext,
             String intent,
+            List<String> files,
+            UUID storyId,
             ProjectFreshnessSummary freshnessSummary
     ) {
         String projectSlug = projectContext.project().slug();
+
+        // Map all evidence with trust tier classification
+        List<EngineeringEvidence> allEvidence = repositoryContext.evidence().stream()
+                .map(evidence -> mapEvidence(evidence, repositoryContext, projectSlug))
+                .filter(e -> e != null) // Filter out EXCLUDED
+                .toList();
+
+        // Apply scope hints filtering
+        List<EngineeringEvidence> filteredEvidence = applyScopeFilters(allEvidence, files, storyId, projectContext);
+
+        // Partition into sections by trust tier with deterministic ordering
+        Map<TrustTier, List<EngineeringEvidence>> evidenceByTier = filteredEvidence.stream()
+                .collect(Collectors.groupingBy(EngineeringEvidence::trustTier));
+
+        // Build sections in trust-tier order
+        List<ContextSection> sections = buildSections(evidenceByTier);
+
+        // Build compatibility evidence[] by flattening sections in trust-tier order
+        List<EngineeringEvidence> compatibilityEvidence = sections.stream()
+                .flatMap(s -> s.evidence().stream())
+                .toList();
+
+        // Build request echo with normalized scope
+        ContextRequestEcho requestEcho = new ContextRequestEcho(
+                projectSlug,
+                intent,
+                files != null ? files : List.of(),
+                storyId
+        );
+
         return new EngineeringContext(
                 projectContextContractMapper.toContract(projectContext),
                 intent,
-                mapEvidence(repositoryContext, projectSlug),
-                mapMetadata(repositoryContext, freshnessSummary)
+                compatibilityEvidence,
+                mapMetadata(repositoryContext, freshnessSummary),
+                sections,
+                requestEcho
         );
     }
 
-    private List<EngineeringEvidence> mapEvidence(
-            RepositoryContext repositoryContext,
-            String projectSlug
+    private List<EngineeringEvidence> applyScopeFilters(
+            List<EngineeringEvidence> evidence,
+            List<String> files,
+            UUID storyId,
+            ProjectContextSnapshot projectContext
     ) {
-        return repositoryContext.evidence().stream()
-                .map(evidence -> mapEvidence(evidence, repositoryContext, projectSlug))
+        List<EngineeringEvidence> filtered = new ArrayList<>(evidence);
+
+        // Apply files[] filter - only to TECHNICAL_EVIDENCE section
+        if (files != null && !files.isEmpty()) {
+            filtered = filtered.stream()
+                    .filter(e -> {
+                        if (e.trustTier() != TrustTier.TECHNICAL_EVIDENCE) return true;
+                        String originatingFile = e.originatingFile();
+                        if (originatingFile == null) return false;
+                        return files.stream().anyMatch(f ->
+                                originatingFile.equals(f) || originatingFile.startsWith(f + "/"));
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        // Apply storyId filter - only to TECHNICAL_EVIDENCE section
+        if (storyId != null) {
+            filtered = applyStoryIdFilter(filtered, storyId);
+        }
+
+        return filtered;
+    }
+
+    /**
+     * Defensive non-broadening guard. Primary commit-window filtering is
+     * performed by {@code RepositoryContextAdapter.filterByStoryScope} using
+     * authoritative repository history (ProjectCommitRepository BFS traversal).
+     * This guard ensures no TECHNICAL_EVIDENCE without any commit attribution
+     * leaked through.
+     */
+    private List<EngineeringEvidence> applyStoryIdFilter(
+            List<EngineeringEvidence> evidence,
+            UUID storyId
+    ) {
+        if (storyId == null) return evidence;
+        return evidence.stream()
+                .filter(e -> {
+                    if (e.trustTier() != TrustTier.TECHNICAL_EVIDENCE) return true;
+                    return e.identifier() != null
+                            || (e.relatedReferences() != null && !e.relatedReferences().isEmpty());
+                })
+                .collect(Collectors.toList());
+    }
+
+    private List<ContextSection> buildSections(Map<TrustTier, List<EngineeringEvidence>> evidenceByTier) {
+        List<ContextSection> sections = new ArrayList<>();
+
+        // Section order: TRUSTED, HUMAN_AUTHORED, TECHNICAL_EVIDENCE, SYSTEM_METADATA
+        sections.add(buildSection(
+                "trusted_knowledge",
+                TrustTier.TRUSTED,
+                evidenceByTier.getOrDefault(TrustTier.TRUSTED, List.of()),
+                "Validated project knowledge governing this task"
+        ));
+
+        sections.add(buildSection(
+                "human_context",
+                TrustTier.HUMAN_AUTHORED,
+                evidenceByTier.getOrDefault(TrustTier.HUMAN_AUTHORED, List.of()),
+                "Human-authored project context and constraints"
+        ));
+
+        sections.add(buildSection(
+                "technical_evidence",
+                TrustTier.TECHNICAL_EVIDENCE,
+                evidenceByTier.getOrDefault(TrustTier.TECHNICAL_EVIDENCE, List.of()),
+                "Repository-derived technical evidence"
+        ));
+
+        sections.add(buildSection(
+                "system_metadata",
+                TrustTier.SYSTEM_METADATA,
+                evidenceByTier.getOrDefault(TrustTier.SYSTEM_METADATA, List.of()),
+                "System metadata for context interpretation"
+        ));
+
+        return sections;
+    }
+
+    private ContextSection buildSection(
+            String name,
+            TrustTier trustTier,
+            List<EngineeringEvidence> evidence,
+            String rationale
+    ) {
+        List<EngineeringEvidence> ordered = orderEvidence(evidence);
+        return new ContextSection(name, trustTier, ordered, rationale);
+    }
+
+    private List<EngineeringEvidence> orderEvidence(List<EngineeringEvidence> evidence) {
+        return evidence.stream()
+                .sorted(Comparator
+                        .<EngineeringEvidence, Boolean>comparing(e -> e.occurredAt() == null)
+                        .thenComparing(
+                                Comparator.comparing(EngineeringEvidence::occurredAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        )
+                        .thenComparing(EngineeringEvidence::identifier, Comparator.nullsLast(Comparator.naturalOrder()))
+                )
                 .toList();
+    }
+
+    private TrustTier classifyTrustTier(RepositoryEvidence evidence) {
+        String kind = evidence.kind();
+        String sourceType = evidence.provenance() != null ? evidence.provenance().sourceType() : null;
+
+        // TRUSTED: validated knowledge from accepted proposals
+        if ("CORE_KNOWLEDGE".equals(sourceType)
+                && (kind.equals("INSIGHT") || kind.equals("DECISION") || kind.equals("ENGINEERING_EVENT"))) {
+            return TrustTier.TRUSTED;
+        }
+
+        // HUMAN_AUTHORED: human context inputs, repository documents
+        if (kind.equals("PROJECT_NOTE")
+                || kind.equals("MILESTONE")
+                || kind.equals("ARTIFACT")
+                || kind.equals("ENGINEERING_STORY")
+                || kind.equals("CHALLENGE")) {
+            return TrustTier.HUMAN_AUTHORED;
+        }
+
+        // SYSTEM_METADATA: analysis execution metadata, freshness, diagnostics
+        if (kind.equals("ANALYSIS")
+                || kind.equals("FRESHNESS")
+                || kind.equals("DIAGNOSTIC")
+                || kind.equals("SELECTION_METADATA")) {
+            return TrustTier.SYSTEM_METADATA;
+        }
+
+        // TECHNICAL_EVIDENCE: repository-derived
+        if (sourceType != null
+                && (sourceType.equals("GIT")
+                || sourceType.equals("DETERMINISTIC_EXTRACTION")
+                || sourceType.equals("CORE_ANALYSIS")
+                || sourceType.equals("REPOSITORY_STRUCTURE"))) {
+            return TrustTier.TECHNICAL_EVIDENCE;
+        }
+
+        // EXCLUDED: unvalidated proposals, AI engine output
+        if (kind.equals("VALIDATABLE_PROPOSAL") || "AI_ENGINE".equals(sourceType)) {
+            return null;
+        }
+
+        // Unknown/unsupported kinds are excluded (not silently classified)
+        return null;
     }
 
     private EngineeringEvidence mapEvidence(
@@ -70,6 +253,13 @@ public class EngineeringContextContractMapper {
             String projectSlug
     ) {
         var provenance = evidence.provenance();
+
+        TrustTier trustTier = classifyTrustTier(evidence);
+
+        // Filter out EXCLUDED evidence (UNVALIDATED/TRANSIENT_AI)
+        if (trustTier == null) {
+            return null;
+        }
 
         return new EngineeringEvidence(
                 evidence.kind(),
@@ -85,8 +275,19 @@ public class EngineeringContextContractMapper {
                 evidence.extractionMetadata(),
                 mapContent(evidence.content()),
                 mapSymbols(evidence.symbols()),
-                resolveResource(evidence, projectSlug)
+                resolveResource(evidence, projectSlug),
+                trustTier
         );
+    }
+
+    private List<EngineeringEvidence> mapEvidence(
+            RepositoryContext repositoryContext,
+            String projectSlug
+    ) {
+        return repositoryContext.evidence().stream()
+                .map(evidence -> mapEvidence(evidence, repositoryContext, projectSlug))
+                .filter(e -> e != null) // Filter out EXCLUDED
+                .toList();
     }
 
     /**

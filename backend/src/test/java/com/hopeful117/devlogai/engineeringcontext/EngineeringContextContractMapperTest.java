@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.engineeringcontext;
 
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidence;
 import com.hopeful117.devlogai.engineeringcontext.mapper.EngineeringContextContractMapper;
 import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
 import com.hopeful117.devlogai.projectcontext.mapper.ProjectContextContractMapper;
@@ -88,12 +89,13 @@ class EngineeringContextContractMapperTest {
         when(repositoryContext.truncated()).thenReturn(false);
         when(repositoryContext.usedTokens()).thenReturn(120);
         when(repositoryContext.contextDigest()).thenReturn("digest-123");
+        when(repositoryContext.warnings()).thenReturn(List.of());
 
         String intent =
                 "Investigate why Project Notes Markdown is displayed incorrectly.";
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, intent, null);
+                mapper.toContract(projectSnapshot, repositoryContext, intent, List.of(), null, null);
 
         assertThat(result.project()).isSameAs(mappedProject);
         assertThat(result.intent()).isEqualTo(intent);
@@ -193,7 +195,7 @@ class EngineeringContextContractMapperTest {
                 "CONTENT_ENRICHMENT_TRUNCATED"));
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, "intent", null);
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", List.of(), null, null);
 
         assertThat(result.evidence()).hasSize(1);
         var mapped = result.evidence().getFirst();
@@ -273,7 +275,7 @@ class EngineeringContextContractMapperTest {
         when(repositoryContext.warnings()).thenReturn(java.util.List.of());
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, "intent", null);
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", List.of(), null, null);
 
         var mapped = result.evidence().getFirst();
         assertThat(mapped.occurredAt())
@@ -322,19 +324,21 @@ class EngineeringContextContractMapperTest {
         when(repositoryContext.warnings()).thenReturn(java.util.List.of());
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, "intent", null);
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", List.of(), null, null);
 
         assertThat(result.evidence()).hasSize(5);
-        assertThat(result.evidence().get(0).resource())
-                .isEqualTo("devlog://projects/devlog-ai/decisions/" + decisionId);
-        assertThat(result.evidence().get(1).resource())
-                .isEqualTo("devlog://projects/devlog-ai/insights/" + insightId);
-        assertThat(result.evidence().get(2).resource())
-                .isEqualTo("devlog://projects/devlog-ai/stories/" + storyId);
-        assertThat(result.evidence().get(3).resource())
-                .isEqualTo("devlog://projects/devlog-ai/engineering-events/" + eventId);
-        assertThat(result.evidence().get(4).resource())
-                .isEqualTo("devlog://projects/devlog-ai/commits/" + sha);
+
+        // Verify all expected resources are present (order determined by trust tier + occurredAt)
+        List<String> resources = result.evidence().stream()
+                .map(EngineeringEvidence::resource)
+                .toList();
+        assertThat(resources).contains(
+                "devlog://projects/devlog-ai/decisions/" + decisionId,
+                "devlog://projects/devlog-ai/insights/" + insightId,
+                "devlog://projects/devlog-ai/stories/" + storyId,
+                "devlog://projects/devlog-ai/engineering-events/" + eventId,
+                "devlog://projects/devlog-ai/commits/" + sha
+        );
     }
 
     @Test
@@ -362,7 +366,7 @@ class EngineeringContextContractMapperTest {
         when(repositoryContext.warnings()).thenReturn(java.util.List.of());
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, "intent", null);
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", List.of(), null, null);
 
         assertThat(result.evidence())
                 .allSatisfy(e -> assertThat(e.resource()).isNull());
@@ -397,14 +401,22 @@ class EngineeringContextContractMapperTest {
         when(repositoryContext.warnings()).thenReturn(java.util.List.of());
 
         EngineeringContext result =
-                mapper.toContract(projectSnapshot, repositoryContext, "intent", null);
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", List.of(), null, null);
 
+        // UNKNOWN_KIND with CORE_KNOWLEDGE sourceType is excluded by the trust tier classifier
+        // (unsupported kinds are excluded, not silently classified)
+        assertThat(result.evidence()).hasSize(3);
         assertThat(result.evidence())
                 .allSatisfy(e -> assertThat(e.resource()).isNull());
     }
 
     private RepositoryEvidence evidence(
             String kind, String identifier, String originatingFile) {
+        String sourceType = switch (kind) {
+            case "DECISION", "INSIGHT", "ENGINEERING_EVENT" -> "CORE_KNOWLEDGE";
+            case "CHANGED_FILE", "SOURCE_FILE", "COMMIT" -> "GIT";
+            default -> "CORE_KNOWLEDGE";
+        };
         return new RepositoryEvidence(
                 switch (kind) {
                     case "DECISION" -> RepositoryContextLayer.ADR;
@@ -423,7 +435,7 @@ class EngineeringContextContractMapperTest {
                 EvidenceScore.unscored(),
                 List.of(),
                 new RepositoryEvidence.EvidenceProvenance(
-                        "CORE_KNOWLEDGE", null, originatingFile, identifier),
+                        sourceType, null, originatingFile, identifier),
                 java.util.Map.of(),
                 60,
                 List.of());
@@ -489,7 +501,7 @@ class EngineeringContextContractMapperTest {
                 com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus.CURRENT));
 
         var result = mapper.toContract(projectSnapshotWithSlug(), repositoryContext,
-                "intent", freshnessSummary);
+                "intent", List.of(), null, freshnessSummary);
 
         var freshness = result.metadata().freshness();
         assertThat(freshness).isNotNull();
@@ -512,7 +524,7 @@ class EngineeringContextContractMapperTest {
                 com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus.CURRENT));
 
         var result = mapper.toContract(projectSnapshotWithSlug(), repositoryContext,
-                "intent", freshnessSummary);
+                "intent", List.of(), null, freshnessSummary);
 
         var freshness = result.metadata().freshness();
         assertThat(freshness.status())
@@ -536,7 +548,7 @@ class EngineeringContextContractMapperTest {
                         com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus.STALE));
 
         var result = mapper.toContract(projectSnapshotWithSlug(), repositoryContext,
-                "intent", freshnessSummary);
+                "intent", List.of(), null, freshnessSummary);
 
         var freshness = result.metadata().freshness();
         assertThat(freshness.status())
@@ -554,7 +566,7 @@ class EngineeringContextContractMapperTest {
         var repositoryContext = contextWithRevisions(List.of(liveHead));
 
         var result = mapper.toContract(projectSnapshotWithSlug(), repositoryContext,
-                "intent", null);
+                "intent", List.of(), null, null);
 
         var freshness = result.metadata().freshness();
         assertThat(freshness.status())

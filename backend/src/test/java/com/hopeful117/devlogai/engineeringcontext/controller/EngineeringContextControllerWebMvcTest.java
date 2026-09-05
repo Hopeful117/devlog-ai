@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.engineeringcontext.controller;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidence;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextMetadata;
+import com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier;
 import com.hopeful117.devlogai.contracts.projectcontext.ProjectContext;
 import com.hopeful117.devlogai.contracts.projectcontext.ProjectNote;
 import com.hopeful117.devlogai.engineeringcontext.EngineeringContextFacade;
@@ -20,6 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -72,7 +74,8 @@ class EngineeringContextControllerWebMvcTest extends ControllerWebMvcTestSupport
                         Map.of("collectorId", "commit-diff", "collectorVersion", "v1"),
                         null,
                         null,
-                        "devlog://projects/devlog-ai/commits/a1b2c3d4e5f67890abcdef1234567890abcdef12"
+                        "devlog://projects/devlog-ai/commits/a1b2c3d4e5f67890abcdef1234567890abcdef12",
+                        TrustTier.TECHNICAL_EVIDENCE
                 )
         );
 
@@ -90,12 +93,16 @@ class EngineeringContextControllerWebMvcTest extends ControllerWebMvcTestSupport
                 projectContext,
                 "Investigate why Project Notes Markdown is displayed incorrectly.",
                 evidence,
-                metadata
+                metadata,
+                List.of(),
+                null
         );
 
         when(facade.getEngineeringContext(
-                        "devlog-ai",
-                        "Investigate why Project Notes Markdown is displayed incorrectly."
+                        eq("devlog-ai"),
+                        eq("Investigate why Project Notes Markdown is displayed incorrectly."),
+                        eq(List.of()),
+                        eq(null)
                 ))
                 .thenReturn(engineeringContext);
 
@@ -149,6 +156,9 @@ class EngineeringContextControllerWebMvcTest extends ControllerWebMvcTestSupport
 
         verify(facade).getEngineeringContext(
                 "devlog-ai",
-                "Investigate why Project Notes Markdown is displayed incorrectly.");
+                "Investigate why Project Notes Markdown is displayed incorrectly.",
+                List.of(),
+                null
+        );
     }
 }

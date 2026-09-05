@@ -9,7 +9,8 @@ public record EngineeringContext(
         ProjectContext project,
         String intent,
         List<EngineeringEvidence> evidence,
-        EngineeringContextMetadata metadata
-
+        EngineeringContextMetadata metadata,
+        List<ContextSection> sections,
+        ContextRequestEcho requestEcho
 ) {
 }

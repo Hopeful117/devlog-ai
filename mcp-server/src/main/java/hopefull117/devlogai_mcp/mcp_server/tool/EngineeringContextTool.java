@@ -8,6 +8,9 @@ import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.List;
+import java.util.UUID;
+
 @Component
 @RequiredArgsConstructor
 public class EngineeringContextTool {
@@ -28,12 +31,26 @@ public class EngineeringContextTool {
                     description = "Engineering task or investigation for which relevant context is requested",
                     required = true
             )
-            String intent
+            String intent,
+
+            @McpArg(
+                    description = "Optional file paths to narrow evidence scope",
+                    required = false
+            )
+            List<String> files,
+
+            @McpArg(
+                    description = "Optional Engineering Story UUID to scope context to story commit window",
+                    required = false
+            )
+            UUID storyId
     ) {
         EngineeringContext engineeringContext =
                 devlogProjectContextClient.getEngineeringContext(
                         projectSlug,
-                        intent
+                        intent,
+                        files,
+                        storyId
                 );
 
         return objectMapper.writeValueAsString(engineeringContext);

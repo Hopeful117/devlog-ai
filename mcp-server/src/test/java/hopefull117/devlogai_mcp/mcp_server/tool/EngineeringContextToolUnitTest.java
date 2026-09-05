@@ -3,6 +3,9 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidence;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextMetadata;
+import com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier;
+import com.hopeful117.devlogai.contracts.engineeringcontext.ContextSection;
+import com.hopeful117.devlogai.contracts.engineeringcontext.ContextRequestEcho;
 import com.hopeful117.devlogai.contracts.projectcontext.ProjectContext;
 import com.hopeful117.devlogai.contracts.projectcontext.ProjectNote;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
@@ -67,7 +70,8 @@ class EngineeringContextToolUnitTest {
                         Map.of("collectorId", "commit-diff"),
                         null,
                         null,
-                        "devlog://projects/devlog-ai/commits/a1b2c3d4e5f67890abcdef1234567890abcdef12"
+                        "devlog://projects/devlog-ai/commits/a1b2c3d4e5f67890abcdef1234567890abcdef12",
+                        TrustTier.TECHNICAL_EVIDENCE
                 )
         );
 
@@ -85,18 +89,24 @@ class EngineeringContextToolUnitTest {
                 projectContext,
                 "Investigate why Project Notes Markdown is displayed incorrectly.",
                 evidence,
-                metadata
+                metadata,
+                List.of(),
+                null
         );
 
         when(devlogProjectContextClient.getEngineeringContext(
                         "devlog-ai",
-                        "Investigate why Project Notes Markdown is displayed incorrectly."
+                        "Investigate why Project Notes Markdown is displayed incorrectly.",
+                        List.of(),
+                        null
                 ))
                 .thenReturn(engineeringContext);
 
         String result = engineeringContextTool.getEngineeringContext(
                 "devlog-ai",
-                "Investigate why Project Notes Markdown is displayed incorrectly."
+                "Investigate why Project Notes Markdown is displayed incorrectly.",
+                List.of(),
+                null
         );
 
         // Verify JSON contains expected fields
@@ -125,7 +135,9 @@ class EngineeringContextToolUnitTest {
         // Verify the client was called with correct arguments
         Mockito.verify(devlogProjectContextClient).getEngineeringContext(
                 "devlog-ai",
-                "Investigate why Project Notes Markdown is displayed incorrectly."
+                "Investigate why Project Notes Markdown is displayed incorrectly.",
+                List.of(),
+                null
         );
     }
 }
