@@ -7,6 +7,7 @@ class ProposalType(str, Enum):
     ENGINEERING_EVENT = "ENGINEERING_EVENT"
     CHALLENGE = "CHALLENGE"
     DOCUMENTATION = "DOCUMENTATION"
+    NONE = "NONE"
 
 
 class AiTaskResultStatus(str, Enum):

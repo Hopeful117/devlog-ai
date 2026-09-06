@@ -18,6 +18,8 @@ import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
 import com.hopeful117.devlogai.proposal.entity.ProposalType;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
+import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
+import com.hopeful117.devlogai.storycontextanalysis.usecase.AnalyzeStoryContextUseCase;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -58,6 +60,9 @@ class AiTaskResultServiceTest {
 
     @Mock
     private ObjectMapper objectMapper;
+
+    @Mock
+    private AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
 
     @InjectMocks
     private AiTaskResultServiceImpl service;
@@ -420,6 +425,125 @@ class AiTaskResultServiceTest {
 
         assertEquals("AI_TASK_INVALID_TERMINAL_RESULT", error.getCode());
         verifyNoInteractions(analysisRepository);
+    }
+
+    @Test
+    void shouldDelegateStoryContextAnalysisCallbackToUseCaseAndPreservePromptExecutionMetadata() {
+        UUID correlationId = UUID.randomUUID();
+        Instant completedAt = Instant.parse("2026-09-06T10:00:00Z");
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("engineering-story-context-analysis");
+        task.setIntentVersion("v1");
+        task.setContextSnapshot(Map.of(
+                "analysisId", task.getAnalysis().getId().toString(),
+                "intentId", "engineering-story-context-analysis",
+                "intentVersion", "v1",
+                "storyId", UUID.randomUUID().toString()
+        ));
+
+        PromptExecutionMetadata promptExec = new PromptExecutionMetadata(
+                "story-context-prompt-v1", "openai", "gpt-4.1-mini",
+                "digest-abc", "context-digest-xyz");
+        StoryContextAnalysisResult analysisResult = new StoryContextAnalysisResult(
+                null, null, null, null, null, null, null, null, null, null, null, null, null);
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                completedAt, List.of(), null, promptExec, null, analysisResult);
+
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+        when(proposalRepository.countByAiTaskId(task.getId())).thenReturn(0L);
+
+        AiTaskResultAcknowledgement result = service.handle(correlationId, request);
+
+        assertTrue(result.acknowledged());
+        assertFalse(result.duplicate());
+        assertEquals("story-context-prompt-v1", task.getPromptVersion());
+        assertEquals("openai", task.getProvider());
+        assertEquals("gpt-4.1-mini", task.getModelIdentifier());
+        assertEquals("digest-abc", task.getPromptContentDigest());
+        assertEquals("context-digest-xyz", task.getContextDigest());
+        verify(analyzeStoryContextUseCase).handleCallback(correlationId, request);
+        verify(proposalRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void shouldRejectStoryContextAnalysisCallbackWithoutAnalysisResult() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("engineering-story-context-analysis");
+        task.setIntentVersion("v1");
+
+        PromptExecutionMetadata promptExec = new PromptExecutionMetadata(
+                "story-context-prompt-v1", "mock", "model",
+                "a".repeat(64), "b".repeat(64));
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.now(), List.of(), null, promptExec, null, null);
+
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+
+        InvalidAiTaskResultException ex = assertThrows(
+                InvalidAiTaskResultException.class,
+                () -> service.handle(correlationId, request)
+        );
+        assertTrue(ex.getMessage().contains("analysisResult"));
+        verifyNoInteractions(analyzeStoryContextUseCase);
+    }
+
+    @Test
+    void shouldHandleDuplicateStoryContextAnalysisCallbackAsNoOp() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.COMPLETED);
+        task.setIntentId("engineering-story-context-analysis");
+        task.setIntentVersion("v1");
+
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+        when(proposalRepository.countByAiTaskId(task.getId())).thenReturn(0L);
+
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.now(), List.of(), null, promptMetadata(), null, null);
+
+        AiTaskResultAcknowledgement result = service.handle(correlationId, request);
+
+        assertTrue(result.acknowledged());
+        assertTrue(result.duplicate());
+        assertEquals(AiTaskStatus.COMPLETED, result.taskStatus());
+        verifyNoInteractions(analyzeStoryContextUseCase);
+    }
+
+    @Test
+    void shouldHandleFailedStoryContextAnalysisCallback() {
+        UUID correlationId = UUID.randomUUID();
+        Instant completedAt = Instant.now();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("engineering-story-context-analysis");
+        task.setIntentVersion("v1");
+
+        PromptExecutionMetadata promptExec = new PromptExecutionMetadata(
+                "story-context-prompt-v1", "mock", "model",
+                "a".repeat(64), "b".repeat(64));
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.FAILED,
+                completedAt, List.of(),
+                new AiTaskResultError("PROVIDER_TIMEOUT", "LLM did not respond"),
+                promptExec, null, null);
+
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+        when(proposalRepository.countByAiTaskId(task.getId())).thenReturn(0L);
+
+        AiTaskResultAcknowledgement result = service.handle(correlationId, request);
+
+        assertEquals(AiTaskStatus.FAILED, result.taskStatus());
+        assertEquals(AiTaskStatus.FAILED, task.getStatus());
+        assertEquals("PROVIDER_TIMEOUT", task.getFailureCode());
+        assertEquals("LLM did not respond", task.getFailureMessage());
+        assertEquals(completedAt, task.getCompletedAt());
+        verify(analyzeStoryContextUseCase).handleCallback(correlationId, request);
     }
 
     private AiTask task(UUID correlationId, AiTaskStatus status) {
