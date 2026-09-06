@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.proposal import AiTaskResultStatus, ProposalType
 from app.schemas.insight import ArchitectureDeltaConclusion
+from app.schemas.story_context_analysis import StoryContextAnalysisResult
 
 
 class ResultContractModel(BaseModel):
@@ -61,6 +62,7 @@ class AiTaskResultRequest(ResultContractModel):
         default=None, alias="promptExecution"
     )
     synthesis: AnalysisSynthesisResult | None = Field(default=None)
+    analysis_result: StoryContextAnalysisResult | None = Field(default=None, alias="analysisResult")
 
 
 class AiTaskResultAcknowledgement(ResultContractModel):

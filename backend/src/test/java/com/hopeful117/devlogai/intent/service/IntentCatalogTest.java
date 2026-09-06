@@ -14,7 +14,8 @@ class IntentCatalogTest {
         assertEquals(
                 java.util.List.of("describe-project-v1", "generate-readme-v1", "architecture-overview-v1",
                         "architecture-overview-v2",
-                        "analyze-engineering-event-v1", "analyze-engineering-decision-v1"),
+                        "analyze-engineering-event-v1", "analyze-engineering-decision-v1",
+                        "engineering-story-context-analysis-v1"),
                 catalog.all().stream().map(
                         com.hopeful117.devlogai.intent.model.IntentDefinition::key).toList());
     }
@@ -38,5 +39,16 @@ class IntentCatalogTest {
     @Test
     void shouldRejectUnknownOrFreeFormIntent() {
         assertThrows(EntityNotFoundException.class, () -> catalog.resolve("write-anything"));
+    }
+
+    @Test
+    void shouldResolveStoryContextAnalysisIntent() {
+        var intent = catalog.resolve("engineering-story-context-analysis-v1");
+        assertEquals("engineering-story-context-analysis", intent.id());
+        assertEquals("v1", intent.version());
+        assertEquals(com.hopeful117.devlogai.proposal.entity.ProposalType.NONE, intent.outputProposalType());
+        assertTrue(intent.supportedInsightTypes().isEmpty());
+        assertEquals(java.util.List.of("engineering-story-v1", "project-state-v1", "history-v1"),
+                intent.contextProfiles());
     }
 }

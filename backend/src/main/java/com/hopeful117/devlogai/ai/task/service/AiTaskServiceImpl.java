@@ -6,6 +6,7 @@ import com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.response.AiTaskResponse;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
+import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.mapper.AiTaskMapper;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
@@ -65,6 +66,120 @@ public class AiTaskServiceImpl implements AiTaskService {
     }
 
     @Override
+    public AiTaskResponse createForStoryContextAnalysis(
+            UUID analysisId,
+            AiTaskType taskType,
+            String intentId,
+            String intentVersion,
+            String promptTemplate,
+            Map<String, Object> selectedKnowledgeSnapshot,
+            String contextDigest,
+            Map<String, Object> groundingContract,
+            Map<String, Object> userGuidance
+    ) {
+        Analysis analysis = findAnalysis(analysisId);
+        IntentDefinition intent = intentCatalog.resolve(intentId, intentVersion);
+
+        Map<String, Object> contextSnapshot = new LinkedHashMap<>(Map.of(
+                "analysisId", analysisId.toString(),
+                "intentId", intentId,
+                "intentVersion", intentVersion
+        ));
+        if (selectedKnowledgeSnapshot != null && selectedKnowledgeSnapshot.containsKey("engineeringStories")) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> stories = (List<Map<String, Object>>) selectedKnowledgeSnapshot.get("engineeringStories");
+            if (stories != null && !stories.isEmpty() && stories.get(0).containsKey("id")) {
+                contextSnapshot.put("storyId", stories.get(0).get("id").toString());
+            }
+        }
+
+        Map<String, Object> intentSnapshot = objectMapper.convertValue(intent, Map.class);
+
+        AiTask task = new AiTask();
+        task.setAnalysis(analysis);
+        task.setCorrelationId(UUID.randomUUID());
+        task.setStatus(AiTaskStatus.CREATED);
+        task.setTaskType(taskType);
+        task.setIntentId(intent.id());
+        task.setIntentVersion(intent.version());
+        task.setIntentSnapshot(intentSnapshot);
+        task.setUserGuidanceSnapshot(userGuidance != null
+                ? Collections.unmodifiableMap(new LinkedHashMap<>(userGuidance))
+                : null);
+        task.setPromptRequestId(task.getCorrelationId());
+        task.setContextSnapshot(contextSnapshot);
+        task.setSelectedKnowledgeSnapshot(selectedKnowledgeSnapshot);
+        task.setSelectionVersion(null);
+        task.setSelectionDigest(contextDigest);
+        task.setAttemptCount(0);
+        task.setExternalJobId(null);
+        task.setFailureCode(null);
+        task.setFailureMessage(null);
+        task.setSubmittedAt(null);
+        task.setStartedAt(null);
+        task.setCompletedAt(null);
+
+        return aiTaskMapper.toResponse(aiTaskRepository.save(task));
+    }
+
+    @Override
+    public AiTask createForStoryContextAnalysisEntity(
+            UUID analysisId,
+            AiTaskType taskType,
+            String intentId,
+            String intentVersion,
+            String promptTemplate,
+            Map<String, Object> selectedKnowledgeSnapshot,
+            String contextDigest,
+            Map<String, Object> groundingContract,
+            Map<String, Object> userGuidance
+    ) {
+        Analysis analysis = findAnalysis(analysisId);
+        IntentDefinition intent = intentCatalog.resolve(intentId, intentVersion);
+
+        Map<String, Object> contextSnapshot = new LinkedHashMap<>(Map.of(
+                "analysisId", analysisId.toString(),
+                "intentId", intentId,
+                "intentVersion", intentVersion
+        ));
+        if (selectedKnowledgeSnapshot != null && selectedKnowledgeSnapshot.containsKey("engineeringStories")) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> stories = (List<Map<String, Object>>) selectedKnowledgeSnapshot.get("engineeringStories");
+            if (stories != null && !stories.isEmpty() && stories.get(0).containsKey("id")) {
+                contextSnapshot.put("storyId", stories.get(0).get("id").toString());
+            }
+        }
+
+        Map<String, Object> intentSnapshot = objectMapper.convertValue(intent, Map.class);
+
+        AiTask task = new AiTask();
+        task.setAnalysis(analysis);
+        task.setCorrelationId(UUID.randomUUID());
+        task.setStatus(AiTaskStatus.CREATED);
+        task.setTaskType(taskType);
+        task.setIntentId(intent.id());
+        task.setIntentVersion(intent.version());
+        task.setIntentSnapshot(intentSnapshot);
+        task.setUserGuidanceSnapshot(userGuidance != null
+                ? Collections.unmodifiableMap(new LinkedHashMap<>(userGuidance))
+                : null);
+        task.setPromptRequestId(task.getCorrelationId());
+        task.setContextSnapshot(contextSnapshot);
+        task.setSelectedKnowledgeSnapshot(selectedKnowledgeSnapshot);
+        task.setSelectionVersion(null);
+        task.setSelectionDigest(contextDigest);
+        task.setAttemptCount(0);
+        task.setExternalJobId(null);
+        task.setFailureCode(null);
+        task.setFailureMessage(null);
+        task.setSubmittedAt(null);
+        task.setStartedAt(null);
+        task.setCompletedAt(null);
+
+        return aiTaskRepository.save(task);
+    }
+
+    @Override
     public AiTaskResponse attachSelectedKnowledge(UUID id, SelectedKnowledge selectedKnowledge) {
         AiTask task = findTask(id);
         requireStatus(task, AiTaskStatus.CREATED, AiTaskStatus.CREATED);
@@ -84,7 +199,6 @@ public class AiTaskServiceImpl implements AiTaskService {
             SelectedKnowledge selectedKnowledge,
             Analysis analysis
     ) {
-        @SuppressWarnings("unchecked")
         Map<String, Object> contextSnapshot = objectMapper.convertValue(
                 context,
                 Map.class
@@ -94,7 +208,6 @@ public class AiTaskServiceImpl implements AiTaskService {
 
         AiTask task = aiTaskMapper.toEntity(request);
         IntentDefinition intent = intentCatalog.resolve(analysis.getIntentId(), analysis.getIntentVersion());
-        @SuppressWarnings("unchecked")
         Map<String, Object> intentSnapshot = objectMapper.convertValue(intent, Map.class);
         task.setAnalysis(analysis);
         task.setCorrelationId(UUID.randomUUID());

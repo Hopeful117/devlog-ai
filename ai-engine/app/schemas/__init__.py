@@ -8,6 +8,23 @@ from app.schemas.ai_task_result import (
     AiTaskResultRequest,
 )
 from app.schemas.insight import InsightGenerationOutput, InsightProposalOutput
+from app.schemas.story_context_analysis import (
+    StoryContextAnalysisResult,
+    EvidenceRef,
+    ObjectiveUnderstanding,
+    ArchitectureFinding,
+    DecisionFinding,
+    EvidenceFinding,
+    HistoricalContextItem,
+    ConstraintFinding,
+    ImpactedComponentFinding,
+    Uncertainty,
+    MissingInformation,
+    ImplementationQuestion,
+    Confidence,
+    Provenance,
+    OutputClassification,
+)
 
 __all__ = [
     "AiProposalResult",
@@ -18,4 +35,19 @@ __all__ = [
     "AiTaskSubmissionResponse",
     "InsightGenerationOutput",
     "InsightProposalOutput",
+    "StoryContextAnalysisResult",
+    "EvidenceRef",
+    "ObjectiveUnderstanding",
+    "ArchitectureFinding",
+    "DecisionFinding",
+    "EvidenceFinding",
+    "HistoricalContextItem",
+    "ConstraintFinding",
+    "ImpactedComponentFinding",
+    "Uncertainty",
+    "MissingInformation",
+    "ImplementationQuestion",
+    "Confidence",
+    "Provenance",
+    "OutputClassification",
 ]
