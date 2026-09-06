@@ -34,131 +34,144 @@ public record StoryContextAnalysisResult(
         outputClassification = outputClassification != null ? outputClassification : new OutputClassification(List.of());
     }
 
-    public record ObjectiveUnderstanding(String summary) {
+    public record ObjectiveUnderstanding(
+            String summary,
+            List<String> keyDomains,
+            List<String> primaryTechnologies,
+            List<String> architecturalPatterns
+    ) {
         public ObjectiveUnderstanding {
-            // Empty allowed
+            summary = summary != null ? summary : "";
+            keyDomains = keyDomains != null ? List.copyOf(keyDomains) : List.of();
+            primaryTechnologies = primaryTechnologies != null ? List.copyOf(primaryTechnologies) : List.of();
+            architecturalPatterns = architecturalPatterns != null ? List.copyOf(architecturalPatterns) : List.of();
+        }
+        
+        // Backward compatibility constructor for compact constructor
+        public ObjectiveUnderstanding(String summary) {
+            this(summary, List.of(), List.of(), List.of());
         }
     }
 
     public record ArchitectureFinding(
             String title,
             String description,
-            EvidenceRef evidenceRef,
-            String relationType
+            GroundingMetadata grounding
     ) {
         public ArchitectureFinding {
             if (title == null || title.isBlank()) throw new IllegalArgumentException("title must not be blank");
             if (description == null || description.isBlank()) throw new IllegalArgumentException("description must not be blank");
-            if (evidenceRef == null) throw new IllegalArgumentException("evidenceRef must not be null");
-            if (relationType == null || relationType.isBlank()) throw new IllegalArgumentException("relationType must not be blank");
+            if (grounding == null) throw new IllegalArgumentException("grounding must not be null");
         }
     }
 
     public record DecisionFinding(
-            String decisionId,
             String title,
-            String summary,
-            EvidenceRef evidenceRef,
-            String relevance
+            String context,
+            String choice,
+            String rationale,
+            GroundingMetadata grounding
     ) {
         public DecisionFinding {
-            if (decisionId == null || decisionId.isBlank()) throw new IllegalArgumentException("decisionId must not be blank");
             if (title == null || title.isBlank()) throw new IllegalArgumentException("title must not be blank");
-            if (summary == null || summary.isBlank()) throw new IllegalArgumentException("summary must not be blank");
-            if (evidenceRef == null) throw new IllegalArgumentException("evidenceRef must not be null");
-            if (relevance == null || relevance.isBlank()) throw new IllegalArgumentException("relevance must not be blank");
+            if (context == null || context.isBlank()) throw new IllegalArgumentException("context must not be blank");
+            if (choice == null || choice.isBlank()) throw new IllegalArgumentException("choice must not be blank");
+            if (rationale == null || rationale.isBlank()) throw new IllegalArgumentException("rationale must not be blank");
+            if (grounding == null) throw new IllegalArgumentException("grounding must not be null");
         }
     }
 
     public record EvidenceFinding(
-            String evidenceId,
-            String kind,
-            String summary,
-            EvidenceRef evidenceRef,
-            String interpretation
+            String title,
+            String description,
+            String evidenceKind,
+            GroundingMetadata grounding
     ) {
         public EvidenceFinding {
-            if (evidenceId == null || evidenceId.isBlank()) throw new IllegalArgumentException("evidenceId must not be blank");
-            if (kind == null || kind.isBlank()) throw new IllegalArgumentException("kind must not be blank");
-            if (summary == null || summary.isBlank()) throw new IllegalArgumentException("summary must not be blank");
-            if (evidenceRef == null) throw new IllegalArgumentException("evidenceRef must not be null");
-            if (interpretation == null || interpretation.isBlank()) throw new IllegalArgumentException("interpretation must not be blank");
+            if (title == null || title.isBlank()) throw new IllegalArgumentException("title must not be blank");
+            if (description == null || description.isBlank()) throw new IllegalArgumentException("description must not be blank");
+            if (evidenceKind == null || evidenceKind.isBlank()) throw new IllegalArgumentException("evidenceKind must not be blank");
+            if (grounding == null) throw new IllegalArgumentException("grounding must not be null");
         }
     }
 
     public record HistoricalContextItem(
-            String storyId,
-            String storyTitle,
-            String summary,
-            EvidenceRef evidenceRef,
-            String relevance
+            String title,
+            String description,
+            String period,
+            List<String> relatedCommitHashes,
+            GroundingMetadata grounding
     ) {
         public HistoricalContextItem {
-            if (storyId == null || storyId.isBlank()) throw new IllegalArgumentException("storyId must not be blank");
-            if (storyTitle == null || storyTitle.isBlank()) throw new IllegalArgumentException("storyTitle must not be blank");
-            if (summary == null || summary.isBlank()) throw new IllegalArgumentException("summary must not be blank");
-            if (evidenceRef == null) throw new IllegalArgumentException("evidenceRef must not be null");
-            if (relevance == null || relevance.isBlank()) throw new IllegalArgumentException("relevance must not be blank");
+            if (title == null || title.isBlank()) throw new IllegalArgumentException("title must not be blank");
+            if (description == null || description.isBlank()) throw new IllegalArgumentException("description must not be blank");
+            if (period == null || period.isBlank()) throw new IllegalArgumentException("period must not be blank");
+            relatedCommitHashes = relatedCommitHashes != null ? List.copyOf(relatedCommitHashes) : List.of();
+            if (grounding == null) throw new IllegalArgumentException("grounding must not be null");
         }
     }
 
     public record ConstraintFinding(
             String title,
             String description,
-            EvidenceRef evidenceRef,
-            String constraintType
+            String constraintType,
+            GroundingMetadata grounding
     ) {
         public ConstraintFinding {
             if (title == null || title.isBlank()) throw new IllegalArgumentException("title must not be blank");
             if (description == null || description.isBlank()) throw new IllegalArgumentException("description must not be blank");
-            if (evidenceRef == null) throw new IllegalArgumentException("evidenceRef must not be null");
             if (constraintType == null || constraintType.isBlank()) throw new IllegalArgumentException("constraintType must not be blank");
+            if (grounding == null) throw new IllegalArgumentException("grounding must not be null");
         }
     }
 
     public record ImpactedComponentFinding(
-            String component,
+            String componentName,
+            String impactDescription,
             String impactType,
-            String description,
-            EvidenceRef evidenceRef,
-            String confidence
+            GroundingMetadata grounding
     ) {
         public ImpactedComponentFinding {
-            if (component == null || component.isBlank()) throw new IllegalArgumentException("component must not be blank");
+            if (componentName == null || componentName.isBlank()) throw new IllegalArgumentException("componentName must not be blank");
+            if (impactDescription == null || impactDescription.isBlank()) throw new IllegalArgumentException("impactDescription must not be blank");
             if (impactType == null || impactType.isBlank()) throw new IllegalArgumentException("impactType must not be blank");
-            if (description == null || description.isBlank()) throw new IllegalArgumentException("description must not be blank");
-            if (evidenceRef == null) throw new IllegalArgumentException("evidenceRef must not be null");
-            if (confidence == null || confidence.isBlank()) throw new IllegalArgumentException("confidence must not be blank");
+            if (grounding == null) throw new IllegalArgumentException("grounding must not be null");
         }
     }
 
     public record Uncertainty(
             String description,
-            String reason
+            String reason,
+            List<EvidenceRef> relatedEvidence
     ) {
         public Uncertainty {
             if (description == null || description.isBlank()) throw new IllegalArgumentException("description must not be blank");
             if (reason == null || reason.isBlank()) throw new IllegalArgumentException("reason must not be blank");
+            relatedEvidence = relatedEvidence != null ? List.copyOf(relatedEvidence) : List.of();
         }
     }
 
     public record MissingInformation(
             String description,
-            String reason
+            String reason,
+            List<String> suggestedSources
     ) {
         public MissingInformation {
             if (description == null || description.isBlank()) throw new IllegalArgumentException("description must not be blank");
             if (reason == null || reason.isBlank()) throw new IllegalArgumentException("reason must not be blank");
+            suggestedSources = suggestedSources != null ? List.copyOf(suggestedSources) : List.of();
         }
     }
 
     public record ImplementationQuestion(
             String question,
-            String context
+            String context,
+            List<String> relatedComponents
     ) {
         public ImplementationQuestion {
             if (question == null || question.isBlank()) throw new IllegalArgumentException("question must not be blank");
             if (context == null || context.isBlank()) throw new IllegalArgumentException("context must not be blank");
+            relatedComponents = relatedComponents != null ? List.copyOf(relatedComponents) : List.of();
         }
     }
 
@@ -166,13 +179,45 @@ public record StoryContextAnalysisResult(
         HIGH, MEDIUM, LOW
     }
 
+    public enum RelationType {
+        EXPLICIT,
+        TEMPORAL_PROXIMITY,
+        POSSIBLE_RELEVANCE,
+        INFERRED_HYPOTHESIS
+    }
+
+    public record GroundingMetadata(
+            List<EvidenceRef> evidenceReferences,
+            String classification,
+            boolean grounded,
+            RelationType relationType
+    ) {
+        public GroundingMetadata {
+            evidenceReferences = evidenceReferences != null ? List.copyOf(evidenceReferences) : List.of();
+            if (classification == null || classification.isBlank()) throw new IllegalArgumentException("classification must not be blank");
+            if (relationType == null) throw new IllegalArgumentException("relationType must not be null");
+        }
+    }
+
     public record Provenance(
             String contextDigest,
             String promptVersion,
-            Instant generatedAt
+            String provider,
+            String modelIdentifier,
+            String promptContentDigest,
+            String intentId,
+            String intentVersion,
+            List<String> guidanceKeys,
+            java.util.Map<String, Object> executionMetadata
     ) {
         public Provenance {
-            if (generatedAt == null) generatedAt = Instant.now();
+            guidanceKeys = guidanceKeys != null ? List.copyOf(guidanceKeys) : List.of();
+            executionMetadata = executionMetadata != null ? java.util.Map.copyOf(executionMetadata) : java.util.Map.of();
+        }
+        
+        // Backward compatibility constructor for compact constructor
+        public Provenance(String contextDigest, String promptVersion, Instant generatedAt) {
+            this(contextDigest, promptVersion, null, null, null, null, null, List.of(), java.util.Map.of());
         }
     }
 
@@ -184,15 +229,15 @@ public record StoryContextAnalysisResult(
         }
 
         public record ClassificationEntry(
-                String findingType,
-                String findingId,
+                String findingReference,
                 Classification classification,
-                boolean grounded
+                boolean grounded,
+                String rationale
         ) {
             public ClassificationEntry {
-                if (findingType == null || findingType.isBlank()) throw new IllegalArgumentException("findingType must not be blank");
-                if (findingId == null || findingId.isBlank()) throw new IllegalArgumentException("findingId must not be blank");
+                if (findingReference == null || findingReference.isBlank()) throw new IllegalArgumentException("findingReference must not be blank");
                 if (classification == null) throw new IllegalArgumentException("classification must not be null");
+                rationale = rationale != null ? rationale : "";
             }
         }
 

@@ -19,7 +19,8 @@
               {"reference": "docker-compose.yml", "resource": "devlog://projects/test-project/commits/abc123/files/docker-compose.yml"}
             ],
             "classification": "FACTUAL_EXTRACTION",
-            "grounded": true
+            "grounded": true,
+            "relationType": "EXPLICIT"
           }
         }
       ],
@@ -53,7 +54,7 @@
         "promptVersion": "story-context-analysis-prompt-v1",
         "provider": "mock",
         "modelIdentifier": "deterministic-v1",
-        "promptContentDigest": "8eec1f7d5faf59769f26e3695647f01c55587d01882192cbb85f3956c6b9d236",
+        "promptContentDigest": "f866dd446b2672cb006ad5752c670307fa320d80f849d3721ad4687a2977b50a",
         "intentId": "engineering-story-context-analysis",
         "intentVersion": "v1",
         "guidanceKeys": [],
@@ -81,8 +82,8 @@
     "provider": "mock",
     "model": "deterministic-v1",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "8eec1f7d5faf59769f26e3695647f01c55587d01882192cbb85f3956c6b9d236",
-    "schemaDigest": "ecdf3514bd136e94cebd0f5c37173c52e61adfe9f3c8ae48eafeae74ab307089"
+    "promptContentDigest": "f866dd446b2672cb006ad5752c670307fa320d80f849d3721ad4687a2977b50a",
+    "schemaDigest": "e0c7bac41fd6432a77e5d72ea693cbfa4382eb48628d486206b5c16cfad53107"
   },
   "qualitativeGrounding": {
     "status": "REVIEWED",

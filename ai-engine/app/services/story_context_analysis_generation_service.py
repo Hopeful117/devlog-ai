@@ -15,11 +15,22 @@ from app.schemas.ai_task_result import (
     AiTaskResultRequest,
     PromptExecutionMetadata,
 )
-from app.schemas.story_context_analysis import StoryContextAnalysisResult
+from app.schemas.story_context_analysis import StoryContextAnalysisResult, RelationType
 
 
 class StoryContextAnalysisOutputValidationError(ValueError):
     pass
+
+
+# Findings that express relationships and must have relationType
+RELATIONSHIP_BEARING_FINDING_TYPES = {
+    "architecture_findings",
+    "decision_findings",
+    "historical_context",
+    "impacted_component_findings",
+}
+
+VALID_RELATION_TYPES = {rt.value for rt in RelationType}
 
 
 logger = logging.getLogger(__name__)
@@ -159,6 +170,17 @@ class StoryContextAnalysisGenerationService:
                 raise StoryContextAnalysisOutputValidationError(
                     f"FACTUAL_EXTRACTION and AI_INTERPRETATION findings must be grounded"
                 )
+            # Validate relationType for relationship-bearing findings
+            finding_type = type(finding).__name__.lower().replace("finding", "_findings").replace("historicalcontextitem", "historical_context")
+            if finding_type in RELATIONSHIP_BEARING_FINDING_TYPES:
+                if finding.grounding.relation_type is None:
+                    raise StoryContextAnalysisOutputValidationError(
+                        f"Finding {finding.title} must have relationType"
+                    )
+                if finding.grounding.relation_type.value not in VALID_RELATION_TYPES:
+                    raise StoryContextAnalysisOutputValidationError(
+                        f"Finding {finding.title} has invalid relationType: {finding.grounding.relation_type.value}"
+                    )
 
         for unc in output.uncertainties:
             for er in unc.related_evidence:

@@ -1,6 +1,6 @@
 package hopefull117.devlogai_mcp.mcp_server.tool;
 
-import com.hopeful117.devlogai.contracts.storycontextanalysis.StoryContextAnalysisResult;
+import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpArg;

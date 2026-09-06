@@ -33,11 +33,13 @@ GROUNDING REQUIREMENTS:
 - Empty sections are valid and preferred over fabricated content.
 
 RELATIONSHIP SEMANTICS:
-- When noting relationships between components, use exactly one of:
+- When noting relationships between components, you MUST use exactly one of:
   EXPLICIT (directly stated in evidence), TEMPORAL_PROXIMITY (co-occurring in time),
   POSSIBLE_RELEVANCE (may be related), INFERRED_HYPOTHESIS (tentative inference).
 - Confidence NEVER promotes a relationship category.
 - Only repository/Core evidence capable of establishing an explicit relationship may be treated as explicit.
+- The relationType field is REQUIRED for all ArchitectureFinding, DecisionFinding, HistoricalContextItem, and ImpactedComponentFinding.
+- EvidenceFinding, ConstraintFinding, Uncertainty, MissingInformation, and ImplementationQuestion do not require relationType.
 
 OUTPUT CLASSIFICATION:
 - Each finding must be classified as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION.
@@ -120,6 +122,7 @@ class StoryContextAnalysisPromptBuilder:
             "Produce a StoryContextAnalysisResult with all required fields.\n"
             "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
             "Classify each finding as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION in outputClassification.\n"
+            "ArchitectureFinding, DecisionFinding, HistoricalContextItem, and ImpactedComponentFinding MUST include relationType (EXPLICIT, TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE, or INFERRED_HYPOTHESIS).\n"
             "If a section has no grounded findings, return an empty array for that section.\n"
             "Do not fabricate content to populate sections."
         )

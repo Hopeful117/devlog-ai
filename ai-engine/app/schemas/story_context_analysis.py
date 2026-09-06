@@ -1,5 +1,6 @@
 from typing import Annotated, Any
 from uuid import UUID
+from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -10,6 +11,13 @@ class StoryContextAnalysisContractModel(BaseModel):
     )
 
 
+class RelationType(str, Enum):
+    EXPLICIT = "EXPLICIT"
+    TEMPORAL_PROXIMITY = "TEMPORAL_PROXIMITY"
+    POSSIBLE_RELEVANCE = "POSSIBLE_RELEVANCE"
+    INFERRED_HYPOTHESIS = "INFERRED_HYPOTHESIS"
+
+
 class EvidenceRef(StoryContextAnalysisContractModel):
     reference: str = Field(min_length=1, max_length=500)
     resource: str | None = Field(default=None, min_length=1, max_length=500)
@@ -17,8 +25,9 @@ class EvidenceRef(StoryContextAnalysisContractModel):
 
 class GroundingMetadata(StoryContextAnalysisContractModel):
     evidence_references: list[EvidenceRef] = Field(default_factory=list, alias="evidenceReferences")
-    classification: str = Field(default="AI_INTERPRETATION", min_length=1, max_length=50)
+    classification: str = Field(default="AI_INTERPRETATION", min_length=1, max_length=50, pattern="^(FACTUAL_EXTRACTION|AI_INTERPRETATION|RECOMMENDATION)$")
     grounded: bool = False
+    relation_type: RelationType | None = Field(default=None, alias="relationType")
 
 
 class ObjectiveUnderstanding(StoryContextAnalysisContractModel):
