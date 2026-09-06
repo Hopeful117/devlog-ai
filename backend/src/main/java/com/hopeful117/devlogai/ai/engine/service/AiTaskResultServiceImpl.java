@@ -379,7 +379,6 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             );
         }
 
-        applyPromptExecution(task, request.promptExecution());
         analyzeStoryContextUseCase.handleCallback(task.getCorrelationId(), request);
 
         return acknowledgement(task, false);

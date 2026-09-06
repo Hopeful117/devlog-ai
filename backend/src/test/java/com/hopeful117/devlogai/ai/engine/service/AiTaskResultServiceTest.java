@@ -458,11 +458,6 @@ class AiTaskResultServiceTest {
 
         assertTrue(result.acknowledged());
         assertFalse(result.duplicate());
-        assertEquals("story-context-prompt-v1", task.getPromptVersion());
-        assertEquals("openai", task.getProvider());
-        assertEquals("gpt-4.1-mini", task.getModelIdentifier());
-        assertEquals("digest-abc", task.getPromptContentDigest());
-        assertEquals("context-digest-xyz", task.getContextDigest());
         verify(analyzeStoryContextUseCase).handleCallback(correlationId, request);
         verify(proposalRepository, never()).saveAll(any());
     }

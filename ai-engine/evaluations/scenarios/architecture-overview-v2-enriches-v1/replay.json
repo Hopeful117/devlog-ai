@@ -44,7 +44,7 @@
     "model": "gpt-4.1-mini",
     "promptVersion": "architecture-overview-prompt-v2",
     "promptContentDigest": "56a42fa219834c3f15ef969d5ce5ce192238f96a0bad73c264785a0e7535cec6",
-    "schemaDigest": "99be8c6a4b15516cb45b81049288c6ed28965516c04c3ed8c4ad046302c3a7fd"
+    "schemaDigest": "f6d0dc0e67e2d4adf45d6f895e482b6dcbcaa3b6b69a77d657624ef915a927e3"
   },
   "qualitativeGrounding": {
     "status": "REVIEWED",

@@ -1,0 +1,95 @@
+{
+  "scenarioId": "engineering-story-context-analysis-v1",
+  "scenarioVersion": "1.0.0",
+  "output": {
+    "proposals": [],
+    "analysisResult": {
+      "objectiveUnderstanding": {
+        "summary": "DevLog AI is a multi-service system with a Java backend, Python AI engine, Angular frontend, and PostgreSQL database.",
+        "keyDomains": ["backend", "ai-engine", "frontend"],
+        "primaryTechnologies": ["Java", "Python", "Angular"],
+        "architecturalPatterns": ["microservices", "event-driven"]
+      },
+      "architectureFindings": [
+        {
+          "title": "Multi-service Docker architecture",
+          "description": "The project uses a Docker Compose configuration defining backend, ai-engine, frontend, and PostgreSQL services.",
+          "grounding": {
+            "evidenceReferences": [
+              {"reference": "docker-compose.yml", "resource": "devlog://projects/test-project/commits/abc123/files/docker-compose.yml"}
+            ],
+            "classification": "FACTUAL_EXTRACTION",
+            "grounded": true
+          }
+        }
+      ],
+      "decisionFindings": [],
+      "evidenceFindings": [
+        {
+          "title": "Docker Compose service configuration",
+          "description": "Multi-service Docker Compose configuration with declared service dependencies.",
+          "evidenceKind": "REPOSITORY_STRUCTURE",
+          "grounding": {
+            "evidenceReferences": [
+              {"reference": "docker-compose.yml", "resource": "devlog://projects/test-project/commits/abc123/files/docker-compose.yml"}
+            ],
+            "classification": "FACTUAL_EXTRACTION",
+            "grounded": true
+          }
+        }
+      ],
+      "historicalContext": [],
+      "constraintFindings": [],
+      "impactedComponentFindings": [],
+      "uncertainties": [],
+      "missingInformation": [],
+      "implementationQuestions": [],
+      "confidence": {
+        "level": "MEDIUM",
+        "rationale": "Analysis based on a single deployment configuration file."
+      },
+      "provenance": {
+        "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promptVersion": "story-context-analysis-prompt-v1",
+        "provider": "mock",
+        "modelIdentifier": "deterministic-v1",
+        "promptContentDigest": "8eec1f7d5faf59769f26e3695647f01c55587d01882192cbb85f3956c6b9d236",
+        "intentId": "engineering-story-context-analysis",
+        "intentVersion": "v1",
+        "guidanceKeys": [],
+        "executionMetadata": {}
+      },
+      "outputClassification": [
+        {
+          "findingReference": "architectureFindings.0",
+          "classification": "FACTUAL_EXTRACTION",
+          "grounded": true,
+          "rationale": "Directly observed in docker-compose.yml"
+        },
+        {
+          "findingReference": "evidenceFindings.0",
+          "classification": "FACTUAL_EXTRACTION",
+          "grounded": true,
+          "rationale": "Directly observed in docker-compose.yml"
+        }
+      ]
+    }
+  },
+  "capture": {
+    "repositoryRevision": "2e849641cf74361d7703e4b3f53609b9c5b3e83e",
+    "capturedAt": "2026-09-06T10:00:00Z",
+    "provider": "mock",
+    "model": "deterministic-v1",
+    "promptVersion": "story-context-analysis-prompt-v1",
+    "promptContentDigest": "8eec1f7d5faf59769f26e3695647f01c55587d01882192cbb85f3956c6b9d236",
+    "schemaDigest": "ecdf3514bd136e94cebd0f5c37173c52e61adfe9f3c8ae48eafeae74ab307089"
+  },
+  "qualitativeGrounding": {
+    "status": "REVIEWED",
+    "unsupportedMaterialClaims": 0,
+    "contradictedMaterialClaims": 0,
+    "plausibleButUnprovenMaterialClaims": 0,
+    "limitedNonCriticalImprecision": false,
+    "notes": "All findings are grounded in the provided docker-compose.yml evidence reference."
+  }
+}

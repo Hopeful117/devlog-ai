@@ -1,5 +1,6 @@
 import hashlib
 import json
+import uuid
 from dataclasses import dataclass
 
 from app.providers.base import GenerationPolicy, Prompt, PromptTraceability
@@ -128,21 +129,27 @@ class StoryContextAnalysisPromptBuilder:
         context_digest = selection_digest
 
         return Prompt(
+            prompt_id=str(uuid.uuid5(uuid.NAMESPACE_URL, content_digest)),
+            prompt_version=request.intent.prompt_template,
+            intent_id=request.intent.id,
+            intent_version=request.intent.version,
             system_message=SYSTEM_MESSAGE,
             user_message=user_message,
-            prompt_version=self.BUILDER_VERSION,
-            content_digest=content_digest,
+            expected_output_schema=StoryContextAnalysisResult.model_json_schema(),
             traceability=PromptTraceability(
-                context_digest=context_digest,
-                schema_digest=hashlib.sha256(schema_json.encode()).hexdigest(),
+                request_id=str(request.request_id),
+                correlation_id=str(request.correlation_id),
+                ai_task_id=str(request.ai_task_id),
+                analysis_id=str(request.analysis_id),
                 intent_id=request.intent.id,
                 intent_version=request.intent.version,
+                context_digest=context_digest,
+                analysis_context_id=None,
+                profile_id=None,
+                profile_version=None,
             ),
-            generation_policy=GenerationPolicy(
-                temperature=0.1,
-                max_tokens=8000,
-                response_format={"type": "json_object"},
-            ),
+            generation_policy=GenerationPolicy(10, 5000, True),
+            content_digest=content_digest,
         )
 
     def _canonical(self, value: object) -> str:
@@ -185,10 +192,14 @@ class StoryContextAnalysisPromptBuilder:
         content_digest = hashlib.sha256(content.encode()).hexdigest()
 
         return Prompt(
+            prompt_id=str(uuid.uuid5(uuid.NAMESPACE_URL, content_digest)),
+            prompt_version=original_prompt.prompt_version,
+            intent_id=original_prompt.intent_id,
+            intent_version=original_prompt.intent_version,
             system_message=SYSTEM_MESSAGE,
             user_message=corrective_user_message,
-            prompt_version=self.BUILDER_VERSION + "-retry",
-            content_digest=content_digest,
+            expected_output_schema=original_prompt.expected_output_schema,
             traceability=original_prompt.traceability,
             generation_policy=original_prompt.generation_policy,
+            content_digest=content_digest,
         )
