@@ -48,7 +48,7 @@ public class AnalyzeStoryContextUseCase {
     private final StoryContextAnalysisRepository storyContextAnalysisRepository;
     private final ObjectMapper objectMapper;
 
-    public void execute(
+    public UUID execute(
             String projectSlug,
             UUID storyId,
             List<String> files,
@@ -103,6 +103,8 @@ public class AnalyzeStoryContextUseCase {
         );
 
         aiEngineClient.submit(promptRequest);
+
+        return aiTask.getId();
     }
 
     private Map<String, Object> buildSelectedKnowledge(EngineeringContext context, EngineeringStory story) {
