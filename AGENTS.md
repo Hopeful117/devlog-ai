@@ -94,7 +94,7 @@ devlog-ai/
 │
 ├── mcp-server/                  # MCP Server (Spring AI MCP, Java)
 │   └── src/main/java/.../mcp_server/
-│       ├── tool/               # get_engineering_context, search_project_history, EchoTool
+│       ├── tool/               # get_engineering_context, search_project_history, analyze_story_context
 │   │   ├── resource/           # devlog:// resources (stories, decisions, insights, events, commits, freshness)
 │   └── ...
 │
@@ -106,7 +106,7 @@ devlog-ai/
 │
 ├── docs/
 │   ├── decisions/              # ADR-001 through ADR-067
-│   ├── stories/                # Engineering Stories (0001-0112)
+│   ├── stories/                # Engineering Stories (0001-0113)
 │   ├── discoveries/            # Investigation documents
 │   └── architecture.md, pipeline.md, knowledge-model.md, etc.
 │
