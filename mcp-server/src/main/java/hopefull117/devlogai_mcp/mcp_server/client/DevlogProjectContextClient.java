@@ -15,12 +15,12 @@ import java.util.Map;
 import java.util.UUID;
 
 
-@HttpExchange("/api/v1/projects")
+@HttpExchange("/api/v1")
 public interface DevlogProjectContextClient {
-    @GetExchange("/{projectSlug}/context")
+    @GetExchange("/projects/{projectSlug}/context")
     ProjectContext getProjectContext(@PathVariable String projectSlug);
 
-    @GetExchange("/{projectSlug}/engineering-context")
+    @GetExchange("/projects/{projectSlug}/engineering-context")
     EngineeringContext getEngineeringContext(
             @PathVariable String projectSlug,
             @RequestParam("intent") String intent,
@@ -28,12 +28,19 @@ public interface DevlogProjectContextClient {
             @RequestParam(value = "storyId", required = false) UUID storyId
     );
 
-    @PostExchange("/{projectSlug}/stories/{storyId}/analyze-context")
-    StoryContextAnalysisResult analyzeStoryContext(
+    @PostExchange("/projects/{projectSlug}/stories/{storyId}/analyze-context")
+    AnalyzeContextResponse analyzeStoryContext(
             @PathVariable String projectSlug,
             @PathVariable UUID storyId,
             @RequestBody(required = false) AnalyzeContextRequest request
     );
 
+    @GetExchange("/ai/tasks/{aiTaskId}/story-context-analysis")
+    StoryContextAnalysisResult getStoryContextAnalysis(
+            @PathVariable UUID aiTaskId
+    );
+
     record AnalyzeContextRequest(List<String> files, Map<String, Object> guidance) {}
+
+    record AnalyzeContextResponse(UUID aiTaskId) {}
 }

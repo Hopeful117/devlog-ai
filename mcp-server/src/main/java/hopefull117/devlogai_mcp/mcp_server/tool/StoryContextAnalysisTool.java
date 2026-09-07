@@ -3,6 +3,7 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.stereotype.Component;
@@ -14,14 +15,18 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class StoryContextAnalysisTool {
+
+    private static final int TIMEOUT_SECONDS = 120;
+    private static final int POLL_INTERVAL_MS = 2000;
 
     private final DevlogProjectContextClient devlogProjectContextClient;
     private final ObjectMapper objectMapper;
 
     @McpTool(
             name = "analyze_story_context",
-            description = "Analyzes an Engineering Story context and produces a structured, grounded analysis for Discuss/Plan preparation"
+            description = "Analyzes an Engineering Story context and produces a structured, grounded analysis for Discuss/Plan preparation. Submits analysis, waits for completion, and returns the canonical persisted result."
     )
     public String analyzeStoryContext(
             @McpArg(description = "Slug identifying the DevLog project", required = true) String projectSlug,
@@ -34,7 +39,56 @@ public class StoryContextAnalysisTool {
             request = new DevlogProjectContextClient.AnalyzeContextRequest(files, guidance);
         }
 
-        StoryContextAnalysisResult result = devlogProjectContextClient.analyzeStoryContext(projectSlug, storyId, request);
-        return objectMapper.writeValueAsString(result);
+        DevlogProjectContextClient.AnalyzeContextResponse submitResponse =
+                devlogProjectContextClient.analyzeStoryContext(projectSlug, storyId, request);
+
+        UUID aiTaskId = submitResponse.aiTaskId();
+        log.info("Story context analysis submitted: aiTaskId={}", aiTaskId);
+
+        long startTime = System.currentTimeMillis();
+        long timeoutMs = TIMEOUT_SECONDS * 1000L;
+
+        while (System.currentTimeMillis() - startTime < timeoutMs) {
+            try {
+                Thread.sleep(POLL_INTERVAL_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return buildErrorResponse("Interrupted while waiting for analysis", aiTaskId);
+            }
+
+            StoryContextAnalysisResult result = pollForAnalysis(aiTaskId);
+            if (result != null) {
+                log.info("Story context analysis completed: aiTaskId={}", aiTaskId);
+                return objectMapper.writeValueAsString(result);
+            }
+        }
+
+        log.warn("Story context analysis timed out: aiTaskId={}", aiTaskId);
+        return buildErrorResponse(
+                "Analysis did not complete within " + TIMEOUT_SECONDS + " seconds. " +
+                "The analysis may still be processing. AI Task ID: " + aiTaskId,
+                aiTaskId
+        );
+    }
+
+    private StoryContextAnalysisResult pollForAnalysis(UUID aiTaskId) {
+        try {
+            return devlogProjectContextClient.getStoryContextAnalysis(aiTaskId);
+        } catch (Exception e) {
+            log.debug("Poll for analysis aiTaskId={} returned error: {}", aiTaskId, e.getMessage());
+            return null;
+        }
+    }
+
+    private String buildErrorResponse(String message, UUID aiTaskId) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "error", message,
+                    "aiTaskId", aiTaskId.toString(),
+                    "status", "TIMEOUT_OR_NOT_READY"
+            ));
+        } catch (Exception e) {
+            return "{\"error\":\"" + message + "\",\"aiTaskId\":\"" + aiTaskId + "\"}";
+        }
     }
 }
