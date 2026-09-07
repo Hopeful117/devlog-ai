@@ -64,7 +64,7 @@ public class IntentCatalog {
                         "Retourner zéro proposition lorsque les preuves sont insuffisantes."),
                 eventOutputContract(), "analyze-engineering-event-prompt-v1",
                 List.of(HISTORY_PROFILE, PROJECT_STATE_PROFILE)));
-register(result, new IntentDefinition(
+        register(result, new IntentDefinition(
                 "analyze-engineering-decision", "v1",
                 "Proposer des décisions d'ingénierie fondées sur l'analyse du code et son impact.",
                 ProposalType.ENGINEERING_DECISION, IntentExecutionMode.GENERIC,
@@ -74,6 +74,22 @@ register(result, new IntentDefinition(
                         "Retourner zéro proposition lorsque les preuves sont insuffisantes."),
                 decisionOutputContract(), "analyze-engineering-decision-prompt-v1",
                 List.of(HISTORY_PROFILE, PROJECT_STATE_PROFILE)));
+        register(result, new IntentDefinition(
+                "engineering-story-context-analysis", "v1",
+                "Produce a structured, grounded analysis of an Engineering Story context for Discuss/Plan preparation.",
+                ProposalType.NONE, IntentExecutionMode.GENERIC,
+                List.of(),
+                List.of(
+                        "Utiliser uniquement le EngineeringContext fourni.",
+                        "Produire une analyse structurée sans créer de ValidatableProposal.",
+                        "Toutes les affirmations factuelles et interprétations doivent être ancrées dans les références d'évidence.",
+                        "Les recommandations doivent être explicitement classifiées.",
+                        "Ne jamais présenter une analyse comme une connaissance validée.",
+                        "Les types de relation doivent être EXPLICIT, TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE ou INFERRED_HYPOTHESIS.",
+                        "La confiance ne promeut jamais une catégorie de relation."
+                ),
+                storyContextAnalysisOutputContract(), "story-context-analysis-prompt-v1",
+                List.of("engineering-story-v1", PROJECT_STATE_PROFILE, HISTORY_PROFILE)));
         return java.util.Collections.unmodifiableMap(new LinkedHashMap<>(result));
     }
 
@@ -92,6 +108,7 @@ register(result, new IntentDefinition(
             case "describe-project" -> List.of(PROJECT_STATE_PROFILE, HISTORY_PROFILE);
             case "architecture-overview" -> List.of("architecture-v1", HISTORY_PROFILE);
             case "generate-readme" -> List.of("documentation-v1", PROJECT_STATE_PROFILE);
+            case "engineering-story-context-analysis" -> List.of("engineering-story-v1", PROJECT_STATE_PROFILE, HISTORY_PROFILE);
             default -> throw new IllegalArgumentException(
                     "No Context Profiles registered for Intent " + intentId);
         };
@@ -155,6 +172,20 @@ register(result, new IntentDefinition(
                         "supportingFactIds", "supportingObservationIds", "evidenceReferences"),
                 "requiredSynthesisFields", List.of(
                         "title", "sections", "deltaConclusion", "groundingReferences"));
+    }
+
+    private static Map<String, Object> storyContextAnalysisOutputContract() {
+        return Map.of(
+                "type", "object",
+                "structured", true,
+                "hasProposals", false,
+                "hasAnalysisResult", true,
+                "root", "analysisResult",
+                "requiredAnalysisFields", List.of(
+                        "objectiveUnderstanding", "architectureFindings", "decisionFindings",
+                        "evidenceFindings", "historicalContext", "constraintFindings",
+                        "impactedComponentFindings", "uncertainties", "missingInformation",
+                        "implementationQuestions", "confidence", "provenance", "outputClassification"));
     }
 
     private static void register(Map<String, IntentDefinition> target, IntentDefinition intent) {

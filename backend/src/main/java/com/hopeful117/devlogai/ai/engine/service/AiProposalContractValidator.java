@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.Locale;
 
 @Component
 @RequiredArgsConstructor
@@ -41,6 +42,12 @@ class AiProposalContractValidator {
 
     void validate(AiTask task, List<AiProposalResult> proposals) {
         var intent = intents.resolve(task.getIntentId(), task.getIntentVersion());
+        if (intent.outputProposalType() == ProposalType.NONE) {
+            if (!proposals.isEmpty()) {
+                fail("Intent does not produce proposals");
+            }
+            return;
+        }
         if (proposals.size() > 10) fail("Proposal count exceeds Intent maximum");
         Set<String> allowedReferences = new LinkedHashSet<>();
         Set<UUID> allowedFactIds = new LinkedHashSet<>();
@@ -69,6 +76,11 @@ class AiProposalContractValidator {
     }
 
     void validateSynthesis(AiTask task, AnalysisSynthesisResult synthesis, boolean hasDeltas) {
+        var intent = intents.resolve(task.getIntentId(), task.getIntentVersion());
+        if (intent.outputProposalType() == ProposalType.NONE) {
+            // Story Context Analysis does not produce synthesis
+            return;
+        }
         Set<String> allowedReferences = new LinkedHashSet<>();
         collectReferences(task.getSelectedKnowledgeSnapshot(), allowedReferences);
         collectStringIds(task.getSelectedKnowledgeSnapshot(), "selectedFacts", allowedReferences);

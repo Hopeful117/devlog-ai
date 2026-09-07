@@ -2,6 +2,7 @@ from typing import Any
 from uuid import UUID
 
 from app.schemas.insight import KnowledgeDeltaType
+from app.schemas.story_context_analysis import StoryContextAnalysisResult
 
 from evaluations.models import (
     Correctness,
@@ -27,85 +28,10 @@ def evaluate_replay(
     scenario: EvaluationScenario,
     replay: EvaluationReplay,
 ) -> EvaluationResult:
-    proposals = replay.output.proposals
-    expected_delta = scenario.expectation.expected_delta
-    expected_target = scenario.expectation.expected_target_id
-    actual_deltas = [proposal.delta_type for proposal in proposals]
-    actual_targets = [proposal.target_insight_id for proposal in proposals]
-
-    proposal_correct = len(proposals) == 0 if expected_delta is None else bool(proposals)
-    delta_correct = proposal_correct and (
-        expected_delta is None
-        or all(delta == expected_delta for delta in actual_deltas)
-    )
-    target_correctness = _target_correctness(
-        expected_delta,
-        expected_target,
-        actual_targets,
-    )
-
-    deterministic_grounding_passed = _deterministic_grounding_passes(
-        scenario,
-        replay,
-    )
-    trust_safety = (
-        TrustSafety.SAFE
-        if deterministic_grounding_passed
-        else TrustSafety.VIOLATION
-    )
-    grounding_quality = _grounding_quality(
-        scenario,
-        replay,
-        deterministic_grounding_passed,
-    )
-    overall_quality = _overall_quality(
-        structural_validity=StructuralValidity.VALID,
-        proposal_correct=proposal_correct,
-        delta_correct=delta_correct,
-        target_correctness=target_correctness,
-        grounding_quality=grounding_quality,
-        trust_safety=trust_safety,
-    )
-    counters = _counters(
-        overall_quality,
-        delta_correct,
-        expected_delta,
-        target_correctness,
-        trust_safety,
-    )
-    gate_result = _gate_result(scenario, counters)
-
-    return EvaluationResult(
-        scenario_id=scenario.scenario_id,
-        scenario_version=scenario.scenario_version,
-        evaluator_version=EVALUATOR_VERSION,
-        execution_status=ExecutionStatus.EVALUATED,
-        validation_errors=[],
-        proposal_count=len(proposals),
-        expected_delta=expected_delta,
-        actual_deltas=actual_deltas,
-        expected_target_id=expected_target,
-        actual_target_ids=actual_targets,
-        structural_validity=StructuralValidity.VALID,
-        proposal_correctness=(
-            Correctness.CORRECT if proposal_correct else Correctness.INCORRECT
-        ),
-        delta_correctness=(
-            Correctness.CORRECT if delta_correct else Correctness.INCORRECT
-        ),
-        target_correctness=target_correctness,
-        grounding_quality=grounding_quality,
-        deterministic_grounding_passed=deterministic_grounding_passed,
-        qualitative_grounding_status=(
-            replay.qualitative_grounding.status
-            if replay.qualitative_grounding is not None
-            else None
-        ),
-        trust_safety=trust_safety,
-        overall_quality=overall_quality,
-        gate_result=gate_result,
-        counters=counters,
-    )
+    intent_id = scenario.intent.id
+    if intent_id == "engineering-story-context-analysis":
+        return _evaluate_story_context_analysis(scenario, replay)
+    return _evaluate_insight_generation(scenario, replay)
 
 
 def invalid_artifact_result(
@@ -154,7 +80,20 @@ def invalid_artifact_result(
         )
 
     raw_output = raw_replay.get("output")
-    raw_proposals = raw_output.get("proposals") if isinstance(raw_output, dict) else None
+    if not isinstance(raw_output, dict):
+        return invalid_artifact_result(
+            issues,
+            scenario=scenario,
+            scenario_id=scenario_id,
+        )
+
+    intent_id = scenario.intent.id if scenario else ""
+    if intent_id == "engineering-story-context-analysis":
+        return _invalid_artifact_result_story_context(
+            issues, scenario, raw_output, scenario_id
+        )
+
+    raw_proposals = raw_output.get("proposals")
     if not isinstance(raw_proposals, list):
         return invalid_artifact_result(
             issues,
@@ -213,6 +152,63 @@ def invalid_artifact_result(
         overall_quality=OverallQuality.WEAK,
         gate_result=GateResult.FAILED,
         counters=counters,
+    )
+
+
+def _invalid_artifact_result_story_context(
+    issues: list[ValidationIssue],
+    scenario: EvaluationScenario | None,
+    raw_output: dict[str, Any],
+    scenario_id: str,
+) -> EvaluationResult:
+    raw_analysis = raw_output.get("analysisResult")
+    if not isinstance(raw_analysis, dict):
+        return EvaluationResult(
+            scenario_id=scenario.scenario_id if scenario else scenario_id,
+            scenario_version=scenario.scenario_version if scenario else "",
+            evaluator_version=EVALUATOR_VERSION,
+            execution_status=ExecutionStatus.INVALID_SCENARIO,
+            validation_errors=issues,
+            proposal_count=0,
+            expected_delta=None,
+            actual_deltas=[],
+            expected_target_id=None,
+            actual_target_ids=[],
+            structural_validity=StructuralValidity.INVALID,
+            proposal_correctness=Correctness.CORRECT,
+            delta_correctness=Correctness.CORRECT,
+            target_correctness=TargetCorrectness.TARGET_NOT_APPLICABLE,
+            grounding_quality=GroundingQuality.NOT_EVALUATED,
+            deterministic_grounding_passed=None,
+            qualitative_grounding_status=None,
+            trust_safety=TrustSafety.NOT_EVALUATED,
+            overall_quality=OverallQuality.WEAK,
+            gate_result=GateResult.FAILED,
+            counters=_empty_counters(),
+        )
+
+    return EvaluationResult(
+        scenario_id=scenario.scenario_id if scenario else scenario_id,
+        scenario_version=scenario.scenario_version if scenario else "",
+        evaluator_version=EVALUATOR_VERSION,
+        execution_status=ExecutionStatus.INVALID_SCENARIO,
+        validation_errors=issues,
+        proposal_count=0,
+        expected_delta=None,
+        actual_deltas=[],
+        expected_target_id=None,
+        actual_target_ids=[],
+        structural_validity=StructuralValidity.INVALID,
+        proposal_correctness=Correctness.CORRECT,
+        delta_correctness=Correctness.CORRECT,
+        target_correctness=TargetCorrectness.TARGET_NOT_APPLICABLE,
+        grounding_quality=GroundingQuality.NOT_EVALUATED,
+        deterministic_grounding_passed=None,
+        qualitative_grounding_status=None,
+        trust_safety=TrustSafety.NOT_EVALUATED,
+        overall_quality=OverallQuality.WEAK,
+        gate_result=GateResult.FAILED,
+        counters=_empty_counters(),
     )
 
 
@@ -381,6 +377,259 @@ def _gate_result(
         and counters.execution_failure_count <= gate.maximum_execution_failures
     )
     return GateResult.PASSED if passed else GateResult.FAILED
+
+
+def _evaluate_insight_generation(
+    scenario: EvaluationScenario,
+    replay: EvaluationReplay,
+) -> EvaluationResult:
+    proposals = replay.output.proposals
+    expected_delta = scenario.expectation.expected_delta
+    expected_target = scenario.expectation.expected_target_id
+    actual_deltas = [proposal.delta_type for proposal in proposals]
+    actual_targets = [proposal.target_insight_id for proposal in proposals]
+
+    proposal_correct = len(proposals) == 0 if expected_delta is None else bool(proposals)
+    delta_correct = proposal_correct and (
+        expected_delta is None
+        or all(delta == expected_delta for delta in actual_deltas)
+    )
+    target_correctness = _target_correctness(
+        expected_delta,
+        expected_target,
+        actual_targets,
+    )
+
+    deterministic_grounding_passed = _deterministic_grounding_passes(
+        scenario,
+        replay,
+    )
+    trust_safety = (
+        TrustSafety.SAFE
+        if deterministic_grounding_passed
+        else TrustSafety.VIOLATION
+    )
+    grounding_quality = _grounding_quality(
+        scenario,
+        replay,
+        deterministic_grounding_passed,
+    )
+    overall_quality = _overall_quality(
+        structural_validity=StructuralValidity.VALID,
+        proposal_correct=proposal_correct,
+        delta_correct=delta_correct,
+        target_correctness=target_correctness,
+        grounding_quality=grounding_quality,
+        trust_safety=trust_safety,
+    )
+    counters = _counters(
+        overall_quality,
+        delta_correct,
+        expected_delta,
+        target_correctness,
+        trust_safety,
+    )
+    gate_result = _gate_result(scenario, counters)
+
+    return EvaluationResult(
+        scenario_id=scenario.scenario_id,
+        scenario_version=scenario.scenario_version,
+        evaluator_version=EVALUATOR_VERSION,
+        execution_status=ExecutionStatus.EVALUATED,
+        validation_errors=[],
+        proposal_count=len(proposals),
+        expected_delta=expected_delta,
+        actual_deltas=actual_deltas,
+        expected_target_id=expected_target,
+        actual_target_ids=actual_targets,
+        structural_validity=StructuralValidity.VALID,
+        proposal_correctness=(
+            Correctness.CORRECT if proposal_correct else Correctness.INCORRECT
+        ),
+        delta_correctness=(
+            Correctness.CORRECT if delta_correct else Correctness.INCORRECT
+        ),
+        target_correctness=target_correctness,
+        grounding_quality=grounding_quality,
+        deterministic_grounding_passed=deterministic_grounding_passed,
+        qualitative_grounding_status=(
+            replay.qualitative_grounding.status
+            if replay.qualitative_grounding is not None
+            else None
+        ),
+        trust_safety=trust_safety,
+        overall_quality=overall_quality,
+        gate_result=gate_result,
+        counters=counters,
+    )
+
+
+def _evaluate_story_context_analysis(
+    scenario: EvaluationScenario,
+    replay: EvaluationReplay,
+) -> EvaluationResult:
+    analysis_result = replay.output.analysis_result
+    if analysis_result is None:
+        raise ValueError("Story context analysis replay must include analysis_result")
+
+    expectation = scenario.expectation
+    allowed_facts = set(expectation.allowed_fact_ids)
+    allowed_observations = set(expectation.allowed_observation_ids)
+    allowed_evidence = set(expectation.allowed_evidence_references)
+
+    deterministic_grounding_passed = _deterministic_grounding_passes_story_context(
+        scenario,
+        replay,
+    )
+    trust_safety = (
+        TrustSafety.SAFE
+        if deterministic_grounding_passed
+        else TrustSafety.VIOLATION
+    )
+
+    structural_validity = StructuralValidity.VALID
+    proposal_correct = True
+    delta_correct = True
+    target_correctness = TargetCorrectness.TARGET_NOT_APPLICABLE
+
+    grounding_quality = _grounding_quality_story_context(
+        scenario,
+        replay,
+        deterministic_grounding_passed,
+    )
+    overall_quality = _overall_quality_story_context(
+        structural_validity=structural_validity,
+        grounding_quality=grounding_quality,
+        trust_safety=trust_safety,
+    )
+    counters = _counters_story_context(
+        overall_quality,
+        trust_safety,
+    )
+    gate_result = _gate_result(scenario, counters)
+
+    return EvaluationResult(
+        scenario_id=scenario.scenario_id,
+        scenario_version=scenario.scenario_version,
+        evaluator_version=EVALUATOR_VERSION,
+        execution_status=ExecutionStatus.EVALUATED,
+        validation_errors=[],
+        proposal_count=0,
+        expected_delta=None,
+        actual_deltas=[],
+        expected_target_id=None,
+        actual_target_ids=[],
+        structural_validity=structural_validity,
+        proposal_correctness=Correctness.CORRECT,
+        delta_correctness=Correctness.CORRECT,
+        target_correctness=target_correctness,
+        grounding_quality=grounding_quality,
+        deterministic_grounding_passed=deterministic_grounding_passed,
+        qualitative_grounding_status=(
+            replay.qualitative_grounding.status
+            if replay.qualitative_grounding is not None
+            else None
+        ),
+        trust_safety=trust_safety,
+        overall_quality=overall_quality,
+        gate_result=gate_result,
+        counters=counters,
+    )
+
+
+def _deterministic_grounding_passes_story_context(
+    scenario: EvaluationScenario,
+    replay: EvaluationReplay,
+) -> bool:
+    expectation = scenario.expectation
+    allowed_facts = set(expectation.allowed_fact_ids)
+    allowed_observations = set(expectation.allowed_observation_ids)
+    allowed_evidence = set(expectation.allowed_evidence_references)
+
+    analysis_result = replay.output.analysis_result
+
+    all_findings = (
+        analysis_result.architecture_findings
+        + analysis_result.decision_findings
+        + analysis_result.evidence_findings
+        + analysis_result.historical_context
+        + analysis_result.constraint_findings
+        + analysis_result.impacted_component_findings
+    )
+
+    for finding in all_findings:
+        finding_refs = {er.reference for er in finding.grounding.evidence_references}
+        if not finding_refs.issubset(allowed_evidence):
+            return False
+
+    for unc in analysis_result.uncertainties:
+        for er in unc.related_evidence:
+            if er.reference not in allowed_evidence:
+                return False
+
+    return True
+
+
+def _grounding_quality_story_context(
+    scenario: EvaluationScenario,
+    replay: EvaluationReplay,
+    deterministic_grounding_passed: bool,
+) -> GroundingQuality:
+    if not deterministic_grounding_passed:
+        return GroundingQuality.UNSUPPORTED
+
+    review = replay.qualitative_grounding
+    if review is None:
+        return (
+            GroundingQuality.REVIEW_REQUIRED
+            if scenario.expectation.qualitative_grounding_required
+            else GroundingQuality.GROUNDED
+        )
+    if review.contradicted_material_claims:
+        return GroundingQuality.CONTRADICTED
+    if (
+        review.unsupported_material_claims
+        or review.plausible_but_unproven_material_claims
+    ):
+        return GroundingQuality.UNSUPPORTED
+    if review.limited_non_critical_imprecision:
+        return GroundingQuality.LIMITED
+    return GroundingQuality.GROUNDED
+
+
+def _overall_quality_story_context(
+    *,
+    structural_validity: StructuralValidity,
+    grounding_quality: GroundingQuality,
+    trust_safety: TrustSafety,
+) -> OverallQuality:
+    semantics_correct = (
+        structural_validity == StructuralValidity.VALID
+        and trust_safety == TrustSafety.SAFE
+    )
+    if not semantics_correct:
+        return OverallQuality.WEAK
+    if grounding_quality == GroundingQuality.GROUNDED:
+        return OverallQuality.STRONG
+    if grounding_quality == GroundingQuality.LIMITED:
+        return OverallQuality.ACCEPTABLE
+    return OverallQuality.WEAK
+
+
+def _counters_story_context(
+    quality: OverallQuality,
+    trust_safety: TrustSafety,
+) -> EvaluationCounters:
+    return EvaluationCounters(
+        total_runs=1,
+        strong_count=int(quality == OverallQuality.STRONG),
+        acceptable_count=int(quality == OverallQuality.ACCEPTABLE),
+        weak_count=int(quality == OverallQuality.WEAK),
+        incorrect_delta_count=0,
+        incorrect_target_count=0,
+        trust_violation_count=int(trust_safety == TrustSafety.VIOLATION),
+        execution_failure_count=0,
+    )
 
 
 def _valid_raw_deltas(raw_proposals: list[Any]) -> list[KnowledgeDeltaType]:

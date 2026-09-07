@@ -1,0 +1,233 @@
+{
+  "scenarioId": "engineering-story-context-analysis-v1",
+  "scenarioVersion": "1.0.0",
+  "intent": {
+    "id": "engineering-story-context-analysis",
+    "version": "v1"
+  },
+  "promptRequest": {
+    "requestId": "00000000-0000-0000-0000-000000000011",
+    "correlationId": "00000000-0000-0000-0000-000000000012",
+    "analysisId": "00000000-0000-0000-0000-000000000013",
+    "aiTaskId": "00000000-0000-0000-0000-000000000014",
+    "taskType": "STORY_CONTEXT_ANALYSIS",
+    "intent": {
+      "id": "engineering-story-context-analysis",
+      "version": "v1",
+      "objective": "Produce a structured, grounded analysis of an Engineering Story context for Discuss/Plan preparation.",
+      "outputProposalType": "NONE",
+      "executionMode": "GENERIC",
+      "supportedInsightTypes": [],
+      "constraints": [
+        "Use only the provided EngineeringContext.",
+        "Never invent project characteristics or present analysis as validated knowledge.",
+        "Ground all factual claims with evidence references from the context.",
+        "Classify findings as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION.",
+        "Return zero findings when evidence is insufficient.",
+        "Preserve uncertainty; do not fabricate content to populate sections.",
+        "Relationship types must be EXPLICIT, TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE or INFERRED_HYPOTHESIS.",
+        "Confidence never promotes a relationship category."
+      ],
+      "outputSchema": {
+        "type": "object",
+        "structured": true,
+        "hasProposals": false,
+        "hasAnalysisResult": true,
+        "root": "analysisResult",
+        "requiredAnalysisFields": [
+          "objectiveUnderstanding",
+          "architectureFindings",
+          "decisionFindings",
+          "evidenceFindings",
+          "historicalContext",
+          "constraintFindings",
+          "impactedComponentFindings",
+          "uncertainties",
+          "missingInformation",
+          "implementationQuestions",
+          "confidence",
+          "provenance",
+          "outputClassification"
+        ]
+      },
+      "promptTemplate": "story-context-analysis-prompt-v1",
+      "contextProfiles": [
+        "engineering-story-v1",
+        "project-state-v1",
+        "history-v1"
+      ]
+    },
+    "userGuidance": null,
+    "selectedKnowledge": {
+      "project": {
+        "id": "00000000-0000-0000-0000-000000000025",
+        "name": "test-project",
+        "slug": "test-project"
+      },
+      "analysis": {
+        "id": "00000000-0000-0000-0000-000000000013"
+      },
+      "projectProfile": {
+        "id": "00000000-0000-0000-0000-000000000026",
+        "profileVersion": "v1"
+      },
+      "selectedFacts": [
+        {
+          "id": "00000000-0000-0000-0000-000000000101",
+          "type": "DOCKER_SERVICE_DEPENDS_ON",
+          "content": "from=backend,to=ai-engine",
+          "evidenceReferences": [
+            "docker-compose.yml"
+          ]
+        },
+        {
+          "id": "00000000-0000-0000-0000-000000000102",
+          "type": "DOCKER_SERVICE_ENV_REFERENCE",
+          "content": "from=backend,to=ai-engine,source=environment,url=http://ai-engine:8000",
+          "evidenceReferences": [
+            "docker-compose.yml"
+          ]
+        }
+      ],
+      "selectedObservations": [
+        {
+          "id": "00000000-0000-0000-0000-000000000201",
+          "type": "ARCHITECTURE_MODULARIZATION",
+          "content": "The controlled deployment defines multiple services with declared startup and configuration references.",
+          "supportingFactIds": [
+            "00000000-0000-0000-0000-000000000101",
+            "00000000-0000-0000-0000-000000000102"
+          ]
+        }
+      ],
+      "diagnostics": {
+        "collectionComplete": true,
+        "truncated": false,
+        "warningCount": 0,
+        "errorCount": 0
+      },
+      "selectedInsights": [],
+      "existingArchitectureKnowledge": [
+        {
+          "insightId": "00000000-0000-0000-0000-000000000301",
+          "title": "Project containerization",
+          "content": "The project uses containers coordinated through a composition file.",
+          "sourceType": "ARCHITECTURE_DESCRIPTION"
+        }
+      ],
+      "repositoryContext": {
+        "contextVersion": "repository-context-engine-v1",
+        "profile": "PROJECT_STATE",
+        "evidence": [
+          {
+            "reference": "docker-compose.yml",
+            "kind": "REPOSITORY_STRUCTURE",
+            "layer": "RUNTIME",
+            "summary": "Multi-service Docker Compose configuration",
+            "sourceType": "REPOSITORY",
+            "originatingFile": "docker-compose.yml",
+            "identifier": "docker-compose.yml",
+            "relevanceScore": 90,
+            "selectionReason": "Primary deployment descriptor",
+            "occurredAt": "2026-01-01T00:00:00Z",
+            "relatedReferences": [],
+            "extractionMetadata": {},
+            "content": {},
+            "symbols": {},
+            "resource": "devlog://projects/test-project/commits/abc123/files/docker-compose.yml",
+            "trustTier": "TECHNICAL_EVIDENCE"
+          }
+        ],
+        "usedTokens": 0,
+        "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "selectedEngineeringEvents": [],
+      "engineeringStories": [
+        {
+          "id": "00000000-0000-0000-0000-000000000401",
+          "title": "Story 0112 Context Agent",
+          "status": "DESIGN_APPROVED",
+          "baseCommit": "abc123",
+          "targetCommit": "def456",
+          "reference": "story:00000000-0000-0000-0000-000000000401",
+          "relatedReferences": []
+        }
+      ],
+      "selectedHumanContextInputs": [],
+      "knowledgeRelations": [],
+      "evolutionContext": null,
+      "selectionMetadata": {
+        "selectionVersion": "knowledge-selection-v4"
+      },
+      "selectionDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "expectedOutputContract": {
+      "type": "object",
+      "structured": true,
+      "hasProposals": false,
+      "hasAnalysisResult": true,
+      "root": "analysisResult",
+      "requiredAnalysisFields": [
+        "objectiveUnderstanding",
+        "architectureFindings",
+        "decisionFindings",
+        "evidenceFindings",
+        "historicalContext",
+        "constraintFindings",
+        "impactedComponentFindings",
+        "uncertainties",
+        "missingInformation",
+        "implementationQuestions",
+        "confidence",
+        "provenance",
+        "outputClassification"
+      ]
+    },
+    "metadata": {
+      "source": "canonical-evaluation-fixture"
+    }
+  },
+  "requiredSelectedInputs": [
+    {
+      "kind": "FACT",
+      "id": "00000000-0000-0000-0000-000000000101"
+    },
+    {
+      "kind": "FACT",
+      "id": "00000000-0000-0000-0000-000000000102"
+    },
+    {
+      "kind": "OBSERVATION",
+      "id": "00000000-0000-0000-0000-000000000201"
+    }
+  ],
+  "expectation": {
+    "expectedDelta": null,
+    "expectedTargetId": null,
+    "allowedFactIds": [
+      "00000000-0000-0000-0000-000000000101",
+      "00000000-0000-0000-0000-000000000102"
+    ],
+    "allowedObservationIds": [
+      "00000000-0000-0000-0000-000000000201"
+    ],
+    "allowedEvidenceReferences": [
+      "docker-compose.yml"
+    ],
+    "qualitativeGroundingRequired": true
+  },
+  "gate": {
+    "requiredRuns": 1,
+    "minimumStrong": 1,
+    "maximumIncorrectDelta": 0,
+    "maximumIncorrectTarget": 0,
+    "maximumTrustViolations": 0,
+    "maximumExecutionFailures": 0
+  },
+  "reproducibility": {
+    "repositoryRevision": "2e849641cf74361d7703e4b3f53609b9c5b3e83e",
+    "promptVersion": "story-context-analysis-prompt-v1",
+    "promptContentDigest": "f866dd446b2672cb006ad5752c670307fa320d80f849d3721ad4687a2977b50a",
+    "schemaDigest": "ee34b6de67ef87b15f2d184d4cf894e0e80feaccb2cdda0a955dd1db78f95cee"
+  }
+}

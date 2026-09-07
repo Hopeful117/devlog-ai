@@ -17,6 +17,7 @@ import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.storycontextanalysis.usecase.AnalyzeStoryContextUseCase;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
     private final AnalysisRepository analysisRepository;
     private final AiProposalContractValidator proposalContractValidator;
     private final ObjectMapper objectMapper;
+    private final AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
 
     @Override
     @Transactional
@@ -52,6 +54,10 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                         "AI task correlation", correlationId
                 ));
         validateExternalJobId(task, request.externalJobId());
+
+        if (isStoryContextAnalysisIntent(task)) {
+            return handleStoryContextAnalysis(task, request);
+        }
 
         if (isTerminal(task.getStatus())) {
             if (task.getStatus() == AiTaskStatus.COMPLETED
@@ -326,5 +332,55 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                 task.getStatus(),
                 proposalRepository.countByAiTaskId(task.getId())
         );
+    }
+
+    private boolean isStoryContextAnalysisIntent(AiTask task) {
+        return "engineering-story-context-analysis".equals(task.getIntentId())
+                && "v1".equals(task.getIntentVersion());
+    }
+
+    private AiTaskResultAcknowledgement handleStoryContextAnalysis(AiTask task, AiTaskResultRequest request) {
+        if (task.getStatus().isTerminal()) {
+            log.info("Duplicate callback for completed story context analysis task correlationId={}", task.getCorrelationId());
+            return acknowledgement(task, true);
+        }
+        if (task.getStatus() == AiTaskStatus.CREATED) {
+            throw new AiTaskResultConflictException(
+                    "AI_TASK_NOT_READY",
+                    task.getStatus(),
+                    "AI task cannot receive a result yet."
+            );
+        }
+        if (task.getStatus() != AiTaskStatus.SUBMITTED
+                && task.getStatus() != AiTaskStatus.PROCESSING) {
+            throw new AiTaskResultConflictException(
+                    "AI_TASK_INVALID_STATE",
+                    task.getStatus(),
+                    "AI task cannot receive a result from its current status."
+            );
+        }
+
+        if (request.status() == AiTaskResultStatus.FAILED) {
+            if (request.promptExecution() != null) {
+                applyPromptExecution(task, request.promptExecution());
+            }
+            failTask(task, request);
+            aiTaskRepository.save(task);
+            finishAnalysis(task, AnalysisStatus.FAILED, request.completedAt());
+            log.warn("Story context analysis task marked failed correlationId={} failureCode={}",
+                    task.getCorrelationId(), request.error().code());
+            analyzeStoryContextUseCase.handleCallback(task.getCorrelationId(), request);
+            return acknowledgement(task, false);
+        }
+
+        if (request.analysisResult() == null) {
+            throw new InvalidAiTaskResultException(
+                    "Story Context Analysis callback must include analysisResult"
+            );
+        }
+
+        analyzeStoryContextUseCase.handleCallback(task.getCorrelationId(), request);
+
+        return acknowledgement(task, false);
     }
 }

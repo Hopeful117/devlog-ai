@@ -49,6 +49,16 @@ def insight_output_schema_digest() -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def story_context_output_schema_digest() -> str:
+    from app.schemas.story_context_analysis import StoryContextAnalysisResult
+    encoded = json.dumps(
+        StoryContextAnalysisResult.model_json_schema(),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def resolve_scenario_directory(
     scenario_id: str,
     scenarios_root: Path = SCENARIOS_DIR,
@@ -144,18 +154,25 @@ def validate_scenario(scenario: EvaluationScenario) -> list[ValidationIssue]:
                 message="scenario intent identity must match promptRequest.intent",
             )
         )
-    if request.task_type != AiTaskType.INSIGHT_GENERATION:
+    if request.task_type not in (AiTaskType.INSIGHT_GENERATION, AiTaskType.STORY_CONTEXT_ANALYSIS):
         issues.append(
             ValidationIssue(
                 code="INCOMPATIBLE_TASK_TYPE",
-                message="promptRequest must use INSIGHT_GENERATION",
+                message="promptRequest must use INSIGHT_GENERATION or STORY_CONTEXT_ANALYSIS",
             )
         )
-    if request.intent.output_proposal_type != ProposalType.INSIGHT:
+    if request.task_type == AiTaskType.INSIGHT_GENERATION and request.intent.output_proposal_type != ProposalType.INSIGHT:
         issues.append(
             ValidationIssue(
                 code="INCOMPATIBLE_PROPOSAL_TYPE",
                 message="promptRequest intent must produce INSIGHT proposals",
+            )
+        )
+    if request.task_type == AiTaskType.STORY_CONTEXT_ANALYSIS and request.intent.output_proposal_type != ProposalType.NONE:
+        issues.append(
+            ValidationIssue(
+                code="INCOMPATIBLE_PROPOSAL_TYPE",
+                message="promptRequest intent must produce NONE proposals for STORY_CONTEXT_ANALYSIS",
             )
         )
     if request.expected_output_contract != request.intent.output_schema:
@@ -166,7 +183,11 @@ def validate_scenario(scenario: EvaluationScenario) -> list[ValidationIssue]:
             )
         )
     try:
-        prompt = InsightPromptBuilder().build(request)
+        if request.task_type == AiTaskType.STORY_CONTEXT_ANALYSIS:
+            from app.prompts.story_context_analysis import StoryContextAnalysisPromptBuilder
+            prompt = StoryContextAnalysisPromptBuilder().build(request)
+        else:
+            prompt = InsightPromptBuilder().build(request)
     except PromptConstructionError as exc:
         issues.append(
             ValidationIssue(
@@ -189,13 +210,22 @@ def validate_scenario(scenario: EvaluationScenario) -> list[ValidationIssue]:
                 message="promptVersion must match promptRequest.intent.promptTemplate",
             )
         )
-    if scenario.reproducibility.schema_digest != insight_output_schema_digest():
-        issues.append(
-            ValidationIssue(
-                code="SCHEMA_DIGEST_MISMATCH",
-                message="schemaDigest does not match InsightGenerationOutput",
+    if request.task_type == AiTaskType.STORY_CONTEXT_ANALYSIS:
+        if scenario.reproducibility.schema_digest != story_context_output_schema_digest():
+            issues.append(
+                ValidationIssue(
+                    code="SCHEMA_DIGEST_MISMATCH",
+                    message="schemaDigest does not match StoryContextAnalysisResult",
+                )
             )
-        )
+    else:
+        if scenario.reproducibility.schema_digest != insight_output_schema_digest():
+            issues.append(
+                ValidationIssue(
+                    code="SCHEMA_DIGEST_MISMATCH",
+                    message="schemaDigest does not match InsightGenerationOutput",
+                )
+            )
     if scenario.gate.required_runs != 1:
         issues.append(
             ValidationIssue(

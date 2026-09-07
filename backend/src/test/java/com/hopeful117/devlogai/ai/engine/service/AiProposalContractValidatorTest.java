@@ -25,6 +25,8 @@ class AiProposalContractValidatorTest {
         UUID factId = UUID.randomUUID();
         UUID humanContextId = UUID.randomUUID();
         AiTask task = AiTask.builder()
+                .intentId("architecture-overview")
+                .intentVersion("v2")
                 .selectedKnowledgeSnapshot(Map.of(
                         "selectedFacts", List.of(Map.of(
                                 "id", factId.toString(),
@@ -55,13 +57,14 @@ class AiProposalContractValidatorTest {
 
     @Test
     void requiresDeltaForRelationshipAbsentFromExistingArchitectureKnowledge() {
-        AiTask task = AiTask.builder().selectedKnowledgeSnapshot(Map.of(
-                "selectedFacts", List.of(Map.of(
-                        "id", UUID.randomUUID().toString(),
-                        "content", "from=api,to=database")),
-                "existingArchitectureKnowledge", List.of(Map.of(
-                        "title", "Containerized project",
-                        "content", "The project uses Docker Compose."))))
+        AiTask task = AiTask.builder().intentId("architecture-overview").intentVersion("v2")
+                .selectedKnowledgeSnapshot(Map.of(
+                        "selectedFacts", List.of(Map.of(
+                                "id", UUID.randomUUID().toString(),
+                                "content", "from=api,to=database")),
+                        "existingArchitectureKnowledge", List.of(Map.of(
+                                "title", "Containerized project",
+                                "content", "The project uses Docker Compose."))))
                 .build();
         AnalysisSynthesisResult synthesis = new AnalysisSynthesisResult(
                 "Architecture",
@@ -321,11 +324,12 @@ class AiProposalContractValidatorTest {
     }
 
     private AiTask relationshipTask(List<Map<String, Object>> existingKnowledge) {
-        return AiTask.builder().selectedKnowledgeSnapshot(Map.of(
-                "selectedFacts", List.of(Map.of(
-                        "id", UUID.randomUUID().toString(),
-                        "content", "from=backend,to=ai-engine")),
-                "existingArchitectureKnowledge", existingKnowledge))
+        return AiTask.builder().intentId("architecture-overview").intentVersion("v2")
+                .selectedKnowledgeSnapshot(Map.of(
+                        "selectedFacts", List.of(Map.of(
+                                "id", UUID.randomUUID().toString(),
+                                "content", "from=backend,to=ai-engine")),
+                        "existingArchitectureKnowledge", existingKnowledge))
                 .build();
     }
 

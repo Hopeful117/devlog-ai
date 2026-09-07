@@ -4,10 +4,13 @@ import com.hopeful117.devlogai.ai.task.dto.request.CreateAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.request.FailAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.response.AiTaskResponse;
+import com.hopeful117.devlogai.ai.task.entity.AiTask;
+import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface AiTaskService {
@@ -18,6 +21,30 @@ public interface AiTaskService {
 
     AiTaskResponse create(CreateAiTaskRequest request, AnalysisContext context,
                           SelectedKnowledge selectedKnowledge);
+
+    AiTaskResponse createForStoryContextAnalysis(
+            UUID analysisId,
+            AiTaskType taskType,
+            String intentId,
+            String intentVersion,
+            String promptTemplate,
+            Map<String, Object> selectedKnowledgeSnapshot,
+            String contextDigest,
+            Map<String, Object> groundingContract,
+            Map<String, Object> userGuidance
+    );
+
+    AiTask createForStoryContextAnalysisEntity(
+            UUID analysisId,
+            AiTaskType taskType,
+            String intentId,
+            String intentVersion,
+            String promptTemplate,
+            Map<String, Object> selectedKnowledgeSnapshot,
+            String contextDigest,
+            Map<String, Object> groundingContract,
+            Map<String, Object> userGuidance
+    );
 
     AiTaskResponse attachSelectedKnowledge(UUID id, SelectedKnowledge selectedKnowledge);
 

@@ -5,5 +5,6 @@ public enum ProposalType {
     ENGINEERING_DECISION,
     ENGINEERING_EVENT,
     CHALLENGE,
-    DOCUMENTATION
+    DOCUMENTATION,
+    NONE
 }

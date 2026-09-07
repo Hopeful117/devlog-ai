@@ -4,12 +4,14 @@ from app.clients.core_callback_client import CoreCallbackClient
 from app.core.config import Settings, get_settings
 from app.prompts.insight import InsightPromptBuilder
 from app.prompts.deliverable import DeliverablePromptBuilder
+from app.prompts.story_context_analysis import StoryContextAnalysisPromptBuilder
 from app.providers.base import LlmProvider
 from app.providers.mock import MockLlmProvider
 from app.providers.openai import OpenAiLlmProvider
 from app.services.insight_generation_service import InsightGenerationService
 from app.services.task_processing_service import AiTaskProcessingService
 from app.services.deliverable_generation_service import DeliverableGenerationService
+from app.services.story_context_analysis_generation_service import StoryContextAnalysisGenerationService
 from app.prompts.engineering_event import EngineeringEventPromptBuilder
 from app.prompts.decision import EngineeringDecisionPromptBuilder
 from app.services.engineering_event_generation_service import EngineeringEventGenerationService
@@ -55,8 +57,13 @@ def get_task_processing_service() -> AiTaskProcessingService:
         prompt_builder=EngineeringDecisionPromptBuilder(),
         callback_client=callback_client,
     )
+    story_context_analysis_service = StoryContextAnalysisGenerationService(
+        provider=build_llm_provider(settings),
+        prompt_builder=StoryContextAnalysisPromptBuilder(),
+        callback_client=callback_client,
+    )
     return AiTaskProcessingService(
-        insight_service, callback_client, event_service, decision_service
+        insight_service, callback_client, event_service, decision_service, story_context_analysis_service
     )
 
 

@@ -2,6 +2,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from app.models.intent import InsightType
+from app.schemas.story_context_analysis import StoryContextAnalysisResult
 from enum import Enum
 
 
@@ -71,3 +72,4 @@ class InsightProposalOutput(InsightOutputModel):
 class InsightGenerationOutput(InsightOutputModel):
     proposals: list[InsightProposalOutput] = Field(max_length=20)
     synthesis: AnalysisSynthesisOutput | None = Field(default=None)
+    analysis_result: StoryContextAnalysisResult | None = Field(default=None, alias="analysisResult")

@@ -5,5 +5,9 @@ public enum AiTaskStatus {
     SUBMITTED,
     PROCESSING,
     COMPLETED,
-    FAILED
+    FAILED;
+
+    public boolean isTerminal() {
+        return this == COMPLETED || this == FAILED;
+    }
 }
