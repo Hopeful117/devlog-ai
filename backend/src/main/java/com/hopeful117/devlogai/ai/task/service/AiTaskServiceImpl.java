@@ -12,7 +12,11 @@ import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.context.AnalysisContextService;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
+import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
+import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
+import com.hopeful117.devlogai.project.entity.Project;
+import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
@@ -43,6 +47,7 @@ public class AiTaskServiceImpl implements AiTaskService {
     private final ObjectMapper objectMapper;
     private final IntentCatalog intentCatalog;
     private final SelectedKnowledgePromptProjectionService promptProjectionService;
+    private final ProjectRepository projectRepository;
 
     @Override
     public AiTaskResponse create(CreateAiTaskRequest request) {
@@ -124,7 +129,7 @@ public class AiTaskServiceImpl implements AiTaskService {
 
     @Override
     public AiTask createForStoryContextAnalysisEntity(
-            UUID analysisId,
+            UUID projectId,
             AiTaskType taskType,
             String intentId,
             String intentVersion,
@@ -134,21 +139,28 @@ public class AiTaskServiceImpl implements AiTaskService {
             Map<String, Object> groundingContract,
             Map<String, Object> userGuidance
     ) {
-        Analysis analysis = findAnalysis(analysisId);
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new EntityNotFoundException("Project", projectId));
+
+        // Get or create an Analysis for the project with STORY_CONTEXT_ANALYSIS type
+        List<Analysis> existing = analysisRepository.findByProjectIdAndTypeOrderByCreatedAtDesc(projectId, AnalysisType.STORY_CONTEXT_ANALYSIS);
+        Analysis analysis = existing.isEmpty()
+                ? analysisRepository.save(Analysis.builder()
+                        .project(project)
+                        .type(AnalysisType.STORY_CONTEXT_ANALYSIS)
+                        .intentId("engineering-story-context-analysis")
+                        .intentVersion("v1")
+                        .status(AnalysisStatus.PENDING)
+                        .build())
+                : existing.get(0);
+
         IntentDefinition intent = intentCatalog.resolve(intentId, intentVersion);
 
         Map<String, Object> contextSnapshot = new LinkedHashMap<>(Map.of(
-                "analysisId", analysisId.toString(),
+                "analysisId", analysis.getId().toString(),
                 "intentId", intentId,
                 "intentVersion", intentVersion
         ));
-        if (selectedKnowledgeSnapshot != null && selectedKnowledgeSnapshot.containsKey("engineeringStories")) {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> stories = (List<Map<String, Object>>) selectedKnowledgeSnapshot.get("engineeringStories");
-            if (stories != null && !stories.isEmpty() && stories.get(0).containsKey("id")) {
-                contextSnapshot.put("storyId", stories.get(0).get("id").toString());
-            }
-        }
 
         Map<String, Object> intentSnapshot = objectMapper.convertValue(intent, Map.class);
 
@@ -166,7 +178,7 @@ public class AiTaskServiceImpl implements AiTaskService {
         task.setPromptRequestId(task.getCorrelationId());
         task.setContextSnapshot(contextSnapshot);
         task.setSelectedKnowledgeSnapshot(selectedKnowledgeSnapshot);
-        task.setSelectionVersion(null);
+        task.setSelectionVersion("knowledge-selection-v1");
         task.setSelectionDigest(contextDigest);
         task.setAttemptCount(0);
         task.setExternalJobId(null);

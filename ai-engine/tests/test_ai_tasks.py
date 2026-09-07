@@ -132,6 +132,7 @@ async def test_submit_ai_task_rejects_unsupported_type_without_background_task()
             "DECISION_PROPOSAL_GENERATION",
             "EVENT_PROPOSAL_GENERATION",
             "INSIGHT_GENERATION",
+            "STORY_CONTEXT_ANALYSIS",
         ],
     }
     assert processing_service.calls == []

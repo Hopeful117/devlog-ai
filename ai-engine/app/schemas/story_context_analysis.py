@@ -103,6 +103,10 @@ class Confidence(StoryContextAnalysisContractModel):
     rationale: str = ""
 
 
+class ExecutionMetadata(StoryContextAnalysisContractModel):
+    pass
+
+
 class Provenance(StoryContextAnalysisContractModel):
     context_digest: str = Field(alias="contextDigest", min_length=1, max_length=64)
     prompt_version: str = Field(alias="promptVersion", min_length=1, max_length=100)
@@ -112,7 +116,7 @@ class Provenance(StoryContextAnalysisContractModel):
     intent_id: str = Field(alias="intentId", min_length=1, max_length=80)
     intent_version: str = Field(alias="intentVersion", min_length=1, max_length=20)
     guidance_keys: list[str] = Field(default_factory=list, alias="guidanceKeys")
-    execution_metadata: dict[str, Any] = Field(default_factory=dict, alias="executionMetadata")
+    execution_metadata: ExecutionMetadata = Field(default_factory=ExecutionMetadata, alias="executionMetadata")
 
 
 class OutputClassification(StoryContextAnalysisContractModel):
