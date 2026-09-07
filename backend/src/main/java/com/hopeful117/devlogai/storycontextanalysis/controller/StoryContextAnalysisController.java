@@ -1,5 +1,7 @@
 package com.hopeful117.devlogai.storycontextanalysis.controller;
 
+import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
+import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAnalysisQueryService;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.AnalyzeStoryContextUseCase;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -13,14 +15,14 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/projects/{projectSlug}/stories/{storyId}")
 @RequiredArgsConstructor
 public class StoryContextAnalysisController {
 
     private final AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
+    private final StoryContextAnalysisQueryService storyContextAnalysisQueryService;
 
-    @PostMapping("/analyze-context")
-    public ResponseEntity<Void> analyzeContext(
+    @PostMapping("/api/v1/projects/{projectSlug}/stories/{storyId}/analyze-context")
+    public ResponseEntity<AnalyzeContextResponse> analyzeContext(
             @PathVariable @NotBlank String projectSlug,
             @PathVariable @NotNull UUID storyId,
             @Valid @RequestBody(required = false) AnalyzeContextRequest request
@@ -28,14 +30,25 @@ public class StoryContextAnalysisController {
         List<String> files = request != null ? request.files() : List.of();
         Map<String, Object> guidance = request != null ? request.guidance() : null;
 
-        analyzeStoryContextUseCase.execute(
+        UUID aiTaskId = analyzeStoryContextUseCase.execute(
                 projectSlug, storyId, files, guidance
         );
-        return ResponseEntity.accepted().build();
+        return ResponseEntity.accepted().body(new AnalyzeContextResponse(aiTaskId));
+    }
+
+    @GetMapping("/api/v1/ai/tasks/{aiTaskId}/story-context-analysis")
+    public ResponseEntity<StoryContextAnalysisResult> getStoryContextAnalysis(
+            @PathVariable @NotNull UUID aiTaskId
+    ) {
+        return storyContextAnalysisQueryService.findByAiTaskId(aiTaskId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     public record AnalyzeContextRequest(
             List<String> files,
             Map<String, Object> guidance
     ) {}
+
+    public record AnalyzeContextResponse(UUID aiTaskId) {}
 }
