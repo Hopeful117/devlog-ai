@@ -61,6 +61,18 @@ public class StoryContextAnalysisTool {
                 log.info("Story context analysis completed: aiTaskId={}", aiTaskId);
                 return objectMapper.writeValueAsString(result);
             }
+
+            try {
+                DevlogProjectContextClient.AiTaskStatusResponse taskStatus =
+                        devlogProjectContextClient.getAiTaskStatus(aiTaskId);
+                if ("FAILED".equals(taskStatus.status())) {
+                    log.warn("Story context analysis task failed: aiTaskId={}, failureCode={}",
+                            aiTaskId, taskStatus.failureCode());
+                    return buildTerminalFailureResponse(aiTaskId, taskStatus);
+                }
+            } catch (Exception e) {
+                log.debug("Could not check AiTask status aiTaskId={}: {}", aiTaskId, e.getMessage());
+            }
         }
 
         log.warn("Story context analysis timed out: aiTaskId={}", aiTaskId);
@@ -77,6 +89,20 @@ public class StoryContextAnalysisTool {
         } catch (Exception e) {
             log.debug("Poll for analysis aiTaskId={} returned error: {}", aiTaskId, e.getMessage());
             return null;
+        }
+    }
+
+    private String buildTerminalFailureResponse(UUID aiTaskId,
+            DevlogProjectContextClient.AiTaskStatusResponse taskStatus) {
+        try {
+            return objectMapper.writeValueAsString(Map.of(
+                    "error", "Analysis task failed: " + (taskStatus.failureMessage() != null ? taskStatus.failureMessage() : "unknown error"),
+                    "aiTaskId", aiTaskId.toString(),
+                    "status", "TASK_FAILED",
+                    "failureCode", taskStatus.failureCode() != null ? taskStatus.failureCode() : "UNKNOWN"
+            ));
+        } catch (Exception e) {
+            return "{\"error\":\"Analysis task failed\",\"aiTaskId\":\"" + aiTaskId + "\",\"status\":\"TASK_FAILED\"}";
         }
     }
 

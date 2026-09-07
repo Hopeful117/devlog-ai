@@ -64,6 +64,76 @@ class StoryContextAnalysisToolTest {
     }
 
     @Test
+    void shouldStopPollingImmediatelyOnTerminalFailure() throws Exception {
+        UUID aiTaskId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+
+        var submitResponse = new DevlogProjectContextClient.AnalyzeContextResponse(aiTaskId);
+        when(devlogProjectContextClient.analyzeStoryContext(
+                eq("test-project"), eq(storyId), any()))
+                .thenReturn(submitResponse);
+
+        when(devlogProjectContextClient.getStoryContextAnalysis(aiTaskId))
+                .thenThrow(new org.springframework.web.client.HttpServerErrorException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Not found"));
+
+        var failedStatus = new DevlogProjectContextClient.AiTaskStatusResponse(
+                aiTaskId, "FAILED", "AI_ENGINE_ERROR", "Python engine returned error");
+        when(devlogProjectContextClient.getAiTaskStatus(aiTaskId))
+                .thenReturn(failedStatus);
+
+        long startTime = System.currentTimeMillis();
+        String result = storyContextAnalysisTool.analyzeStoryContext(
+                "test-project", storyId, null, null);
+        long elapsed = System.currentTimeMillis() - startTime;
+
+        assertTrue(result.contains("TASK_FAILED"), "Expected TASK_FAILED status in response");
+        assertTrue(result.contains("Python engine returned error"), "Expected failure message");
+        assertTrue(result.contains(aiTaskId.toString()), "Expected aiTaskId in response");
+        assertTrue(elapsed < 10000, "Expected fast return on FAILED, took " + elapsed + "ms");
+
+        verify(devlogProjectContextClient, atLeastOnce()).getStoryContextAnalysis(aiTaskId);
+        verify(devlogProjectContextClient, atLeastOnce()).getAiTaskStatus(aiTaskId);
+    }
+
+    @Test
+    void shouldContinuePollingWhenTaskIsNonTerminal() throws Exception {
+        UUID aiTaskId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+
+        var submitResponse = new DevlogProjectContextClient.AnalyzeContextResponse(aiTaskId);
+        when(devlogProjectContextClient.analyzeStoryContext(
+                eq("test-project"), eq(storyId), any()))
+                .thenReturn(submitResponse);
+
+        var processingStatus = new DevlogProjectContextClient.AiTaskStatusResponse(
+                aiTaskId, "PROCESSING", null, null);
+        when(devlogProjectContextClient.getAiTaskStatus(aiTaskId))
+                .thenReturn(processingStatus);
+
+        var analysisResult = new StoryContextAnalysisResult(
+                new StoryContextAnalysisResult.ObjectiveUnderstanding("Completed"),
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(),
+                StoryContextAnalysisResult.Confidence.HIGH,
+                new StoryContextAnalysisResult.Provenance("digest", "v1", null),
+                new StoryContextAnalysisResult.OutputClassification(List.of())
+        );
+
+        when(devlogProjectContextClient.getStoryContextAnalysis(aiTaskId))
+                .thenThrow(new org.springframework.web.client.HttpServerErrorException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Not found"))
+                .thenReturn(analysisResult);
+
+        String result = storyContextAnalysisTool.analyzeStoryContext(
+                "test-project", storyId, null, null);
+
+        assertTrue(result.contains("Completed"));
+        verify(devlogProjectContextClient, atLeast(2)).getStoryContextAnalysis(aiTaskId);
+        verify(devlogProjectContextClient, atLeastOnce()).getAiTaskStatus(aiTaskId);
+    }
+
+    @Test
     void shouldReturnTimeoutErrorWhenAnalysisDoesNotComplete() throws Exception {
         UUID aiTaskId = UUID.randomUUID();
         UUID storyId = UUID.randomUUID();
@@ -76,6 +146,10 @@ class StoryContextAnalysisToolTest {
         when(devlogProjectContextClient.getStoryContextAnalysis(aiTaskId))
                 .thenThrow(new org.springframework.web.client.HttpServerErrorException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "Not found"));
+
+        when(devlogProjectContextClient.getAiTaskStatus(aiTaskId))
+                .thenReturn(new DevlogProjectContextClient.AiTaskStatusResponse(
+                        aiTaskId, "SUBMITTED", null, null));
 
         String result = storyContextAnalysisTool.analyzeStoryContext(
                 "test-project", storyId, null, null);

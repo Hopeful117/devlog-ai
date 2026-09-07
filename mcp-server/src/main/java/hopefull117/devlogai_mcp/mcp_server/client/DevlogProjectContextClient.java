@@ -40,7 +40,19 @@ public interface DevlogProjectContextClient {
             @PathVariable UUID aiTaskId
     );
 
+    @GetExchange("/ai-tasks/{aiTaskId}")
+    AiTaskStatusResponse getAiTaskStatus(
+            @PathVariable UUID aiTaskId
+    );
+
     record AnalyzeContextRequest(List<String> files, Map<String, Object> guidance) {}
 
     record AnalyzeContextResponse(UUID aiTaskId) {}
+
+    record AiTaskStatusResponse(
+            UUID id,
+            String status,
+            String failureCode,
+            String failureMessage
+    ) {}
 }
