@@ -13,6 +13,8 @@ import java.io.Writer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -82,6 +84,42 @@ class StdioProtocolHygieneTest {
             assertThat(toolsListResponse.path("id").asInt()).isEqualTo(4);
             assertThat(toolsListResponse.path("result").path("tools").isArray()).isTrue();
 
+            writeJsonLine(stdin, """
+                    {"jsonrpc":"2.0","id":5,"method":"prompts/list","params":{}}
+                    """);
+            JsonNode promptsListResponse = readJsonLine(stdout, executor, READ_TIMEOUT);
+            assertThat(promptsListResponse.path("id").asInt()).isEqualTo(5);
+            assertThat(promptsListResponse.path("result").path("prompts").isArray()).isTrue();
+
+            writeJsonLine(stdin, """
+                    {"jsonrpc":"2.0","id":6,"method":"resources/read","params":{"uri":"devlog://server/info"}}
+                    """);
+            JsonNode serverInfoResponse = readJsonLine(stdout, executor, READ_TIMEOUT);
+            assertThat(serverInfoResponse.path("id").asInt()).isEqualTo(6);
+            JsonNode serverInfo = OBJECT_MAPPER.readTree(
+                    serverInfoResponse.path("result").path("contents").path(0).path("text").asText());
+
+            assertThat(capabilityDescriptors(serverInfo.path("tools"), "name"))
+                    .containsExactlyElementsOf(capabilityDescriptors(
+                            toolsListResponse.path("result").path("tools"), "name"));
+            assertThat(capabilityDescriptors(serverInfo.path("prompts"), "name"))
+                    .containsExactlyElementsOf(capabilityDescriptors(
+                            promptsListResponse.path("result").path("prompts"), "name"));
+
+            List<String> registeredResources = new ArrayList<>(capabilityDescriptors(
+                    resourcesListResponse.path("result").path("resources"), "uri"));
+            registeredResources.addAll(capabilityDescriptors(
+                    templatesResponse.path("result").path("resourceTemplates"), "uriTemplate"));
+            registeredResources.sort(Comparator.naturalOrder());
+            assertThat(capabilityDescriptors(serverInfo.path("resources"), "uri"))
+                    .containsExactlyElementsOf(registeredResources);
+
+            assertThat(capabilityValues(serverInfo.path("tools"), "name"))
+                    .doesNotContain("echo_message")
+                    .contains("analyze_story_context");
+            assertThat(capabilityValues(serverInfo.path("prompts"), "name"))
+                    .doesNotContain("explain_code");
+
             String stderrSnapshot = drainAvailable(stderr);
             assertThat(stderrSnapshot)
                     .as("startup diagnostics should be available on stderr")
@@ -122,6 +160,22 @@ class StdioProtocolHygieneTest {
         writer.write(payload.strip());
         writer.write(System.lineSeparator());
         writer.flush();
+    }
+
+    private static List<String> capabilityDescriptors(JsonNode capabilities, String uriField) {
+        List<String> descriptors = new ArrayList<>();
+        capabilities.forEach(capability -> descriptors.add(String.join("|",
+                capability.path("name").asText(),
+                capability.path(uriField).asText(),
+                capability.path("description").asText())));
+        descriptors.sort(Comparator.naturalOrder());
+        return descriptors;
+    }
+
+    private static List<String> capabilityValues(JsonNode capabilities, String field) {
+        List<String> values = new ArrayList<>();
+        capabilities.forEach(capability -> values.add(capability.path(field).asText()));
+        return values;
     }
 
     private static JsonNode readJsonLine(

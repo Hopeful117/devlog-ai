@@ -14,6 +14,16 @@ arguments : projectSlug*, intent*
 retour    : EngineeringContext (project, evidence[], metadata)
 ```
 
+## `analyze_story_context`
+
+Analyse le contexte d'une Engineering Story pour les phases Discuss/Plan et
+retourne le résultat structuré et persisté de l'analyse.
+
+```text
+arguments : projectSlug*, storyId*, files, guidance
+retour    : StoryContextAnalysisResult
+```
+
 ## `search_project_history` *(Story 0090)*
 
 Recherche déterministe dans l'**historique déjà importé** par DevLog :
@@ -68,6 +78,8 @@ déterministe complet du commit (fichiers classifiés, références ADR/roadmap�
 - pas de filtres booléens/temporels en V1 ;
 - limité aux données importées par DevLog pour le projet demandé.
 
-## `echo_message`
+## Découverte des capacités
 
-Retourne le message reçu inchangé — outil de diagnostic de connectivité.
+La resource `devlog://server/info` fournit une vue concise des tools, prompts et
+resources opérationnels enregistrés. Les schémas détaillés restent exposés par
+les opérations MCP standard de listing.
