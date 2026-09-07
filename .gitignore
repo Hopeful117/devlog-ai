@@ -5,7 +5,25 @@
 
 # Maven build output
 backend/target/
+**/target/
 
 # JaCoCo reports
 **/jacoco.exec
+
+# Python
+**/__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Data
+data/
+
+# OpenCode
+.opencode/node_modules/
+.opencode/package.json
+.opencode/package-lock.json
 
