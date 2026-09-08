@@ -67,6 +67,7 @@ class EngineeringContextControllerWebMvcTest extends ControllerWebMvcTestSupport
                         "GIT",
                         "project-context-inputs-section.html",
                         "a1b2c3d4e5f67890abcdef1234567890abcdef12",
+                        "diff:a1b2c3d4e5f67890abcdef1234567890abcdef12:project-context-inputs-section.html",
                         95,
                         "SELECTED_BY_RANK",
                         Instant.parse("2026-08-20T10:00:00Z"),

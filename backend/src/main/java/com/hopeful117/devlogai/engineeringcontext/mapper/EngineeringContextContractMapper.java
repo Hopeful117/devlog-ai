@@ -268,6 +268,7 @@ public class EngineeringContextContractMapper {
                 provenance.sourceType(),
                 provenance.originatingFile(),
                 provenance.identifier(),
+                evidence.reference(),
                 evidence.relevanceScore(),
                 selectionReason(evidence, repositoryContext),
                 evidence.occurredAt(),

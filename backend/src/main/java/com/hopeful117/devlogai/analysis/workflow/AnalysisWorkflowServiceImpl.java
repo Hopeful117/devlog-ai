@@ -28,6 +28,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+
 import java.util.UUID;
 
 @Service
@@ -80,6 +82,7 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
                             guidance,
                             promptProjectionService.toMap(selectedKnowledge),
                             intent.outputSchema(),
+                            Map.of(), // groundingContract - not used for standard analysis
                             java.util.Map.of(
                                     "source", "devlog-ai-core",
                                     "analysisContextId", analysisId.toString())

@@ -63,11 +63,15 @@ class StoryContextAnalysisGenerationService:
             return
 
         try:
-            output = await self._generate_and_validate(prompt, submission.selected_knowledge)
+            output = await self._generate_and_validate(
+                prompt, submission.selected_knowledge, submission.grounding_contract or {}
+            )
         except (ValidationError, StoryContextAnalysisOutputValidationError, ValueError) as error:
             corrective_prompt = self._prompt_builder.corrective_retry(prompt, error)
             try:
-                output = await self._generate_and_validate(corrective_prompt, submission.selected_knowledge)
+                output = await self._generate_and_validate(
+                    corrective_prompt, submission.selected_knowledge, submission.grounding_contract or {}
+                )
                 prompt = corrective_prompt
             except (ValidationError, StoryContextAnalysisOutputValidationError, ValueError) as retry_error:
                 await self._send_failure(
@@ -116,35 +120,26 @@ class StoryContextAnalysisGenerationService:
         self,
         prompt: Prompt,
         context: dict[str, object],
+        grounding_contract: dict[str, object],
     ) -> StoryContextAnalysisResult:
         output = await self._provider.generate_structured(prompt, StoryContextAnalysisResult)
         validated = StoryContextAnalysisResult.model_validate(output)
-        self._validate_output(validated, context)
+        self._validate_output(validated, context, grounding_contract)
         return validated
 
     def _validate_output(
         self,
         output: StoryContextAnalysisResult,
         context: dict[str, object],
+        grounding_contract: dict[str, object],
     ) -> None:
-        repo_context = context.get("repositoryContext", {})
-        if not isinstance(repo_context, dict):
-            raise StoryContextAnalysisOutputValidationError("repositoryContext must be an object")
-
-        evidence_references = set()
-        evidence = repo_context.get("evidence", [])
-        if isinstance(evidence, list):
-            for item in evidence:
-                if not isinstance(item, dict):
-                    continue
-                ref = item.get("reference")
+        # Use Java-authored grounding contract (authoritative per Story 0112 D14)
+        allowed_refs = set()
+        allowed_list = grounding_contract.get("allowedEvidenceReferences", [])
+        if isinstance(allowed_list, list):
+            for ref in allowed_list:
                 if isinstance(ref, str):
-                    evidence_references.add(ref)
-                related = item.get("relatedReferences", [])
-                if isinstance(related, list):
-                    for r in related:
-                        if isinstance(r, str):
-                            evidence_references.add(r)
+                    allowed_refs.add(ref)
 
         all_findings = (
             output.architecture_findings
@@ -157,7 +152,7 @@ class StoryContextAnalysisGenerationService:
 
         for finding in all_findings:
             finding_refs = {er.reference for er in finding.grounding.evidence_references}
-            unknown = finding_refs - evidence_references
+            unknown = finding_refs - allowed_refs
             if unknown:
                 raise StoryContextAnalysisOutputValidationError(
                     f"Finding {finding.title} references unknown evidence: {sorted(unknown)}"
@@ -184,7 +179,7 @@ class StoryContextAnalysisGenerationService:
 
         for unc in output.uncertainties:
             for er in unc.related_evidence:
-                if er.reference not in evidence_references:
+                if er.reference not in allowed_refs:
                     raise StoryContextAnalysisOutputValidationError(
                         f"Uncertainty references unknown evidence: {er.reference}"
                     )

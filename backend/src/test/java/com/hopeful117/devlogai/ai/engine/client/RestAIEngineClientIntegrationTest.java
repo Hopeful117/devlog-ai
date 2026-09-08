@@ -82,6 +82,7 @@ class RestAIEngineClientIntegrationTest {
                     guidance,
                     projectedKnowledge,
                     Map.of("type", "object"),
+                    Map.of(), // groundingContract
                     Map.of("source", "test")
             );
 

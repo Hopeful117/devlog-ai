@@ -7,12 +7,25 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.analysis.context.AnalysisContextService;
+import com.hopeful117.devlogai.analysis.diagnostics.repository.AnalysisExecutionDiagnosticRepository;
+import com.hopeful117.devlogai.analysis.entity.Analysis;
+import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
+import com.hopeful117.devlogai.analysis.entity.AnalysisType;
+import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
-import com.hopeful117.devlogai.contracts.projectcontext.ProjectContext;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EvidenceRef;
 import com.hopeful117.devlogai.engineeringcontext.EngineeringContextFacade;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
+import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
+import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
+import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
+import com.hopeful117.devlogai.profile.service.ProjectProfileService;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
@@ -47,6 +60,12 @@ public class AnalyzeStoryContextUseCase {
     private final AiTaskRepository aiTaskRepository;
     private final StoryContextAnalysisRepository storyContextAnalysisRepository;
     private final ObjectMapper objectMapper;
+    private final KnowledgeSelectionService knowledgeSelectionService;
+    private final SelectedKnowledgePromptProjectionService promptProjectionService;
+    private final ProjectProfileService projectProfileService;
+    private final AnalysisContextService analysisContextService;
+    private final AnalysisRepository analysisRepository;
+    private final AnalysisExecutionDiagnosticRepository diagnosticRepository;
 
     public UUID execute(
             String projectSlug,
@@ -71,21 +90,43 @@ public class AnalyzeStoryContextUseCase {
                 storyId
         );
 
-        Map<String, Object> selectedKnowledge = buildSelectedKnowledge(engineeringContext, story);
-        String contextDigest = engineeringContext.metadata().contextDigest();
+        // Build AnalysisContext for SCA using latest ProjectProfile Analysis as baseline
+        ProjectProfileResponse profile = projectProfileService.getLatestByProject(project.getId());
+        UUID baselineAnalysisId = profile != null ? profile.analysisId() : null;
 
+        AnalysisContext analysisContext;
+        if (baselineAnalysisId != null) {
+            // Use the baseline analysis for Facts/Observations but with SCA intent
+            AnalysisContext baselineContext = analysisContextService.build(baselineAnalysisId);
+            analysisContext = adaptContextForSCA(baselineContext, engineeringContext, story, intentDef, guidance);
+        } else {
+            // No baseline analysis - create minimal context with empty knowledge
+            analysisContext = createMinimalSCAContext(project, engineeringContext, story, intentDef, guidance);
+        }
+
+        // Select validated knowledge using Story-aware KnowledgeSelectionService
+        UserGuidance userGuidance = mapGuidance(guidance);
+        SelectedKnowledge selectedKnowledge = knowledgeSelectionService.select(analysisContext, intentDef, userGuidance);
+
+        String contextDigest = selectedKnowledge.selectionDigest();
+
+        // Build grounding contract from EngineeringContext canonical evidence references
+        Map<String, Object> groundingContract = buildGroundingContract(engineeringContext);
+
+        // Create AiTask with selected knowledge and grounding contract
         AiTask aiTask = aiTaskService.createForStoryContextAnalysisEntity(
                 project.getId(),
                 AiTaskType.STORY_CONTEXT_ANALYSIS,
                 INTENT_ID,
                 INTENT_VERSION,
                 intentDef.promptTemplate(),
-                selectedKnowledge,
+                promptProjectionService.toMap(selectedKnowledge),
                 contextDigest,
-                buildGroundingContract(engineeringContext),
+                groundingContract,
                 guidance
         );
 
+        // Capture and store freshness snapshot
         Map<String, Object> freshnessSnapshot = captureFreshnessSnapshot(engineeringContext);
         if (freshnessSnapshot != null) {
             Map<String, Object> contextSnapshot = new LinkedHashMap<>(aiTask.getContextSnapshot());
@@ -94,6 +135,16 @@ public class AnalyzeStoryContextUseCase {
             aiTaskRepository.save(aiTask);
         }
 
+        // Store grounding contract in task for callback validation
+        Map<String, Object> taskContextSnapshot = new LinkedHashMap<>(aiTask.getContextSnapshot());
+        taskContextSnapshot.put("groundingContract", groundingContract);
+        aiTask.setContextSnapshot(taskContextSnapshot);
+        aiTaskRepository.save(aiTask);
+
+        // Submit task before sending to Python (ensures SUBMITTED status)
+        aiTaskService.submit(aiTask.getId(), new com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest(null));
+
+        // Build PromptRequest with selected knowledge and grounding contract
         PromptRequest promptRequest = new PromptRequest(
                 UUID.randomUUID(),
                 aiTask.getCorrelationId(),
@@ -101,9 +152,10 @@ public class AnalyzeStoryContextUseCase {
                 aiTask.getId(),
                 AiTaskType.STORY_CONTEXT_ANALYSIS,
                 intentDef,
-                null,
-                selectedKnowledge,
+                userGuidance,
+                promptProjectionService.toMap(selectedKnowledge),
                 intentDef.outputSchema(),
+                groundingContract,
                 Map.of(
                         "projectSlug", projectSlug,
                         "storyId", storyId.toString()
@@ -115,36 +167,14 @@ public class AnalyzeStoryContextUseCase {
         return aiTask.getId();
     }
 
-    private Map<String, Object> buildSelectedKnowledge(EngineeringContext context, EngineeringStory story) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("project", context.project());
-        result.put("analysis", Map.of());
-        result.put("projectProfile", context.project());
-        result.put("selectedFacts", List.of());
-        result.put("selectedObservations", List.of());
-        result.put("diagnostics", List.of());
-        result.put("selectedInsights", List.of());
-        result.put("selectionMetadata", List.of());
-        result.put("selectionDigest", context.metadata().contextDigest());
-        result.put("repositoryContext", Map.of("evidence", context.evidence()));
-        result.put("engineeringStories", List.of(Map.of(
-                "id", story.getId().toString(),
-                "title", story.getTitle(),
-                "status", story.getStatus().name(),
-                "baseCommit", story.getBaseCommit(),
-                "targetCommit", story.getTargetCommit(),
-                "reference", "story:" + story.getId(),
-                "relatedReferences", List.of()
-        )));
-        return result;
-    }
-
     private Map<String, Object> buildGroundingContract(EngineeringContext context) {
         Set<String> allowedRefs = new LinkedHashSet<>();
         for (var evidence : context.evidence()) {
-            if (evidence.identifier() != null) {
-                allowedRefs.add(evidence.identifier());
+            // Use canonical reference for grounding (RepositoryEvidence.reference)
+            if (evidence.reference() != null) {
+                allowedRefs.add(evidence.reference());
             }
+            // Also include related references as they may be cited
             if (evidence.relatedReferences() != null) {
                 allowedRefs.addAll(evidence.relatedReferences());
             }
@@ -158,6 +188,157 @@ public class AnalyzeStoryContextUseCase {
             return null;
         }
         return objectMapper.convertValue(context.metadata().freshness(), Map.class);
+    }
+
+    /**
+     * Adapts the baseline AnalysisContext for SCA by:
+     * - Keeping Facts/Observations from baseline
+     * - Setting SCA intent in analysis snapshot
+     * - Including only the current Story
+     * - Preserving other context (Insights, Events, Relations, Human Inputs)
+     */
+    private AnalysisContext adaptContextForSCA(
+            AnalysisContext baselineContext,
+            EngineeringContext engineeringContext,
+            EngineeringStory story,
+            IntentDefinition intentDef,
+            Map<String, Object> guidance
+    ) {
+        // Create SCA analysis snapshot with correct intent
+        AnalysisContext.AnalysisSnapshot scaAnalysisSnapshot = new AnalysisContext.AnalysisSnapshot(
+                baselineContext.analysis().id(),
+                baselineContext.analysis().type(),
+                INTENT_ID,
+                INTENT_VERSION,
+                baselineContext.analysis().status(),
+                baselineContext.analysis().startedAt(),
+                baselineContext.analysis().completedAt(),
+                baselineContext.analysis().createdAt()
+        );
+
+        // Include only the current story
+        var currentStorySnapshot = new com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringStorySnapshot(
+                story.getId(),
+                story.getProject().getId(),
+                story.getStoryNumber(),
+                story.getTitle(),
+                story.getStatus().name(),
+                story.getStoryPath(),
+                story.getBaseCommit(),
+                story.getTargetCommit(),
+                story.getCreatedAt(),
+                story.getCompletedAt()
+        );
+
+        // Convert UserGuidance if provided
+        UserGuidance userGuidance = mapGuidance(guidance);
+
+        return new AnalysisContext(
+                baselineContext.project(),
+                scaAnalysisSnapshot,
+                baselineContext.projectProfile(),
+                baselineContext.facts(),
+                baselineContext.observations(),
+                baselineContext.recentKnowledgeEvents(),
+                baselineContext.relatedAnalyses(),
+                baselineContext.architectureArtifacts(),
+                baselineContext.relatedDecisions(),
+                baselineContext.recentMilestones(),
+                baselineContext.validatedProposals(),
+                baselineContext.evolutionContext(),
+                baselineContext.validatedEngineeringEvents(),
+                baselineContext.openChallenges(),
+                baselineContext.knowledgeRelations(),
+                List.of(currentStorySnapshot),
+                baselineContext.humanContextInputs()
+        );
+    }
+
+    /**
+     * Creates a minimal SCA context when no baseline analysis exists.
+     * KnowledgeSelectionService will return empty selections but with valid structure.
+     */
+    private AnalysisContext createMinimalSCAContext(
+            Project project,
+            EngineeringContext engineeringContext,
+            EngineeringStory story,
+            IntentDefinition intentDef,
+            Map<String, Object> guidance
+    ) {
+        var projectSnapshot = new AnalysisContext.ProjectSnapshot(
+                project.getId(), project.getName(), project.getSlug(), null, project.getStatus()
+        );
+
+        var analysisSnapshot = new AnalysisContext.AnalysisSnapshot(
+                UUID.randomUUID(), // synthetic ID for context only
+                AnalysisType.STORY_CONTEXT_ANALYSIS,
+                INTENT_ID,
+                INTENT_VERSION,
+                AnalysisStatus.COMPLETED,
+                Instant.now(),
+                Instant.now(),
+                Instant.now()
+        );
+
+        var currentStorySnapshot = new com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringStorySnapshot(
+                story.getId(),
+                story.getProject().getId(),
+                story.getStoryNumber(),
+                story.getTitle(),
+                story.getStatus().name(),
+                story.getStoryPath(),
+                story.getBaseCommit(),
+                story.getTargetCommit(),
+                story.getCreatedAt(),
+                story.getCompletedAt()
+        );
+
+        // Get project profile for context
+        ProjectProfileResponse profile = projectProfileService.getLatestByProject(project.getId());
+
+        UserGuidance userGuidance = mapGuidance(guidance);
+
+        return new AnalysisContext(
+                projectSnapshot,
+                analysisSnapshot,
+                profile,
+                List.of(), // facts
+                List.of(), // observations
+                List.of(), // recentKnowledgeEvents
+                List.of(), // relatedAnalyses
+                List.of(), // architectureArtifacts
+                List.of(), // relatedDecisions
+                List.of(), // recentMilestones
+                List.of(), // validatedProposals
+                null, // evolutionContext
+                List.of(), // validatedEngineeringEvents
+                List.of(), // openChallenges
+                List.of(), // knowledgeRelations
+                List.of(currentStorySnapshot),
+                List.of() // humanContextInputs
+        );
+    }
+
+    private UserGuidance mapGuidance(Map<String, Object> guidance) {
+        if (guidance == null || guidance.isEmpty()) {
+            return null;
+        }
+        String focus = (String) guidance.get("focus");
+        @SuppressWarnings("unchecked")
+        List<String> priorities = (List<String>) guidance.getOrDefault("priorities", List.of());
+        @SuppressWarnings("unchecked")
+        List<String> questions = (List<String>) guidance.getOrDefault("questions", List.of());
+        String outputContext = (String) guidance.get("outputContext");
+        String perspective = (String) guidance.get("perspective");
+
+        return new UserGuidance(
+                focus,
+                "kiko",
+                perspective,
+                outputContext,
+                INTENT_ID,
+                priorities
+        );
     }
 
     @Transactional
@@ -183,6 +364,9 @@ public class AnalyzeStoryContextUseCase {
         if (analysisResult == null) {
             throw new IllegalStateException("Story Context Analysis callback must include analysisResult");
         }
+
+        // Authoritative Java validation of AI output
+        validateStoryContextAnalysisResult(analysisResult, task);
 
         UUID storyId = UUID.fromString(
                 task.getContextSnapshot().get("storyId").toString()
@@ -212,5 +396,130 @@ public class AnalyzeStoryContextUseCase {
         task.setPromptContentDigest(request.promptExecution().promptContentDigest());
         task.setContextDigest(request.promptExecution().contextDigest());
         aiTaskRepository.save(task);
+    }
+
+    /**
+     * Authoritative Java validation of Story Context Analysis result.
+     * Validates grounding, trust, relationships, classification, and digest consistency.
+     * Per Story 0112 D14 and ADR-067: Java/Core is sole grounding authority.
+     */
+    private void validateStoryContextAnalysisResult(StoryContextAnalysisResult result, AiTask task) {
+        // Extract grounding contract from task context
+        @SuppressWarnings("unchecked")
+        Map<String, Object> groundingContract = task.getContextSnapshot() != null
+                ? (Map<String, Object>) task.getContextSnapshot().get("groundingContract")
+                : Map.of();
+
+        @SuppressWarnings("unchecked")
+        List<String> allowedRefs = (List<String>) groundingContract.getOrDefault("allowedEvidenceReferences", List.of());
+        Set<String> allowedRefSet = new LinkedHashSet<>(allowedRefs);
+
+        // Validate context digest consistency
+        String expectedDigest = task.getContextDigest();
+        String actualDigest = result.provenance().contextDigest();
+        if (expectedDigest != null && !expectedDigest.equals(actualDigest)) {
+            throw new IllegalStateException("Context digest mismatch: expected " + expectedDigest + ", got " + actualDigest);
+        }
+
+        // Validate all finding types that have GroundingMetadata
+        validateGroundedFindings(result.architectureFindings(), allowedRefSet);
+        validateGroundedFindings(result.decisionFindings(), allowedRefSet);
+        validateGroundedFindings(result.evidenceFindings(), allowedRefSet);
+        validateGroundedFindings(result.historicalContext(), allowedRefSet);
+        validateGroundedFindings(result.constraintFindings(), allowedRefSet);
+        validateGroundedFindings(result.impactedComponentFindings(), allowedRefSet);
+
+        // Validate uncertainties
+        for (StoryContextAnalysisResult.Uncertainty uncertainty : result.uncertainties()) {
+            for (EvidenceRef evidenceRef : uncertainty.relatedEvidence()) {
+                if (!allowedRefSet.contains(evidenceRef.reference())) {
+                    throw new IllegalStateException(
+                            "Uncertainty references unauthorized evidence: " + evidenceRef.reference()
+                    );
+                }
+            }
+        }
+
+        // Validate output classification
+        for (StoryContextAnalysisResult.OutputClassification.ClassificationEntry entry : result.outputClassification().entries()) {
+            if (!Set.of("FACTUAL_EXTRACTION", "AI_INTERPRETATION", "RECOMMENDATION").contains(entry.classification().name())) {
+                throw new IllegalStateException("Invalid output classification: " + entry.classification());
+            }
+        }
+
+        // Validate confidence
+        if (!Set.of("HIGH", "MEDIUM", "LOW").contains(result.confidence().name())) {
+            throw new IllegalStateException("Invalid confidence level: " + result.confidence());
+        }
+
+        // Forbidden outputs check: no proposals should be generated for this intent
+        // (Story 0112: ValidatableProposal is forbidden in V1)
+    }
+
+    private void validateGroundedFindings(List<? extends Record> findings, Set<String> allowedRefs) {
+        for (Record finding : findings) {
+            try {
+                // Use reflection to access grounding() method
+                var groundingMethod = finding.getClass().getMethod("grounding");
+                Object grounding = groundingMethod.invoke(finding);
+
+                // Access evidenceReferences from grounding
+                var evidenceRefsMethod = grounding.getClass().getMethod("evidenceReferences");
+                @SuppressWarnings("unchecked")
+                List<EvidenceRef> evidenceRefs = (List<EvidenceRef>) evidenceRefsMethod.invoke(grounding);
+
+                for (EvidenceRef evidenceRef : evidenceRefs) {
+                    if (!allowedRefs.contains(evidenceRef.reference())) {
+                        var titleMethod = finding.getClass().getMethod("title");
+                        String title = (String) titleMethod.invoke(finding);
+                        throw new IllegalStateException(
+                                "Finding '" + title + "' references unauthorized evidence: " + evidenceRef.reference()
+                        );
+                    }
+                }
+
+                // Validate classification
+                var classificationMethod = grounding.getClass().getMethod("classification");
+                String classification = (String) classificationMethod.invoke(grounding);
+                if (!Set.of("FACTUAL_EXTRACTION", "AI_INTERPRETATION", "RECOMMENDATION").contains(classification)) {
+                    var titleMethod = finding.getClass().getMethod("title");
+                    String title = (String) titleMethod.invoke(finding);
+                    throw new IllegalStateException(
+                            "Finding '" + title + "' has invalid classification: " + classification
+                    );
+                }
+
+                // Factual/Interpretative findings must be grounded with at least one evidence reference
+                if (("FACTUAL_EXTRACTION".equals(classification) || "AI_INTERPRETATION".equals(classification))
+                        && evidenceRefs.isEmpty()) {
+                    var titleMethod = finding.getClass().getMethod("title");
+                    String title = (String) titleMethod.invoke(finding);
+                    throw new IllegalStateException(
+                            "Finding '" + title + "' of type " + classification + " must have at least one evidence reference"
+                    );
+                }
+
+                // Validate relationType
+                var relationTypeMethod = grounding.getClass().getMethod("relationType");
+                Object relationType = relationTypeMethod.invoke(grounding);
+                if (relationType == null) {
+                    var titleMethod = finding.getClass().getMethod("title");
+                    String title = (String) titleMethod.invoke(finding);
+                    throw new IllegalStateException(
+                            "Finding '" + title + "' must have relationType"
+                    );
+                }
+                if (!Set.of("EXPLICIT", "TEMPORAL_PROXIMITY", "POSSIBLE_RELEVANCE", "INFERRED_HYPOTHESIS")
+                        .contains(relationType.toString())) {
+                    var titleMethod = finding.getClass().getMethod("title");
+                    String title = (String) titleMethod.invoke(finding);
+                    throw new IllegalStateException(
+                            "Finding '" + title + "' has invalid relationType: " + relationType
+                    );
+                }
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalStateException("Validation failed for finding: " + e.getMessage(), e);
+            }
+        }
     }
 }

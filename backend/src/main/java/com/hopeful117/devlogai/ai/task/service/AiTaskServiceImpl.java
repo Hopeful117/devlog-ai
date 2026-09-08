@@ -162,6 +162,20 @@ public class AiTaskServiceImpl implements AiTaskService {
                 "intentVersion", intentVersion
         ));
 
+        // Store grounding contract in context snapshot for callback validation
+        if (groundingContract != null && !groundingContract.isEmpty()) {
+            contextSnapshot.put("groundingContract", groundingContract);
+        }
+
+        // Extract storyId from selected knowledge for callback
+        if (selectedKnowledgeSnapshot != null && selectedKnowledgeSnapshot.containsKey("engineeringStories")) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> stories = (List<Map<String, Object>>) selectedKnowledgeSnapshot.get("engineeringStories");
+            if (stories != null && !stories.isEmpty() && stories.get(0).containsKey("id")) {
+                contextSnapshot.put("storyId", stories.get(0).get("id").toString());
+            }
+        }
+
         Map<String, Object> intentSnapshot = objectMapper.convertValue(intent, Map.class);
 
         AiTask task = new AiTask();
@@ -178,7 +192,9 @@ public class AiTaskServiceImpl implements AiTaskService {
         task.setPromptRequestId(task.getCorrelationId());
         task.setContextSnapshot(contextSnapshot);
         task.setSelectedKnowledgeSnapshot(selectedKnowledgeSnapshot);
-        task.setSelectionVersion("knowledge-selection-v1");
+        // Use v5 for SCA intent (Story-aware selection)
+        task.setSelectionVersion("engineering-story-context-analysis".equals(intentId)
+                ? "knowledge-selection-v5" : "knowledge-selection-v1");
         task.setSelectionDigest(contextDigest);
         task.setAttemptCount(0);
         task.setExternalJobId(null);
