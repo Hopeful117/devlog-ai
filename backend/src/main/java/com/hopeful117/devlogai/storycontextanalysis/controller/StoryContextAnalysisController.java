@@ -1,6 +1,6 @@
 package com.hopeful117.devlogai.storycontextanalysis.controller;
 
-import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
+import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse;
 import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAnalysisQueryService;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.AnalyzeStoryContextUseCase;
 import jakarta.validation.Valid;
@@ -37,10 +37,10 @@ public class StoryContextAnalysisController {
     }
 
     @GetMapping("/api/v1/ai/tasks/{aiTaskId}/story-context-analysis")
-    public ResponseEntity<StoryContextAnalysisResult> getStoryContextAnalysis(
+    public ResponseEntity<StoryContextAnalysisResponse> getStoryContextAnalysis(
             @PathVariable @NotNull UUID aiTaskId
     ) {
-        return storyContextAnalysisQueryService.findByAiTaskId(aiTaskId)
+        return storyContextAnalysisQueryService.findResponseByAiTaskId(aiTaskId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

@@ -46,6 +46,10 @@ public class StoryContextAnalysis {
     @Column(name = "prompt_execution_metadata", columnDefinition = "jsonb")
     private Map<String, Object> promptExecutionMetadata;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "context_freshness", columnDefinition = "jsonb")
+    private Map<String, Object> contextFreshness;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

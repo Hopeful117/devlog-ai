@@ -1,6 +1,6 @@
 package hopefull117.devlogai_mcp.mcp_server.tool;
 
-import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
+import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,10 +56,10 @@ public class StoryContextAnalysisTool {
                 return buildErrorResponse("Interrupted while waiting for analysis", aiTaskId);
             }
 
-            StoryContextAnalysisResult result = pollForAnalysis(aiTaskId);
-            if (result != null) {
+            StoryContextAnalysisResponse response = pollForAnalysis(aiTaskId);
+            if (response != null) {
                 log.info("Story context analysis completed: aiTaskId={}", aiTaskId);
-                return objectMapper.writeValueAsString(result);
+                return objectMapper.writeValueAsString(response);
             }
 
             try {
@@ -83,7 +83,7 @@ public class StoryContextAnalysisTool {
         );
     }
 
-    private StoryContextAnalysisResult pollForAnalysis(UUID aiTaskId) {
+    private StoryContextAnalysisResponse pollForAnalysis(UUID aiTaskId) {
         try {
             return devlogProjectContextClient.getStoryContextAnalysis(aiTaskId);
         } catch (Exception e) {
