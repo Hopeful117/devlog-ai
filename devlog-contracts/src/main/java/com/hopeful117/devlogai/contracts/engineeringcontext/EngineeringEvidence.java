@@ -8,6 +8,7 @@ public record EngineeringEvidence(
         String sourceType,
         String originatingFile,
         String identifier,
+        String reference,
         Integer relevanceScore,
         String selectionReason,
         java.time.Instant occurredAt,

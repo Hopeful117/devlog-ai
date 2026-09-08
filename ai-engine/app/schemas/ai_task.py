@@ -63,6 +63,7 @@ class PromptRequest(ContractModel):
     user_guidance: UserGuidance | None = Field(default=None, alias="userGuidance")
     selected_knowledge: dict[str, Any] = Field(alias="selectedKnowledge")
     expected_output_contract: dict[str, Any] = Field(alias="expectedOutputContract")
+    grounding_contract: dict[str, Any] = Field(default_factory=dict, alias="groundingContract")
     metadata: dict[str, Any]
 
 

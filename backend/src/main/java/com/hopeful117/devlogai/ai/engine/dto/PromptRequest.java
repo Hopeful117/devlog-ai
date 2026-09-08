@@ -20,6 +20,7 @@ public record PromptRequest(
         UserGuidance userGuidance,
         Map<String, Object> selectedKnowledge,
         Map<String, Object> expectedOutputContract,
+        Map<String, Object> groundingContract,
         Map<String, Object> metadata
 ) {
     public PromptRequest {
@@ -34,6 +35,8 @@ public record PromptRequest(
                 new LinkedHashMap<>(selectedKnowledge)
         );
         expectedOutputContract = Map.copyOf(expectedOutputContract);
+        groundingContract = groundingContract == null ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(groundingContract));
         metadata = Map.copyOf(metadata);
     }
 }

@@ -205,7 +205,7 @@ class RestAIEngineClientTest {
                 new SelectedKnowledgePromptProjectionService(new ObjectMapper(), new SemanticSectionComposer()).toMap(selected);
         return new PromptRequest(correlationId, correlationId, analysisId, UUID.randomUUID(),
                 AiTaskType.INSIGHT_GENERATION, intent, null,
-                projectedKnowledge, intent.outputSchema(), Map.of());
+                projectedKnowledge, intent.outputSchema(), Map.of(), Map.of());
     }
 
     private PromptRequest requestWithSelectedInsight(
@@ -240,6 +240,6 @@ class RestAIEngineClientTest {
                 new SelectedKnowledgePromptProjectionService(new ObjectMapper(), new SemanticSectionComposer()).toMap(selected);
         return new PromptRequest(correlationId, correlationId, analysisId, UUID.randomUUID(),
                 AiTaskType.INSIGHT_GENERATION, intent, null,
-                projectedKnowledge, intent.outputSchema(), Map.of());
+                projectedKnowledge, intent.outputSchema(), Map.of(), Map.of());
     }
 }

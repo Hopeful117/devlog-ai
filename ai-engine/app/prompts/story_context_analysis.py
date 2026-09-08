@@ -98,7 +98,8 @@ class StoryContextAnalysisPromptBuilder:
             ) if request.user_guidance else {}
         )
         schema_json = self._canonical(request.expected_output_contract)
-        grounding_json = self._canonical(self._grounding_contract(request.selected_knowledge))
+        # Use Java-authored grounding contract from PromptRequest (authoritative per Story 0112 D14)
+        grounding_json = self._canonical(request.grounding_contract or self._grounding_contract(request.selected_knowledge))
 
         user_message = (
             "INTENT\n"
