@@ -8,6 +8,7 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextFreshness;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
 import com.hopeful117.devlogai.contracts.projectcontext.ProjectContext;
 import com.hopeful117.devlogai.engineeringcontext.EngineeringContextFacade;
@@ -86,6 +87,14 @@ public class AnalyzeStoryContextUseCase {
                 guidance
         );
 
+        Map<String, Object> freshnessSnapshot = captureFreshnessSnapshot(engineeringContext);
+        if (freshnessSnapshot != null) {
+            Map<String, Object> contextSnapshot = new LinkedHashMap<>(aiTask.getContextSnapshot());
+            contextSnapshot.put("contextFreshness", freshnessSnapshot);
+            aiTask.setContextSnapshot(contextSnapshot);
+            aiTaskRepository.save(aiTask);
+        }
+
         PromptRequest promptRequest = new PromptRequest(
                 UUID.randomUUID(),
                 aiTask.getCorrelationId(),
@@ -144,6 +153,14 @@ public class AnalyzeStoryContextUseCase {
         return Map.of("allowedEvidenceReferences", new ArrayList<>(allowedRefs));
     }
 
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> captureFreshnessSnapshot(EngineeringContext context) {
+        if (context.metadata() == null || context.metadata().freshness() == null) {
+            return null;
+        }
+        return objectMapper.convertValue(context.metadata().freshness(), Map.class);
+    }
+
     @Transactional
     public void handleCallback(UUID correlationId, AiTaskResultRequest request) {
         AiTask task = aiTaskRepository.findByCorrelationIdForUpdate(correlationId)
@@ -172,12 +189,18 @@ public class AnalyzeStoryContextUseCase {
                 task.getContextSnapshot().get("storyId").toString()
         );
 
+        @SuppressWarnings("unchecked")
+        Map<String, Object> contextFreshness = task.getContextSnapshot() != null
+                ? (Map<String, Object>) task.getContextSnapshot().get("contextFreshness")
+                : null;
+
         StoryContextAnalysis analysis = StoryContextAnalysis.builder()
                 .story(storyRepository.findById(storyId).orElseThrow())
                 .aiTask(task)
                 .analysisSnapshot(objectMapper.convertValue(analysisResult, Map.class))
                 .contextDigest(request.promptExecution().contextDigest())
                 .promptExecutionMetadata(objectMapper.convertValue(request.promptExecution(), Map.class))
+                .contextFreshness(contextFreshness)
                 .build();
 
         storyContextAnalysisRepository.save(analysis);

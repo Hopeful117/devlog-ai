@@ -2,7 +2,7 @@ package hopefull117.devlogai_mcp.mcp_server.client;
 
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
 import com.hopeful117.devlogai.contracts.projectcontext.ProjectContext;
-import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
+import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -36,7 +36,7 @@ public interface DevlogProjectContextClient {
     );
 
     @GetExchange("/ai/tasks/{aiTaskId}/story-context-analysis")
-    StoryContextAnalysisResult getStoryContextAnalysis(
+    StoryContextAnalysisResponse getStoryContextAnalysis(
             @PathVariable UUID aiTaskId
     );
 
