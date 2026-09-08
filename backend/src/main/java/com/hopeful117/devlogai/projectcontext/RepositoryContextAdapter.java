@@ -30,9 +30,11 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
@@ -96,17 +98,20 @@ public class RepositoryContextAdapter {
             List<String> files,
             UUID storyId
     ) {
-
+        var currentStory = resolveStory(snapshot, storyId);
+        String selectionText = selectionText(storyDescription, currentStory, files);
+        BoundedKnowledge boundedKnowledge = boundedKnowledge(
+                snapshot, storyDescription, currentStory, files);
         AnalysisContext syntheticContext =
-                synthesizeAnalysisContext(projectId, snapshot, storyDescription);
+                synthesizeAnalysisContext(projectId, snapshot, boundedKnowledge, currentStory);
 
-        IntentDefinition intent = createIntentDefinition(storyDescription);
+        IntentDefinition intent = createIntentDefinition(selectionText);
 
         List<Insight> validatedInsights =
                 insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
                         projectId, List.of(InsightStatus.ACTIVE));
 
-        UserGuidance guidance = createGuidance(storyDescription);
+        UserGuidance guidance = createGuidance(selectionText);
 
         RepositoryContext context = repositoryContextService.build(
                 syntheticContext, intent, guidance, validatedInsights);
@@ -121,7 +126,8 @@ public class RepositoryContextAdapter {
     private AnalysisContext synthesizeAnalysisContext(
             UUID projectId,
             ProjectContextSnapshot snapshot,
-            String storyDescription) {
+            BoundedKnowledge boundedKnowledge,
+            ProjectContextSnapshot.EngineeringStorySnapshot currentStory) {
 
         AnalysisContext.ProjectSnapshot projectSnapshot =
                 new AnalysisContext.ProjectSnapshot(
@@ -149,8 +155,8 @@ public class RepositoryContextAdapter {
                 projectSnapshot,
                 analysisSnapshot,
                 snapshot.latestProjectProfile(),
-                boundedFacts(snapshot, storyDescription),
-                boundedObservations(snapshot, storyDescription),
+                boundedKnowledge.facts(),
+                boundedKnowledge.observations(),
                 snapshot.recentKnowledgeEvents(),
                 snapshot.recentAnalyses(),
                 snapshot.architectureArtifacts(),
@@ -161,7 +167,39 @@ public class RepositoryContextAdapter {
                 snapshot.validatedEngineeringEvents(),
                 snapshot.openChallenges(),
                 snapshot.knowledgeRelations(),
-                snapshot.engineeringStories());
+                currentStory == null ? snapshot.engineeringStories() : List.of(currentStory));
+    }
+
+    private ProjectContextSnapshot.EngineeringStorySnapshot resolveStory(
+            ProjectContextSnapshot snapshot,
+            UUID storyId
+    ) {
+        if (storyId == null) return null;
+        return snapshot.engineeringStories().stream()
+                .filter(story -> storyId.equals(story.id()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String selectionText(
+            String storyDescription,
+            ProjectContextSnapshot.EngineeringStorySnapshot currentStory,
+            List<String> files
+    ) {
+        List<String> parts = new ArrayList<>();
+        addIfPresent(parts, storyDescription);
+        if (currentStory != null) {
+            addIfPresent(parts, currentStory.title());
+            addIfPresent(parts, currentStory.storyPath());
+        }
+        if (files != null) {
+            files.forEach(file -> addIfPresent(parts, file));
+        }
+        return String.join(" ", parts);
+    }
+
+    private void addIfPresent(List<String> parts, String value) {
+        if (value != null && !value.isBlank()) parts.add(value);
     }
 
     /**
@@ -178,25 +216,12 @@ public class RepositoryContextAdapter {
             return List.of();
         }
         UUID analysisId = snapshot.latestProjectProfile().analysisId();
-        List<String> terms = IntentTerms.extract(storyDescription);
-        List<Fact> window = factRepository.findByAnalysisIdOrderByDetectedAtDescIdDesc(
-                analysisId, org.springframework.data.domain.PageRequest.of(0, FACT_WINDOW));
-        record Scored(Fact fact, long matches) { }
-        List<Scored> scored = new ArrayList<>();
-        for (Fact fact : window) {
-            long matches = IntentTerms.matches(terms, fact.getContent());
-            if (matches > 0) scored.add(new Scored(fact, matches));
-        }
-        scored.sort(Comparator.comparingLong(Scored::matches).reversed()
-                .thenComparing(scoredEntry -> scoredEntry.fact().getDetectedAt(),
-                        Comparator.nullsLast(Comparator.reverseOrder())));
+        List<ScoredFact> scored = rankedFacts(
+                analysisId, List.of(), IntentTerms.extract(storyDescription));
         return scored.stream()
+                .filter(ScoredFact::relevant)
                 .limit(MAXIMUM_FACT_CANDIDATES)
-                .map(value -> new AnalysisContext.FactSnapshot(value.fact().getId(),
-                        value.fact().getType(), value.fact().getContent(),
-                        value.fact().getSource(),
-                        List.copyOf(value.fact().getEvidenceReferences()),
-                        value.fact().getDetectedAt()))
+                .map(value -> toFactSnapshot(value.fact()))
                 .toList();
     }
 
@@ -208,31 +233,182 @@ public class RepositoryContextAdapter {
             return List.of();
         }
         UUID analysisId = snapshot.latestProjectProfile().analysisId();
-        List<String> terms = IntentTerms.extract(storyDescription);
-        List<Observation> window =
-                observationRepository.findByAnalysisIdOrderByCreatedAtDescIdDesc(
-                        analysisId, org.springframework.data.domain.PageRequest.of(
-                                0, OBSERVATION_WINDOW));
-        record Scored(Observation observation, long matches) { }
-        List<Scored> scored = new ArrayList<>();
-        for (Observation observation : window) {
-            long matches = IntentTerms.matches(terms, observation.getContent());
-            if (matches > 0) scored.add(new Scored(observation, matches));
-        }
-        scored.sort(Comparator.comparingLong(Scored::matches).reversed()
-                .thenComparing(scoredEntry -> scoredEntry.observation().getCreatedAt(),
-                        Comparator.nullsLast(Comparator.reverseOrder())));
+        List<ScoredObservation> scored = rankedObservations(
+                analysisId, List.of(), IntentTerms.extract(storyDescription));
         return scored.stream()
+                .filter(ScoredObservation::relevant)
                 .limit(MAXIMUM_OBSERVATION_CANDIDATES)
-                .map(value -> new AnalysisContext.ObservationSnapshot(
-                        value.observation().getId(), value.observation().getType(),
-                        value.observation().getContent(), null, null,
-                        value.observation().getSupportingFacts() == null ? List.of()
-                                : value.observation().getSupportingFacts().stream()
-                                        .map(fact -> fact.getId()).toList(),
-                        value.observation().getCreatedAt()))
+                .map(value -> toObservationSnapshot(value.observation()))
                 .toList();
     }
+
+    private BoundedKnowledge boundedKnowledge(
+            ProjectContextSnapshot snapshot,
+            String intentText,
+            ProjectContextSnapshot.EngineeringStorySnapshot currentStory,
+            List<String> files
+    ) {
+        if (snapshot.latestProjectProfile() == null
+                || snapshot.latestProjectProfile().analysisId() == null) {
+            return new BoundedKnowledge(List.of(), List.of());
+        }
+        UUID analysisId = snapshot.latestProjectProfile().analysisId();
+        List<String> storyTerms = IntentTerms.extract(selectionText(null, currentStory, files));
+        List<String> intentTerms = IntentTerms.extract(intentText);
+        List<ScoredFact> facts = rankedFacts(analysisId, storyTerms, intentTerms);
+        List<ScoredObservation> observations = rankedObservations(
+                analysisId, storyTerms, intentTerms);
+        Map<UUID, ScoredFact> factsById = new HashMap<>();
+        facts.forEach(value -> factsById.putIfAbsent(value.fact().getId(), value));
+
+        List<ScoredObservation> selectedObservations = new ArrayList<>();
+        LinkedHashSet<UUID> requiredFactIds = new LinkedHashSet<>();
+        for (ScoredObservation candidate : observations) {
+            if (!candidate.relevant()
+                    || selectedObservations.size() >= MAXIMUM_OBSERVATION_CANDIDATES) {
+                continue;
+            }
+            List<UUID> supportingIds = supportingFactIds(candidate.observation());
+            if (!factsById.keySet().containsAll(supportingIds)) continue;
+            LinkedHashSet<UUID> expanded = new LinkedHashSet<>(requiredFactIds);
+            expanded.addAll(supportingIds);
+            if (expanded.size() > MAXIMUM_FACT_CANDIDATES) continue;
+            requiredFactIds = expanded;
+            selectedObservations.add(candidate);
+        }
+
+        List<ScoredFact> selectedFacts = requiredFactIds.stream()
+                .map(factsById::get)
+                .filter(Objects::nonNull)
+                .sorted(factOrder())
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        Set<UUID> selectedFactIds = new HashSet<>(requiredFactIds);
+        for (ScoredFact candidate : facts) {
+            if (selectedFacts.size() >= MAXIMUM_FACT_CANDIDATES) break;
+            if (candidate.relevant() && selectedFactIds.add(candidate.fact().getId())) {
+                selectedFacts.add(candidate);
+            }
+        }
+        return new BoundedKnowledge(
+                selectedFacts.stream().map(value -> toFactSnapshot(value.fact())).toList(),
+                selectedObservations.stream()
+                        .map(value -> toObservationSnapshot(value.observation())).toList());
+    }
+
+    private List<ScoredFact> rankedFacts(
+            UUID analysisId,
+            List<String> storyTerms,
+            List<String> intentTerms
+    ) {
+        return factRepository.findByAnalysisIdOrderByDetectedAtDescIdDesc(
+                        analysisId, org.springframework.data.domain.PageRequest.of(0, FACT_WINDOW))
+                .stream()
+                .map(fact -> new ScoredFact(fact,
+                        IntentTerms.matches(storyTerms, factSearchText(fact)),
+                        IntentTerms.matches(intentTerms, factSearchText(fact))))
+                .sorted(factOrder())
+                .toList();
+    }
+
+    private List<ScoredObservation> rankedObservations(
+            UUID analysisId,
+            List<String> storyTerms,
+            List<String> intentTerms
+    ) {
+        return observationRepository.findByAnalysisIdOrderByCreatedAtDescIdDesc(
+                        analysisId, org.springframework.data.domain.PageRequest.of(
+                                0, OBSERVATION_WINDOW))
+                .stream()
+                .map(observation -> new ScoredObservation(observation,
+                        IntentTerms.matches(storyTerms, observationSearchText(observation)),
+                        IntentTerms.matches(intentTerms, observationSearchText(observation))))
+                .sorted(observationOrder())
+                .toList();
+    }
+
+    private String factSearchText(Fact fact) {
+        return String.join(" ",
+                Objects.toString(fact.getType(), ""),
+                Objects.toString(fact.getContent(), ""),
+                Objects.toString(fact.getSource(), ""),
+                joinValues(fact.getEvidenceReferences()));
+    }
+
+    private String observationSearchText(Observation observation) {
+        return Objects.toString(observation.getType(), "") + " "
+                + Objects.toString(observation.getContent(), "");
+    }
+
+    private String joinValues(Iterable<?> values) {
+        if (values == null) return "";
+        List<String> normalized = new ArrayList<>();
+        values.forEach(value -> {
+            if (value != null) normalized.add(value.toString());
+        });
+        normalized.sort(String::compareTo);
+        return String.join(" ", normalized);
+    }
+
+    private Comparator<ScoredFact> factOrder() {
+        return Comparator.comparingLong(ScoredFact::storyMatches).reversed()
+                .thenComparing(Comparator.comparingLong(ScoredFact::intentMatches).reversed())
+                .thenComparing(value -> value.fact().getDetectedAt(),
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(value -> value.fact().getId());
+    }
+
+    private Comparator<ScoredObservation> observationOrder() {
+        return Comparator.comparingLong(ScoredObservation::storyMatches).reversed()
+                .thenComparing(Comparator.comparingLong(
+                        ScoredObservation::intentMatches).reversed())
+                .thenComparing(value -> value.observation().getCreatedAt(),
+                        Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(value -> value.observation().getId());
+    }
+
+    private List<UUID> supportingFactIds(Observation observation) {
+        if (observation.getSupportingFacts() == null) return List.of();
+        return observation.getSupportingFacts().stream()
+                .map(Fact::getId)
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(UUID::toString))
+                .toList();
+    }
+
+    private AnalysisContext.FactSnapshot toFactSnapshot(Fact fact) {
+        List<String> references = fact.getEvidenceReferences() == null ? List.of()
+                : fact.getEvidenceReferences().stream().sorted().toList();
+        return new AnalysisContext.FactSnapshot(fact.getId(), fact.getType(), fact.getContent(),
+                fact.getSource(), references, fact.getDetectedAt());
+    }
+
+    private AnalysisContext.ObservationSnapshot toObservationSnapshot(Observation observation) {
+        return new AnalysisContext.ObservationSnapshot(
+                observation.getId(), observation.getType(), observation.getContent(),
+                observation.getRuleId(), observation.getRuleVersion(),
+                supportingFactIds(observation), observation.getCreatedAt());
+    }
+
+    private record ScoredFact(Fact fact, long storyMatches, long intentMatches) {
+        boolean relevant() {
+            return storyMatches > 0 || intentMatches > 0;
+        }
+    }
+
+    private record ScoredObservation(
+            Observation observation,
+            long storyMatches,
+            long intentMatches
+    ) {
+        boolean relevant() {
+            return storyMatches > 0 || intentMatches > 0;
+        }
+    }
+
+    private record BoundedKnowledge(
+            List<AnalysisContext.FactSnapshot> facts,
+            List<AnalysisContext.ObservationSnapshot> observations
+    ) { }
 
     private IntentDefinition createIntentDefinition(String storyDescription) {
         String objective = (storyDescription != null && !storyDescription.isBlank())

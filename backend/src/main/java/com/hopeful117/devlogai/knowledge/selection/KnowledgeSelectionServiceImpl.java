@@ -12,6 +12,7 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.intelligence.IntentTerms;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
@@ -24,6 +25,8 @@ import java.util.*;
 @Service
 public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService {
     static final String VERSION = "knowledge-selection-v4";
+    static final String STORY_AWARE_VERSION = "knowledge-selection-v5";
+    private static final String STORY_CONTEXT_ANALYSIS = "engineering-story-context-analysis";
     private static final String BUILD = "BUILD";
     private static final String CONTAINER = "CONTAINER";
     private static final String DOCKER = "DOCKER";
@@ -62,14 +65,25 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 && context.evolutionContext() == null) {
             throw new IllegalStateException("Evolution context is required for Engineering Event Intent");
         }
+        List<String> storyTerms = storyTerms(context, intent);
         Comparator<AnalysisContext.ObservationSnapshot> observationOrder = Comparator
                 .comparingInt((AnalysisContext.ObservationSnapshot value) ->
-                        observationScore(intent.id(), value) + guidanceScore(guidance, value.type() + " " + value.content())).reversed()
+                        storyScore(storyTerms, observationText(value))).reversed()
+                .thenComparing(Comparator.comparingInt(
+                        (AnalysisContext.ObservationSnapshot value) ->
+                                observationScore(intent.id(), value)
+                                        + guidanceScore(guidance,
+                                        value.type() + " " + value.content())).reversed())
                 .thenComparing(value -> value.type().name())
                 .thenComparing(value -> value.id().toString());
         Comparator<AnalysisContext.FactSnapshot> factOrder = Comparator
                 .comparingInt((AnalysisContext.FactSnapshot value) ->
-                        factScore(intent.id(), value) + guidanceScore(guidance, value.type() + " " + value.content())).reversed()
+                        storyScore(storyTerms, factText(value))).reversed()
+                .thenComparing(Comparator.comparingInt(
+                        (AnalysisContext.FactSnapshot value) ->
+                                factScore(intent.id(), value)
+                                        + guidanceScore(guidance,
+                                        value.type() + " " + value.content())).reversed())
                 .thenComparing(value -> value.type().name())
                 .thenComparing(AnalysisContext.FactSnapshot::source)
                 .thenComparing(AnalysisContext.FactSnapshot::content)
@@ -85,10 +99,16 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 rankedObservations, rankedFacts, factOrder);
         List<AnalysisContext.ObservationSnapshot> observations = selectionSlice.observations();
         List<AnalysisContext.FactSnapshot> facts = selectionSlice.facts();
-        List<Insight> insightCandidates = insightRepository
+        List<Insight> activeInsightCandidates = insightRepository
                 .findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                        context.project().id(), List.of(InsightStatus.ACTIVE)).stream()
-                .sorted(Comparator.comparing(Insight::getCreatedAt,
+                        context.project().id(), List.of(InsightStatus.ACTIVE));
+        List<Insight> insightCandidates = activeInsightCandidates.stream()
+                .filter(insight -> storyTerms.isEmpty()
+                        || storyScore(storyTerms, insightText(insight)) > 0)
+                .sorted(Comparator
+                        .comparingInt((Insight insight) ->
+                                storyScore(storyTerms, insightText(insight))).reversed()
+                        .thenComparing(Insight::getCreatedAt,
                                 Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(Insight::getId))
                 .toList();
@@ -110,20 +130,25 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 diagnostic.isCollectionComplete(), diagnostic.isTruncated(),
                 diagnostic.getWarningCount(), diagnostic.getErrorCount());
         int candidates = context.observations().size() + context.facts().size()
-                + insightCandidates.size() + context.validatedEngineeringEvents().size()
+                + activeInsightCandidates.size() + context.validatedEngineeringEvents().size()
                 + context.knowledgeRelations().size() + repositoryContext.candidateCount();
         int selected = 1 + observations.size() + facts.size() + insights.size()
                 + existingArchitectureKnowledge.size()
                 + engineeringEvents.size() + humanContextInputs.size()
                 + knowledgeRelations.size() + repositoryContext.evidence().size() + 1
                 + (context.evolutionContext() == null ? 0 : 1);
-        var metadata = new SelectedKnowledge.SelectionMetadata(
-                VERSION,
-                List.of("REPOSITORY_FIRST_LAYERING", "INTENT_SPECIFIC_RANKING",
+        List<String> appliedRules = new ArrayList<>(List.of(
+                "REPOSITORY_FIRST_LAYERING", "INTENT_SPECIFIC_RANKING",
                         "USER_GUIDANCE_KEYWORD_BOOST", "STABLE_TYPE_AND_SEMANTIC_ORDER",
                         "DUPLICATE_FACT_CONTENT_ELIMINATION", "OBSERVATION_FACT_CLOSURE",
                         "KNOWLEDGE_BUDGET", "EVOLUTION_CONTEXT_REQUIRED",
-                        "KNOWLEDGE_RELATION_PRESERVATION"),
+                        "KNOWLEDGE_RELATION_PRESERVATION"));
+        if (isStoryContextAnalysis(intent)) {
+            appliedRules.add("ENGINEERING_STORY_RELEVANCE");
+        }
+        var metadata = new SelectedKnowledge.SelectionMetadata(
+                selectionVersion(intent),
+                List.copyOf(appliedRules),
                 selected, Math.max(0, candidates + 2 - selected), BUDGET,
                 diagnostic.isCollectionComplete() ? "COMPLETE" : "PARTIAL");
         String digest = digest(context, new DigestComponents(observations, facts, diagnostics,
@@ -153,6 +178,59 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
         if (intentId.equals("generate-readme"))
             return containsAny(type, "DOCUMENTATION", "APPLICATION", "TEST", CONTAINER) ? 100 : 20;
         return containsAny(type, "ARCHITECTURE", "APPLICATION", "TECHNOLOGY", CONTAINER) ? 80 : 40;
+    }
+
+    private List<String> storyTerms(AnalysisContext context, IntentDefinition intent) {
+        if (!isStoryContextAnalysis(intent) || context.engineeringStories().size() != 1) {
+            return List.of();
+        }
+        var story = context.engineeringStories().getFirst();
+        return IntentTerms.extract(String.join(" ",
+                Objects.toString(story.title(), ""),
+                Objects.toString(story.storyPath(), "")));
+    }
+
+    private boolean isStoryContextAnalysis(IntentDefinition intent) {
+        return STORY_CONTEXT_ANALYSIS.equals(intent.id());
+    }
+
+    private String selectionVersion(IntentDefinition intent) {
+        return isStoryContextAnalysis(intent) ? STORY_AWARE_VERSION : VERSION;
+    }
+
+    private int storyScore(List<String> storyTerms, String candidate) {
+        return IntentTerms.matches(storyTerms, candidate);
+    }
+
+    private String factText(AnalysisContext.FactSnapshot fact) {
+        return String.join(" ",
+                fact.type().name(),
+                Objects.toString(fact.content(), ""),
+                Objects.toString(fact.source(), ""),
+                joinValues(fact.evidenceReferences()));
+    }
+
+    private String observationText(AnalysisContext.ObservationSnapshot observation) {
+        return observation.type().name() + " " + Objects.toString(observation.content(), "");
+    }
+
+    private String insightText(Insight insight) {
+        return String.join(" ",
+                Objects.toString(insight.getType(), ""),
+                Objects.toString(insight.getSeverity(), ""),
+                Objects.toString(insight.getTitle(), ""),
+                Objects.toString(insight.getContent(), ""),
+                Objects.toString(insight.getSourceType(), ""),
+                joinValues(insight.getEvidenceReferences()));
+    }
+
+    private String joinValues(Collection<?> values) {
+        if (values == null || values.isEmpty()) return "";
+        return values.stream()
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .sorted()
+                .collect(java.util.stream.Collectors.joining(" "));
     }
 
     private int factScore(String intentId, AnalysisContext.FactSnapshot value) {
