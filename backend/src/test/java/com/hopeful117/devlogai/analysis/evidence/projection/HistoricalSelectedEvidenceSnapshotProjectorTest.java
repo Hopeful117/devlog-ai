@@ -73,7 +73,8 @@ class HistoricalSelectedEvidenceSnapshotProjectorTest {
             "knowledge-selection-v1",
             "knowledge-selection-v2",
             "knowledge-selection-v3",
-            "knowledge-selection-v4"
+            "knowledge-selection-v4",
+            "knowledge-selection-v5"
     })
     void shouldSupportObservedVersionsWithPresenceAwareCategories(String version) {
         Map<String, Object> snapshot = minimalSnapshot(version);
@@ -146,7 +147,7 @@ class HistoricalSelectedEvidenceSnapshotProjectorTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    @ValueSource(strings = {" ", "knowledge-selection-v5"})
+    @ValueSource(strings = {" ", "knowledge-selection-v6"})
     void shouldRejectMissingBlankAndUnknownVersions(String version) {
         HistoricalSelectedEvidenceSnapshotProjector.HistoricalSnapshotReadException exception =
                 assertThrows(

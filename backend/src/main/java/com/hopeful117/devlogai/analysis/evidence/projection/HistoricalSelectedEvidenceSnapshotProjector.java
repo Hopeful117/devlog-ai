@@ -56,7 +56,8 @@ public class HistoricalSelectedEvidenceSnapshotProjector {
             "knowledge-selection-v1",
             "knowledge-selection-v2",
             "knowledge-selection-v3",
-            "knowledge-selection-v4"
+            "knowledge-selection-v4",
+            "knowledge-selection-v5"
     );
 
     private final ObjectMapper objectMapper;
