@@ -8,7 +8,6 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
-import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextFreshness;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
 import com.hopeful117.devlogai.contracts.projectcontext.ProjectContext;
 import com.hopeful117.devlogai.engineeringcontext.EngineeringContextFacade;

@@ -1,6 +1,7 @@
 package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
+import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,16 +42,10 @@ class StoryContextAnalysisToolTest {
                 eq("test-project"), eq(storyId), any()))
                 .thenReturn(submitResponse);
 
-        var analysisResult = new StoryContextAnalysisResult(
-                new StoryContextAnalysisResult.ObjectiveUnderstanding("Test summary"),
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(),
-                StoryContextAnalysisResult.Confidence.HIGH,
-                new StoryContextAnalysisResult.Provenance("digest", "v1", null),
-                new StoryContextAnalysisResult.OutputClassification(List.of())
-        );
+        var analysisResult = buildAnalysisResult("Test summary", StoryContextAnalysisResult.Confidence.HIGH);
+        var response = new StoryContextAnalysisResponse(analysisResult, null);
         when(devlogProjectContextClient.getStoryContextAnalysis(aiTaskId))
-                .thenReturn(analysisResult);
+                .thenReturn(response);
 
         String result = storyContextAnalysisTool.analyzeStoryContext(
                 "test-project", storyId, null, null);
@@ -111,19 +106,13 @@ class StoryContextAnalysisToolTest {
         when(devlogProjectContextClient.getAiTaskStatus(aiTaskId))
                 .thenReturn(processingStatus);
 
-        var analysisResult = new StoryContextAnalysisResult(
-                new StoryContextAnalysisResult.ObjectiveUnderstanding("Completed"),
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(),
-                StoryContextAnalysisResult.Confidence.HIGH,
-                new StoryContextAnalysisResult.Provenance("digest", "v1", null),
-                new StoryContextAnalysisResult.OutputClassification(List.of())
-        );
+        var analysisResult = buildAnalysisResult("Completed", StoryContextAnalysisResult.Confidence.HIGH);
+        var response = new StoryContextAnalysisResponse(analysisResult, null);
 
         when(devlogProjectContextClient.getStoryContextAnalysis(aiTaskId))
                 .thenThrow(new org.springframework.web.client.HttpServerErrorException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "Not found"))
-                .thenReturn(analysisResult);
+                .thenReturn(response);
 
         String result = storyContextAnalysisTool.analyzeStoryContext(
                 "test-project", storyId, null, null);
@@ -168,16 +157,10 @@ class StoryContextAnalysisToolTest {
                 eq("test-project"), eq(storyId), any()))
                 .thenReturn(submitResponse);
 
-        var analysisResult = new StoryContextAnalysisResult(
-                new StoryContextAnalysisResult.ObjectiveUnderstanding("Correlated result"),
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(),
-                StoryContextAnalysisResult.Confidence.MEDIUM,
-                new StoryContextAnalysisResult.Provenance("digest", "v1", null),
-                new StoryContextAnalysisResult.OutputClassification(List.of())
-        );
+        var analysisResult = buildAnalysisResult("Correlated result", StoryContextAnalysisResult.Confidence.MEDIUM);
+        var response = new StoryContextAnalysisResponse(analysisResult, null);
         when(devlogProjectContextClient.getStoryContextAnalysis(aiTaskId))
-                .thenReturn(analysisResult);
+                .thenReturn(response);
 
         storyContextAnalysisTool.analyzeStoryContext("test-project", storyId, null, null);
 
@@ -196,21 +179,65 @@ class StoryContextAnalysisToolTest {
                 eq("test-project"), eq(storyId), any()))
                 .thenReturn(submitResponse);
 
-        var analysisResult = new StoryContextAnalysisResult(
-                new StoryContextAnalysisResult.ObjectiveUnderstanding("Test"),
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-                List.of(), List.of(), List.of(),
-                StoryContextAnalysisResult.Confidence.LOW,
-                new StoryContextAnalysisResult.Provenance("digest", "v1", null),
-                new StoryContextAnalysisResult.OutputClassification(List.of())
-        );
+        var analysisResult = buildAnalysisResult("Test", StoryContextAnalysisResult.Confidence.LOW);
+        var response = new StoryContextAnalysisResponse(analysisResult, null);
         when(devlogProjectContextClient.getStoryContextAnalysis(aiTaskId))
-                .thenReturn(analysisResult);
+                .thenReturn(response);
 
         storyContextAnalysisTool.analyzeStoryContext("test-project", storyId, files, guidance);
 
         verify(devlogProjectContextClient).analyzeStoryContext(
                 eq("test-project"), eq(storyId),
                 argThat(req -> req.files().equals(files) && req.guidance().equals(guidance)));
+    }
+
+    @Test
+    void shouldExposeFreshnessFromResponse() throws Exception {
+        UUID aiTaskId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+
+        var submitResponse = new DevlogProjectContextClient.AnalyzeContextResponse(aiTaskId);
+        when(devlogProjectContextClient.analyzeStoryContext(
+                eq("test-project"), eq(storyId), any()))
+                .thenReturn(submitResponse);
+
+        var analysisResult = buildAnalysisResult("With freshness", StoryContextAnalysisResult.Confidence.HIGH);
+        Map<String, Object> freshnessSnapshot = Map.of(
+                "status", "STALE",
+                "repositoryRevision", "abc123",
+                "contextRevision", "def456",
+                "sources", List.of(Map.of(
+                        "sourceId", UUID.randomUUID().toString(),
+                        "name", "git-main",
+                        "status", "STALE",
+                        "observedRevision", "abc123",
+                        "contextRevision", "def456"
+                ))
+        );
+        var response = new StoryContextAnalysisResponse(analysisResult, freshnessSnapshot);
+        when(devlogProjectContextClient.getStoryContextAnalysis(aiTaskId))
+                .thenReturn(response);
+
+        String result = storyContextAnalysisTool.analyzeStoryContext(
+                "test-project", storyId, null, null);
+
+        assertTrue(result.contains("analysis"), "Expected analysis field in MCP response");
+        assertTrue(result.contains("contextFreshness"), "Expected contextFreshness field in MCP response");
+        assertTrue(result.contains("STALE"), "Expected STALE freshness status");
+        assertTrue(result.contains("abc123"), "Expected repositoryRevision");
+        assertTrue(result.contains("def456"), "Expected contextRevision");
+        assertTrue(result.contains("git-main"), "Expected per-source name");
+    }
+
+    private StoryContextAnalysisResult buildAnalysisResult(
+            String summary, StoryContextAnalysisResult.Confidence confidence) {
+        return new StoryContextAnalysisResult(
+                new StoryContextAnalysisResult.ObjectiveUnderstanding(summary),
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(),
+                confidence,
+                new StoryContextAnalysisResult.Provenance("digest", "v1", null),
+                new StoryContextAnalysisResult.OutputClassification(List.of())
+        );
     }
 }
