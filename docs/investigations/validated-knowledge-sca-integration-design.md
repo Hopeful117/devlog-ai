@@ -4,686 +4,718 @@ Design artifact. No production code was modified.
 
 ## Status
 
-**DESIGN_COMPLETE — AWAITING_HUMAN_REVIEW**
+```text
+VALIDATED_KNOWLEDGE_SCA_DESIGN = REVISION_COMPLETE_AWAITING_HUMAN_REVIEW
+PRIMARY_DIRECTION              = ACCEPTED
+GROUNDING_MODEL                = PROVENANCE_INTERSECTION
+SELECTION_IS_STORY_AWARE       = NO (current), YES_WITH_SMALL_CHANGE (designed V1)
+PROJECT_WIDE_CANDIDATES        = INSUFFICIENTLY_STORY_AWARE
+ADR_REQUIRED                   = NO
+RAG_READINESS                  = NOT_READY
+IMPLEMENTATION                 = NOT_AUTHORIZED
+```
 
-## Scope
+## Revision Summary
 
-This design determines the smallest architecturally correct integration of DevLog's existing
-validated knowledge selection pipeline into Story Context Analysis.
+This revision preserves the accepted direction to reuse `KnowledgeSelectionService` and
+include Facts, Observations, and Insights in V1. It corrects two claims from the original
+design:
+
+1. A selected Fact's historical `evidenceReferences` do not automatically expand the
+   grounding universe. They may ground a new finding only when the same canonical
+   reference is present in the authorized current `EngineeringContext`.
+2. `KnowledgeSelectionService` is intent-aware but does not currently rank Facts,
+   Observations, or Insights against the current Engineering Story. Project-wide newest-N
+   retrieval would add material recency bias and cross-analysis ambiguity.
+
+The previously proposed Python grounding expansion and project-wide Fact/Observation
+repository methods are removed from the implementation plan.
 
 ---
 
-## 1. Reconstructed Current Pipeline
+## 1. Current Pipeline and Disconnect
 
-### Current flow (disconnected)
-
-```
-Engineering Story (storyId)
-        │
-        ▼
-EngineeringContextFacade.getEngineeringContext(projectSlug, intentId, files, storyId)
-        │
-        ▼
-EngineeringContext ──────────────────────────────────────────────────────┐
-        │                                                                │
-        ▼                                                                ▼
-buildSelectedKnowledge(context, story)                          context.metadata().freshness()
-        │                                                                │
-        ▼                                                                ▼
-selectedKnowledge Map                                              contextFreshness snapshot
-  ├── project: context.project()                                   (captured, persisted)
-  ├── analysis: Map.of()  ← EMPTY
-  ├── projectProfile: context.project()  ← DUPLICATE of project
-  ├── selectedFacts: List.of()  ← HARDCODED EMPTY
-  ├── selectedObservations: List.of()  ← HARDCODED EMPTY
-  ├── diagnostics: List.of()  ← EMPTY
-  ├── selectedInsights: List.of()  ← HARDCODED EMPTY
-  ├── selectionMetadata: List.of()  ← EMPTY
-  ├── selectionDigest: context.metadata().contextDigest()
-  ├── repositoryContext: {evidence: context.evidence()}
-  └── engineeringStories: [single story]
-        │
-        ▼
-AiTaskService.createForStoryContextAnalysisEntity(...)
-        │
-        ▼
-AiTask (with selectedKnowledgeSnapshot, contextSnapshot)
-        │
-        ▼
-AIEngineClient.submit(PromptRequest)
-        │
-        ▼
-Python: StoryContextAnalysisPromptBuilder.build()
-  ├── Validates required sections (including selectedFacts, selectedObservations, selectedInsights)
-  ├── Builds GROUNDING CONTRACT from repositoryContext.evidence[] only
-  └── Constructs prompt with INTENT + CONSTRAINTS + KNOWLEDGE + GROUNDING + SCHEMA
-        │
-        ▼
-LLM generates StoryContextAnalysisResult
-        │
-        ▼
-Python: _validate_output() checks grounding against repositoryContext.evidence[] only
-        │
-        ▼
-Callback → AnalyzeStoryContextUseCase.handleCallback()
-        │
-        ▼
-StoryContextAnalysis persisted (with contextFreshness from Story 0114)
+```text
+Engineering Story
+        |
+        v
+EngineeringContextFacade
+        |
+        v
+authorized EngineeringContext
+        |
+        +--> repositoryContext.evidence -> current grounding candidates
+        |
+        v
+AnalyzeStoryContextUseCase.buildSelectedKnowledge()
+        |
+        +--> selectedFacts = []
+        +--> selectedObservations = []
+        +--> selectedInsights = []
+        |
+        v
+Python prompt + defensive validation
+        |
+        v
+StoryContextAnalysis snapshot
 ```
 
-### Exact disconnect
+`AnalyzeStoryContextUseCase.buildSelectedKnowledge()` currently hard-codes all three
+selected knowledge lists as empty. The Python prompt already requires these sections, so
+the integration point remains valid.
 
-**`AnalyzeStoryContextUseCase.buildSelectedKnowledge()` (lines 119-140)** produces empty
-knowledge lists:
+The current grounding path has additional repository inconsistencies relevant to this
+design:
 
-```java
-result.put("selectedFacts", List.of());        // ← DISCONNECT
-result.put("selectedObservations", List.of());  // ← DISCONNECT
-result.put("selectedInsights", List.of());      // ← DISCONNECT
-```
+- Java builds a grounding contract from `EngineeringEvidence.identifier` and
+  `relatedReferences`, but `AiTaskServiceImpl.createForStoryContextAnalysisEntity()`
+  accepts and then ignores that contract.
+- Python reconstructs an allow-list from `repositoryContext.evidence[].reference` and
+  `relatedReferences`.
+- `RepositoryEvidence.reference` is the canonical evidence identity, but
+  `EngineeringContextContractMapper` maps only `provenance.identifier` into
+  `EngineeringEvidence.identifier`; the contract has no `reference` field.
+- Story Context Analysis callbacks do not perform the authoritative Java grounding
+  revalidation required by Story 0112 D14 and ADR-067.
 
-The `KnowledgeSelectionService` exists, is sophisticated (intent-aware ranking, budget
-constraints, grounding closure), and is already used by the standard analysis workflow.
-It is simply not invoked by the Story Context Analysis use case.
-
-### What the prompt builder already expects
-
-The Python prompt builder (`story_context_analysis.py:76-85`) validates that these sections
-exist in `selectedKnowledge`:
-
-```python
-required_sections = {
-    "project", "analysis", "projectProfile", "selectedFacts",
-    "selectedObservations", "diagnostics", "selectedInsights",
-    "selectionMetadata", "selectionDigest", "repositoryContext", "engineeringStories",
-}
-```
-
-The prompt includes them under "SELECTED KNOWLEDGE". The LLM receives them. The issue is
-that they are always empty.
+These are pre-existing grounding-boundary defects. The future implementation must repair
+them rather than broaden Python authority.
 
 ---
 
-## 2. Epistemic Model of Selected Knowledge
+## 2. Repository Grounding Semantics
 
-### Fact (TECHNICAL_EVIDENCE tier)
+### 2.1 Existing concepts are distinct
 
-| Property | Value |
-|----------|-------|
-| Deterministic | Yes — extracted by collectors during analysis |
-| Human validation required | No |
-| Trust tier | TECHNICAL_EVIDENCE |
-| Lifecycle | Immutable once created; no status field |
-| Freshness | Tied to the analysis it belongs to |
-| Evidence references | `evidenceReferences: Set<String>` — file paths, commit hashes |
-| Suitable for grounding | Yes — facts are direct evidence |
+| Concept | Repository representation | Semantic role |
+|---|---|---|
+| Source evidence | `RepositoryEvidence.reference`, content, symbols, provenance | Repository-observed material available to a consumer |
+| Knowledge provenance | `Fact.evidenceReferences`, `Observation.supportingFacts`, `Insight.evidenceReferences` and proposal lineage | Explains why persisted knowledge exists |
+| Knowledge identity | Fact/Observation/Insight UUID; `fact:`, `observation:`, `insight:` references | Identifies a knowledge object, not automatically its source |
+| Citation | Story Context Analysis `EvidenceRef.reference` | Pointer emitted by generated output |
+| Grounding evidence | Java-authorized canonical references in the execution grounding contract | Exact references a new finding may cite |
+| Resource | `EvidenceRef.resource` | Optional navigation metadata, never identity or trust authority |
 
-### Observation (TECHNICAL_EVIDENCE tier)
+ADR-063 explicitly separates retrieval, composition, projection, grounding, and expansion.
+It also requires each citable element to carry one canonical reference and visible
+non-citable elements to be distinguishable. Story 0112 D13 defines
+`EvidenceRef.reference` as that canonical grounding key. Story 0112 D14 makes Java/Core
+the sole grounding authority.
 
-| Property | Value |
-|----------|-------|
-| Deterministic | Yes — rule-derived from Facts |
-| Human validation required | No |
-| Trust tier | TECHNICAL_EVIDENCE |
-| Lifecycle | Immutable once created |
-| Evidence references | Via `supportingFacts` → Fact.evidenceReferences |
-| Suitable for grounding | Indirectly — observations are conclusions, not raw evidence |
-| Grounding closure | Every selected observation's supporting facts must be in selected facts |
+Therefore:
 
-### Insight (TRUSTED tier)
-
-| Property | Value |
-|----------|-------|
-| Deterministic | No — AI-generated, human-promoted |
-| Human validation required | Yes — mandatory Validation entity |
-| Trust tier | TRUSTED (highest) |
-| Lifecycle | ACTIVE / ARCHIVED / SUPERSEDED |
-| Evidence references | `evidenceReferences: List<String>` — the original grounding |
-| Suitable for grounding | Context only — insights inform analysis but are not raw evidence |
-| Citation format | `insight:<uuid>` — unique, deterministic, traceable |
-
-### Decision (TRUSTED or HUMAN_AUTHORED tier)
-
-| Property | Value |
-|----------|-------|
-| Deterministic | No — AI-generated or human-authored |
-| Human validation required | Context-dependent (proposal is optional) |
-| Trust tier | TRUSTED (if from accepted proposal) or HUMAN_AUTHORED |
-| Lifecycle | No status field; append-only |
-| Suitable for V1 | DEFERRED — different selection semantics needed |
-
-### EngineeringEvent (TRUSTED tier)
-
-| Property | Value |
-|----------|-------|
-| Deterministic | No — AI-generated, human-promoted |
-| Human validation required | Yes — mandatory Validation entity |
-| Trust tier | TRUSTED |
-| Lifecycle | Append-only; temporal via occurredAt/baseCommit/targetCommit |
-| Suitable for V1 | DEFERRED — requires evolution context for proper selection |
-
-### Selection eligibility summary
-
-| Type | INCLUDE_V1 | Reasoning |
-|------|-----------|-----------|
-| Facts | YES | Deterministic evidence; directly supports grounding |
-| Observations | YES | Deterministic conclusions; grounding closure enforces consistency |
-| Insights | YES | Trusted knowledge; informs analysis context |
-| Decisions | DEFER | Different selection semantics; not all have proposals |
-| EngineeringEvents | DEFER | Requires evolution context; different scope |
-| HumanContextInputs | YES | Already included in AnalysisContext; limited to 5 |
-| KnowledgeRelations | YES | Already passed through without filtering |
-
----
-
-## 3. Knowledge Selection Contract
-
-### Selection intent
-
-The existing `engineering-story-context-analysis` v1 intent is registered in the
-`IntentCatalog` with:
-
-```java
-IntentDefinition(
-    "engineering-story-context-analysis",
-    "v1",
-    "Analyze the Engineering Story context...",
-    ProposalType.NONE,
-    IntentExecutionMode.GENERIC,
-    List.of(),  // no supported insight types
-    List.of(),  // constraints
-    outputSchema,
-    "story-context-analysis-prompt-v1",
-    List.of("engineering-story-v1", "project-state-v1", "history-v1")
-)
+```text
+knowledge is visible
+!= knowledge is citable
+!= its provenance is current grounding evidence
 ```
 
-This intent already exists. **Do NOT create a new intent.**
+### 2.2 Existing standard-analysis model
 
-The intent has `outputProposalType = NONE`, which means the selection service does not
-need to include proposal-specific knowledge.
+Standard Insight generation admits selected current-analysis Fact IDs, Observation IDs,
+Fact `evidenceReferences`, and selected repository evidence references. That model is safe
+there because the Facts and Observations belong to the Analysis being generated and the
+selection service enforces Observation-to-Fact closure.
 
-### Selection inputs
+It does not establish that arbitrary historical Fact provenance is current evidence for a
+later Story Context Analysis. `RepositoryEvidenceResolverImpl` can traverse persisted
+Insight/Proposal/Observation/Fact lineage, but resolution capability is not grounding
+authorization.
 
-The `KnowledgeSelectionService.select()` method requires:
+### 2.3 Corrected Story Context Analysis model
 
-```java
-SelectedKnowledge select(AnalysisContext context, IntentDefinition intent, UserGuidance guidance);
+The selected model is **PROVENANCE_INTERSECTION**, governed by current evidence:
+
+```text
+authorized current EngineeringContext evidence references = C
+selected historical Fact provenance references           = P
+
+admissible Fact-derived grounding = P intersect C
 ```
 
-**AnalysisContext construction for Story Context Analysis:**
+Operationally, Java constructs the allow-list from canonical references of evidence
+actually present in the authorized `EngineeringContext` and admitted by the SCA
+consumer's citability policy. It does not add `P` separately. The intersection happens
+naturally: a historical provenance value is usable only if the same canonical value is
+already in `C`.
 
-The use case must construct a minimal `AnalysisContext` from project-scoped data:
+For V1, selected Insights remain context-only even if another projection exposes their
+identity. Current scoped technical evidence and current human-authored repository evidence
+may be citable when Java admits the item for the finding category. Trust tier alone does
+not decide citability; ADR-063 defines these as separate properties.
 
-```java
-AnalysisContext context = new AnalysisContext(
-    projectSnapshot,           // from projectRepository
-    analysisSnapshot,          // from the existing Analysis entity
-    projectProfile,            // from projectProfileService or project context
-    factSnapshots,             // NEW: query from factRepository by project
-    observationSnapshots,      // NEW: query from observationRepository by project
-    recentKnowledgeEvents,     // from projectContextProvider
-    relatedAnalyses,           // List.of() — not needed for this intent
-    architectureArtifacts,     // List.of()
-    relatedDecisions,          // List.of()
-    recentMilestones,          // List.of()
-    validatedProposals,        // from projectContextProvider
-    evolutionContext,          // null — not an engineering event intent
-    validatedEngineeringEvents,// from projectContextProvider
-    openChallenges,            // from projectContextProvider
-    knowledgeRelations,        // from projectContextProvider
-    engineeringStories,        // from projectContextProvider
-    humanContextInputs         // from projectContextProvider
-);
+`relatedReferences` are relationship/expansion links. They must not automatically become
+grounding references merely because they are attached to selected evidence. A related
+reference is citable only when it is independently present as a canonical citable
+reference in the authorized context.
+
+This preserves the safety property:
+
+> A newly generated finding cannot claim grounding in evidence that the analysis context
+> cannot actually justify.
+
+### 2.4 Authoritative contract flow
+
+```text
+RepositoryEvidence.reference
+        |
+        v
+EngineeringEvidence.reference (canonical, additive contract field)
+        |
+        v
+Java grounding contract (immutable per execution)
+        |
+        +--> Python prompt and defensive validation
+        |
+        v
+Java callback validation (authoritative)
 ```
 
-**New repository methods required:**
+Python must consume the Java contract, not reconstruct it from selected knowledge. This
+is not a new architectural decision; it restores approved Story 0112 D13/D14 semantics.
 
-```java
-// FactRepository
-List<Fact> findTopByProjectIdOrderByDetectedAtDescIdDesc(UUID projectId, Pageable pageable);
+---
 
-// ObservationRepository
-List<Observation> findTopByProjectIdOrderByCreatedAtDescIdDesc(UUID projectId, Pageable pageable);
+## 3. Knowledge Semantics for V1
+
+### 3.1 Facts
+
+Facts remain deterministic `TECHNICAL_EVIDENCE` and remain included in V1. Their identity,
+content, source, detection time, and provenance are useful context.
+
+For Story Context Analysis:
+
+- A selected historical Fact may inform reasoning.
+- Its `evidenceReferences` remain historical provenance.
+- The selected Fact does not directly expand the grounding allow-list.
+- A provenance reference may be cited only when it intersects current authorized evidence.
+- A Fact identity may be cited only if that identity is independently represented as a
+  canonical citable item in the authorized `EngineeringContext`.
+
+Classification:
+
+```text
+FACTS_CAN_DIRECTLY_GROUND_NEW_FINDINGS = CONDITIONAL
+HISTORICAL_PROVENANCE_EXPANDS_ALLOWED_EVIDENCE = NO
 ```
 
-These query the most recent facts/observations across ALL analyses for the project,
-not just the current analysis. This ensures the agent sees the full project knowledge.
+### 3.2 Observations
 
-**UserGuidance:** Passed through from the original request (nullable).
+Observations remain deterministic derived knowledge and remain included in V1.
+`supportingFacts` preserve explicit derivation closure but do not convert an Observation
+into raw current evidence.
 
-### Selection output
+For Story Context Analysis:
 
-The `SelectedKnowledge` record is the existing output contract:
+- A selected Observation may inform reasoning.
+- All selected supporting Facts must remain in selected Facts.
+- Supporting Fact provenance is subject to the same current-evidence intersection.
+- The Observation itself may be cited only if its canonical identity is independently
+  present as citable authorized evidence.
+- Deterministic derivation does not imply automatic grounding inheritance.
 
-```java
-SelectedKnowledge(
-    project, analysis, projectProfile,
-    selectedObservations, selectedFacts, diagnostics,
-    selectedInsights, existingArchitectureKnowledge,
-    selectedEngineeringEvents, selectedHumanContextInputs,
-    knowledgeRelations, repositoryContext,
-    evolutionContext, selectionMetadata, selectionDigest
-)
+Classification:
+
+```text
+OBSERVATIONS_CAN_DIRECTLY_GROUND_NEW_FINDINGS = CONDITIONAL
 ```
 
-This is projected into the prompt-compatible map by the existing
-`SelectedKnowledgePromptProjectionService.toMap()` method.
+### 3.3 Insights
 
-### Selection budget
+Insights remain included as trusted contextual knowledge. They may influence
+interpretation, identify prior human-promoted understanding, and reduce repeated analysis.
 
-The existing budget applies unchanged:
+Their historical evidence references do not become current technical evidence, and their
+human validation does not transfer trust to newly generated output.
 
-```java
-BUDGET = new KnowledgeBudget(
-    40,  // maximumFacts
-    25,  // maximumObservations
-    10,  // maximumInsights
-    5,   // maximumArchitectureKnowledge
-    60   // maximumRepositoryEvidence
-)
+```text
+Insight
+  -> trusted contextual knowledge
+  -> may influence interpretation
+  -> does not directly ground a new finding
+  -> does not make new output trusted
 ```
 
-No new budget is needed. The existing intent-aware ranking and budget constraints
-ensure the agent receives a bounded, relevant knowledge set.
+Classification:
 
----
-
-## 4. Knowledge Types for V1
-
-| Type | Decision | Reasoning |
-|------|----------|-----------|
-| **Facts** | INCLUDE_V1 | Deterministic evidence; directly supports grounding via evidenceReferences |
-| **Observations** | INCLUDE_V1 | Deterministic conclusions; grounding closure ensures consistency |
-| **Insights** | INCLUDE_V1 | Trusted knowledge; informs analysis context; cited as `insight:<uuid>` |
-| **Decisions** | DEFER | Different selection semantics; not all have proposals; requires design |
-| **EngineeringEvents** | DEFER | Requires evolution context; different scope; requires design |
-| **HumanContextInputs** | INCLUDE_V1 | Already in AnalysisContext; limited to 5; human-authored context |
-| **KnowledgeRelations** | INCLUDE_V1 | Already passed through; provides explicit relationship edges |
-
----
-
-## 5. Grounding Contract Design
-
-### Current grounding contract
-
-The grounding contract extracts allowed evidence references from
-`repositoryContext.evidence[]` only:
-
-```python
-def _grounding_contract(self, selected_knowledge):
-    allowed_refs = set()
-    repo_context = selected_knowledge.get("repositoryContext", {})
-    evidence = repo_context.get("evidence", [])
-    for item in evidence:
-        allowed_refs.add(item.get("reference"))
-        allowed_refs.update(item.get("relatedReferences", []))
-    return {"allowedEvidenceReferences": sorted(allowed_refs)}
+```text
+INSIGHTS_CAN_DIRECTLY_GROUND_NEW_FINDINGS = NO
 ```
 
-### Proposed grounding contract (V1 expansion)
+### 3.4 V1 knowledge set
 
-Expand to include evidence references from selected Facts:
+| Type | V1 | Role |
+|---|---|---|
+| Facts | Include | Deterministic contextual knowledge; conditional grounding by current-evidence intersection |
+| Observations | Include | Deterministic derived context; preserve supporting-Fact closure |
+| Insights | Include | Trusted context only; no direct technical grounding or trust inheritance |
+| HumanContextInputs | Include | Human-authored context; not automatic technical evidence |
+| KnowledgeRelations | Include | Explicit relationships; no confidence-based promotion |
+| Decisions | Defer | Accepted review decision; different selection semantics |
+| EngineeringEvents | Defer | Accepted review decision; evolution-specific semantics |
 
-```python
-def _grounding_contract(self, selected_knowledge):
-    allowed_refs = set()
-    
-    # Source 1: repositoryContext.evidence (existing)
-    repo_context = selected_knowledge.get("repositoryContext", {})
-    evidence = repo_context.get("evidence", [])
-    for item in evidence:
-        ref = item.get("reference")
-        if isinstance(ref, str):
-            allowed_refs.add(ref)
-        related = item.get("relatedReferences", [])
-        if isinstance(related, list):
-            for r in related:
-                if isinstance(r, str):
-                    allowed_refs.add(r)
-    
-    # Source 2: selectedFacts[].evidenceReferences (NEW)
-    facts = selected_knowledge.get("selectedFacts", [])
-    if isinstance(facts, list):
-        for fact in facts:
-            if isinstance(fact, dict):
-                refs = fact.get("evidenceReferences", [])
-                if isinstance(refs, list):
-                    for ref in refs:
-                        if isinstance(ref, str):
-                            allowed_refs.add(ref)
-    
-    return {"allowedEvidenceReferences": sorted(allowed_refs)}
+---
+
+## 4. Selection Trace
+
+### 4.1 Candidate retrieval, ranking, and final budget
+
+These are separate stages:
+
+```text
+candidate retrieval -> ranking/composition -> final context budget
 ```
 
-**Why this is correct:**
+In the standard analysis workflow, `AnalysisContextServiceImpl` retrieves the newest 100
+Facts and 50 Observations from the current Analysis before selection. It repairs
+Observation-to-Fact closure. `KnowledgeSelectionServiceImpl` then selects at most 40 Facts
+and 25 Observations. Active Insights are loaded project-wide and the newest 10 are selected.
 
-- Facts carry `evidenceReferences` that point to repository evidence (file paths, commit
-  hashes). These are the same type of references already in `repositoryContext.evidence[]`.
-- Adding them to the allowed set is semantically consistent — they ARE repository evidence.
-- Observations do not add new evidence references because their grounding comes from their
-  `supportingFacts`, which are already in the selected facts.
-- Insights are NOT added to the grounding contract. They are context, not evidence. The
-  agent uses insights to inform its analysis but grounds findings in repository evidence.
+The previous design incorrectly proposed applying the standard 100/50 windows across all
+project analyses. No current repository method or invariant supports that interpretation.
 
-### Grounding contract for validation
+### 4.2 Signals actually used
 
-The same expansion must be applied to `_validate_output()` in
-`story_context_analysis_generation_service.py`, which builds the allowed evidence set
-from the same sources.
+| Signal | Available? | Used by direct Fact/Observation/Insight ranking? | How | Story-specific? |
+|---|---|---|---|---|
+| Intent ID | Yes | Yes / Yes / No | Hard-coded type-name score groups for Facts and Observations | No |
+| Intent objective | Yes | No | Used only by repository-evidence ranker | No unless objective contains Story text |
+| Context profiles | Yes | No | Weight repository-evidence ranking | No |
+| Fact/Observation type | Yes | Yes | Principal direct score | No |
+| Fact/Observation content | Yes | Yes | User-guidance term overlap only | Only if guidance contains Story terms |
+| Fact source/evidence paths | Yes | Tie only / No | Deterministic ordering; not semantic ranking | No |
+| Observation supporting Facts | Yes | Closure only | Required Facts retained or Observation removed | No |
+| Insight title/content/type/severity | Yes | No | Main list is ACTIVE, newest-first, top 10 | No |
+| Recency | Yes | Candidate gate / top-10 order | Newest 100/50 upstream; newest Insights | No |
+| User priorities/focus/outputContext | Yes | Facts and Observations only | Lexical boost over type/content | Potentially, but caller-controlled |
+| Story ID | Yes | No | Post-ranking commit-window filter in `RepositoryContextAdapter` | Scope only |
+| Story title | Yes | No | Story is an independent ROADMAP evidence item | No candidate-to-Story comparison |
+| Story path | Yes | No | Originating path of independent Story evidence | No candidate-to-Story comparison |
+| Base/target commits | Yes | No | Post-ranking technical-evidence filter | Scope only |
+| Story objective/description/acceptance criteria | No structured fields | No | Persisted `EngineeringStory` does not contain them | No |
+| Requested files | Yes | No | Post-ranking technical-evidence filter | Scope only |
+| Knowledge relations | Yes | No | Preserved/projected, not used to rank knowledge | No |
+| Repository evidence | Yes | Separate path | Multi-criterion intent, architecture, history, recency, provenance, guidance | Weakly Story-adjacent only |
 
-### Evidence reference model impact
+### 4.3 Engineering Story path
 
-The `EvidenceRef` schema is unchanged:
+`AnalysisContext.engineeringStories` exists, but `KnowledgeSelectionServiceImpl.select()`
+does not consume it when ranking Facts, Observations, or Insights. Stories are converted
+into independent `ROADMAP` evidence using title, path, status, and commit metadata. Their
+presence does not increase another candidate's score.
 
-```python
-class EvidenceRef(StoryContextAnalysisContractModel):
-    reference: str = Field(min_length=1, max_length=500)
-    resource: str | None = Field(default=None, min_length=1, max_length=500)
+`storyId` and requested files are applied after repository ranking as scope filters. They
+can remove evidence but cannot promote relevant candidates or refill unused budget.
+
+Additionally, `EngineeringContextFacadeImpl` currently passes the intent ID as the
+adapter's `storyDescription`. Therefore the adapter's lexical Fact/Observation filtering
+is intent-aware, not aware of the requested Story title or contents.
+
+Current classification:
+
+```text
+SELECTION_IS_INTENT_AWARE = YES
+SELECTION_IS_STORY_AWARE = NO
 ```
 
-Findings continue to reference repository evidence. The agent does NOT cite insights
-directly in findings. This preserves the output contract and ensures all cited evidence
-is deterministic and traceable.
-
-### Why insights are not grounding references
-
-1. **Trust model:** Insights are TRUSTED knowledge, but findings should be grounded in
-   TECHNICAL_EVIDENCE. Citing an insight as evidence conflates trust tiers.
-2. **Traceability:** Insight → evidence chain is already recorded on the Insight entity
-   (`evidenceReferences` field). The agent does not need to re-expose this chain.
-3. **Simplicity:** Keeping the grounding contract evidence-only avoids schema changes
-   and output contract changes.
-4. **ADR-006 compliance:** AI output (findings) grounded in human-validated knowledge
-   (insights) could imply the finding inherits trust from the insight. Keeping grounding
-   in repository evidence preserves the trust boundary.
+The repository-context path has Story-based post-selection scope, but that is not
+Story-aware ranking.
 
 ---
 
-## 6. Freshness Interaction
+## 5. Candidate Retrieval Decision
 
-**No change to freshness semantics.**
+### 5.1 Rejected strategy
 
-- The `contextFreshness` snapshot is captured at context construction time (Story 0114).
-- Selected knowledge may come from analyses that were current when created but are now
-  stale relative to the current repository revision.
-- The freshness snapshot describes PROJECT-LEVEL synchronization status, not per-item
-  validity.
-- Filtering knowledge based on freshness would imply semantic invalidation that current
-  freshness semantics cannot justify (as established in the freshness investigation).
-- The agent receives the freshness snapshot alongside the analysis, enabling consumers
-  to assess staleness.
+Reject:
 
-**This is a known limitation, not a defect.** The design preserves the established
-distinction:
-
-```
-ProjectFreshnessStatus ≠ specific knowledge validity
+```text
+newest 100 Facts across project
+newest 50 Observations across project
+        -> KnowledgeSelectionService
 ```
 
----
+Reasons:
 
-## 7. Cross-Story Knowledge
+1. Relevant older knowledge can be excluded before ranking; the selector cannot recover it.
+2. Facts and Observations are owned by an Analysis; global rows mix baselines and revisions.
+3. Observation supporting-Fact closure is analysis-scoped and would need cross-analysis
+   reconstruction not represented in current snapshots.
+4. Repeated deterministic extraction across analyses introduces duplicate/staleness
+   ambiguity.
+5. Breadth across a project does not create Story relevance.
 
-**ALLOWED — existing behavior.**
+The hidden candidate recency bias is **MATERIAL**.
 
-The `KnowledgeSelectionService` queries facts and observations from the project, not
-from a specific story. The selected knowledge is project-scoped. This means the agent
-sees knowledge from all previous analyses, including those for other stories.
+### 5.2 Existing safer repository pattern
 
-This is correct because:
-- Project-level knowledge (architecture, technology, build system) is story-agnostic
-- Story-specific knowledge is provided via `engineeringStories` in the selected knowledge
-- The intent-aware ranking ensures story-relevant knowledge is prioritized
+`RepositoryContextAdapter` already provides a bounded deterministic pattern for Story
+preparation:
 
----
-
-## 8. Historical Analyses
-
-**NO backfill.**
-
-Historical Story Context Analyses (before this integration) have empty `selectedFacts`,
-`selectedObservations`, and `selectedInsights`. They remain historical snapshots.
-
-This is consistent with:
-- Story 0114 precedent (historical analyses keep their original context)
-- The principle that persisted analysis is a historical record
-- The absence of any requirement to regenerate historical analyses
-
-Future analyses will include validated knowledge. The difference is visible and expected.
-
----
-
-## 9. Evaluation Strategy
-
-### ADR-066 scenario extension
-
-The existing scenario fixture (`engineering-story-context-analysis-v1/scenario.json`)
-should be extended to include:
-
-1. Non-empty `selectedFacts` with `evidenceReferences`
-2. Non-empty `selectedObservations` with `supportingFactIds`
-3. Non-empty `selectedInsights` with `id`, `type`, `title`, `content`
-
-The scenario expectation should be updated to:
-- Verify that findings can reference fact evidence references
-- Verify that grounding validation accepts expanded evidence set
-- Verify that the agent uses insights as context (observable in findings)
-
-### Test strategy
-
-| Test | What it proves |
-|------|---------------|
-| Unit: `AnalyzeStoryContextUseCase` invokes `KnowledgeSelectionService` | Knowledge is selected |
-| Unit: `buildSelectedKnowledge` populates non-empty lists | Lists are not empty |
-| Unit: Grounding contract includes fact evidence references | Expanded grounding works |
-| Unit: Grounding validation accepts fact evidence references | Validation passes |
-| Unit: Grounding validation rejects unknown references | Validation still rejects |
-| Unit: Empty knowledge remains valid | No regression when no knowledge exists |
-| Integration: Full SCA flow with knowledge-enriched context | End-to-end works |
-| ADR-066: Scenario with knowledge items passes | Evaluation passes |
-| Regression: Existing tests pass unchanged | No regression |
-
-### Behavioral invariants to verify
-
-1. Agent findings reference validated knowledge items when available
-2. Output classification includes FACTUAL_EXTRACTION entries grounded in fact evidence
-3. Empty knowledge produces valid analysis (no fabricated knowledge)
-4. Historical analysis behavior unchanged
-5. Freshness snapshot behavior unchanged (Story 0114)
-
----
-
-## 10. Answers to Investigation Questions
-
-### Q1: Knowledge budget constraints
-
-**Answer:** Use existing budget unchanged. The `KnowledgeBudget(40, 25, 10, 5, 60)` is
-appropriate for V1. The intent-aware ranking ensures story-relevant knowledge is
-prioritized. No new budget is needed.
-
-### Q2: Which knowledge types are most valuable
-
-**Answer:** Facts and Observations (deterministic evidence, grounding-capable) and
-Insights (trusted context). Decisions and Engineering Events are deferred because they
-require different selection semantics.
-
-### Q3: Cross-story knowledge
-
-**Answer:** ALLOWED — existing behavior. The selection is project-scoped, which is correct.
-Project-level knowledge is story-agnostic; story-specific context is provided via
-`engineeringStories`.
-
-### Q4: Grounding contract handling
-
-**Answer:** Expand `_grounding_contract()` and `_validate_output()` to include fact
-`evidenceReferences`. Insights are context, not grounding references. The output schema
-is unchanged.
-
-### Q5: ADR-066 evaluation
-
-**Answer:** Extend the scenario fixture with non-empty knowledge items. Update expectations
-to verify expanded grounding. Verify the agent uses insights as context.
-
-### Q6: Historical backfill
-
-**Answer:** NO. Historical analyses keep their original context. This is consistent with
-Story 0114 precedent and the principle that persisted analysis is a historical record.
-
----
-
-## 11. Minimal V1 Design
-
-### Flow diagram
-
-```
-AnimateStoryContextUseCase.execute()
-        │
-        ├─ 1. Query project-scoped facts (NEW repository method)
-        │     factRepository.findTopByProjectIdOrderByDetectedAtDescIdDesc(projectId, 100)
-        │
-        ├─ 2. Query project-scoped observations (NEW repository method)
-        │     observationRepository.findTopByProjectIdOrderByCreatedAtDescIdDesc(projectId, 50)
-        │
-        ├─ 3. Query active insights (EXISTING repository method)
-        │     insightRepository.findByProjectIdAndStatusOrderByCreatedAtDescIdDesc(projectId, ACTIVE, 10)
-        │
-        ├─ 4. Build AnalysisContext from project-scoped data
-        │     new AnalysisContext(projectSnapshot, analysisSnapshot, profile,
-        │         facts, observations, knowledgeEvents, ...,
-        │         engineeringEvents, challenges, relations, stories, humanInputs)
-        │
-        ├─ 5. Invoke KnowledgeSelectionService.select()
-        │     selectedKnowledge = selectionService.select(analysisContext, intent, guidance)
-        │
-        ├─ 6. Project to prompt-compatible map
-        │     selectedKnowledgeMap = promptProjectionService.toMap(selectedKnowledge)
-        │
-        ├─ 7. Merge with repositoryContext (existing)
-        │     selectedKnowledgeMap.put("repositoryContext", Map.of("evidence", engineeringContext.evidence()))
-        │
-        └─ 8. Pass to AI Engine (existing flow unchanged)
+```text
+latest ProjectProfile Analysis (single comparable baseline)
+        -> newest 200 Facts / 200 Observations
+        -> deterministic term overlap
+        -> relevance order, then recency tie-break
+        -> bounded candidates (currently 8 Facts / 6 Observations)
 ```
 
-### Components changed
+This preserves one Analysis provenance boundary and applies relevance before the final
+small cap. It still has a bounded 200-row recency window, but it is safer than global
+newest-N retrieval and follows ADR-063's bounded candidate-polling model.
 
-| Component | Change | Why |
-|-----------|--------|-----|
-| `AnalyzeStoryContextUseCase` | Invoke knowledge selection; populate selectedKnowledge from selection output | Core integration point |
-| `FactRepository` | Add `findTopByProjectIdOrderByDetectedAtDescIdDesc` | Query project-scoped facts |
-| `ObservationRepository` | Add `findTopByProjectIdOrderByCreatedAtDescIdDesc` | Query project-scoped observations |
-| `StoryContextAnalysisPromptBuilder._grounding_contract()` | Include fact evidence references | Expand allowed evidence set |
-| `StoryContextAnalysisGenerationService._validate_output()` | Include fact evidence references | Consistent validation |
+### 5.3 Corrected V1 candidate semantics
 
-### Components unchanged
+Reuse that baseline-analysis pattern, with a small Story-aware correction:
 
-| Component | Why unchanged |
-|-----------|--------------|
-| `KnowledgeSelectionService` | Reused as-is; no interface change |
-| `SelectedKnowledge` | Output contract unchanged |
-| `SelectedKnowledgePromptProjectionService` | Projection unchanged |
-| `EngineeringContextFacade` | Context construction unchanged |
-| `AiTaskService` | Task creation unchanged |
-| `StoryContextAnalysisResult` (Pydantic) | Output schema unchanged |
-| `EvidenceRef` (Pydantic) | Evidence reference model unchanged |
-| `StoryContextAnalysis` entity | Persistence unchanged |
-| `StoryContextAnalysisResponse` | Response contract unchanged |
-| Story 0114 freshness snapshot | Freshness mechanism unchanged |
-| AI prompt template | Template unchanged; knowledge sections already expected |
-| AI system message | System message unchanged |
+1. Resolve the requested persisted Story before candidate construction.
+2. Build deterministic selection terms from fields already authorized and available:
+   Story title, Story path, requested files, intent objective, and normalized user
+   guidance focus/priorities/output context.
+3. Retrieve a bounded overfetch window from the latest ProjectProfile Analysis only.
+4. Rank term overlap before the candidate cap; use recency and stable identity only as
+   tie-breakers.
+5. Repair Observation-to-Fact closure within that same baseline Analysis before invoking
+   `KnowledgeSelectionService`.
+6. Pass only the requested Story in the SCA `AnalysisContext.engineeringStories` section.
+7. For the SCA intent, add the same deterministic Story-term relevance signal to the
+   selector's Fact, Observation, and Insight ordering. In particular, Insights must no
+   longer be newest-only for this intent.
+8. Apply commit-window and requested-file scope before final composition where the
+   canonical evidence model permits it; retain existing fail-closed behavior.
+9. Invoke the existing `KnowledgeSelectionService` for closure, budgets, repository
+   composition, diagnostics, metadata, and digest.
 
----
+No Story Markdown parser is introduced. Objective, description, and acceptance criteria
+are not structured persisted Story fields today; claiming to rank on them would be false.
 
-## 12. Implementation Impact Map
+### 5.4 Cross-Story knowledge
 
-### Must change
+Cross-story/project knowledge remains allowed. The corrected semantics do not mean
+"current Story only". They mean:
 
-| Component | Current responsibility | Required change | Contract impact | Test impact |
-|-----------|----------------------|----------------|----------------|-------------|
-| `AnalyzeStoryContextUseCase` | Builds empty selectedKnowledge | Query facts/observations/insights; invoke selection; project result | selectedKnowledge now non-empty | New unit tests for selection invocation |
-| `FactRepository` | Queries by analysisId | Add project-scoped query | New method | New repository test |
-| `ObservationRepository` | Queries by analysisId | Add project-scoped query | New method | New repository test |
-| `StoryContextAnalysisPromptBuilder` | Grounding from repo evidence only | Include fact evidence references | Expanded allowedEvidenceReferences | Updated grounding tests |
-| `StoryContextAnalysisGenerationService` | Validation from repo evidence only | Include fact evidence references | Consistent validation | Updated validation tests |
-| ADR-066 scenario fixture | Minimal knowledge | Include knowledge items | Updated fixture | Updated evaluation |
+```text
+single coherent baseline
+  + current Story relevance signals
+  + project knowledge allowed to compete
+  + deterministic budgets
+```
 
-### Must NOT change
+General architecture or build knowledge can still rank highly. Unrelated recent project
+knowledge no longer wins eligibility solely because it is newer.
 
-| Component | Why |
-|-----------|-----|
-| `KnowledgeSelectionService` interface | Reused as-is |
-| `SelectedKnowledge` record | Output contract unchanged |
-| `StoryContextAnalysisResult` (Pydantic) | Output schema unchanged |
-| `EvidenceRef` (Pydantic) | Evidence reference model unchanged |
-| `StoryContextAnalysis` entity | Persistence unchanged |
-| `StoryContextAnalysisResponse` | Response contract unchanged |
-| AI prompt template | Sections already expected |
-| AI system message | Unchanged |
-| Story 0114 freshness mechanism | Unchanged |
-| MCP server/tool/client | Response contract unchanged |
+Classification of the rejected project-wide newest-N strategy:
+
+```text
+PROJECT_WIDE_CANDIDATE_STRATEGY = INSUFFICIENTLY_STORY_AWARE
+```
+
+The smallest safe correction is relevance-before-cap over one baseline plus SCA-specific
+Story-term ranking, not project-wide newest-N queries.
 
 ---
 
-## 13. ADR Gate
+## 6. Corrected Minimal V1 Design
 
-**ADR_REQUIRED = NO**
+```text
+Engineering Story + files + guidance
+        |
+        v
+Java resolves Story and constructs deterministic Story selection terms
+        |
+        v
+latest comparable baseline Analysis
+        |
+        +--> bounded Fact/Observation overfetch
+        +--> Story relevance before cap
+        +--> Observation/Fact closure
+        |
+        v
+SCA AnalysisContext (current Story only; coherent baseline candidates)
+        |
+        v
+KnowledgeSelectionService
+        +--> SCA Story-term ordering
+        +--> existing budgets and closure
+        +--> relevant ACTIVE Insights, not newest-only
+        +--> SelectedKnowledge projection
+        |
+        v
+authorized EngineeringContext canonical evidence references
+        |
+        v
+Java immutable grounding contract
+        |
+        +--> Python defensive validation
+        +--> Java authoritative callback validation
+        |
+        v
+persist non-trusted StoryContextAnalysis snapshot
+```
 
-This integration connects existing architectural capabilities (KnowledgeSelectionService,
-AnalysisContext, SelectedKnowledge) rather than establishing a new architectural direction.
+### Lifecycle requirement
 
-The grounding contract expansion is a behavioral change but not an architectural decision —
-it follows the established pattern from the insight generation service which already includes
-fact evidence references in its grounding set.
+`KnowledgeSelectionService` requires a matching Analysis, ProjectProfile, and persisted
+`AnalysisExecutionDiagnostic`. Today `createForStoryContextAnalysisEntity()` creates or
+reuses the SCA Analysis only after selected knowledge has been built, and accepts selected
+knowledge in the same call. Future implementation must separate "establish SCA analysis
+and diagnostics" from "create task with selected knowledge" so selection has valid inputs.
+It must not fabricate a synthetic persisted Analysis ID or weaken mandatory diagnostics.
 
-If the investigation reveals that the grounding contract change requires broader architectural
-consideration (e.g., affecting other intents), an ADR may be warranted. But for V1, the
-change is scoped to the Story Context Analysis prompt builder and validation service.
+### Budget
+
+The existing final budget remains unchanged:
+
+```text
+maximumFacts                 = 40
+maximumObservations          = 25
+maximumInsights              = 10
+maximumArchitectureKnowledge = 5
+maximumRepositoryEvidence    = 60
+```
+
+Candidate overfetch is not the final budget. Exact SCA overfetch/candidate caps should use
+the existing adapter constants initially and remain configurable only if repository-scale
+evidence later justifies adjustment.
 
 ---
 
-## 14. RAG Readiness
+## 7. Grounding Contract Design
 
-**RAG_READINESS = NOT_READY**
+### Java authority
 
-This integration does not change the RAG readiness assessment. The primary bottleneck
-was that the agent received no validated knowledge. After this integration, the agent
-receives knowledge through the existing deterministic selection engine.
+Java constructs `allowedEvidenceReferences` exclusively from canonical references of
+citable evidence in the authorized, scoped `EngineeringContext`. Scope and SCA citability
+remain Java decisions; trust tier is preserved but does not alone imply citability.
+Selected knowledge cannot broaden this set, and Insights are context-only in V1.
 
-Vector retrieval would be warranted only if:
-1. The deterministic selection consistently fails to find relevant knowledge
-2. The knowledge corpus grows beyond what budget-constrained selection can handle
-3. Semantic similarity becomes more relevant than intent-aware ranking
+The contract must be persisted with the task or its immutable execution snapshot, sent in
+`PromptRequest`, and reused for authoritative callback validation.
 
-None of these conditions hold for V1.
+### Python responsibility
 
----
+Python receives the explicit contract and uses it for prompt instructions, defensive
+subset validation, and corrective retry. It must not scan `selectedFacts`,
+`selectedObservations`, `selectedInsights`, or `repositoryContext` to create additional
+allowed references.
 
-## 15. Unresolved Risks/Questions
+The previous changes proposed for `_grounding_contract()` and `_validate_output()` to add
+all Fact `evidenceReferences` are therefore removed. Those functions instead need to
+consume the Java-provided contract.
 
-1. **AnalysisContext construction scope:** The use case constructs a minimal AnalysisContext.
-   If the selection service evolves to require additional AnalysisContext fields (e.g.,
-   `relatedAnalyses`, `architectureArtifacts`), the use case must be updated. This is
-   a maintenance risk, not a design risk.
+### Finding requirements
 
-2. **Project-scoped fact/observation query performance:** Querying facts and observations
-   by project ID across all analyses may be slow for projects with many analyses. The
-   budget (100 facts, 50 observations) and pagination mitigate this, but monitoring
-   is recommended.
+- Every `FACTUAL_EXTRACTION` and `AI_INTERPRETATION` must have `grounded=true` and at
+  least one evidence reference from the Java allow-list.
+- `RECOMMENDATION` may be ungrounded but must remain explicitly classified.
+- Unknown or fabricated references are rejected defensively in Python and authoritatively
+  in Java.
+- `EvidenceRef.resource` remains navigation-only and does not enter subset validation.
+- Related references do not become citable unless independently authorized canonically.
 
-3. **Knowledge freshness alignment:** Selected facts/observations may come from older
-   analyses. The freshness snapshot provides project-level status but not per-item
-   validity. This is a known limitation documented in the design.
-
-4. **Insight citation format:** Insights are included as context but not as grounding
-   references. If future requirements demand insight citation, the EvidenceRef schema
-   would need extension. This is deferred.
-
-5. **Grounding closure with project-scoped facts:** The grounding closure algorithm
-   ensures every selected observation's supporting facts are in the selected facts.
-   With project-scoped facts, the closure set is larger. This should be validated
-   empirically but is architecturally sound.
+No Story Context Analysis output-schema change is needed.
 
 ---
 
-*Generated from repository evidence on the `design/validated-knowledge-sca-integration` branch.*
-*If repository reality contradicts this design, repository reality wins.*
+## 8. Freshness and Historical Analyses
+
+Freshness semantics remain unchanged:
+
+```text
+ProjectFreshnessStatus != specific knowledge validity
+```
+
+Project freshness does not prove every selected historical Fact is currently true, and a
+STALE project does not automatically invalidate every knowledge item. The persisted Story
+0114 freshness snapshot remains project-level execution context.
+
+Historical Story Context Analyses are not regenerated or backfilled. Future analyses use
+the revised selection and grounding contract; prior snapshots preserve what was supplied
+at their execution time.
+
+---
+
+## 9. ADR-066 Evaluation Strategy
+
+The evaluation must make context influence and grounding authorization independently
+observable.
+
+### Required scenarios
+
+1. A selected Fact is present in prompt knowledge.
+2. A selected Observation and all its selected supporting Facts are present.
+3. A selected Insight is present as trusted context.
+4. Relevant selected knowledge measurably influences interpretation without requiring it
+   to be cited as evidence.
+5. A Fact historical provenance reference absent from current authorized evidence is
+   rejected as grounding.
+6. A Fact historical provenance reference also present as canonical current evidence is
+   accepted.
+7. An Observation identity/supporting Fact identity absent from the current evidence
+   allow-list is rejected.
+8. Insight identity and `Insight.evidenceReferences` do not automatically become allowed
+   grounding.
+9. Legitimate canonical current evidence grounds a factual or interpretative finding.
+10. Fabricated evidence is rejected in Python and Java validation tests.
+11. A factual/interpretative finding with an empty evidence list is rejected.
+12. Empty selected knowledge remains valid and does not cause fabrication.
+13. Story-relevant older baseline knowledge outranks newer irrelevant candidates inside
+    the overfetch window.
+14. A candidate outside the bounded window remains excluded and truncation is observable.
+15. Insight selection for the SCA intent uses Story relevance before recency.
+16. Freshness snapshot capture and persistence remain unchanged.
+17. Historical analyses remain unchanged.
+
+### Fixture correction
+
+The ADR-066 fixture must include separate values for:
+
+```text
+selected knowledge provenance references
+authorized current grounding references
+disallowed historical-only provenance references
+```
+
+The evaluator must check non-empty grounding for factual/interpretative findings, not only
+set inclusion when references happen to be present.
+
+---
+
+## 10. Future Implementation Impact Map
+
+Implementation remains unauthorized.
+
+### MUST_CHANGE
+
+| Component | Required future change | Reason |
+|---|---|---|
+| `AnalyzeStoryContextUseCase` | Replace empty knowledge map with projected `SelectedKnowledge`; orchestrate selection after SCA Analysis/diagnostics exist | Integration point and valid selector lifecycle |
+| SCA Analysis/task creation in `AiTaskService` or a focused lifecycle service | Separate Analysis/diagnostic establishment from task creation; persist grounding contract | Removes current ordering cycle and ignored contract parameter |
+| `RepositoryContextAdapter` or extracted shared bounded-candidate capability | Reuse single-baseline overfetch; add current Story/files/guidance terms; preserve Fact closure | Story-aware candidates without global queries |
+| `KnowledgeSelectionServiceImpl` | Add SCA-specific deterministic Story relevance to Fact, Observation, and Insight ordering while preserving existing budgets | Current direct selection is not Story-aware; Insights are newest-only |
+| `EngineeringEvidence` and `EngineeringContextContractMapper` | Preserve canonical `RepositoryEvidence.reference` distinctly from provenance identifier | Story 0112 D13 and ADR-063 canonical identity |
+| Java `PromptRequest` plus Python request schema | Carry explicit immutable Java grounding contract | Story 0112 D14; Python must not reconstruct authority |
+| `StoryContextAnalysisPromptBuilder` | Render supplied grounding contract; do not expand from knowledge provenance | Defensive generation contract |
+| `StoryContextAnalysisGenerationService` | Validate against supplied contract; require non-empty refs for factual/interpretative findings | Defensive validation and safety property |
+| Dedicated Java SCA callback validator / callback path | Authoritatively validate evidence subset and required grounding before persistence | ADR-067 and Story 0112 D14 |
+| Selection metadata | Expose baseline/window/relevance strategy and truncation | Makes candidate recency limits auditable |
+| Backend, AI Engine, ADR-066 tests | Cover provenance intersection, Story ranking, closure, empty context, freshness regression | Verification |
+
+### MUST_NOT_CHANGE
+
+| Component or decision | Constraint |
+|---|---|
+| `KnowledgeSelectionService` role | Reuse it; do not create a parallel selector |
+| Final `KnowledgeBudget` | Preserve 40/25/10/5/60 for V1 |
+| Fact/Observation/Insight V1 inclusion | Preserve accepted review decision |
+| Decision/EngineeringEvent deferral | Preserve accepted review decision |
+| `StoryContextAnalysisResult` output schema | No change required |
+| `EvidenceRef` shape | Keep `{reference, resource?}`; resource remains navigation-only |
+| Insight trust semantics | Context does not transfer trust to generated output |
+| Story 0114 freshness | No redesign or per-item freshness system |
+| Historical analyses | No backfill or regeneration |
+| Java/Core authority | No Python-side authority reconstruction |
+| Architecture | No RAG, vectors, new agent, microservice, or event-driven redesign |
+
+### Removed from the previous plan
+
+- Do not add project-wide `FactRepository.find...ByProjectId...` or
+  `ObservationRepository.find...ByProjectId...` newest-N methods for this integration.
+- Do not add every selected Fact provenance value to Python's grounding allow-list.
+- Do not treat `relatedReferences` as automatically citable.
+- Do not leave `AiTaskService`, `EngineeringContext`, or Java callback validation unchanged;
+  repository evidence shows they participate in the current grounding defect.
+
+---
+
+## 11. Final Decisions
+
+### Grounding
+
+```text
+GROUNDING_MODEL = PROVENANCE_INTERSECTION
+
+new finding grounding
+  -> canonical current evidence authorized by Java
+  -> historical provenance usable only on exact intersection
+  -> selected knowledge cannot expand authority
+```
+
+### Selection
+
+```text
+CURRENT KNOWLEDGE SELECTION
+  -> intent-aware
+  -> not Story-aware for direct Facts/Observations/Insights
+  -> Story scope is primarily post-ranking filtering
+
+DESIGNED V1
+  -> one comparable baseline Analysis
+  -> bounded overfetch
+  -> current Story relevance before final candidate cap
+  -> SCA-specific deterministic Story signal in KnowledgeSelectionService
+  -> existing closure and final budget
+```
+
+### Governance gates
+
+```text
+ADR_REQUIRED = NO
+```
+
+The grounding corrections restore accepted Story 0112/ADR-063/ADR-067 rules. The
+selection correction is a consumer-specific deterministic composition policy already
+allowed by ADR-063, not a new architecture.
+
+```text
+RAG_READINESS = NOT_READY
+```
+
+The current gap is deterministic query construction and ranking, not lack of vector
+retrieval. Existing baseline retrieval, lexical terms, commit scope, file scope, and
+budgets are sufficient for V1 after the specified small change.
+
+---
+
+## 12. Remaining Limitations
+
+1. Persisted Stories expose title/path/status/commit bounds, not structured objective,
+   description, acceptance criteria, or component scope. V1 cannot honestly rank on
+   fields it does not have.
+2. The bounded baseline window retains a recency eligibility boundary. Relevant knowledge
+   older than the window can still be missed; selection metadata must expose truncation.
+3. Latest ProjectProfile Analysis is a coherent deterministic baseline, not proof that all
+   included historical knowledge remains semantically current.
+4. Explicit file and commit scope currently occur after repository ranking. Moving all
+   scope before candidate retrieval may require collector-specific work beyond the first
+   minimal implementation; fail-closed filtering must remain meanwhile.
+5. The current canonical-reference projection and callback-validation defects predate this
+   design. Implementation cannot be authorized safely without including their focused
+   remediation in the implementation Story.
+6. Knowledge can influence an interpretation without a machine-verifiable explanation of
+   exactly which context item influenced reasoning. Grounding validation proves cited
+   evidence membership, not complete reasoning provenance.
+
+---
+
+## Repository Evidence Reviewed
+
+- `AnalyzeStoryContextUseCase`
+- `AiTaskServiceImpl`
+- `AnalysisContext` and `AnalysisContextServiceImpl`
+- `KnowledgeSelectionServiceImpl`
+- `SelectedKnowledge` and `SelectedKnowledgePromptProjectionService`
+- `RepositoryContextAdapter`
+- `RepositoryEvidence`, collectors, ranker, selector, and resolver
+- `EngineeringContextContractMapper` and `EngineeringEvidence`
+- Fact, Observation, Insight, Proposal, and Validation entities/services
+- Story Context Analysis prompt, schema, generation service, evaluator, and fixtures
+- standard Insight prompt and output validation
+- ADR-006, ADR-008, ADR-022, ADR-063, ADR-064, ADR-066, ADR-067
+- Story 0112 D13/D14 and Story 0114 freshness behavior
+
+---
+
+*Revised from repository evidence on `design/validated-knowledge-sca-integration` after
+human architectural review. If repository reality contradicts this design, repository
+reality wins.*
