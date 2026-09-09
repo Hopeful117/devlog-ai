@@ -1,6 +1,6 @@
 {
   "scenarioId": "engineering-story-context-analysis-v1",
-  "scenarioVersion": "1.0.0",
+  "scenarioVersion": "1.1.0",
   "intent": {
     "id": "engineering-story-context-analysis",
     "version": "v1"
@@ -77,7 +77,7 @@
           "type": "DOCKER_SERVICE_DEPENDS_ON",
           "content": "from=backend,to=ai-engine",
           "evidenceReferences": [
-            "docker-compose.yml"
+            "historical/docker-compose.yml"
           ]
         },
         {
@@ -106,7 +106,15 @@
         "warningCount": 0,
         "errorCount": 0
       },
-      "selectedInsights": [],
+      "selectedInsights": [
+        {
+          "id": "00000000-0000-0000-0000-000000000302",
+          "type": "ARCHITECTURAL",
+          "severity": "INFO",
+          "title": "Core and AI Engine boundary",
+          "content": "The Core owns deterministic authority while the AI Engine performs probabilistic generation."
+        }
+      ],
       "existingArchitectureKnowledge": [
         {
           "insightId": "00000000-0000-0000-0000-000000000301",
@@ -145,21 +153,51 @@
       "engineeringStories": [
         {
           "id": "00000000-0000-0000-0000-000000000401",
+          "projectId": "00000000-0000-0000-0000-000000000025",
+          "storyNumber": 112,
           "title": "Story 0112 Context Agent",
-          "status": "DESIGN_APPROVED",
+          "status": "COMPLETED",
+          "storyPath": "docs/stories/0112-devlog-story-context-agent/story.md",
           "baseCommit": "abc123",
           "targetCommit": "def456",
-          "reference": "story:00000000-0000-0000-0000-000000000401",
-          "relatedReferences": []
+          "createdAt": "2026-01-01T00:00:00Z",
+          "completedAt": null
         }
       ],
       "selectedHumanContextInputs": [],
       "knowledgeRelations": [],
       "evolutionContext": null,
       "selectionMetadata": {
-        "selectionVersion": "knowledge-selection-v4"
+        "selectionVersion": "knowledge-selection-v5",
+        "appliedRules": [
+          "REPOSITORY_FIRST_LAYERING",
+          "INTENT_SPECIFIC_RANKING",
+          "USER_GUIDANCE_KEYWORD_BOOST",
+          "STABLE_TYPE_AND_SEMANTIC_ORDER",
+          "DUPLICATE_FACT_CONTENT_ELIMINATION",
+          "OBSERVATION_FACT_CLOSURE",
+          "KNOWLEDGE_BUDGET",
+          "EVOLUTION_CONTEXT_REQUIRED",
+          "KNOWLEDGE_RELATION_PRESERVATION",
+          "ENGINEERING_STORY_RELEVANCE"
+        ],
+        "selectedKnowledgeCount": 8,
+        "discardedKnowledgeCount": 0,
+        "knowledgeBudget": {
+          "maximumFacts": 40,
+          "maximumObservations": 25,
+          "maximumInsights": 10,
+          "maximumArchitectureKnowledge": 5,
+          "maximumRepositoryEvidence": 60
+        },
+        "completeness": "COMPLETE"
       },
-      "selectionDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      "selectionDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    "groundingContract": {
+      "allowedEvidenceReferences": [
+        "docker-compose.yml"
+      ]
     },
     "expectedOutputContract": {
       "type": "object",
@@ -225,9 +263,9 @@
     "maximumExecutionFailures": 0
   },
   "reproducibility": {
-    "repositoryRevision": "2e849641cf74361d7703e4b3f53609b9c5b3e83e",
+    "repositoryRevision": "6f0d2da87cc4dc77427c701c3ec1443bb843216d",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "f866dd446b2672cb006ad5752c670307fa320d80f849d3721ad4687a2977b50a",
+    "promptContentDigest": "48d1e5329cb3ce9df2747952559b3d637609939b16904bc9f93d8fbf61cf2c60",
     "schemaDigest": "ee34b6de67ef87b15f2d184d4cf894e0e80feaccb2cdda0a955dd1db78f95cee"
   }
 }

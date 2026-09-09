@@ -98,8 +98,7 @@ class StoryContextAnalysisPromptBuilder:
             ) if request.user_guidance else {}
         )
         schema_json = self._canonical(request.expected_output_contract)
-        # Use Java-authored grounding contract from PromptRequest (authoritative per Story 0112 D14)
-        grounding_json = self._canonical(request.grounding_contract or self._grounding_contract(request.selected_knowledge))
+        grounding_json = self._canonical(request.grounding_contract)
 
         user_message = (
             "INTENT\n"
@@ -158,25 +157,6 @@ class StoryContextAnalysisPromptBuilder:
 
     def _canonical(self, value: object) -> str:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-
-    def _grounding_contract(self, selected_knowledge: dict[str, object]) -> dict[str, object]:
-        allowed_refs = set()
-        repo_context = selected_knowledge.get("repositoryContext", {})
-        if isinstance(repo_context, dict):
-            evidence = repo_context.get("evidence", [])
-            if isinstance(evidence, list):
-                for item in evidence:
-                    if not isinstance(item, dict):
-                        continue
-                    ref = item.get("reference")
-                    if isinstance(ref, str):
-                        allowed_refs.add(ref)
-                    related = item.get("relatedReferences", [])
-                    if isinstance(related, list):
-                        for r in related:
-                            if isinstance(r, str):
-                                allowed_refs.add(r)
-        return {"allowedEvidenceReferences": sorted(allowed_refs)}
 
     def corrective_retry(
         self,

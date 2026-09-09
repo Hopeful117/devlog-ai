@@ -107,6 +107,12 @@ public class AnalyzeStoryContextUseCase {
         // Select validated knowledge using Story-aware KnowledgeSelectionService
         UserGuidance userGuidance = mapGuidance(guidance);
         SelectedKnowledge selectedKnowledge = knowledgeSelectionService.select(analysisContext, intentDef, userGuidance);
+        Map<String, Object> selectedKnowledgeSnapshot = new LinkedHashMap<>(
+                promptProjectionService.toMap(selectedKnowledge));
+        selectedKnowledgeSnapshot.put(
+                "engineeringStories",
+                objectMapper.convertValue(analysisContext.engineeringStories(), List.class)
+        );
 
         String contextDigest = selectedKnowledge.selectionDigest();
 
@@ -120,7 +126,7 @@ public class AnalyzeStoryContextUseCase {
                 INTENT_ID,
                 INTENT_VERSION,
                 intentDef.promptTemplate(),
-                promptProjectionService.toMap(selectedKnowledge),
+                selectedKnowledgeSnapshot,
                 contextDigest,
                 groundingContract,
                 guidance
@@ -153,7 +159,7 @@ public class AnalyzeStoryContextUseCase {
                 AiTaskType.STORY_CONTEXT_ANALYSIS,
                 intentDef,
                 userGuidance,
-                promptProjectionService.toMap(selectedKnowledge),
+                selectedKnowledgeSnapshot,
                 intentDef.outputSchema(),
                 groundingContract,
                 Map.of(
@@ -173,10 +179,6 @@ public class AnalyzeStoryContextUseCase {
             // Use canonical reference for grounding (RepositoryEvidence.reference)
             if (evidence.reference() != null) {
                 allowedRefs.add(evidence.reference());
-            }
-            // Also include related references as they may be cited
-            if (evidence.relatedReferences() != null) {
-                allowedRefs.addAll(evidence.relatedReferences());
             }
         }
         return Map.of("allowedEvidenceReferences", new ArrayList<>(allowedRefs));
