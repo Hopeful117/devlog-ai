@@ -37,6 +37,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -158,7 +159,7 @@ class StoryAwareKnowledgeSelectionTest {
         AnalysisContext ambiguous = context(List.of(), List.of(), List.of(
                 story("OAuth", "docs/one.md"), story("Database", "docs/two.md")));
         when(repositoryContextService.build(eq(ambiguous), eq(storyIntent()),
-                org.mockito.ArgumentMatchers.isNull(), anyList(), anyList()))
+                org.mockito.ArgumentMatchers.isNull(), anyList(), anyList(), any()))
                 .thenReturn(emptyRepositoryContext());
 
         SelectedKnowledge ambiguousResult = service.select(ambiguous, storyIntent(), null);
@@ -185,7 +186,7 @@ class StoryAwareKnowledgeSelectionTest {
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
                 PROJECT_ID, List.of(InsightStatus.ACTIVE))).thenReturn(insights);
         when(repositoryContextService.build(eq(context), eq(storyIntent()),
-                org.mockito.ArgumentMatchers.nullable(UserGuidance.class), anyList(), anyList()))
+                org.mockito.ArgumentMatchers.nullable(UserGuidance.class), anyList(), anyList(), any()))
                 .thenReturn(emptyRepositoryContext());
     }
 

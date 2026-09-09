@@ -40,4 +40,17 @@ public interface RepositoryContextService {
             List<Insight> validatedInsights,
             List<RepositoryEvidence> additionalCandidates
     );
+
+    /**
+     * Builds a RepositoryContext with an explicit revision scope for SCA
+     * document retrieval (Story 0118, ADR-063 §42.2).
+     */
+    RepositoryContext build(
+            AnalysisContext context,
+            IntentDefinition intent,
+            UserGuidance guidance,
+            List<Insight> validatedInsights,
+            List<RepositoryEvidence> additionalCandidates,
+            RepositoryRevisionScope revisionScope
+    );
 }

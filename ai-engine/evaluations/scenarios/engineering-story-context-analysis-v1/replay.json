@@ -54,7 +54,7 @@
         "promptVersion": "story-context-analysis-prompt-v1",
         "provider": "mock",
         "modelIdentifier": "deterministic-v1",
-        "promptContentDigest": "48d1e5329cb3ce9df2747952559b3d637609939b16904bc9f93d8fbf61cf2c60",
+        "promptContentDigest": "20c631cc088a149087e4af6112805700c12a59207db853764890caa5cace5e06",
         "intentId": "engineering-story-context-analysis",
         "intentVersion": "v1",
         "guidanceKeys": [],
@@ -82,7 +82,7 @@
     "provider": "mock",
     "model": "deterministic-v1",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "48d1e5329cb3ce9df2747952559b3d637609939b16904bc9f93d8fbf61cf2c60",
+    "promptContentDigest": "20c631cc088a149087e4af6112805700c12a59207db853764890caa5cace5e06",
     "schemaDigest": "ee34b6de67ef87b15f2d184d4cf894e0e80feaccb2cdda0a955dd1db78f95cee"
   },
   "qualitativeGrounding": {

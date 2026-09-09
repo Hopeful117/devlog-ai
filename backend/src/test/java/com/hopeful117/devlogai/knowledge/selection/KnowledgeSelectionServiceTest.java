@@ -80,7 +80,7 @@ class KnowledgeSelectionServiceTest {
                             .analysisId(analysisId).collectionComplete(true).build()));
             when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
                     projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
-            when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
+            when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList(), any()))
                     .thenReturn(emptyRepositoryContext());
             when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
 
@@ -139,7 +139,7 @@ class KnowledgeSelectionServiceTest {
                 List.of(), Map.of(),
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                 0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
-        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList(), any()))
                 .thenReturn(repositoryContext);
         var service = new KnowledgeSelectionServiceImpl(
                 diagnostics, insights, mapper, repositoryContexts, 15);
@@ -240,7 +240,7 @@ class KnowledgeSelectionServiceTest {
                 List.of(), Map.of(),
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                 0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
-        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList(), any()))
                 .thenReturn(repositoryContext);
         var service = new KnowledgeSelectionServiceImpl(
                 diagnostics, insights, mapper, repositoryContexts, 15);
@@ -313,7 +313,7 @@ class KnowledgeSelectionServiceTest {
                 List.of(), Map.of(),
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                 0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
-        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList(), any()))
                 .thenReturn(repositoryContext);
         var service = new KnowledgeSelectionServiceImpl(
                 diagnostics, insights, mapper, repositoryContexts, 15);
@@ -388,7 +388,7 @@ class KnowledgeSelectionServiceTest {
                 List.of(), Map.of(),
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                 0, 0, 0, false, List.of(), List.of(), "b".repeat(64));
-        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList(), any()))
                 .thenReturn(repositoryContext);
         var service = new KnowledgeSelectionServiceImpl(
                 diagnostics, insights, mapper, repositoryContexts, 15);

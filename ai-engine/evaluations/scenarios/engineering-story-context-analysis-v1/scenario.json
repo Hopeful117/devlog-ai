@@ -144,6 +144,31 @@
             "symbols": {},
             "resource": "devlog://projects/test-project/commits/abc123/files/docker-compose.yml",
             "trustTier": "TECHNICAL_EVIDENCE"
+          },
+          {
+            "reference": "document:00000000-0000-0000-0000-000000000025:docs/stories/0112/story.md@abc123",
+            "kind": "STORY_DOCUMENT",
+            "layer": "PROJECT_DOCUMENTATION",
+            "summary": "Story 0112 Context Agent — COMPLETED",
+            "sourceType": "REPOSITORY",
+            "originatingFile": "docs/stories/0112/story.md",
+            "identifier": "docs/stories/0112/story.md",
+            "relevanceScore": 85,
+            "selectionReason": "Story document with body text for context analysis",
+            "occurredAt": "2026-01-01T00:00:00Z",
+            "relatedReferences": [],
+            "extractionMetadata": {
+              "documentStatus": "COMPLETED",
+              "resolvedRevision": "abc123"
+            },
+            "content": {
+              "status": "COMPLETE",
+              "text": "# Story 0112 — DevLog Story Context Agent\n\n## Status\nCOMPLETED\n\n## Summary\nImplement the Story Context Agent that analyzes engineering stories and produces structured context analysis.\n\n## Acceptance Criteria\n- [x] Agent reads story files from workspace\n- [x] Agent produces structured analysis output\n- [x] Analysis includes architecture findings, decision findings, evidence findings\n- [x] All findings are grounded with evidence references\n- [x] Output follows the StoryContextAnalysis schema",
+              "revision": "abc123"
+            },
+            "symbols": {},
+            "resource": "devlog://projects/test-project/commits/abc123/files/docs/stories/0112/story.md",
+            "trustTier": "HUMAN_AUTHORED"
           }
         ],
         "usedTokens": 0,
@@ -250,7 +275,8 @@
       "00000000-0000-0000-0000-000000000201"
     ],
     "allowedEvidenceReferences": [
-      "docker-compose.yml"
+      "docker-compose.yml",
+      "document:00000000-0000-0000-0000-000000000025:docs/stories/0112/story.md@abc123"
     ],
     "qualitativeGroundingRequired": true
   },
@@ -265,7 +291,7 @@
   "reproducibility": {
     "repositoryRevision": "6f0d2da87cc4dc77427c701c3ec1443bb843216d",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "48d1e5329cb3ce9df2747952559b3d637609939b16904bc9f93d8fbf61cf2c60",
+    "promptContentDigest": "20c631cc088a149087e4af6112805700c12a59207db853764890caa5cace5e06",
     "schemaDigest": "ee34b6de67ef87b15f2d184d4cf894e0e80feaccb2cdda0a955dd1db78f95cee"
   }
 }

@@ -45,6 +45,12 @@ import com.hopeful117.devlogai.storycontextanalysis.entity.StoryContextAnalysis;
 import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService;
 import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService.HistoricalKnowledgeCandidates;
 import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
+import com.hopeful117.devlogai.source.repository.SourceRepository;
+import com.hopeful117.devlogai.source.entity.Source;
+import com.hopeful117.devlogai.source.entity.SourceType;
+import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
+import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
+import com.hopeful117.devlogai.collection.workspace.ResolvedSourceRevision;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -94,6 +100,8 @@ class AnalyzeStoryContextUseCaseTest {
     @Mock private AnalysisRepository analysisRepository;
     @Mock private AnalysisExecutionDiagnosticRepository diagnosticRepository;
     @Mock private HistoricalKnowledgeCandidateService historicalKnowledgeCandidateService;
+    @Mock private SourceRepository sourceRepository;
+    @Mock private WorkspaceManager workspaceManager;
 
     private AnalyzeStoryContextUseCase useCase;
 
@@ -115,7 +123,9 @@ class AnalyzeStoryContextUseCaseTest {
                 analysisContextService,
                 analysisRepository,
                 diagnosticRepository,
-                historicalKnowledgeCandidateService
+                historicalKnowledgeCandidateService,
+                sourceRepository,
+                workspaceManager
         );
     }
 
@@ -160,7 +170,29 @@ class AnalyzeStoryContextUseCaseTest {
                 projectId, analysisId, story,
                 List.of("src/main/java/Canonical.java"), engineeringContext))
                 .thenReturn(historicalCandidates);
-        when(knowledgeSelectionService.select(any(), eq(intent), eq(null)))
+
+        // Mock source repository and workspace manager for revision scope resolution
+        Source source = Source.builder()
+                .id(UUID.randomUUID())
+                .project(project)
+                .name("git")
+                .type(SourceType.GIT_REPOSITORY)
+                .repositoryUrl("https://github.com/test/repo")
+                .active(true)
+                .build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+        when(workspaceManager.resolveCurrentRevision(source))
+                .thenReturn(new ResolvedSourceRevision(source.getId(), null, "abc123def"));
+        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
+                source.getId(),
+                java.nio.file.Path.of("/workspace/test"),
+                "abc123def"
+        );
+        when(workspaceManager.synchronize(eq(source), eq("abc123def")))
+                .thenReturn(workspace);
+
+        when(knowledgeSelectionService.select(any(), eq(intent), eq(null), any()))
                 .thenAnswer(invocation -> selectedKnowledge(invocation.getArgument(0), profile));
         when(promptProjectionService.toMap(any())).thenAnswer(invocation -> {
             SelectedKnowledge selected = invocation.getArgument(0);
@@ -182,7 +214,7 @@ class AnalyzeStoryContextUseCaseTest {
 
         assertEquals(task.getId(), result);
         ArgumentCaptor<AnalysisContext> selectionContext = ArgumentCaptor.forClass(AnalysisContext.class);
-        verify(knowledgeSelectionService).select(selectionContext.capture(), eq(intent), eq(null));
+        verify(knowledgeSelectionService).select(selectionContext.capture(), eq(intent), eq(null), any());
         assertEquals(INTENT_ID, selectionContext.getValue().analysis().intentId());
         assertEquals(
                 List.of(baselineContext.facts().get(0).id(), historicalFact.id()),

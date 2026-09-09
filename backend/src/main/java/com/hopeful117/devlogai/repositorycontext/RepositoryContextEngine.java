@@ -96,9 +96,21 @@ public class RepositoryContextEngine implements RepositoryContextService {
             List<Insight> validatedInsights,
             List<RepositoryEvidence> additionalCandidates
     ) {
+        return build(context, intent, guidance, validatedInsights, additionalCandidates, null);
+    }
+
+    @Override
+    public RepositoryContext build(
+            AnalysisContext context,
+            IntentDefinition intent,
+            UserGuidance guidance,
+            List<Insight> validatedInsights,
+            List<RepositoryEvidence> additionalCandidates,
+            RepositoryRevisionScope revisionScope
+    ) {
         ContextPlan contextPlan = contextIntelligence.plan(context, intent);
         ContextRequest request = new ContextRequest(
-                context, intent, guidance, validatedInsights, contextPlan, budget);
+                context, intent, guidance, validatedInsights, contextPlan, budget, revisionScope);
         List<RepositoryEvidence> candidates = new ArrayList<>(retrieveCandidates(
                 context, intent, guidance, validatedInsights));
         candidates.addAll(additionalCandidates);

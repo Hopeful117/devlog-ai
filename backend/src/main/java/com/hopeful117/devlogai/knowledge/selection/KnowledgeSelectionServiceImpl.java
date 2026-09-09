@@ -60,6 +60,13 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
     @Override
     public SelectedKnowledge select(AnalysisContext context, IntentDefinition intent,
                                     UserGuidance guidance) {
+        return select(context, intent, guidance, null);
+    }
+
+    @Override
+    public SelectedKnowledge select(AnalysisContext context, IntentDefinition intent,
+                                    UserGuidance guidance,
+                                    com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope revisionScope) {
         requireMandatoryKnowledge(context, intent);
         if (intent.outputProposalType() == com.hopeful117.devlogai.proposal.entity.ProposalType.ENGINEERING_EVENT
                 && context.evolutionContext() == null) {
@@ -122,7 +129,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
         List<RepositoryEvidence> promotedCommitDiff = promoteCommitDiffCandidates(
                 context, intent, guidance, insightCandidates);
         RepositoryContext repositoryContext = repositoryContextService.build(
-                context, intent, guidance, insightCandidates, promotedCommitDiff);
+                context, intent, guidance, insightCandidates, promotedCommitDiff, revisionScope);
         AnalysisExecutionDiagnostic diagnostic = diagnosticRepository.findById(context.analysis().id())
                 .orElseThrow(() -> new IllegalStateException(
                         "Mandatory analysis diagnostics are unavailable"));
