@@ -31,6 +31,8 @@ import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import com.hopeful117.devlogai.storycontextanalysis.entity.StoryContextAnalysis;
+import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService;
+import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService.HistoricalKnowledgeCandidates;
 import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +68,7 @@ public class AnalyzeStoryContextUseCase {
     private final AnalysisContextService analysisContextService;
     private final AnalysisRepository analysisRepository;
     private final AnalysisExecutionDiagnosticRepository diagnosticRepository;
+    private final HistoricalKnowledgeCandidateService historicalKnowledgeCandidateService;
 
     public UUID execute(
             String projectSlug,
@@ -98,7 +101,16 @@ public class AnalyzeStoryContextUseCase {
         if (baselineAnalysisId != null) {
             // Use the baseline analysis for Facts/Observations but with SCA intent
             AnalysisContext baselineContext = analysisContextService.build(baselineAnalysisId);
-            analysisContext = adaptContextForSCA(baselineContext, engineeringContext, story, intentDef, guidance);
+            HistoricalKnowledgeCandidates historicalCandidates =
+                    historicalKnowledgeCandidateService.retrieve(
+                            project.getId(),
+                            baselineAnalysisId,
+                            story,
+                            files != null ? files : List.of(),
+                            engineeringContext
+                    );
+            analysisContext = adaptContextForSCA(
+                    baselineContext, story, historicalCandidates);
         } else {
             // No baseline analysis - create minimal context with empty knowledge
             analysisContext = createMinimalSCAContext(project, engineeringContext, story, intentDef, guidance);
@@ -201,10 +213,8 @@ public class AnalyzeStoryContextUseCase {
      */
     private AnalysisContext adaptContextForSCA(
             AnalysisContext baselineContext,
-            EngineeringContext engineeringContext,
             EngineeringStory story,
-            IntentDefinition intentDef,
-            Map<String, Object> guidance
+            HistoricalKnowledgeCandidates historicalCandidates
     ) {
         // Create SCA analysis snapshot with correct intent
         AnalysisContext.AnalysisSnapshot scaAnalysisSnapshot = new AnalysisContext.AnalysisSnapshot(
@@ -232,15 +242,14 @@ public class AnalyzeStoryContextUseCase {
                 story.getCompletedAt()
         );
 
-        // Convert UserGuidance if provided
-        UserGuidance userGuidance = mapGuidance(guidance);
-
         return new AnalysisContext(
                 baselineContext.project(),
                 scaAnalysisSnapshot,
                 baselineContext.projectProfile(),
-                baselineContext.facts(),
-                baselineContext.observations(),
+                mergeById(baselineContext.facts(), historicalCandidates.facts(),
+                        AnalysisContext.FactSnapshot::id),
+                mergeById(baselineContext.observations(), historicalCandidates.observations(),
+                        AnalysisContext.ObservationSnapshot::id),
                 baselineContext.recentKnowledgeEvents(),
                 baselineContext.relatedAnalyses(),
                 baselineContext.architectureArtifacts(),
@@ -254,6 +263,17 @@ public class AnalyzeStoryContextUseCase {
                 List.of(currentStorySnapshot),
                 baselineContext.humanContextInputs()
         );
+    }
+
+    private <T> List<T> mergeById(
+            List<T> baseline,
+            List<T> historical,
+            java.util.function.Function<T, UUID> id
+    ) {
+        LinkedHashMap<UUID, T> merged = new LinkedHashMap<>();
+        baseline.forEach(value -> merged.putIfAbsent(id.apply(value), value));
+        historical.forEach(value -> merged.putIfAbsent(id.apply(value), value));
+        return List.copyOf(merged.values());
     }
 
     /**

@@ -42,6 +42,8 @@ import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.entity.StoryStatus;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import com.hopeful117.devlogai.storycontextanalysis.entity.StoryContextAnalysis;
+import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService;
+import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService.HistoricalKnowledgeCandidates;
 import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -91,6 +93,7 @@ class AnalyzeStoryContextUseCaseTest {
     @Mock private AnalysisContextService analysisContextService;
     @Mock private AnalysisRepository analysisRepository;
     @Mock private AnalysisExecutionDiagnosticRepository diagnosticRepository;
+    @Mock private HistoricalKnowledgeCandidateService historicalKnowledgeCandidateService;
 
     private AnalyzeStoryContextUseCase useCase;
 
@@ -111,7 +114,8 @@ class AnalyzeStoryContextUseCaseTest {
                 projectProfileService,
                 analysisContextService,
                 analysisRepository,
-                diagnosticRepository
+                diagnosticRepository,
+                historicalKnowledgeCandidateService
         );
     }
 
@@ -124,13 +128,17 @@ class AnalyzeStoryContextUseCaseTest {
         EngineeringStory story = story(storyId, project);
         ProjectProfileResponse profile = profile(projectId, analysisId);
         AnalysisContext baselineContext = baselineContext(projectId, analysisId, profile);
-        SelectedKnowledge selectedKnowledge = selectedKnowledge(baselineContext, profile);
-        Map<String, Object> projectedKnowledge = Map.of(
-                "selectedFacts", selectedKnowledge.selectedFacts(),
-                "selectedObservations", selectedKnowledge.selectedObservations(),
-                "selectedInsights", selectedKnowledge.selectedInsights(),
-                "selectionDigest", CONTEXT_DIGEST
-        );
+        AnalysisContext.FactSnapshot historicalFact = new AnalysisContext.FactSnapshot(
+                UUID.randomUUID(), FactType.DOCUMENTATION_CHANGE,
+                "Historical Story context", CANONICAL_REFERENCE,
+                List.of(CANONICAL_REFERENCE), Instant.parse("2026-09-01T10:00:00Z"));
+        AnalysisContext.ObservationSnapshot historicalObservation =
+                new AnalysisContext.ObservationSnapshot(
+                        UUID.randomUUID(), ObservationType.ARCHITECTURE_DOCUMENTATION_PRESENT,
+                        "Historical architecture context", "historical-rule", "v1",
+                        List.of(historicalFact.id()), Instant.parse("2026-09-01T11:00:00Z"));
+        HistoricalKnowledgeCandidates historicalCandidates = new HistoricalKnowledgeCandidates(
+                List.of(historicalFact), List.of(historicalObservation));
         EngineeringContext engineeringContext = engineeringContext();
         IntentDefinition intent = intent();
         AiTask task = AiTask.builder()
@@ -148,8 +156,21 @@ class AnalyzeStoryContextUseCaseTest {
                 .thenReturn(engineeringContext);
         when(projectProfileService.getLatestByProject(projectId)).thenReturn(profile);
         when(analysisContextService.build(analysisId)).thenReturn(baselineContext);
-        when(knowledgeSelectionService.select(any(), eq(intent), eq(null))).thenReturn(selectedKnowledge);
-        when(promptProjectionService.toMap(selectedKnowledge)).thenReturn(projectedKnowledge);
+        when(historicalKnowledgeCandidateService.retrieve(
+                projectId, analysisId, story,
+                List.of("src/main/java/Canonical.java"), engineeringContext))
+                .thenReturn(historicalCandidates);
+        when(knowledgeSelectionService.select(any(), eq(intent), eq(null)))
+                .thenAnswer(invocation -> selectedKnowledge(invocation.getArgument(0), profile));
+        when(promptProjectionService.toMap(any())).thenAnswer(invocation -> {
+            SelectedKnowledge selected = invocation.getArgument(0);
+            return Map.of(
+                    "selectedFacts", selected.selectedFacts(),
+                    "selectedObservations", selected.selectedObservations(),
+                    "selectedInsights", selected.selectedInsights(),
+                    "selectionDigest", CONTEXT_DIGEST
+            );
+        });
         when(aiTaskService.createForStoryContextAnalysisEntity(
                 eq(projectId), eq(AiTaskType.STORY_CONTEXT_ANALYSIS), eq(INTENT_ID), eq("v1"),
                 eq("story-context-analysis-prompt-v1"), any(), eq(CONTEXT_DIGEST),
@@ -163,15 +184,21 @@ class AnalyzeStoryContextUseCaseTest {
         ArgumentCaptor<AnalysisContext> selectionContext = ArgumentCaptor.forClass(AnalysisContext.class);
         verify(knowledgeSelectionService).select(selectionContext.capture(), eq(intent), eq(null));
         assertEquals(INTENT_ID, selectionContext.getValue().analysis().intentId());
-        assertEquals(List.of(baselineContext.facts().get(0)), selectionContext.getValue().facts());
-        assertEquals(List.of(baselineContext.observations().get(0)), selectionContext.getValue().observations());
+        assertEquals(
+                List.of(baselineContext.facts().get(0).id(), historicalFact.id()),
+                selectionContext.getValue().facts().stream()
+                        .map(AnalysisContext.FactSnapshot::id).toList());
+        assertEquals(
+                List.of(baselineContext.observations().get(0).id(), historicalObservation.id()),
+                selectionContext.getValue().observations().stream()
+                        .map(AnalysisContext.ObservationSnapshot::id).toList());
         assertEquals(storyId, selectionContext.getValue().engineeringStories().get(0).id());
 
         ArgumentCaptor<PromptRequest> promptCaptor = ArgumentCaptor.forClass(PromptRequest.class);
         verify(aiEngineClient).submit(promptCaptor.capture());
         PromptRequest request = promptCaptor.getValue();
-        assertFalse(((List<?>) request.selectedKnowledge().get("selectedFacts")).isEmpty());
-        assertFalse(((List<?>) request.selectedKnowledge().get("selectedObservations")).isEmpty());
+        assertEquals(2, ((List<?>) request.selectedKnowledge().get("selectedFacts")).size());
+        assertEquals(2, ((List<?>) request.selectedKnowledge().get("selectedObservations")).size());
         assertFalse(((List<?>) request.selectedKnowledge().get("selectedInsights")).isEmpty());
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> projectedStories =
