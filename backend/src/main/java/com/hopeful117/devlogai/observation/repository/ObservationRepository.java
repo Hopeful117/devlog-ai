@@ -19,6 +19,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     List<Observation> findByAnalysisIdOrderByTypeAscIdAsc(UUID analysisId);
 
+    @EntityGraph(attributePaths = "supportingFacts")
     List<Observation> findByAnalysisIdOrderByCreatedAtDescIdDesc(
             UUID analysisId,
             Pageable pageable
