@@ -25,6 +25,26 @@ public interface FactRepository extends JpaRepository<Fact, UUID> {
 
     List<Fact> findByAnalysisIdAndIdIn(UUID analysisId, java.util.Collection<UUID> ids);
 
+    @Query(value = """
+            with fact_evidence as (
+                select fer.fact_id,
+                       string_agg(fer.reference, chr(31) order by fer.reference) as evidence_str
+                from fact_evidence_references fer
+                group by fer.fact_id
+            )
+            select fact.*
+            from facts fact
+            left join fact_evidence fe on fe.fact_id = fact.id
+            where fact.analysis_id in :analysisIds
+            order by fact.type asc, fact.source asc, fact.content asc,
+                     coalesce(fe.evidence_str, '') asc,
+                     fact.id asc
+            """, nativeQuery = true)
+    List<Fact> findHistoricalCandidates(
+            @Param("analysisIds") java.util.Collection<UUID> analysisIds,
+            Pageable pageable
+    );
+
     @Query("select f.fingerprint from Fact f where f.analysis.id = :analysisId " +
             "and f.fingerprint is not null")
     Set<String> findFingerprintsByAnalysisId(@Param("analysisId") UUID analysisId);

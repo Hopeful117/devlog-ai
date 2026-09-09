@@ -50,4 +50,19 @@ public interface AnalysisRepository extends JpaRepository<Analysis, UUID> {
             UUID analysisId,
             Pageable pageable
     );
+
+    @Query("""
+            select analysis
+            from Analysis analysis
+            where analysis.project.id = :projectId
+              and analysis.status = :status
+              and analysis.id <> :excludedAnalysisId
+            order by analysis.completedAt desc, analysis.createdAt desc, analysis.id desc
+            """)
+    List<Analysis> findHistoricalCandidates(
+            @Param("projectId") UUID projectId,
+            @Param("excludedAnalysisId") UUID excludedAnalysisId,
+            @Param("status") AnalysisStatus status,
+            Pageable pageable
+    );
 }
