@@ -313,7 +313,7 @@ class Story0097CommitDiffReconnectionTest {
                 "v1", List.of(), List.of(), Map.of(),
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                 0, 0, 0, false, List.of(), List.of(), "digest");
-        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList(), any()))
                 .thenReturn(repositoryContext);
 
         var service = new KnowledgeSelectionServiceImpl(
@@ -413,7 +413,7 @@ class Story0097CommitDiffReconnectionTest {
                 "v1", List.of(), List.of(commitDiff), Map.of(),
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000),
                 100, 1, 0, false, List.of(), List.of(), "digest");
-        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList()))
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList(), any()))
                 .thenReturn(repositoryContext);
 
         var service = new KnowledgeSelectionServiceImpl(

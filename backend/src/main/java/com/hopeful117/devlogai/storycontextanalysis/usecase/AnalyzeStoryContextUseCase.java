@@ -35,6 +35,11 @@ import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeC
 import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService.HistoricalKnowledgeCandidates;
 import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.source.entity.Source;
+import com.hopeful117.devlogai.source.repository.SourceRepository;
+import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
+import com.hopeful117.devlogai.collection.workspace.ResolvedSourceRevision;
+import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -69,6 +74,8 @@ public class AnalyzeStoryContextUseCase {
     private final AnalysisRepository analysisRepository;
     private final AnalysisExecutionDiagnosticRepository diagnosticRepository;
     private final HistoricalKnowledgeCandidateService historicalKnowledgeCandidateService;
+    private final SourceRepository sourceRepository;
+    private final WorkspaceManager workspaceManager;
 
     public UUID execute(
             String projectSlug,
@@ -118,7 +125,9 @@ public class AnalyzeStoryContextUseCase {
 
         // Select validated knowledge using Story-aware KnowledgeSelectionService
         UserGuidance userGuidance = mapGuidance(guidance);
-        SelectedKnowledge selectedKnowledge = knowledgeSelectionService.select(analysisContext, intentDef, userGuidance);
+        RepositoryRevisionScope revisionScope = resolveRevisionScope(project, story, baselineAnalysisId);
+        SelectedKnowledge selectedKnowledge = knowledgeSelectionService.select(
+                analysisContext, intentDef, userGuidance, revisionScope);
         Map<String, Object> selectedKnowledgeSnapshot = new LinkedHashMap<>(
                 promptProjectionService.toMap(selectedKnowledge));
         selectedKnowledgeSnapshot.put(
@@ -360,6 +369,81 @@ public class AnalyzeStoryContextUseCase {
                 outputContext,
                 INTENT_ID,
                 priorities
+        );
+    }
+
+    /**
+     * Resolves a single immutable RepositoryRevisionScope per SCA execution
+     * (ADR-063 §42.2, §42.4).
+     *
+     * Resolution order:
+     * 1. EngineeringStory.targetCommit (if non-null)
+     * 2. Analysis.targetRevision (from baseline Analysis)
+     * 3. Source.currentRevision (latest known)
+     * 4. HEAD (fallback via WorkspaceManager)
+     */
+    private RepositoryRevisionScope resolveRevisionScope(
+            Project project,
+            EngineeringStory story,
+            UUID baselineAnalysisId
+    ) {
+        List<Source> sources = sourceRepository
+                .findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(project.getId());
+        if (sources.isEmpty()) {
+            throw new IllegalStateException("No active source found for project " + project.getId());
+        }
+        Source source = sources.getFirst();
+
+        String targetRevision = null;
+        String revisionSource = null;
+
+        // 1. Story.targetCommit
+        if (story.getTargetCommit() != null && !story.getTargetCommit().isBlank()) {
+            targetRevision = story.getTargetCommit();
+            revisionSource = RepositoryRevisionScope.SOURCE_STORY_TARGET;
+        }
+
+        // 2. Analysis.targetRevision
+        if (targetRevision == null && baselineAnalysisId != null) {
+            Optional<Analysis> analysisOpt = analysisRepository.findById(baselineAnalysisId);
+            if (analysisOpt.isPresent()) {
+                Analysis analysis = analysisOpt.get();
+                if (analysis.getTargetRevision() != null && !analysis.getTargetRevision().isBlank()) {
+                    targetRevision = analysis.getTargetRevision();
+                    revisionSource = RepositoryRevisionScope.SOURCE_ANALYSIS_TARGET;
+                }
+            }
+        }
+
+        // 3. Source.currentRevision / 4. HEAD
+        if (targetRevision == null) {
+            try {
+                ResolvedSourceRevision resolved = workspaceManager.resolveCurrentRevision(source);
+                targetRevision = resolved.resolvedRevision();
+                revisionSource = RepositoryRevisionScope.SOURCE_CURRENT_REVISION;
+            } catch (Exception e) {
+                log.warn("Failed to resolve current revision for source {}: {}",
+                        source.getId(), e.getMessage());
+                // Fallback: synchronize to HEAD
+                try {
+                    var workspace = workspaceManager.synchronize(source, null);
+                    targetRevision = workspace.resolvedRevision();
+                    revisionSource = RepositoryRevisionScope.SOURCE_HEAD;
+                } catch (Exception ex) {
+                    throw new IllegalStateException(
+                            "Unable to resolve repository revision for source " + source.getId(), ex);
+                }
+            }
+        }
+
+        // Validate revision exists by synchronizing workspace
+        var workspace = workspaceManager.synchronize(source, targetRevision);
+        return new RepositoryRevisionScope(
+                project.getId(),
+                source.getId(),
+                workspace.resolvedRevision(),
+                workspace.path(),
+                revisionSource
         );
     }
 
