@@ -1,19 +1,19 @@
 {
   "scenarioId": "engineering-story-context-analysis-v1",
-  "scenarioVersion": "1.0.0",
+  "scenarioVersion": "1.1.0",
   "output": {
     "proposals": [],
     "analysisResult": {
       "objectiveUnderstanding": {
-        "summary": "DevLog AI is a multi-service system with a Java backend, Python AI engine, Angular frontend, and PostgreSQL database.",
-        "keyDomains": ["backend", "ai-engine", "frontend"],
-        "primaryTechnologies": ["Java", "Python", "Angular"],
-        "architecturalPatterns": ["microservices", "event-driven"]
+        "summary": "The deployment configuration declares a backend service dependency and environment reference to the ai-engine service.",
+        "keyDomains": ["backend", "ai-engine"],
+        "primaryTechnologies": ["Docker Compose"],
+        "architecturalPatterns": ["service composition"]
       },
       "architectureFindings": [
         {
-          "title": "Multi-service Docker architecture",
-          "description": "The project uses a Docker Compose configuration defining backend, ai-engine, frontend, and PostgreSQL services.",
+          "title": "Configured backend to AI Engine relationship",
+          "description": "The Docker Compose configuration declares a backend dependency and environment reference to the ai-engine service.",
           "grounding": {
             "evidenceReferences": [
               {"reference": "docker-compose.yml", "resource": "devlog://projects/test-project/commits/abc123/files/docker-compose.yml"}
@@ -50,11 +50,11 @@
         "rationale": "Analysis based on a single deployment configuration file."
       },
       "provenance": {
-        "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "contextDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "promptVersion": "story-context-analysis-prompt-v1",
         "provider": "mock",
         "modelIdentifier": "deterministic-v1",
-        "promptContentDigest": "f866dd446b2672cb006ad5752c670307fa320d80f849d3721ad4687a2977b50a",
+        "promptContentDigest": "48d1e5329cb3ce9df2747952559b3d637609939b16904bc9f93d8fbf61cf2c60",
         "intentId": "engineering-story-context-analysis",
         "intentVersion": "v1",
         "guidanceKeys": [],
@@ -77,12 +77,12 @@
     }
   },
   "capture": {
-    "repositoryRevision": "2e849641cf74361d7703e4b3f53609b9c5b3e83e",
+    "repositoryRevision": "6f0d2da87cc4dc77427c701c3ec1443bb843216d",
     "capturedAt": "2026-09-06T10:00:00Z",
     "provider": "mock",
     "model": "deterministic-v1",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "f866dd446b2672cb006ad5752c670307fa320d80f849d3721ad4687a2977b50a",
+    "promptContentDigest": "48d1e5329cb3ce9df2747952559b3d637609939b16904bc9f93d8fbf61cf2c60",
     "schemaDigest": "ee34b6de67ef87b15f2d184d4cf894e0e80feaccb2cdda0a955dd1db78f95cee"
   },
   "qualitativeGrounding": {
@@ -91,6 +91,6 @@
     "contradictedMaterialClaims": 0,
     "plausibleButUnprovenMaterialClaims": 0,
     "limitedNonCriticalImprecision": false,
-    "notes": "All findings are grounded in the provided docker-compose.yml evidence reference."
+    "notes": "Findings cite only the current canonical docker-compose.yml reference. Historical-only Fact provenance and selected Insight context do not expand grounding authority."
   }
 }
