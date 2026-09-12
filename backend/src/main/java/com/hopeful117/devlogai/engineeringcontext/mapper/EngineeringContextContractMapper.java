@@ -217,7 +217,10 @@ public class EngineeringContextContractMapper {
                 || kind.equals("MILESTONE")
                 || kind.equals("ARTIFACT")
                 || kind.equals("ENGINEERING_STORY")
-                || kind.equals("CHALLENGE")) {
+                || kind.equals("CHALLENGE")
+                || kind.equals("STORY_DOCUMENT")
+                || kind.equals("ADR_DOCUMENT")
+                || kind.equals("ROADMAP_DOCUMENT")) {
             return TrustTier.HUMAN_AUTHORED;
         }
 

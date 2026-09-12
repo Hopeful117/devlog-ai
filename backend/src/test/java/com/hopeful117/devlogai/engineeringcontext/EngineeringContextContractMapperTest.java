@@ -442,6 +442,64 @@ class EngineeringContextContractMapperTest {
     }
 
 
+    // ---- trust tier classification for repository document kinds (Story 0119, Subtask 2) ----
+
+    @Test
+    void shouldClassifyStoryDocumentAsHumanAuthored() {
+        assertTrustTierForKind("STORY_DOCUMENT", "REPOSITORY_DOCUMENT",
+                com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier.HUMAN_AUTHORED);
+    }
+
+    @Test
+    void shouldClassifyAdrDocumentAsHumanAuthored() {
+        assertTrustTierForKind("ADR_DOCUMENT", "REPOSITORY_DOCUMENT",
+                com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier.HUMAN_AUTHORED);
+    }
+
+    @Test
+    void shouldClassifyRoadmapDocumentAsHumanAuthored() {
+        assertTrustTierForKind("ROADMAP_DOCUMENT", "REPOSITORY_DOCUMENT",
+                com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier.HUMAN_AUTHORED);
+    }
+
+    private void assertTrustTierForKind(String kind, String sourceType,
+                                         com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier expectedTier) {
+        ProjectContextSnapshot projectSnapshot = projectSnapshotWithSlug();
+        var mappedProject = mock(
+                com.hopeful117.devlogai.contracts.projectcontext.ProjectContext.class);
+        when(projectContextContractMapper.toContract(projectSnapshot))
+                .thenReturn(mappedProject);
+
+        RepositoryEvidence evidence = new RepositoryEvidence(
+                RepositoryContextLayer.PROJECT_DOCUMENTATION,
+                kind,
+                "document:source-1:" + kind.toLowerCase() + ".md",
+                "Test " + kind,
+                Instant.EPOCH,
+                EvidenceScore.unscored(),
+                List.of(),
+                new RepositoryEvidence.EvidenceProvenance(
+                        sourceType, "source-1", "docs/" + kind.toLowerCase() + ".md", null),
+                java.util.Map.of(),
+                60,
+                List.of());
+
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+        when(repositoryContext.evidence()).thenReturn(List.of(evidence));
+        when(repositoryContext.selectionDecisions()).thenReturn(List.of());
+        when(repositoryContext.candidateCount()).thenReturn(1);
+        when(repositoryContext.truncated()).thenReturn(false);
+        when(repositoryContext.usedTokens()).thenReturn(60);
+        when(repositoryContext.contextDigest()).thenReturn("digest");
+        when(repositoryContext.warnings()).thenReturn(List.of());
+
+        EngineeringContext result =
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", List.of(), null, null);
+
+        assertThat(result.evidence()).hasSize(1);
+        assertThat(result.evidence().getFirst().trustTier()).isEqualTo(expectedTier);
+    }
+
     // ---- freshness metadata (story 0091 / ADR-062) ----
 
     private com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary summary(

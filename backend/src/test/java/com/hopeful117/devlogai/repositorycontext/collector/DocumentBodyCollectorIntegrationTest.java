@@ -12,6 +12,7 @@ import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.Engineering
 import com.hopeful117.devlogai.repositorycontext.AdrStatusParser;
 import com.hopeful117.devlogai.repositorycontext.ContextRequest;
 import com.hopeful117.devlogai.repositorycontext.DocumentBudgetPolicy;
+import com.hopeful117.devlogai.repositorycontext.DocumentPriorityComparator;
 import com.hopeful117.devlogai.repositorycontext.DocumentReferenceExtractor;
 import com.hopeful117.devlogai.repositorycontext.DocumentStatus;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
@@ -32,11 +33,18 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class DocumentBodyCollectorIntegrationTest {
@@ -46,217 +54,181 @@ class DocumentBodyCollectorIntegrationTest {
     @Mock private WorkspaceManager workspaceManager;
     @Mock private EngineeringStoryRepository storyRepository;
     @Mock private DocumentReferenceExtractor referenceExtractor;
-    @Mock private AdrStatusParser adrStatusParser;
     @Mock private DocumentBudgetPolicy budgetPolicy;
-    @Mock private EvidenceFactory evidenceFactory;
 
     private DocumentBodyCollector collector;
+    private SynchronizedWorkspace workspace;
 
     private static final UUID PROJECT_ID = UUID.randomUUID();
     private static final UUID SOURCE_ID = UUID.randomUUID();
     private static final String REVISION = "abc123";
+    private static final String STORY_PATH = "docs/stories/0118/story.md";
+    private static final String ADR_PATH = "docs/decisions/ADR-0067.md";
 
     @BeforeEach
     void setUp() {
         collector = new DocumentBodyCollector(
                 contentReader, sourceRepository, workspaceManager, storyRepository,
-                referenceExtractor, adrStatusParser, budgetPolicy, evidenceFactory);
+                referenceExtractor, new AdrStatusParser(), budgetPolicy,
+                new DocumentPriorityComparator(), new EvidenceFactory());
         lenient().when(budgetPolicy.maxCharactersPerDocument()).thenReturn(4000);
         lenient().when(budgetPolicy.maxSelectedDocuments()).thenReturn(5);
+        lenient().when(budgetPolicy.maxTotalCharacters()).thenReturn(12000);
     }
 
     @Test
     void scopePropagatedToWorkspaceManager() {
-        EngineeringStorySnapshot story = createStory(118, "docs/stories/0118/story.md");
-        RepositoryRevisionScope scope = createScope("target_commit_456");
+        Source source = prepareWorkspace("target_commit_456");
+        stubStoryOnly("# Story 0118");
 
-        Source source = Source.builder().id(SOURCE_ID).build();
-        when(sourceRepository.findById(SOURCE_ID)).thenReturn(Optional.of(source));
-        when(workspaceManager.synchronize(source, "target_commit_456")).thenReturn(
-                new SynchronizedWorkspace(SOURCE_ID, Path.of("/workspace"), "target_commit_456"));
-        when(contentReader.readComplete(any(), anyString(), anyInt())).thenReturn(
-                new SecureRepositoryContentReader.ReadResult(
-                        SecureRepositoryContentReader.ReadResult.Status.COMPLETE, "# Story", null));
-        when(referenceExtractor.extract(anyString())).thenReturn(
-                new DocumentReferenceExtractor.ExtractedReferences(
-                        java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), false));
-
-        RepositoryEvidence mockEvidence = mock(RepositoryEvidence.class);
-        when(mockEvidence.withContent(any())).thenReturn(mockEvidence);
-        when(mockEvidence.withExtractionMetadata(any())).thenReturn(mockEvidence);
-        when(evidenceFactory.create(any(), any(), anyInt())).thenReturn(mockEvidence);
-
-        ContextRequest request = createContextRequest(story, scope);
-        collector.collect(request);
+        collector.collect(createContextRequest(createStory(), createScope("target_commit_456")));
 
         verify(workspaceManager).synchronize(source, "target_commit_456");
     }
 
     @Test
     void revisionPrecedenceUsesScopeOverStory() {
-        EngineeringStorySnapshot story = createStory(118, "docs/stories/0118/story.md");
-        RepositoryRevisionScope scope = createScope("scope_revision");
+        Source source = prepareWorkspace("scope_revision");
+        stubStoryOnly("# Story 0118");
 
-        Source source = Source.builder().id(SOURCE_ID).build();
-        when(sourceRepository.findById(SOURCE_ID)).thenReturn(Optional.of(source));
-        when(workspaceManager.synchronize(source, "scope_revision")).thenReturn(
-                new SynchronizedWorkspace(SOURCE_ID, Path.of("/workspace"), "scope_revision"));
-        when(contentReader.readComplete(any(), anyString(), anyInt())).thenReturn(
-                new SecureRepositoryContentReader.ReadResult(
-                        SecureRepositoryContentReader.ReadResult.Status.COMPLETE, "# Story", null));
-        when(referenceExtractor.extract(anyString())).thenReturn(
-                new DocumentReferenceExtractor.ExtractedReferences(
-                        java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), false));
-
-        RepositoryEvidence mockEvidence = mock(RepositoryEvidence.class);
-        when(mockEvidence.withContent(any())).thenReturn(mockEvidence);
-        when(mockEvidence.withExtractionMetadata(any())).thenReturn(mockEvidence);
-        when(evidenceFactory.create(any(), any(), anyInt())).thenReturn(mockEvidence);
-
-        ContextRequest request = createContextRequest(story, scope);
-        collector.collect(request);
+        collector.collect(createContextRequest(createStory(), createScope("scope_revision")));
 
         verify(workspaceManager).synchronize(source, "scope_revision");
     }
 
     @Test
     void budgetEnforcedOnDocumentBody() {
-        lenient().when(budgetPolicy.maxCharactersPerDocument()).thenReturn(100);
-        lenient().when(budgetPolicy.maxSelectedDocuments()).thenReturn(5);
+        when(budgetPolicy.maxCharactersPerDocument()).thenReturn(100);
+        prepareWorkspace(REVISION);
+        stubStoryOnly("S".repeat(100));
 
-        EngineeringStorySnapshot story = createStory(118, "docs/stories/0118/story.md");
-        RepositoryRevisionScope scope = createScope(REVISION);
+        List<RepositoryEvidence> result = collector.collect(
+                createContextRequest(createStory(), createScope(REVISION)));
 
-        Source source = Source.builder().id(SOURCE_ID).build();
-        when(sourceRepository.findById(SOURCE_ID)).thenReturn(Optional.of(source));
-        when(workspaceManager.synchronize(source, REVISION)).thenReturn(
-                new SynchronizedWorkspace(SOURCE_ID, Path.of("/workspace"), REVISION));
-
-        String longContent = "# Story 0118\n\n" + "A".repeat(200);
-        when(contentReader.readComplete(any(), anyString(), anyInt()))
-                .thenReturn(new SecureRepositoryContentReader.ReadResult(
-                        SecureRepositoryContentReader.ReadResult.Status.TRUNCATED,
-                        longContent.substring(0, 100), "Truncated by budget"));
-        when(referenceExtractor.extract(anyString())).thenReturn(
-                new DocumentReferenceExtractor.ExtractedReferences(
-                        java.util.Set.of(), java.util.Set.of(), java.util.Set.of(), false));
-
-        RepositoryEvidence mockEvidence = mock(RepositoryEvidence.class);
-        when(mockEvidence.withContent(any())).thenReturn(mockEvidence);
-        when(mockEvidence.withExtractionMetadata(any())).thenReturn(mockEvidence);
-        when(evidenceFactory.create(any(), any(), anyInt())).thenReturn(mockEvidence);
-
-        ContextRequest request = createContextRequest(story, scope);
-        List<RepositoryEvidence> result = collector.collect(request);
-
-        assertFalse(result.isEmpty());
-        verify(contentReader, atLeastOnce()).readComplete(any(), anyString(), eq(100));
+        assertEquals(1, result.size());
+        assertEquals(100, result.getFirst().content().text().length());
+        verify(contentReader, org.mockito.Mockito.times(2))
+                .readComplete(workspace, STORY_PATH, 100);
     }
 
     @Test
     void adrStatusParsedAndStored() {
-        EngineeringStorySnapshot story = createStory(67, "docs/decisions/ADR-067.md");
-        RepositoryRevisionScope scope = createScope(REVISION);
+        prepareWorkspace(REVISION);
+        String adrContent = "# ADR-067: Test\n\n## Status\n**ACCEPTED**";
+        stubStoryAndAdr(adrContent);
 
-        Source source = Source.builder().id(SOURCE_ID).build();
-        when(sourceRepository.findById(SOURCE_ID)).thenReturn(Optional.of(source));
-        when(workspaceManager.synchronize(source, REVISION)).thenReturn(
-                new SynchronizedWorkspace(SOURCE_ID, Path.of("/workspace"), REVISION));
-        when(contentReader.readComplete(any(), anyString(), anyInt())).thenReturn(
-                new SecureRepositoryContentReader.ReadResult(
-                        SecureRepositoryContentReader.ReadResult.Status.COMPLETE,
-                        "# ADR-067: Test\n\n## Status\nACCEPTED", null));
-        when(adrStatusParser.parse("# ADR-067: Test\n\n## Status\nACCEPTED"))
-                .thenReturn(new AdrStatusParser.AdrStatusResult(DocumentStatus.ACCEPTED, null));
-        when(referenceExtractor.extract(anyString())).thenReturn(
-                new DocumentReferenceExtractor.ExtractedReferences(
-                        java.util.Set.of("67"), java.util.Set.of(), java.util.Set.of(), false));
+        List<RepositoryEvidence> result = collector.collect(
+                createContextRequest(createStory(), createScope(REVISION)));
 
-        RepositoryEvidence mockEvidence = mock(RepositoryEvidence.class);
-        when(mockEvidence.withContent(any())).thenReturn(mockEvidence);
-        when(mockEvidence.withExtractionMetadata(any())).thenReturn(mockEvidence);
-        when(evidenceFactory.create(any(), any(), anyInt())).thenReturn(mockEvidence);
-
-        ContextRequest request = createContextRequest(story, scope);
-        List<RepositoryEvidence> result = collector.collect(request);
-
-        assertFalse(result.isEmpty());
-        verify(adrStatusParser).parse("# ADR-067: Test\n\n## Status\nACCEPTED");
+        RepositoryEvidence adr = result.stream()
+                .filter(evidence -> evidence.kind().equals("ADR_DOCUMENT"))
+                .findFirst().orElseThrow();
+        assertEquals(DocumentStatus.ACCEPTED.name(),
+                adr.extractionMetadata().get("documentStatus"));
     }
 
     @Test
     void supersededAdrDetected() {
-        EngineeringStorySnapshot story = createStory(67, "docs/decisions/ADR-067.md");
-        RepositoryRevisionScope scope = createScope(REVISION);
+        prepareWorkspace(REVISION);
+        String adrContent = "# ADR-067: Test\n\n## Status\n**SUPERSEDED** by [ADR-068]";
+        stubStoryAndAdr(adrContent);
 
-        Source source = Source.builder().id(SOURCE_ID).build();
-        when(sourceRepository.findById(SOURCE_ID)).thenReturn(Optional.of(source));
-        when(workspaceManager.synchronize(source, REVISION)).thenReturn(
-                new SynchronizedWorkspace(SOURCE_ID, Path.of("/workspace"), REVISION));
-        when(contentReader.readComplete(any(), anyString(), anyInt())).thenReturn(
-                new SecureRepositoryContentReader.ReadResult(
-                        SecureRepositoryContentReader.ReadResult.Status.COMPLETE,
-                        "# ADR-067: Test\n\n## Status\n**SUPERSEDED** by [ADR-068]", null));
-        when(adrStatusParser.parse(anyString()))
-                .thenReturn(new AdrStatusParser.AdrStatusResult(DocumentStatus.SUPERSEDED, "68"));
-        when(referenceExtractor.extract(anyString())).thenReturn(
-                new DocumentReferenceExtractor.ExtractedReferences(
-                        java.util.Set.of("67"), java.util.Set.of(), java.util.Set.of(), false));
+        List<RepositoryEvidence> result = collector.collect(
+                createContextRequest(createStory(), createScope(REVISION)));
 
-        RepositoryEvidence mockEvidence = mock(RepositoryEvidence.class);
-        when(mockEvidence.withContent(any())).thenReturn(mockEvidence);
-        when(mockEvidence.withExtractionMetadata(any())).thenReturn(mockEvidence);
-        when(evidenceFactory.create(any(), any(), anyInt())).thenReturn(mockEvidence);
-
-        ContextRequest request = createContextRequest(story, scope);
-        List<RepositoryEvidence> result = collector.collect(request);
-
-        assertFalse(result.isEmpty());
-        verify(adrStatusParser).parse(anyString());
+        RepositoryEvidence adr = result.stream()
+                .filter(evidence -> evidence.kind().equals("ADR_DOCUMENT"))
+                .findFirst().orElseThrow();
+        assertEquals(DocumentStatus.SUPERSEDED.name(),
+                adr.extractionMetadata().get("documentStatus"));
+        assertEquals("ADR-068", adr.extractionMetadata().get("supersededBy"));
     }
 
     @Test
     void oneHopTraversalCollectsReferencedAdrs() {
-        EngineeringStorySnapshot story = createStory(118, "docs/stories/0118/story.md");
-        RepositoryRevisionScope scope = createScope(REVISION);
+        prepareWorkspace(REVISION);
+        stubStoryAndAdr("# ADR-067: Test\n\n## Status\n**ACCEPTED**");
 
-        Source source = Source.builder().id(SOURCE_ID).build();
-        when(sourceRepository.findById(SOURCE_ID)).thenReturn(Optional.of(source));
-        when(workspaceManager.synchronize(source, REVISION)).thenReturn(
-                new SynchronizedWorkspace(SOURCE_ID, Path.of("/workspace"), REVISION));
+        List<RepositoryEvidence> result = collector.collect(
+                createContextRequest(createStory(), createScope(REVISION)));
 
-        String storyContent = "# Story 0118\n\nSee ADR-067 for architecture decisions.";
-        String adrContent = "# ADR-067: Test\n\n## Status\nACCEPTED";
-        when(contentReader.readComplete(any(), anyString(), anyInt()))
-                .thenReturn(new SecureRepositoryContentReader.ReadResult(
-                        SecureRepositoryContentReader.ReadResult.Status.COMPLETE, storyContent, null))
-                .thenReturn(new SecureRepositoryContentReader.ReadResult(
-                        SecureRepositoryContentReader.ReadResult.Status.COMPLETE, storyContent, null))
-                .thenReturn(new SecureRepositoryContentReader.ReadResult(
-                        SecureRepositoryContentReader.ReadResult.Status.COMPLETE, adrContent, null));
-        lenient().when(referenceExtractor.extract(anyString())).thenReturn(
-                new DocumentReferenceExtractor.ExtractedReferences(
-                        java.util.Set.of("67"), java.util.Set.of(), java.util.Set.of(), false));
-        when(adrStatusParser.parse(adrContent))
-                .thenReturn(new AdrStatusParser.AdrStatusResult(DocumentStatus.ACCEPTED, null));
-
-        RepositoryEvidence mockEvidence = mock(RepositoryEvidence.class);
-        when(mockEvidence.withContent(any())).thenReturn(mockEvidence);
-        when(mockEvidence.withExtractionMetadata(any())).thenReturn(mockEvidence);
-        when(evidenceFactory.create(any(), any(), anyInt())).thenReturn(mockEvidence);
-
-        ContextRequest request = createContextRequest(story, scope);
-        List<RepositoryEvidence> result = collector.collect(request);
-
-        assertFalse(result.isEmpty());
-        verify(adrStatusParser).parse(adrContent);
+        assertEquals(2, result.size());
+        assertTrue(result.stream().anyMatch(evidence ->
+                evidence.provenance().originatingFile().equals(ADR_PATH)));
+        assertFalse(result.stream().anyMatch(evidence -> evidence.content().text().isEmpty()));
     }
 
-    private EngineeringStorySnapshot createStory(int storyNumber, String storyPath) {
+    @Test
+    void unavailableAdrBodyIsExcludedFromEvidence() {
+        prepareWorkspace(REVISION);
+        when(referenceExtractor.extract(anyString())).thenReturn(
+                new DocumentReferenceExtractor.ExtractedReferences(
+                        Set.of("67"), Set.of(), Set.of(), false));
+        stubContents(Map.of(
+                STORY_PATH, "# Story 0118\n\nSee ADR-067.",
+                ADR_PATH, "unused"), Set.of(ADR_PATH));
+
+        List<RepositoryEvidence> result = collector.collect(
+                createContextRequest(createStory(), createScope(REVISION)));
+
+        assertEquals(1, result.size());
+        assertEquals(STORY_PATH, result.getFirst().provenance().originatingFile());
+    }
+
+    private Source prepareWorkspace(String revision) {
+        Source source = Source.builder().id(SOURCE_ID).build();
+        workspace = new SynchronizedWorkspace(SOURCE_ID, Path.of("/workspace"), revision);
+        when(sourceRepository.findById(SOURCE_ID)).thenReturn(Optional.of(source));
+        when(workspaceManager.synchronize(source, revision)).thenReturn(workspace);
+        return source;
+    }
+
+    private void stubStoryOnly(String storyContent) {
+        when(referenceExtractor.extract(anyString())).thenReturn(
+                new DocumentReferenceExtractor.ExtractedReferences(
+                        Set.of(), Set.of(), Set.of(), false));
+        stubContents(Map.of(STORY_PATH, storyContent));
+    }
+
+    private void stubStoryAndAdr(String adrContent) {
+        when(referenceExtractor.extract(anyString())).thenReturn(
+                new DocumentReferenceExtractor.ExtractedReferences(
+                        Set.of("67"), Set.of(), Set.of(), false));
+        stubContents(Map.of(
+                STORY_PATH, "# Story 0118\n\nSee ADR-067.",
+                ADR_PATH, adrContent));
+    }
+
+    private void stubContents(Map<String, String> documents) {
+        stubContents(documents, Set.of());
+    }
+
+    private void stubContents(Map<String, String> documents, Set<String> unavailablePaths) {
+        when(contentReader.readComplete(eq(workspace), anyString(), anyInt()))
+                .thenAnswer(invocation -> {
+                    String path = invocation.getArgument(1);
+                    if (unavailablePaths.contains(path)) {
+                        return new SecureRepositoryContentReader.ReadResult(
+                                SecureRepositoryContentReader.ReadResult.Status.UNAVAILABLE,
+                                null, "FILE_UNAVAILABLE");
+                    }
+                    String text = documents.get(path);
+                    int maximum = invocation.getArgument(2);
+                    boolean skipped = text.length() > maximum;
+                    return new SecureRepositoryContentReader.ReadResult(
+                            skipped
+                                    ? SecureRepositoryContentReader.ReadResult.Status.SKIPPED
+                                    : SecureRepositoryContentReader.ReadResult.Status.COMPLETE,
+                            skipped ? null : text,
+                            skipped ? "INPUT_TOO_LARGE" : null);
+                });
+    }
+
+    private EngineeringStorySnapshot createStory() {
         return new EngineeringStorySnapshot(
-                UUID.randomUUID(), PROJECT_ID, storyNumber,
-                "Story " + storyNumber, "IN_PROGRESS", storyPath,
-                null, null, Instant.now(), null);
+                UUID.randomUUID(), PROJECT_ID, 118,
+                "Story 118", "IN_PROGRESS", STORY_PATH,
+                "story_base", "story_target", Instant.EPOCH, null);
     }
 
     private RepositoryRevisionScope createScope(String revision) {
@@ -265,21 +237,14 @@ class DocumentBodyCollectorIntegrationTest {
                 Path.of("/workspace"), "STORY_TARGET_COMMIT");
     }
 
-    private ContextRequest createContextRequest(EngineeringStorySnapshot story,
-                                                 RepositoryRevisionScope scope) {
-        return createContextRequest(List.of(story), scope);
-    }
-
-    private ContextRequest createContextRequest(List<EngineeringStorySnapshot> stories,
-                                                 RepositoryRevisionScope scope) {
+    private ContextRequest createContextRequest(
+            EngineeringStorySnapshot story,
+            RepositoryRevisionScope scope
+    ) {
         return new ContextRequest(
-                createAnalysisContext(stories),
-                createIntent(),
-                null,
-                List.of(),
+                createAnalysisContext(List.of(story)), createIntent(), null, List.of(),
                 new ContextPlan("v1", List.of(), Map.of(), List.of(), 0, List.of()),
-                new RepositoryContext.ContextBudget(60, 500, 20, 6000),
-                scope);
+                new RepositoryContext.ContextBudget(60, 500, 20, 6000), scope);
     }
 
     private AnalysisContext createAnalysisContext(List<EngineeringStorySnapshot> stories) {
@@ -293,9 +258,7 @@ class DocumentBodyCollectorIntegrationTest {
                         Instant.EPOCH, null, Instant.EPOCH),
                 null,
                 List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
-                List.of(),
-                List.of(),
-                null,
+                List.of(), List.of(), null,
                 List.of(), List.of(), List.of(), stories, List.of());
     }
 

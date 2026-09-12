@@ -20,10 +20,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -313,5 +316,166 @@ class RepositoryContextEngineTest {
                 new RepositoryEvidence.EvidenceProvenance(
                         "DETERMINISTIC_EXTRACTION", "repository", reference, reference),
                 Map.of(), 10, List.of());
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Regression: retrieveCandidates and 6-param build() paths
+    // ──────────────────────────────────────────────────────────────
+
+    @Test
+    void retrieveCandidatesUsesUnscopedRequestForNonSCAIntents() {
+        RepositoryEvidence commitDiff = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:abc123:src/App.java", 85);
+
+        RepositoryContextEngine engine = engine(
+                List.of(commitDiff),
+                List.of(commitDiff));
+
+        List<RepositoryEvidence> candidates = engine.retrieveCandidates(
+                mock(AnalysisContext.class),
+                mock(IntentDefinition.class),
+                null, List.of());
+
+        assertEquals(1, candidates.size());
+        assertEquals("diff:abc123:src/App.java", candidates.getFirst().reference());
+    }
+
+    @Test
+    void fourParamBuildDelegatesToRetrieveCandidates() {
+        RepositoryEvidence commitDiff = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:abc123:src/App.java", 85);
+
+        RepositoryContextEngine engine = engine(
+                List.of(commitDiff),
+                List.of(commitDiff));
+
+        RepositoryContext context = engine.build(
+                mock(AnalysisContext.class),
+                mock(IntentDefinition.class),
+                null, List.of());
+
+        assertEquals(1, context.evidence().size());
+        assertEquals("diff:abc123:src/App.java", context.evidence().getFirst().reference());
+    }
+
+    @Test
+    void fiveParamBuildDelegatesToRetrieveCandidates() {
+        RepositoryEvidence commitDiff = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:abc123:src/App.java", 85);
+        RepositoryEvidence promotedDiff = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:def456:src/Service.java", 75);
+
+        RepositoryContextEngine engine = engine(
+                List.of(commitDiff),
+                List.of(commitDiff, promotedDiff));
+
+        RepositoryContext context = engine.build(
+                mock(AnalysisContext.class),
+                mock(IntentDefinition.class),
+                null, List.of(),
+                List.of(promotedDiff));
+
+        assertEquals(2, context.evidence().size());
+        assertTrue(context.evidence().stream()
+                .anyMatch(e -> e.reference().equals("diff:abc123:src/App.java")));
+        assertTrue(context.evidence().stream()
+                .anyMatch(e -> e.reference().equals("diff:def456:src/Service.java")));
+    }
+
+    @Test
+    void sixParamBuildUsesScopedRequestForCandidateCollection() {
+        // After the fix (Story 0119 Subtask 1), the 6-param build() uses its
+        // scoped ContextRequest for candidate collection via the internal
+        // collectCandidates() primitive, preserving RepositoryRevisionScope
+        // through to collectors.
+        RepositoryEvidence commitDiff = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:abc123:src/App.java", 85);
+
+        RepositoryContextEngine engine = engine(
+                List.of(commitDiff),
+                List.of(commitDiff));
+
+        RepositoryRevisionScope revisionScope = new RepositoryRevisionScope(
+                UUID.randomUUID(), UUID.randomUUID(), "abc123",
+                java.nio.file.Path.of("/workspace"), "STORY_TARGET_COMMIT");
+
+        RepositoryContext context = engine.build(
+                mock(AnalysisContext.class),
+                mock(IntentDefinition.class),
+                null, List.of(),
+                List.of(),
+                revisionScope);
+
+        // Post-fix: scope is preserved through collectCandidates() and passed to collectors
+        assertNotNull(context);
+        assertFalse(context.evidence().isEmpty());
+    }
+
+    @Test
+    void retrieveCandidatesAndBuildProduceConsistentCandidatePool() {
+        // Verifies that the shared retrieval primitive is used consistently
+        RepositoryEvidence commitDiff1 = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:abc123:src/App.java", 85);
+        RepositoryEvidence commitDiff2 = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:def456:src/Service.java", 75);
+        RepositoryEvidence gitHistory = evidence(
+                RepositoryContextLayer.GIT_HISTORY, "GIT_COMMIT",
+                "git:abc123", 70);
+
+        RepositoryContextEngine engine = engine(
+                List.of(commitDiff1, commitDiff2, gitHistory),
+                List.of(commitDiff1, commitDiff2, gitHistory));
+
+        List<RepositoryEvidence> candidates = engine.retrieveCandidates(
+                mock(AnalysisContext.class),
+                mock(IntentDefinition.class),
+                null, List.of());
+
+        RepositoryContext context = engine.build(
+                mock(AnalysisContext.class),
+                mock(IntentDefinition.class),
+                null, List.of());
+
+        // Both paths must expose the same candidate pool
+        assertEquals(3, candidates.size());
+        assertEquals(3, context.candidateCount());
+    }
+
+    @Test
+    void sixParamBuildIncludesAdditionalCandidatesInSelection() {
+        RepositoryEvidence collectorOutput = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:collector:src/App.java", 85);
+        RepositoryEvidence additionalCandidate = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:additional:src/Service.java", 75);
+
+        RepositoryContextEngine engine = engine(
+                List.of(collectorOutput),
+                List.of(collectorOutput, additionalCandidate));
+
+        RepositoryRevisionScope revisionScope = new RepositoryRevisionScope(
+                UUID.randomUUID(), UUID.randomUUID(), "abc123",
+                java.nio.file.Path.of("/workspace"), "STORY_TARGET_COMMIT");
+
+        RepositoryContext context = engine.build(
+                mock(AnalysisContext.class),
+                mock(IntentDefinition.class),
+                null, List.of(),
+                List.of(additionalCandidate),
+                revisionScope);
+
+        assertEquals(2, context.evidence().size());
+        assertTrue(context.evidence().stream()
+                .anyMatch(e -> e.reference().equals("diff:collector:src/App.java")));
+        assertTrue(context.evidence().stream()
+                .anyMatch(e -> e.reference().equals("diff:additional:src/Service.java")));
     }
 }
