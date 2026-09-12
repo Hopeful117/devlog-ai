@@ -16,10 +16,8 @@ public record DocumentCandidate(
         String sourceId,
         String relativePath,
         String adrNumber,      // for ADR_DOCUMENT
-        DocumentStatus adrStatus, // for ADR_DOCUMENT
         int storyNumber,       // for STORY_DOCUMENT (referenced)
-        boolean isMainStory,   // for STORY_DOCUMENT
-        DocumentStatus adrStatusRaw // raw status for parsing
+        boolean isMainStory    // for STORY_DOCUMENT
 ) {
     public int parsedAdrNumber() {
         if (adrNumber == null || adrNumber.isBlank()) return Integer.MAX_VALUE;
@@ -36,9 +34,5 @@ public record DocumentCandidate(
 
     public boolean isMainStory() {
         return isMainStory;
-    }
-
-    public DocumentStatus adrStatus() {
-        return adrStatus != null ? adrStatus : DocumentStatus.UNKNOWN;
     }
 }

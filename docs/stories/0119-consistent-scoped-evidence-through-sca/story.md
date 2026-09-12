@@ -236,16 +236,15 @@ Silently selects first active Source by `createdAt` + `id` ordering.
 ### 5.2 Deterministic enforcement algorithm
 
 ```
-INPUT: sorted list of document candidates (by priority), DocumentBudgetPolicy
+INPUT: discovered document candidates, DocumentBudgetPolicy
 OUTPUT: selected documents with bounded content
 
+orderedCandidates = metadataOnlySort(candidates)
+admittedCandidates = orderedCandidates.take(maxSelectedDocuments)
 remainingAggregateBudget = maxTotalCharacters
-selectedCount = 0
 selected = []
 
-for candidate in candidates:
-    if selectedCount >= maxSelectedDocuments:
-        break
+for candidate in admittedCandidates:
     if remainingAggregateBudget <= 0:
         break
     
@@ -258,10 +257,16 @@ for candidate in candidates:
     
     selected.add(candidate.withContent(content))
     remainingAggregateBudget -= content.text().length()
-    selectedCount += 1
 
 return selected
 ```
+
+The primary Story discovery read is independent of the evidence-body character
+allocation so explicit references are not lost solely because the Story exceeds
+`maxCharactersPerDocument`. Existing `SecureRepositoryContentReader` safety
+limits still bound that read. If admitted as evidence, the primary Story remains
+subject to the same per-document and aggregate evidence budgets as every other
+document.
 
 ### 5.3 Key design decisions
 
@@ -269,11 +274,11 @@ return selected
 
 2. **`Instant.now()` removed from evidence identity**: Replace with the resolved revision from `RepositoryRevisionScope`. The `occurredAt` field becomes the workspace synchronization timestamp (deterministic per revision), not the collection execution timestamp.
 
-3. **`SKIPPED` (INPUT_TOO_LARGE) documents are excluded, not truncated**: `SecureRepositoryContentReader.readComplete()` already rejects oversized documents. The collector should skip them rather than silently returning partial content. This preserves content integrity.
+3. **`SKIPPED` (INPUT_TOO_LARGE) documents are excluded, not truncated**: `SecureRepositoryContentReader.readComplete()` already rejects oversized documents. The collector should skip them rather than silently returning partial content. Admission is already bounded, so exclusion does not cause an out-of-bound candidate to be materialized as a replacement.
 
-4. **Deterministic ordering before budget application**: Documents are sorted by `DocumentPriorityComparator` (ADR priority by status, story order, roadmap last) before the budget loop. The budget applied to a specific document is deterministic given the same input set.
+4. **Deterministic metadata-only ordering before admission**: Documents are sorted by `DocumentPriorityComparator` using only metadata available without candidate-body reads: primary Story, referenced ADRs by number/path, referenced Stories by number/path, then roadmap. ADR status and supersession are parsed only after an admitted ADR body is materialized. The budget applied to a specific document is deterministic given the same input set.
 
-5. **No `Integer.MAX_VALUE` charging**: The budget loop charges the actual `content.text().length()` consumed, not a policy constant. This produces accurate remaining-budget accounting.
+5. **Actual retained-length charging**: The budget loop charges the actual `content.text().length()` consumed, not a policy or discovery-read limit. This produces accurate remaining-budget accounting.
 
 ---
 
@@ -446,7 +451,7 @@ Then the test verifies that scope propagation survives the complete `KnowledgeSe
 - Track `remainingAggregateBudget` across documents
 - Charge `content.text().length()` per document (not `maxCharactersPerDocument`)
 - Skip documents that would exceed aggregate budget (deterministic behavior: once budget exhausted, stop collecting)
-- Add `DocumentPriorityComparator` (deterministic sort: ADR by status, story order, roadmap last)
+- Add `DocumentPriorityComparator` (deterministic metadata-only sort: primary Story, ADR number/path, referenced Story number/path, roadmap)
 - Add unit tests for budget enforcement
 
 **Files**:

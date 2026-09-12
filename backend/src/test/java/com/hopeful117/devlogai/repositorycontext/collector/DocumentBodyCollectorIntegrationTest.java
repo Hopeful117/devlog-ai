@@ -107,8 +107,7 @@ class DocumentBodyCollectorIntegrationTest {
 
         assertEquals(1, result.size());
         assertEquals(100, result.getFirst().content().text().length());
-        verify(contentReader, org.mockito.Mockito.times(2))
-                .readComplete(workspace, STORY_PATH, 100);
+        verify(contentReader).readComplete(workspace, STORY_PATH, Integer.MAX_VALUE);
     }
 
     @Test
@@ -125,6 +124,7 @@ class DocumentBodyCollectorIntegrationTest {
                 .findFirst().orElseThrow();
         assertEquals(DocumentStatus.ACCEPTED.name(),
                 adr.extractionMetadata().get("documentStatus"));
+        verify(contentReader).readComplete(workspace, ADR_PATH, 4000);
     }
 
     @Test
@@ -142,6 +142,7 @@ class DocumentBodyCollectorIntegrationTest {
         assertEquals(DocumentStatus.SUPERSEDED.name(),
                 adr.extractionMetadata().get("documentStatus"));
         assertEquals("ADR-068", adr.extractionMetadata().get("supersededBy"));
+        verify(contentReader).readComplete(workspace, ADR_PATH, 4000);
     }
 
     @Test

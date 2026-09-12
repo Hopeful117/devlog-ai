@@ -29,11 +29,11 @@ class DocumentPriorityComparatorTest {
 
         assertEquals(List.of(
                         "main-story",
-                        "adr-7-ACCEPTED",
-                        "adr-30-ACCEPTED",
-                        "adr-11-SUPERSEDED",
                         "adr-5-PROPOSED",
+                        "adr-7-ACCEPTED",
+                        "adr-11-SUPERSEDED",
                         "adr-20-UNKNOWN",
+                        "adr-30-ACCEPTED",
                         "story-2",
                         "story-12",
                         "roadmap"),
@@ -72,6 +72,6 @@ class DocumentPriorityComparatorTest {
         return new DocumentCandidate(
                 kind, label + ".md", label, layer, "ref:" + label,
                 Instant.EPOCH, "source", label + ".md", adrNumber,
-                adrStatus, storyNumber, mainStory, adrStatus);
+                storyNumber, mainStory);
     }
 }
