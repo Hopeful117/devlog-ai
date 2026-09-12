@@ -1,5 +1,7 @@
 package com.hopeful117.devlogai.analysis.controller;
 
+import com.hopeful117.devlogai.analysis.communication.AnalysisCommunicationResponse;
+import com.hopeful117.devlogai.analysis.communication.AnalysisCommunicationUseCase;
 import com.hopeful117.devlogai.analysis.dto.request.CreateAnalysisRequest;
 import com.hopeful117.devlogai.analysis.dto.response.AnalysisResponse;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
@@ -33,6 +35,7 @@ public class AnalysisController {
     private final AnalysisDiagnosticsService analysisDiagnosticsService;
     private final AiTaskSelectedEvidenceService aiTaskSelectedEvidenceService;
     private final AnalysisResultQueryService analysisResultQueryService;
+    private final AnalysisCommunicationUseCase analysisCommunicationUseCase;
 
     @GetMapping("/{id}/selected-evidence")
     public ResponseEntity<AiTaskSelectedEvidenceResponse> getSelectedEvidence(
@@ -58,6 +61,11 @@ public class AnalysisController {
     @GetMapping("/{id}/result")
     public ResponseEntity<AnalysisResultResponse> getResult(@PathVariable UUID id) {
         return ResponseEntity.ok(analysisResultQueryService.getResult(id));
+    }
+
+    @PostMapping("/{id}/communicate")
+    public ResponseEntity<AnalysisCommunicationResponse> communicate(@PathVariable UUID id) {
+        return ResponseEntity.ok(analysisCommunicationUseCase.execute(id));
     }
 
     @PostMapping

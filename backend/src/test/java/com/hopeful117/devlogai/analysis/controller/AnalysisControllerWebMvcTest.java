@@ -9,6 +9,7 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.evidence.dto.AiTaskSelectedEvidenceResponse;
 import com.hopeful117.devlogai.analysis.evidence.dto.AiTaskSelectedEvidenceResponse.TaskIdentity;
 import com.hopeful117.devlogai.analysis.evidence.service.AiTaskSelectedEvidenceService;
+import com.hopeful117.devlogai.analysis.communication.AnalysisCommunicationUseCase;
 import com.hopeful117.devlogai.analysis.result.service.AnalysisResultQueryService;
 import com.hopeful117.devlogai.analysis.service.AnalysisService;
 import com.hopeful117.devlogai.analysis.workflow.AnalysisWorkflowService;
@@ -48,8 +49,9 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
         AiTaskSelectedEvidenceService selectedEvidence = mock(AiTaskSelectedEvidenceService.class);
         AnalysisResultQueryService resultQuery = mock(AnalysisResultQueryService.class);
+        AnalysisCommunicationUseCase communication = mock(AnalysisCommunicationUseCase.class);
         MockMvc mvc = mockMvc(new AnalysisController(
-                service, workflow, diagnostics, selectedEvidence, resultQuery));
+                service, workflow, diagnostics, selectedEvidence, resultQuery, communication));
         UUID id = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
@@ -124,8 +126,9 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
         AiTaskSelectedEvidenceService selectedEvidence = mock(AiTaskSelectedEvidenceService.class);
         AnalysisResultQueryService resultQuery = mock(AnalysisResultQueryService.class);
+        AnalysisCommunicationUseCase communication = mock(AnalysisCommunicationUseCase.class);
         MockMvc mvc = mockMvc(new AnalysisController(
-                service, workflow, diagnostics, selectedEvidence, resultQuery));
+                service, workflow, diagnostics, selectedEvidence, resultQuery, communication));
 
         UUID projectId = UUID.randomUUID();
         UUID sourceId = UUID.randomUUID();
@@ -153,8 +156,9 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
         AiTaskSelectedEvidenceService selectedEvidence = mock(AiTaskSelectedEvidenceService.class);
         AnalysisResultQueryService resultQuery = mock(AnalysisResultQueryService.class);
+        AnalysisCommunicationUseCase communication = mock(AnalysisCommunicationUseCase.class);
         MockMvc mvc = mockMvc(new AnalysisController(
-                service, workflow, diagnostics, selectedEvidence, resultQuery));
+                service, workflow, diagnostics, selectedEvidence, resultQuery, communication));
 
         UUID projectId = UUID.randomUUID();
         when(service.create(any()))
@@ -174,8 +178,9 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
         AiTaskSelectedEvidenceService selectedEvidence = mock(AiTaskSelectedEvidenceService.class);
         AnalysisResultQueryService resultQuery = mock(AnalysisResultQueryService.class);
+        AnalysisCommunicationUseCase communication = mock(AnalysisCommunicationUseCase.class);
         MockMvc mvc = mockMvc(new AnalysisController(
-                service, workflow, diagnostics, selectedEvidence, resultQuery));
+                service, workflow, diagnostics, selectedEvidence, resultQuery, communication));
         UUID id = UUID.randomUUID();
 
         LinkedHashMap<String, Object> context = new LinkedHashMap<>();
@@ -199,8 +204,9 @@ class AnalysisControllerWebMvcTest extends ControllerWebMvcTestSupport {
         AnalysisDiagnosticsService diagnostics = mock(AnalysisDiagnosticsService.class);
         AiTaskSelectedEvidenceService selectedEvidence = mock(AiTaskSelectedEvidenceService.class);
         AnalysisResultQueryService resultQuery = mock(AnalysisResultQueryService.class);
+        AnalysisCommunicationUseCase communication = mock(AnalysisCommunicationUseCase.class);
         MockMvc mvc = mockMvc(new AnalysisController(
-                service, workflow, diagnostics, selectedEvidence, resultQuery));
+                service, workflow, diagnostics, selectedEvidence, resultQuery, communication));
         UUID id = UUID.randomUUID();
         when(selectedEvidence.getSelectedEvidence(id))
                 .thenThrow(new EntityNotFoundException("Analysis", id));
