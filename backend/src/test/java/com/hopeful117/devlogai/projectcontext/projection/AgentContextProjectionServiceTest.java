@@ -279,6 +279,136 @@ class AgentContextProjectionServiceTest {
                 second.repositoryContext().warnings());
     }
 
+    // ──────────────────────────────────────────────────────────────
+    // WP6: Projection/history regression audit
+    // ──────────────────────────────────────────────────────────────
+
+    @Test
+    void shouldHandleDuplicateEvidenceReferences() {
+        // Same evidence reference appearing twice in RepositoryContext
+        // passes through to projection (deduplication happens earlier in pipeline)
+        RepositoryEvidence first = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:duplicate:src/App.java", "content-first");
+        RepositoryEvidence second = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:duplicate:src/App.java", "content-second");
+
+        AgentRepositoryContext projected = service(32_768, 8_192).project(
+                PROJECT_ID, projectContext(), context(List.of(first, second)), GENERATED_AT)
+                .repositoryContext();
+
+        // Projection preserves all evidence from RepositoryContext
+        // Deduplication happens at selection time, not projection time
+        assertEquals(2, projected.evidence().size());
+        assertEquals("diff:duplicate:src/App.java", projected.evidence().get(0).reference());
+        assertEquals("diff:duplicate:src/App.java", projected.evidence().get(1).reference());
+    }
+
+    @Test
+    void shouldHandleEmptyEvidenceList() {
+        // Empty evidence list should produce valid minimal projection
+        AgentRepositoryContext projected = service(32_768, 8_192).project(
+                PROJECT_ID, projectContext(), context(List.of()), GENERATED_AT)
+                .repositoryContext();
+
+        assertEquals(0, projected.evidence().size());
+        assertEquals(0, projected.selectedCount());
+        assertEquals("repository-digest", projected.repositoryContextDigest());
+    }
+
+    @Test
+    void shouldHandleEmptyProjectContext() {
+        // Null/empty project context should be handled gracefully
+        ProjectContextSnapshot emptyContext = new ProjectContextSnapshot(
+                null, null,
+                List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(),
+                List.of(), List.of(), List.of(),
+                List.of(), List.of());
+
+        AgentRepositoryContext projected = service(32_768, 8_192).project(
+                PROJECT_ID, emptyContext, context(List.of()), GENERATED_AT)
+                .repositoryContext();
+
+        assertEquals(0, projected.evidence().size());
+    }
+
+    @Test
+    void shouldProduceDeterministicReplayForSameInput() {
+        // Multiple projections with identical input should produce identical output
+        // (deterministic replay behavior)
+        AgentContextProjectionService svc = service(10_000, 2_500);
+        List<RepositoryEvidence> evidenceItems = java.util.stream.IntStream.range(0, 3)
+                .mapToObj(index -> evidence(RepositoryContextLayer.COMMIT_DIFF,
+                        "CHANGED_FILE", "diff:replay-" + index,
+                        "content-" + "z".repeat(200)))
+                .toList();
+        RepositoryContext ctx = context(evidenceItems);
+
+        // Run projection multiple times
+        AgentEngineeringStoryContext r1 = svc.project(PROJECT_ID, projectContext(), ctx, GENERATED_AT);
+        AgentEngineeringStoryContext r2 = svc.project(PROJECT_ID, projectContext(), ctx, GENERATED_AT);
+        AgentEngineeringStoryContext r3 = svc.project(PROJECT_ID, projectContext(), ctx, GENERATED_AT);
+
+        // All should have identical projection digests
+        assertEquals(r1.repositoryContext().projectionDigest(), r2.repositoryContext().projectionDigest());
+        assertEquals(r2.repositoryContext().projectionDigest(), r3.repositoryContext().projectionDigest());
+
+        // Evidence ordering should be identical
+        for (int i = 0; i < r1.repositoryContext().evidence().size(); i++) {
+            assertEquals(r1.repositoryContext().evidence().get(i).reference(),
+                    r2.repositoryContext().evidence().get(i).reference());
+            assertEquals(r2.repositoryContext().evidence().get(i).reference(),
+                    r3.repositoryContext().evidence().get(i).reference());
+        }
+
+        // Warnings should be identical
+        assertEquals(r1.repositoryContext().warnings(), r2.repositoryContext().warnings());
+        assertEquals(r2.repositoryContext().warnings(), r3.repositoryContext().warnings());
+    }
+
+    @Test
+    void shouldPreserveOrderingOfEvidenceFromRepositoryContext() {
+        // Evidence order in RepositoryContext should be preserved in projection
+        // (after selection/filtering steps)
+        List<RepositoryEvidence> evidenceItems = List.of(
+                evidence(RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                        "diff:first:src/A.java", "content-a"),
+                evidence(RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                        "diff:second:src/B.java", "content-b"),
+                evidence(RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                        "diff:third:src/C.java", "content-c"));
+
+        AgentRepositoryContext projected = service(32_768, 8_192).project(
+                PROJECT_ID, projectContext(), context(evidenceItems), GENERATED_AT)
+                .repositoryContext();
+
+        // Should preserve relative ordering (first, second, third)
+        assertEquals(3, projected.evidence().size());
+        assertEquals("diff:first:src/A.java", projected.evidence().get(0).reference());
+        assertEquals("diff:second:src/B.java", projected.evidence().get(1).reference());
+        assertEquals("diff:third:src/C.java", projected.evidence().get(2).reference());
+    }
+
+    @Test
+    void shouldHandleCommitDiffEvidenceInProjection() {
+        // Verify COMMIT_DIFF layer evidence survives projection
+        RepositoryEvidence commitDiff = evidence(
+                RepositoryContextLayer.COMMIT_DIFF, "CHANGED_FILE",
+                "diff:abc123:src/Feature.java", "Modified Feature.java (+50/-10)");
+
+        AgentRepositoryContext projected = service(32_768, 8_192).project(
+                PROJECT_ID, projectContext(), context(List.of(commitDiff)), GENERATED_AT)
+                .repositoryContext();
+
+        assertEquals(1, projected.evidence().size());
+        assertEquals("COMMIT_DIFF", projected.evidence().getFirst().layer());
+        assertEquals("CHANGED_FILE", projected.evidence().getFirst().kind());
+        assertEquals("diff:abc123:src/Feature.java", projected.evidence().getFirst().reference());
+        assertEquals(49, projected.evidence().getFirst().relevanceScore());
+    }
+
     private AgentContextProjectionService service(int bytes, int tokens) {
         return new AgentContextProjectionService(objectMapper,
                 new AgentContextProjectionPolicy(bytes, tokens, 3, 3));

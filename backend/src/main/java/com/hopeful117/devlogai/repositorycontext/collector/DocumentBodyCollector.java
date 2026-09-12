@@ -7,6 +7,8 @@ import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.Engineering
 import com.hopeful117.devlogai.repositorycontext.AdrStatusParser;
 import com.hopeful117.devlogai.repositorycontext.ContextRequest;
 import com.hopeful117.devlogai.repositorycontext.DocumentBudgetPolicy;
+import com.hopeful117.devlogai.repositorycontext.DocumentPriorityComparator;
+import com.hopeful117.devlogai.repositorycontext.DocumentCandidate;
 import com.hopeful117.devlogai.repositorycontext.DocumentReference;
 import com.hopeful117.devlogai.repositorycontext.DocumentReferenceExtractor;
 import com.hopeful117.devlogai.repositorycontext.DocumentStatus;
@@ -44,6 +46,12 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentBodyCollector.class);
 
+    /**
+     * Fallback timestamp when {@code Source.lastSynchronizedAt} is null
+     * (source never collected). Ensures deterministic digests (Story 0119, Subtask 4).
+     */
+    static final Instant UNAVAILABLE_SYNC_TIMESTAMP = Instant.EPOCH;
+
     static final String COLLECTOR_ID = "document-body";
     static final String COLLECTOR_VERSION = "v1";
     static final String SOURCE_TYPE = "REPOSITORY_DOCUMENT";
@@ -55,6 +63,7 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
     private final DocumentReferenceExtractor referenceExtractor;
     private final AdrStatusParser adrStatusParser;
     private final DocumentBudgetPolicy budgetPolicy;
+    private final DocumentPriorityComparator priorityComparator;
     private final EvidenceFactory evidenceFactory;
 
     public DocumentBodyCollector(
@@ -65,6 +74,7 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
             DocumentReferenceExtractor referenceExtractor,
             AdrStatusParser adrStatusParser,
             DocumentBudgetPolicy budgetPolicy,
+            DocumentPriorityComparator priorityComparator,
             EvidenceFactory evidenceFactory
     ) {
         this.contentReader = contentReader;
@@ -74,6 +84,7 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
         this.referenceExtractor = referenceExtractor;
         this.adrStatusParser = adrStatusParser;
         this.budgetPolicy = budgetPolicy;
+        this.priorityComparator = priorityComparator;
         this.evidenceFactory = evidenceFactory;
     }
 
@@ -95,136 +106,96 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
         }
         var currentStory = stories.getFirst();
 
-        SynchronizedWorkspace workspace = resolveWorkspace(scope);
-        if (workspace == null) {
+        ResolvedWorkspace resolved = resolveWorkspace(scope);
+        if (resolved == null) {
             log.warn("Document body collection skipped: workspace unavailable for source {}",
                     scope.sourceId());
             return List.of();
         }
 
-        List<RepositoryEvidence> candidates = new ArrayList<>();
+        Instant occurredAt = resolved.occurredAt;
+
+        // Build all document candidates with metadata for prioritization
+        List<DocumentCandidate> docCandidates = new ArrayList<>();
         Set<String> seenReferences = new LinkedHashSet<>();
 
-        collectStoryDocument(currentStory, workspace, scope, candidates, seenReferences);
-
-        String storyContent = readStoryContent(currentStory, workspace);
-        DocumentReferenceExtractor.ExtractedReferences refs =
-                referenceExtractor.extract(storyContent);
-
-        collectAdrDocuments(refs.adrNumbers(), workspace, scope, candidates, seenReferences);
-        collectReferencedStoryDocuments(refs.storyNumbers(), currentStory, workspace, scope,
-                candidates, seenReferences);
-        collectRoadmapDocument(refs.hasRoadmapReference(), workspace, scope, candidates,
-                seenReferences);
-
-        return List.copyOf(candidates);
-    }
-
-    private SynchronizedWorkspace resolveWorkspace(RepositoryRevisionScope scope) {
-        try {
-            Optional<Source> sourceOpt = sourceRepository.findById(scope.sourceId());
-            if (sourceOpt.isEmpty()) {
-                return null;
-            }
-            Source source = sourceOpt.get();
-            return workspaceManager.synchronize(source, scope.resolvedRevision());
-        } catch (Exception e) {
-            log.warn("Workspace resolution failed for source {}: {}", scope.sourceId(), e.getMessage());
-            return null;
-        }
-    }
-
-    private void collectStoryDocument(
-            EngineeringStorySnapshot storySnapshot,
-            SynchronizedWorkspace workspace,
-            RepositoryRevisionScope scope,
-            List<RepositoryEvidence> candidates,
-            Set<String> seenReferences
-    ) {
-        String storyPath = storySnapshot.storyPath();
-        if (storyPath == null || storyPath.isBlank()) {
-            return;
-        }
-        DocumentReference docRef = new DocumentReference(
-                scope.sourceId(), normalizePath(storyPath), scope.resolvedRevision());
-        String evidenceRef = docRef.toEvidenceReference();
-        if (!seenReferences.add(evidenceRef)) {
-            return;
-        }
-
-        SecureRepositoryContentReader.ReadResult result = contentReader.readComplete(
-                workspace, storyPath, budgetPolicy.maxCharactersPerDocument());
-
-        RepositoryEvidenceContent.Status contentStatus = mapStatus(result.status());
-        String contentText = result.text();
-        String reason = result.reason();
-
-        RepositoryEvidenceContent content = new RepositoryEvidenceContent(
-                contentStatus, contentText, reason,
-                DocumentBudgetPolicy.POLICY_ID, COLLECTOR_VERSION,
-                scope.resolvedRevision());
-
-        String summary = buildStorySummary(storySnapshot);
-        Map<String, String> extractionMeta = buildExtractionMeta(scope, storyPath,
-                "STORY_DOCUMENT", null);
-
-        RepositoryEvidence evidence = evidenceFactory.create(
-                metadata(),
-                new EvidenceFactory.EvidenceInput(
-                        RepositoryContextLayer.PROJECT_DOCUMENTATION,
+        // Build main story document candidate and extract references
+        String storyPath = currentStory.storyPath();
+        String storyContent = null;
+        DocumentReferenceExtractor.ExtractedReferences refs = null;
+        if (storyPath != null && !storyPath.isBlank()) {
+            String normalizedPath = normalizePath(storyPath);
+            DocumentReference docRef = new DocumentReference(scope.sourceId(), normalizedPath, scope.resolvedRevision());
+            String evidenceRef = docRef.toEvidenceReference();
+            if (seenReferences.add(evidenceRef)) {
+                // Inline readStoryContent
+                SecureRepositoryContentReader.ReadResult storyResult = contentReader.readComplete(
+                        resolved.workspace, storyPath, budgetPolicy.maxCharactersPerDocument());
+                storyContent = storyResult.text();
+                refs = referenceExtractor.extract(storyContent);
+                docCandidates.add(new DocumentCandidate(
                         "STORY_DOCUMENT",
+                        normalizedPath,
+                        buildStorySummary(currentStory),
+                        RepositoryContextLayer.PROJECT_DOCUMENTATION,
                         evidenceRef,
-                        summary,
-                        Instant.now(),
-                        List.of(),
+                        occurredAt,
                         scope.sourceId().toString(),
-                        storyPath,
-                        storySnapshot.toString()),
-                budgetPolicy.maxCharactersPerDocument());
-
-        evidence = evidence.withContent(content);
-        evidence = evidence.withExtractionMetadata(extractionMeta);
-        candidates.add(evidence);
-    }
-
-    private String readStoryContent(EngineeringStorySnapshot storySnapshot, SynchronizedWorkspace workspace) {
-        String path = storySnapshot.storyPath();
-        if (path == null || path.isBlank()) {
-            return null;
-        }
-        SecureRepositoryContentReader.ReadResult result = contentReader.readComplete(
-                workspace, path, budgetPolicy.maxCharactersPerDocument());
-        return result.text();
-    }
-
-    private void collectAdrDocuments(
-            Set<String> adrNumbers,
-            SynchronizedWorkspace workspace,
-            RepositoryRevisionScope scope,
-            List<RepositoryEvidence> candidates,
-            Set<String> seenReferences
-    ) {
-        for (String adrNumber : adrNumbers) {
-            String adrPath = resolveAdrPath(adrNumber);
-            if (adrPath == null) {
-                continue;
+                        normalizedPath,
+                        null,
+                        null,
+                        0,
+                        true,
+                        null
+                ));
             }
-            collectDocumentBody(
-                    adrPath, "ADR_DOCUMENT", RepositoryContextLayer.ADR,
-                    "ADR-" + adrNumber, workspace, scope, candidates, seenReferences, true);
         }
-    }
 
-    private void collectReferencedStoryDocuments(
-            Set<String> storyNumbers,
-            Object currentStory,
-            SynchronizedWorkspace workspace,
-            RepositoryRevisionScope scope,
-            List<RepositoryEvidence> candidates,
-            Set<String> seenReferences
-    ) {
+        // If no story path, extract refs from empty content
+        if (refs == null && storyContent != null) {
+            refs = referenceExtractor.extract(storyContent);
+        } else if (refs == null) {
+            refs = referenceExtractor.extract("");
+        }
+
+        // Build ADR document candidates
+        for (String adrNumber : refs.adrNumbers()) {
+            String adrPath = resolveAdrPath(adrNumber);
+            if (adrPath != null) {
+                String normalizedPath = normalizePath(adrPath);
+                DocumentReference docRef = new DocumentReference(scope.sourceId(), normalizedPath, scope.resolvedRevision());
+                String evidenceRef = docRef.toEvidenceReference();
+                if (seenReferences.add(evidenceRef)) {
+                    // Read content to determine status for priority
+                    SecureRepositoryContentReader.ReadResult adrResult = contentReader.readComplete(
+                            resolved.workspace, adrPath, budgetPolicy.maxCharactersPerDocument());
+                    DocumentStatus adrStatus = DocumentStatus.UNKNOWN;
+                    if (adrResult.text() != null) {
+                        AdrStatusParser.AdrStatusResult parsed = adrStatusParser.parse(adrResult.text());
+                        adrStatus = parsed.status();
+                    }
+                    docCandidates.add(new DocumentCandidate(
+                            "ADR_DOCUMENT",
+                            normalizedPath,
+                            "ADR-" + adrNumber,
+                            RepositoryContextLayer.ADR,
+                            evidenceRef,
+                            occurredAt,
+                            scope.sourceId().toString(),
+                            normalizedPath,
+                            adrNumber,
+                            adrStatus,
+                            0,
+                            false,
+                            adrStatus
+                    ));
+                }
+            }
+        }
+
+        // Build referenced story document candidates
         UUID projectId = scope.projectId();
-        for (String storyNumber : storyNumbers) {
+        for (String storyNumber : refs.storyNumbers()) {
             Integer num;
             try {
                 num = Integer.parseInt(storyNumber);
@@ -239,89 +210,157 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
                 continue;
             }
             EngineeringStory story = storyOpt.get();
-            String storyPath = story.getStoryPath();
-            if (storyPath == null || storyPath.isBlank()) {
+            String refStoryPath = story.getStoryPath();
+            if (refStoryPath == null || refStoryPath.isBlank()) {
                 continue;
             }
-            collectDocumentBody(
-                    storyPath, "STORY_DOCUMENT", RepositoryContextLayer.PROJECT_DOCUMENTATION,
-                    "Story " + storyNumber, workspace, scope, candidates, seenReferences, false);
-        }
-    }
-
-    private void collectRoadmapDocument(
-            boolean hasRoadmapReference,
-            SynchronizedWorkspace workspace,
-            RepositoryRevisionScope scope,
-            List<RepositoryEvidence> candidates,
-            Set<String> seenReferences
-    ) {
-        if (!hasRoadmapReference) {
-            return;
-        }
-        collectDocumentBody(
-                "docs/roadmap.md", "ROADMAP_DOCUMENT", RepositoryContextLayer.ROADMAP,
-                "Roadmap", workspace, scope, candidates, seenReferences, false);
-    }
-
-    private void collectDocumentBody(
-            String relativePath,
-            String kind,
-            RepositoryContextLayer layer,
-            String label,
-            SynchronizedWorkspace workspace,
-            RepositoryRevisionScope scope,
-            List<RepositoryEvidence> candidates,
-            Set<String> seenReferences,
-            boolean parseAdrStatus
-    ) {
-        DocumentReference docRef = new DocumentReference(
-                scope.sourceId(), normalizePath(relativePath), scope.resolvedRevision());
-        String evidenceRef = docRef.toEvidenceReference();
-        if (!seenReferences.add(evidenceRef)) {
-            return;
-        }
-
-        SecureRepositoryContentReader.ReadResult result = contentReader.readComplete(
-                workspace, relativePath, budgetPolicy.maxCharactersPerDocument());
-
-        RepositoryEvidenceContent.Status contentStatus = mapStatus(result.status());
-        String contentText = result.text();
-        String reason = result.reason();
-
-        RepositoryEvidenceContent content = new RepositoryEvidenceContent(
-                contentStatus, contentText, reason,
-                DocumentBudgetPolicy.POLICY_ID, COLLECTOR_VERSION,
-                scope.resolvedRevision());
-
-        DocumentStatus docStatus = DocumentStatus.UNKNOWN;
-        String supersededBy = null;
-        if (parseAdrStatus && contentText != null) {
-            AdrStatusParser.AdrStatusResult parsed = adrStatusParser.parse(contentText);
-            docStatus = parsed.status();
-            supersededBy = parsed.supersededBy();
-        }
-
-        Map<String, String> extractionMeta = buildExtractionMeta(scope, relativePath, kind,
-                docStatus, supersededBy);
-
-        RepositoryEvidence evidence = evidenceFactory.create(
-                metadata(),
-                new EvidenceFactory.EvidenceInput(
-                        layer,
-                        kind,
+            String normalizedPath = normalizePath(refStoryPath);
+            DocumentReference docRef = new DocumentReference(scope.sourceId(), normalizedPath, scope.resolvedRevision());
+            String evidenceRef = docRef.toEvidenceReference();
+            if (seenReferences.add(evidenceRef)) {
+                docCandidates.add(new DocumentCandidate(
+                        "STORY_DOCUMENT",
+                        normalizedPath,
+                        "Story " + storyNumber,
+                        RepositoryContextLayer.PROJECT_DOCUMENTATION,
                         evidenceRef,
-                        label,
-                        Instant.now(),
-                        List.of(),
+                        occurredAt,
                         scope.sourceId().toString(),
-                        relativePath,
-                        evidenceRef),
-                budgetPolicy.maxCharactersPerDocument());
+                        normalizedPath,
+                        null,
+                        null,
+                        num,
+                        false,
+                        null
+                ));
+            }
+        }
 
-        evidence = evidence.withContent(content);
-        evidence = evidence.withExtractionMetadata(extractionMeta);
-        candidates.add(evidence);
+        // Build roadmap document candidate
+        if (refs.hasRoadmapReference()) {
+            String normalizedPath = normalizePath("docs/roadmap.md");
+            DocumentReference docRef = new DocumentReference(scope.sourceId(), normalizedPath, scope.resolvedRevision());
+            String evidenceRef = docRef.toEvidenceReference();
+            if (seenReferences.add(evidenceRef)) {
+                docCandidates.add(new DocumentCandidate(
+                        "ROADMAP_DOCUMENT",
+                        normalizedPath,
+                        "Roadmap",
+                        RepositoryContextLayer.ROADMAP,
+                        evidenceRef,
+                        occurredAt,
+                        scope.sourceId().toString(),
+                        normalizedPath,
+                        null,
+                        null,
+                        0,
+                        false,
+                        null
+                ));
+            }
+        }
+
+        // Sort by priority before budget application
+        docCandidates.sort(priorityComparator);
+
+        // Budget loop: deterministic enforcement per Story 0119 §5.2
+        int remainingDocSlots = budgetPolicy.maxSelectedDocuments();
+        int remainingAggregateBudget = budgetPolicy.maxTotalCharacters();
+        List<RepositoryEvidence> selected = new ArrayList<>();
+
+        for (DocumentCandidate candidate : docCandidates) {
+            if (remainingDocSlots <= 0) break;
+            if (remainingAggregateBudget <= 0) break;
+
+            int effectiveMaxPerDoc = Math.min(budgetPolicy.maxCharactersPerDocument(), remainingAggregateBudget);
+
+            SecureRepositoryContentReader.ReadResult result = contentReader.readComplete(
+                    resolved.workspace, candidate.path(), effectiveMaxPerDoc);
+
+            // Skip oversized documents entirely (SKIPPED / INPUT_TOO_LARGE)
+            if (result.status() == SecureRepositoryContentReader.ReadResult.Status.SKIPPED) {
+                log.warn("Document {} exceeds per-document limit, skipping", candidate.path());
+                continue;
+            }
+            if (result.status() == SecureRepositoryContentReader.ReadResult.Status.UNAVAILABLE
+                    || result.text() == null) {
+                log.warn("Document {} is unavailable, excluding from evidence", candidate.path());
+                continue;
+            }
+
+            RepositoryEvidenceContent.Status contentStatus = mapStatus(result.status());
+            String contentText = result.text();
+            String reason = result.reason();
+
+            RepositoryEvidenceContent content = new RepositoryEvidenceContent(
+                    contentStatus, contentText, reason,
+                    DocumentBudgetPolicy.POLICY_ID, COLLECTOR_VERSION,
+                    scope.resolvedRevision());
+
+            // Determine layer and parse ADR status if needed
+            RepositoryContextLayer layer = candidate.layer();
+            DocumentStatus docStatus = DocumentStatus.UNKNOWN;
+            String supersededBy = null;
+            if (candidate.kind().equals("ADR_DOCUMENT") && contentText != null) {
+                AdrStatusParser.AdrStatusResult parsed = adrStatusParser.parse(contentText);
+                docStatus = parsed.status();
+                supersededBy = parsed.supersededBy();
+            }
+
+            Map<String, String> extractionMeta = buildExtractionMeta(scope, candidate.path(), candidate.kind(),
+                    docStatus, supersededBy);
+
+            RepositoryEvidence evidence = evidenceFactory.create(
+                    metadata(),
+                    new EvidenceFactory.EvidenceInput(
+                            candidate.layer(),
+                            candidate.kind(),
+                            candidate.evidenceRef(),
+                            candidate.label(),
+                            occurredAt,
+                            List.of(),
+                            scope.sourceId().toString(),
+                            candidate.path(),
+                            candidate.evidenceRef()),
+                    budgetPolicy.maxCharactersPerDocument());
+
+            evidence = evidence.withContent(content);
+            evidence = evidence.withExtractionMetadata(extractionMeta);
+            selected.add(evidence);
+
+            // Charge actual retained content length
+            remainingAggregateBudget -= contentText.length();
+            remainingDocSlots--;
+        }
+
+        return List.copyOf(selected);
+    }
+
+    private static class ResolvedWorkspace {
+        final SynchronizedWorkspace workspace;
+        final Instant occurredAt;
+        ResolvedWorkspace(SynchronizedWorkspace workspace, Instant occurredAt) {
+            this.workspace = workspace;
+            this.occurredAt = occurredAt;
+        }
+    }
+
+    private ResolvedWorkspace resolveWorkspace(RepositoryRevisionScope scope) {
+        try {
+            Optional<Source> sourceOpt = sourceRepository.findById(scope.sourceId());
+            if (sourceOpt.isEmpty()) {
+                return null;
+            }
+            Source source = sourceOpt.get();
+            SynchronizedWorkspace workspace = workspaceManager.synchronize(source, scope.resolvedRevision());
+            Instant occurredAt = source.getLastSynchronizedAt() != null
+                    ? source.getLastSynchronizedAt()
+                    : UNAVAILABLE_SYNC_TIMESTAMP;
+            return new ResolvedWorkspace(workspace, occurredAt);
+        } catch (Exception e) {
+            log.warn("Workspace resolution failed for source {}: {}", scope.sourceId(), e.getMessage());
+            return null;
+        }
     }
 
     private String resolveAdrPath(String adrNumber) {

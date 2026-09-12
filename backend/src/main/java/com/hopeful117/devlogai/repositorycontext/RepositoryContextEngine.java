@@ -73,6 +73,17 @@ public class RepositoryContextEngine implements RepositoryContextService {
         ContextPlan contextPlan = contextIntelligence.plan(context, intent);
         ContextRequest request = new ContextRequest(
                 context, intent, guidance, validatedInsights, contextPlan, budget);
+        return collectCandidates(request);
+    }
+
+    /**
+     * Internal candidate collection primitive that accepts an already-built
+     * ContextRequest. This preserves ContextRequest continuity through the
+     * entire pipeline (collection -> ranking -> selection -> enrichment).
+     * The public retrieveCandidates() builds its unscoped request and delegates here.
+     * The scoped build(...) uses its scoped request and calls here directly.
+     */
+    private List<RepositoryEvidence> collectCandidates(ContextRequest request) {
         List<RepositoryEvidence> candidates = new ArrayList<>();
         collectors.forEach(collector -> candidates.addAll(collector.collect(request)));
         return candidates;
@@ -111,8 +122,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
         ContextPlan contextPlan = contextIntelligence.plan(context, intent);
         ContextRequest request = new ContextRequest(
                 context, intent, guidance, validatedInsights, contextPlan, budget, revisionScope);
-        List<RepositoryEvidence> candidates = new ArrayList<>(retrieveCandidates(
-                context, intent, guidance, validatedInsights));
+        List<RepositoryEvidence> candidates = new ArrayList<>(collectCandidates(request));
         candidates.addAll(additionalCandidates);
         List<RepositoryEvidence> ranked = ranker.rank(candidates, request);
         EvidenceSelector.SelectionResult pathSelection = selector.select(ranked, request);
