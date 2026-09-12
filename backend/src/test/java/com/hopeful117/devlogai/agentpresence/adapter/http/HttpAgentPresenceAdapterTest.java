@@ -42,6 +42,7 @@ class HttpAgentPresenceAdapterTest {
 
     @Test
     void postsExpectedJsonContractToMessageEndpointForEveryLevel() throws Exception {
+        String source = "DEVLOG-REVIEWER";
         List<ReceivedRequest> received = new ArrayList<>();
         startServer(exchange -> {
             received.add(capture(exchange));
@@ -52,7 +53,7 @@ class HttpAgentPresenceAdapterTest {
 
         for (AgentPresenceLevel level : AgentPresenceLevel.values()) {
             adapter.send(new AgentPresenceMessage(
-                    "Build status", "Backend verification completed", level));
+                    source, "Build status", "Backend verification completed", level));
         }
 
         assertEquals(AgentPresenceLevel.values().length, received.size());
@@ -64,7 +65,7 @@ class HttpAgentPresenceAdapterTest {
             assertEquals("application/json", request.contentType());
             assertEquals(request.body().getBytes(StandardCharsets.UTF_8).length,
                     request.contentLength());
-            assertEquals("DEVLOG", payload.get("source").asText());
+            assertEquals(source, payload.get("source").asText());
             assertEquals("Build status", payload.get("title").asText());
             assertEquals("Backend verification completed", payload.get("body").asText());
             assertEquals(AgentPresenceLevel.values()[index].name(),
@@ -83,7 +84,8 @@ class HttpAgentPresenceAdapterTest {
 
         assertTimeout(Duration.ofSeconds(3), () -> assertDoesNotThrow(() ->
                 adapter.send(new AgentPresenceMessage(
-                        "Build status", "Device unavailable", AgentPresenceLevel.WARNING))));
+                        "DEVLOG", "Build status", "Device unavailable",
+                        AgentPresenceLevel.WARNING))));
     }
 
     @Test
@@ -93,7 +95,8 @@ class HttpAgentPresenceAdapterTest {
         when(failingObjectMapper.writeValueAsString(any())).thenThrow(failure);
         AgentPresencePort adapter = adapter("http://127.0.0.1:65535", failingObjectMapper);
         AgentPresenceMessage message = new AgentPresenceMessage(
-                "Build status", "Serialization failed", AgentPresenceLevel.ATTENTION);
+                "DEVLOG", "Build status", "Serialization failed",
+                AgentPresenceLevel.ATTENTION);
 
         assertDoesNotThrow(() -> adapter.send(message));
 
@@ -116,7 +119,8 @@ class HttpAgentPresenceAdapterTest {
 
         assertTimeout(Duration.ofSeconds(4), () -> assertDoesNotThrow(() ->
                 adapter.send(new AgentPresenceMessage(
-                        "Build status", "Device timeout", AgentPresenceLevel.INFO))));
+                        "DEVLOG", "Build status", "Device timeout",
+                        AgentPresenceLevel.INFO))));
     }
 
     private HttpAgentPresenceAdapter adapter(String baseUrl, ObjectMapper mapper) {

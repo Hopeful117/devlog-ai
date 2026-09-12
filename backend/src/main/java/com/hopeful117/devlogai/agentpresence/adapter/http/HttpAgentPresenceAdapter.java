@@ -42,7 +42,7 @@ public class HttpAgentPresenceAdapter implements AgentPresencePort {
     @Override
     public void send(AgentPresenceMessage message) {
         AgentPresenceHttpRequest request = new AgentPresenceHttpRequest(
-                "DEVLOG",
+                message.source(),
                 message.title(),
                 message.body(),
                 message.level().name()
