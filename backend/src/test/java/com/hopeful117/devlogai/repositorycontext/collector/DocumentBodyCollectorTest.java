@@ -45,8 +45,10 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -110,7 +112,7 @@ class DocumentBodyCollectorTest {
     }
 
     @Test
-    void enforcesMaximumOfFiveSelectedDocuments() {
+    void boundsBodyMaterializationToFiveMetadataAdmittedDocuments() {
         prepareWorkspace(null);
         Set<String> adrNumbers = new LinkedHashSet<>(
                 List.of("1", "2", "3", "4", "5", "6"));
@@ -126,6 +128,14 @@ class DocumentBodyCollectorTest {
         assertEquals(5, result.size());
         assertEquals(List.of(STORY_PATH, adrPath(1), adrPath(2), adrPath(3), adrPath(4)),
                 paths(result));
+        verify(contentReader).readComplete(workspace, STORY_PATH, Integer.MAX_VALUE);
+        verify(contentReader).readComplete(workspace, adrPath(1), 4000);
+        verify(contentReader).readComplete(workspace, adrPath(2), 4000);
+        verify(contentReader).readComplete(workspace, adrPath(3), 4000);
+        verify(contentReader).readComplete(workspace, adrPath(4), 4000);
+        verify(contentReader, never()).readComplete(eq(workspace), eq(adrPath(5)), anyInt());
+        verify(contentReader, never()).readComplete(eq(workspace), eq(adrPath(6)), anyInt());
+        verifyNoMoreInteractions(contentReader);
     }
 
     @Test
@@ -144,6 +154,7 @@ class DocumentBodyCollectorTest {
         assertEquals(3, result.size());
         assertEquals(12000, totalContentCharacters(result));
         assertFalse(paths(result).contains(adrPath(3)));
+        verify(contentReader, never()).readComplete(eq(workspace), eq(adrPath(3)), anyInt());
     }
 
     @Test
@@ -159,8 +170,23 @@ class DocumentBodyCollectorTest {
         assertEquals(4000, result.getFirst().content().text().length());
         assertEquals(com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.COMPLETE,
                 result.getFirst().content().status());
-        verify(contentReader, org.mockito.Mockito.times(2))
-                .readComplete(workspace, STORY_PATH, 4000);
+        verify(contentReader).readComplete(workspace, STORY_PATH, Integer.MAX_VALUE);
+    }
+
+    @Test
+    void discoversReferencesBeyondThePrimaryStoryEvidenceLimit() {
+        prepareWorkspace(null);
+        stubDocuments(Map.of(
+                        STORY_PATH, "S".repeat(4001) + " ADR-1",
+                        adrPath(1), acceptedAdr(1)),
+                Set.of(), references(Set.of("1"), Set.of(), false));
+
+        List<RepositoryEvidence> result = collector.collect(
+                createContextRequest(createStory(), createScope()));
+
+        assertEquals(List.of(adrPath(1)), paths(result));
+        verify(contentReader).readComplete(workspace, STORY_PATH, Integer.MAX_VALUE);
+        verify(contentReader).readComplete(workspace, adrPath(1), 4000);
     }
 
     @Test
@@ -195,13 +221,12 @@ class DocumentBodyCollectorTest {
 
         assertEquals(List.of(1000, 3000, 1000), contentLengths(result));
         assertEquals(5000, totalContentCharacters(result));
-        verify(contentReader, org.mockito.Mockito.times(2))
-                .readComplete(workspace, adrPath(1), 4000);
+        verify(contentReader).readComplete(workspace, adrPath(1), 4000);
         verify(contentReader).readComplete(workspace, adrPath(2), 1000);
     }
 
     @Test
-    void excludesSkippedInputTooLargeDocumentsWithoutConsumingSlots() {
+    void excludesSkippedAdmittedDocumentWithoutMaterializingOutsideAdmissionBound() {
         when(budgetPolicy.maxSelectedDocuments()).thenReturn(2);
         prepareWorkspace(null);
         stubDocuments(Map.of(
@@ -213,15 +238,16 @@ class DocumentBodyCollectorTest {
         List<RepositoryEvidence> result = collector.collect(
                 createContextRequest(createStory(), createScope()));
 
-        assertEquals(2, result.size());
-        assertEquals(List.of(STORY_PATH, adrPath(2)), paths(result));
+        assertEquals(1, result.size());
+        assertEquals(List.of(STORY_PATH), paths(result));
+        verify(contentReader, never()).readComplete(eq(workspace), eq(adrPath(2)), anyInt());
         assertTrue(result.stream().noneMatch(evidence ->
                 evidence.content().status()
                         == com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.SKIPPED));
     }
 
     @Test
-    void excludesUnavailableNullDocumentsWithoutConsumingSlots() {
+    void excludesUnavailableAdmittedDocumentWithoutMaterializingOutsideAdmissionBound() {
         when(budgetPolicy.maxSelectedDocuments()).thenReturn(2);
         prepareWorkspace(null);
         stubDocuments(Map.of(
@@ -234,8 +260,9 @@ class DocumentBodyCollectorTest {
         List<RepositoryEvidence> result = collector.collect(
                 createContextRequest(createStory(), createScope()));
 
-        assertEquals(2, result.size());
-        assertEquals(List.of(STORY_PATH, adrPath(2)), paths(result));
+        assertEquals(1, result.size());
+        assertEquals(List.of(STORY_PATH), paths(result));
+        verify(contentReader, never()).readComplete(eq(workspace), eq(adrPath(2)), anyInt());
         assertTrue(result.stream().noneMatch(evidence ->
                 evidence.content().status()
                         == com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.UNAVAILABLE));

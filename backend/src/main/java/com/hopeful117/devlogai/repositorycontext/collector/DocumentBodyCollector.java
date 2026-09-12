@@ -55,6 +55,7 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
     static final String COLLECTOR_ID = "document-body";
     static final String COLLECTOR_VERSION = "v1";
     static final String SOURCE_TYPE = "REPOSITORY_DOCUMENT";
+    private static final int DISCOVERY_MAX_CHARACTERS = Integer.MAX_VALUE;
 
     private final SecureRepositoryContentReader contentReader;
     private final SourceRepository sourceRepository;
@@ -122,16 +123,17 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
         // Build main story document candidate and extract references
         String storyPath = currentStory.storyPath();
         String storyContent = null;
+        SecureRepositoryContentReader.ReadResult storyDiscoveryResult = null;
         DocumentReferenceExtractor.ExtractedReferences refs = null;
         if (storyPath != null && !storyPath.isBlank()) {
             String normalizedPath = normalizePath(storyPath);
             DocumentReference docRef = new DocumentReference(scope.sourceId(), normalizedPath, scope.resolvedRevision());
             String evidenceRef = docRef.toEvidenceReference();
             if (seenReferences.add(evidenceRef)) {
-                // Inline readStoryContent
-                SecureRepositoryContentReader.ReadResult storyResult = contentReader.readComplete(
-                        resolved.workspace, storyPath, budgetPolicy.maxCharactersPerDocument());
-                storyContent = storyResult.text();
+                // Discovery needs the complete Story within the reader's global safety limits.
+                storyDiscoveryResult = contentReader.readComplete(
+                        resolved.workspace, storyPath, DISCOVERY_MAX_CHARACTERS);
+                storyContent = storyDiscoveryResult.text();
                 refs = referenceExtractor.extract(storyContent);
                 docCandidates.add(new DocumentCandidate(
                         "STORY_DOCUMENT",
@@ -143,10 +145,8 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
                         scope.sourceId().toString(),
                         normalizedPath,
                         null,
-                        null,
                         0,
-                        true,
-                        null
+                        true
                 ));
             }
         }
@@ -166,14 +166,6 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
                 DocumentReference docRef = new DocumentReference(scope.sourceId(), normalizedPath, scope.resolvedRevision());
                 String evidenceRef = docRef.toEvidenceReference();
                 if (seenReferences.add(evidenceRef)) {
-                    // Read content to determine status for priority
-                    SecureRepositoryContentReader.ReadResult adrResult = contentReader.readComplete(
-                            resolved.workspace, adrPath, budgetPolicy.maxCharactersPerDocument());
-                    DocumentStatus adrStatus = DocumentStatus.UNKNOWN;
-                    if (adrResult.text() != null) {
-                        AdrStatusParser.AdrStatusResult parsed = adrStatusParser.parse(adrResult.text());
-                        adrStatus = parsed.status();
-                    }
                     docCandidates.add(new DocumentCandidate(
                             "ADR_DOCUMENT",
                             normalizedPath,
@@ -184,10 +176,8 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
                             scope.sourceId().toString(),
                             normalizedPath,
                             adrNumber,
-                            adrStatus,
                             0,
-                            false,
-                            adrStatus
+                            false
                     ));
                 }
             }
@@ -228,10 +218,8 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
                         scope.sourceId().toString(),
                         normalizedPath,
                         null,
-                        null,
                         num,
-                        false,
-                        null
+                        false
                 ));
             }
         }
@@ -252,30 +240,31 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
                         scope.sourceId().toString(),
                         normalizedPath,
                         null,
-                        null,
                         0,
-                        false,
-                        null
+                        false
                 ));
             }
         }
 
-        // Sort by priority before budget application
+        // Admission uses metadata only; candidate bodies are not read to establish this order.
         docCandidates.sort(priorityComparator);
+        List<DocumentCandidate> admittedCandidates = docCandidates.stream()
+                .limit(budgetPolicy.maxSelectedDocuments())
+                .toList();
 
         // Budget loop: deterministic enforcement per Story 0119 §5.2
-        int remainingDocSlots = budgetPolicy.maxSelectedDocuments();
         int remainingAggregateBudget = budgetPolicy.maxTotalCharacters();
         List<RepositoryEvidence> selected = new ArrayList<>();
 
-        for (DocumentCandidate candidate : docCandidates) {
-            if (remainingDocSlots <= 0) break;
+        for (DocumentCandidate candidate : admittedCandidates) {
             if (remainingAggregateBudget <= 0) break;
 
             int effectiveMaxPerDoc = Math.min(budgetPolicy.maxCharactersPerDocument(), remainingAggregateBudget);
 
-            SecureRepositoryContentReader.ReadResult result = contentReader.readComplete(
-                    resolved.workspace, candidate.path(), effectiveMaxPerDoc);
+            SecureRepositoryContentReader.ReadResult result = candidate.isMainStory()
+                    ? applyLimit(storyDiscoveryResult, effectiveMaxPerDoc)
+                    : contentReader.readComplete(
+                            resolved.workspace, candidate.path(), effectiveMaxPerDoc);
 
             // Skip oversized documents entirely (SKIPPED / INPUT_TOO_LARGE)
             if (result.status() == SecureRepositoryContentReader.ReadResult.Status.SKIPPED) {
@@ -330,7 +319,6 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
 
             // Charge actual retained content length
             remainingAggregateBudget -= contentText.length();
-            remainingDocSlots--;
         }
 
         return List.copyOf(selected);
@@ -408,6 +396,21 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
             case SKIPPED -> RepositoryEvidenceContent.Status.SKIPPED;
             case UNAVAILABLE -> RepositoryEvidenceContent.Status.UNAVAILABLE;
         };
+    }
+
+    private SecureRepositoryContentReader.ReadResult applyLimit(
+            SecureRepositoryContentReader.ReadResult result,
+            int maximumCharacters
+    ) {
+        if (result != null
+                && result.status() == SecureRepositoryContentReader.ReadResult.Status.COMPLETE
+                && result.text().length() > maximumCharacters) {
+            return new SecureRepositoryContentReader.ReadResult(
+                    SecureRepositoryContentReader.ReadResult.Status.SKIPPED,
+                    null,
+                    "INPUT_TOO_LARGE");
+        }
+        return result;
     }
 
     private String normalizePath(String path) {

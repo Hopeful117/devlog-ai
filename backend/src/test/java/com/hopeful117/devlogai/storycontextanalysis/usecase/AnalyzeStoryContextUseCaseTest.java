@@ -30,6 +30,7 @@ import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
+import com.hopeful117.devlogai.knowledge.selection.SemanticSectionComposer;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import com.hopeful117.devlogai.observation.entity.ObservationType;
@@ -38,6 +39,12 @@ import com.hopeful117.devlogai.profile.service.ProjectProfileService;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.repositorycontext.ContextProfile;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
+import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.entity.StoryStatus;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
@@ -82,6 +89,8 @@ class AnalyzeStoryContextUseCaseTest {
     private static final String INTENT_ID = "engineering-story-context-analysis";
     private static final String CONTEXT_DIGEST = "a".repeat(64);
     private static final String CANONICAL_REFERENCE = "src/main/java/Canonical.java";
+    private static final String DOCUMENT_REFERENCE =
+            "document:00000000-0000-0000-0000-000000000001:docs/stories/0119/story.md@abc123def";
     private static final String PROVENANCE_IDENTIFIER = "fact:historical-provenance";
     private static final String RELATED_REFERENCE = "src/main/java/Related.java";
 
@@ -94,7 +103,7 @@ class AnalyzeStoryContextUseCaseTest {
     @Mock private AiTaskRepository aiTaskRepository;
     @Mock private StoryContextAnalysisRepository storyContextAnalysisRepository;
     @Mock private KnowledgeSelectionService knowledgeSelectionService;
-    @Mock private SelectedKnowledgePromptProjectionService promptProjectionService;
+    private SelectedKnowledgePromptProjectionService promptProjectionService;
     @Mock private ProjectProfileService projectProfileService;
     @Mock private AnalysisContextService analysisContextService;
     @Mock private AnalysisRepository analysisRepository;
@@ -107,6 +116,9 @@ class AnalyzeStoryContextUseCaseTest {
 
     @BeforeEach
     void setUp() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        promptProjectionService = new SelectedKnowledgePromptProjectionService(
+                objectMapper, new SemanticSectionComposer());
         useCase = new AnalyzeStoryContextUseCase(
                 projectRepository,
                 storyRepository,
@@ -116,7 +128,7 @@ class AnalyzeStoryContextUseCaseTest {
                 aiEngineClient,
                 aiTaskRepository,
                 storyContextAnalysisRepository,
-                new ObjectMapper(),
+                objectMapper,
                 knowledgeSelectionService,
                 promptProjectionService,
                 projectProfileService,
@@ -194,15 +206,6 @@ class AnalyzeStoryContextUseCaseTest {
 
         when(knowledgeSelectionService.select(any(), eq(intent), eq(null), any()))
                 .thenAnswer(invocation -> selectedKnowledge(invocation.getArgument(0), profile));
-        when(promptProjectionService.toMap(any())).thenAnswer(invocation -> {
-            SelectedKnowledge selected = invocation.getArgument(0);
-            return Map.of(
-                    "selectedFacts", selected.selectedFacts(),
-                    "selectedObservations", selected.selectedObservations(),
-                    "selectedInsights", selected.selectedInsights(),
-                    "selectionDigest", CONTEXT_DIGEST
-            );
-        });
         when(aiTaskService.createForStoryContextAnalysisEntity(
                 eq(projectId), eq(AiTaskType.STORY_CONTEXT_ANALYSIS), eq(INTENT_ID), eq("v1"),
                 eq("story-context-analysis-prompt-v1"), any(), eq(CONTEXT_DIGEST),
@@ -236,8 +239,20 @@ class AnalyzeStoryContextUseCaseTest {
         List<Map<String, Object>> projectedStories =
                 (List<Map<String, Object>>) request.selectedKnowledge().get("engineeringStories");
         assertEquals(storyId.toString(), projectedStories.get(0).get("id"));
-        assertEquals(List.of(CANONICAL_REFERENCE),
-                request.groundingContract().get("allowedEvidenceReferences"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectedRepositoryContext =
+                (Map<String, Object>) request.selectedKnowledge().get("repositoryContext");
+        @SuppressWarnings("unchecked")
+        List<String> projectedEvidenceReferences =
+                ((List<Map<String, Object>>) projectedRepositoryContext.get("evidence")).stream()
+                        .map(evidence -> (String) evidence.get("reference"))
+                        .toList();
+        @SuppressWarnings("unchecked")
+        List<String> allowedEvidenceReferences = (List<String>) request.groundingContract()
+                .get("allowedEvidenceReferences");
+        assertEquals(List.of(DOCUMENT_REFERENCE), allowedEvidenceReferences);
+        assertTrue(projectedEvidenceReferences.containsAll(allowedEvidenceReferences));
+        assertFalse(allowedEvidenceReferences.contains(CANONICAL_REFERENCE));
         assertFalse(((List<?>) request.groundingContract().get("allowedEvidenceReferences"))
                 .contains(PROVENANCE_IDENTIFIER));
         assertFalse(((List<?>) request.groundingContract().get("allowedEvidenceReferences"))
@@ -368,7 +383,7 @@ class AnalyzeStoryContextUseCaseTest {
                 context.project(), context.analysis(), profile,
                 context.observations(), context.facts(),
                 new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0),
-                List.of(insight), null,
+                List.of(insight), repositoryContext(),
                 new SelectedKnowledge.SelectionMetadata(
                         "knowledge-selection-v5",
                         List.of("ENGINEERING_STORY_RELEVANCE"),
@@ -377,6 +392,33 @@ class AnalyzeStoryContextUseCaseTest {
                         "COMPLETE"),
                 CONTEXT_DIGEST
         );
+    }
+
+    private RepositoryContext repositoryContext() {
+        RepositoryEvidence evidence = new RepositoryEvidence(
+                RepositoryContextLayer.PROJECT_DOCUMENTATION,
+                "STORY_DOCUMENT",
+                DOCUMENT_REFERENCE,
+                "Story 0119",
+                Instant.parse("2026-09-08T10:00:00Z"),
+                EvidenceScore.unscored(),
+                List.of(),
+                new RepositoryEvidence.EvidenceProvenance(
+                        "REPOSITORY_DOCUMENT", "source-id",
+                        "docs/stories/0119/story.md", DOCUMENT_REFERENCE),
+                Map.of("resolvedRevision", "abc123def"),
+                10,
+                List.of(),
+                new RepositoryEvidenceContent(
+                        RepositoryEvidenceContent.Status.COMPLETE,
+                        "# Story 0119", null, "document-body-budget-v1", "v1",
+                        "abc123def"));
+        return new RepositoryContext(
+                "repository-context-engine-v1", ContextProfile.PROJECT_STATE, List.of(),
+                "context-plan-v1", List.of(), List.of(evidence),
+                Map.of(RepositoryContextLayer.PROJECT_DOCUMENTATION, 1),
+                new RepositoryContext.ContextBudget(60, 500, 20, 6000),
+                10, 1, 0, false, List.of(), List.of(), "repository-digest");
     }
 
     private EngineeringContext engineeringContext() {

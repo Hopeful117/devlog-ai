@@ -39,6 +39,7 @@ import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
 import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
 import com.hopeful117.devlogai.collection.workspace.ResolvedSourceRevision;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -137,8 +138,9 @@ public class AnalyzeStoryContextUseCase {
 
         String contextDigest = selectedKnowledge.selectionDigest();
 
-        // Build grounding contract from EngineeringContext canonical evidence references
-        Map<String, Object> groundingContract = buildGroundingContract(engineeringContext);
+        // Authorize only the canonical repository evidence projected into this prompt.
+        Map<String, Object> groundingContract = buildGroundingContract(
+                selectedKnowledge.repositoryContext());
 
         // Create AiTask with selected knowledge and grounding contract
         AiTask aiTask = aiTaskService.createForStoryContextAnalysisEntity(
@@ -194,7 +196,7 @@ public class AnalyzeStoryContextUseCase {
         return aiTask.getId();
     }
 
-    private Map<String, Object> buildGroundingContract(EngineeringContext context) {
+    private Map<String, Object> buildGroundingContract(RepositoryContext context) {
         Set<String> allowedRefs = new LinkedHashSet<>();
         for (var evidence : context.evidence()) {
             // Use canonical reference for grounding (RepositoryEvidence.reference)
