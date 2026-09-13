@@ -26,8 +26,14 @@ import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
+import com.hopeful117.devlogai.knowledge.selection.SemanticSectionComposer;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTypeException;
+import com.hopeful117.devlogai.insight.entity.InsightSeverity;
+import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
+import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
+import com.hopeful117.devlogai.project.entity.ProjectStatus;
+import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +43,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.UUID;
 import java.time.Instant;
@@ -191,46 +198,95 @@ class AnalysisWorkflowServiceTest {
         AnalysisContext context = mock(AnalysisContext.class);
         AiTaskResponse task = aiTaskResponse(taskId, analysisId, correlationId, AiTaskStatus.CREATED);
         AiTaskResponse submittedTask = aiTaskResponse(taskId, analysisId, correlationId, AiTaskStatus.SUBMITTED);
+        UUID insightId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        SelectedKnowledge selectedKnowledge = selectedKnowledgeWithRelationship(insightId, eventId);
         AiTaskSubmissionResponse submission = new AiTaskSubmissionResponse(
                 correlationId, true, "engine-job-42", Instant.now());
-        Map<String, Object> projectedKnowledge = Map.of(
-                "selectedFacts", List.of(Map.of("id", UUID.randomUUID().toString())),
-                "selectedObservations", List.of(Map.of("id", UUID.randomUUID().toString())),
-                "selectedInsights", List.of(Map.of(
-                        "type", "ARCHITECTURAL",
-                        "severity", "INFO",
-                        "title", "Controllers",
-                        "content", "The project exposes REST controllers."
-                )),
-                "selectionDigest", "a".repeat(64)
-        );
         when(analysisService.start(analysisId)).thenReturn(analysis);
         when(intentCatalog.resolve("describe-project", "v1")).thenReturn(intent());
         when(deterministicAnalysisService.analyze(analysisId))
                 .thenReturn(new DeterministicAnalysisResult(4, 2));
         when(analysisContextService.build(analysisId)).thenReturn(context);
+        when(knowledgeSelectionService.select(any(), any(), any())).thenReturn(selectedKnowledge);
         when(aiTaskService.create(new CreateAiTaskRequest(analysisId, taskType), context)).thenReturn(task);
         when(aiTaskService.attachSelectedKnowledge(taskId, selectedKnowledge)).thenReturn(task);
-        when(promptProjectionService.toMap(selectedKnowledge)).thenReturn(projectedKnowledge);
         when(aiEngineClient.submit(any(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class)))
                 .thenReturn(submission);
         when(aiTaskService.submit(taskId, new SubmitAiTaskRequest("engine-job-42"))).thenReturn(submittedTask);
 
-        workflowService.start(analysisId);
+        AnalysisWorkflowServiceImpl realWorkflow = workflowWithRealProjection();
+        realWorkflow.start(analysisId);
 
         ArgumentCaptor<com.hopeful117.devlogai.ai.engine.dto.PromptRequest> captor =
                 ArgumentCaptor.forClass(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class);
         verify(aiEngineClient).submit(captor.capture());
         com.hopeful117.devlogai.ai.engine.dto.PromptRequest request = captor.getValue();
-        assertEquals(projectedKnowledge, request.selectedKnowledge());
         @SuppressWarnings("unchecked")
         Map<String, Object> projectedInsight =
                 ((List<Map<String, Object>>) request.selectedKnowledge().get("selectedInsights")).getFirst();
-        assertFalse(projectedInsight.containsKey("id"));
+        assertEquals(insightId.toString(), projectedInsight.get("id"));
         assertFalse(projectedInsight.containsKey("analysisId"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> relationships =
+                (List<Map<String, Object>>) request.selectedKnowledge()
+                        .get("relationshipHighlights");
+        assertEquals(1, relationships.size());
+        assertEquals("RELATES_TO", relationships.getFirst().get("relationType"));
+        assertEquals(insightId.toString(),
+                ((Map<String, Object>) relationships.getFirst().get("source")).get("entityId"));
+        assertEquals(eventId.toString(),
+                ((Map<String, Object>) relationships.getFirst().get("target")).get("entityId"));
+        assertFalse(request.selectedKnowledge().containsKey("relationshipDiagnostics"));
         assertEquals("devlog-ai-core", request.metadata().get("source"));
         assertEquals(analysisId.toString(), request.metadata().get("analysisContextId"));
         assertEquals(intent().outputSchema(), request.expectedOutputContract());
+    }
+
+    private AnalysisWorkflowServiceImpl workflowWithRealProjection() {
+        return new AnalysisWorkflowServiceImpl(
+                analysisService,
+                taskTypeResolver,
+                knowledgeCollectionService,
+                deterministicAnalysisService,
+                projectProfileService,
+                analysisContextService,
+                aiTaskService,
+                aiEngineClient,
+                intentCatalog,
+                knowledgeSelectionService,
+                new SelectedKnowledgePromptProjectionService(new ObjectMapper(), new SemanticSectionComposer())
+        );
+    }
+
+    private SelectedKnowledge selectedKnowledgeWithRelationship(UUID insightId, UUID eventId) {
+        return new SelectedKnowledge(
+                new AnalysisContext.ProjectSnapshot(
+                        UUID.randomUUID(), "DevLog", "devlog-ai", "desc", ProjectStatus.ACTIVE),
+                null,
+                null,
+                List.of(),
+                List.of(),
+                new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0),
+                List.of(new SelectedKnowledge.InsightSnapshot(
+                        insightId, UUID.randomUUID(), com.hopeful117.devlogai.insight.entity.InsightType.ARCHITECTURAL,
+                        InsightSeverity.INFO, "Controllers", "The project exposes REST controllers.")),
+                List.of(),
+                List.of(new ProjectContextSnapshot.EngineeringEventSnapshot(
+                        eventId, "CATEGORY", "Deployment", "Deployment event",
+                        UUID.randomUUID(), "base", "target", Instant.EPOCH, UUID.randomUUID())),
+                List.of(),
+                List.of(new ProjectContextSnapshot.KnowledgeRelationSnapshot(
+                        UUID.randomUUID(), EntityType.INSIGHT, insightId,
+                        EntityType.ENGINEERING_EVENT, eventId,
+                        KnowledgeRelationType.RELATES_TO, "ignored", Instant.EPOCH)),
+                null,
+                null,
+                new SelectedKnowledge.SelectionMetadata(
+                        "test", List.of(), 2, 0,
+                        new SelectedKnowledge.KnowledgeBudget(0, 0, 1, 0, 0), "COMPLETE"),
+                "a".repeat(64)
+        );
     }
 
     @Test
