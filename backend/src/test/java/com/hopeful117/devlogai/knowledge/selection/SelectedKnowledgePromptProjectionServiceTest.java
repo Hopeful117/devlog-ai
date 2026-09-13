@@ -111,6 +111,21 @@ class SelectedKnowledgePromptProjectionServiceTest {
     }
 
     @Test
+    void shouldExcludeAdmissionDiagnosticsFromPromptPayload() {
+        UUID relationId = UUID.randomUUID();
+        SelectedKnowledge selectedKnowledge = selectedKnowledge(
+                List.of(), List.of(), List.of(), List.of(), null, profile(),
+                List.of(new SelectedKnowledge.AdmissionDiagnostic(
+                        relationId, "CANDIDATE_NOT_AVAILABLE", "RELATES_TO",
+                        "INSIGHT", UUID.randomUUID(), "ENGINEERING_EVENT", UUID.randomUUID())));
+
+        Map<String, Object> projected = service.toMap(selectedKnowledge);
+
+        assertFalse(projected.containsKey("admissionDiagnostics"));
+        assertFalse(projected.containsKey("relationshipDiagnostics"));
+    }
+
+    @Test
     void shouldExposeHumanContextInputsAsDistinctPromptSection() {
         SelectedKnowledge selectedKnowledge = selectedKnowledge(
                 List.of(),
@@ -364,6 +379,19 @@ class SelectedKnowledgePromptProjectionServiceTest {
             RepositoryContext repositoryContext,
             ProjectProfileResponse profile
     ) {
+        return selectedKnowledge(insights, engineeringEvents, humanContextInputs, knowledgeRelations,
+                repositoryContext, profile, List.of());
+    }
+
+    private SelectedKnowledge selectedKnowledge(
+            List<SelectedKnowledge.InsightSnapshot> insights,
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> engineeringEvents,
+            List<ProjectContextSnapshot.HumanContextInputSnapshot> humanContextInputs,
+            List<ProjectContextSnapshot.KnowledgeRelationSnapshot> knowledgeRelations,
+            RepositoryContext repositoryContext,
+            ProjectProfileResponse profile,
+            List<SelectedKnowledge.AdmissionDiagnostic> admissionDiagnostics
+    ) {
         return new SelectedKnowledge(
                 new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "DevLog", "devlog-ai",
                         "desc", ProjectStatus.ACTIVE),
@@ -377,6 +405,7 @@ class SelectedKnowledgePromptProjectionServiceTest {
                 engineeringEvents,
                 humanContextInputs,
                 knowledgeRelations,
+                admissionDiagnostics,
                 repositoryContext,
                 null,
                 METADATA,

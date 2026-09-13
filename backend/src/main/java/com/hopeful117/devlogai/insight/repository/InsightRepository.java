@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Pageable;
 
 import java.util.Collection;
 import java.util.List;
@@ -25,6 +26,12 @@ public interface InsightRepository extends JpaRepository<Insight, UUID> {
     List<Insight> findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
             UUID projectId,
             Collection<InsightStatus> statuses
+    );
+
+    List<Insight> findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+            UUID projectId,
+            Collection<InsightStatus> statuses,
+            Pageable pageable
     );
 
     List<Insight> findByAnalysisIdOrderByCreatedAtDescIdDesc(UUID analysisId);

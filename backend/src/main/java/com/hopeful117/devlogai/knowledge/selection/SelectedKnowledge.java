@@ -23,8 +23,9 @@ public record SelectedKnowledge(
         List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
                 selectedEngineeringEvents,
         List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.HumanContextInputSnapshot>
-                selectedHumanContextInputs,
+                 selectedHumanContextInputs,
         List<ProjectContextSnapshot.KnowledgeRelationSnapshot> knowledgeRelations,
+        List<AdmissionDiagnostic> admissionDiagnostics,
         RepositoryContext repositoryContext,
         AnalysisContext.EvolutionContext evolutionContext,
         SelectionMetadata selectionMetadata,
@@ -38,6 +39,7 @@ public record SelectedKnowledge(
         selectedEngineeringEvents = List.copyOf(selectedEngineeringEvents);
         selectedHumanContextInputs = List.copyOf(selectedHumanContextInputs);
         knowledgeRelations = List.copyOf(knowledgeRelations);
+        admissionDiagnostics = List.copyOf(admissionDiagnostics);
     }
 
     public SelectedKnowledge(AnalysisContext.ProjectSnapshot project,
@@ -47,7 +49,7 @@ public record SelectedKnowledge(
             List<InsightSnapshot> selectedInsights, RepositoryContext repositoryContext,
             SelectionMetadata selectionMetadata, String selectionDigest) {
         this(project, analysis, projectProfile, selectedObservations, selectedFacts, diagnostics,
-                selectedInsights, List.of(), List.of(), List.of(), List.of(), repositoryContext, null,
+                selectedInsights, List.of(), List.of(), List.of(), List.of(), List.of(), repositoryContext, null,
                 selectionMetadata, selectionDigest);
     }
 
@@ -71,7 +73,7 @@ public record SelectedKnowledge(
     ) {
         this(project, analysis, projectProfile, selectedObservations, selectedFacts, diagnostics,
                 selectedInsights, existingArchitectureKnowledge, selectedEngineeringEvents,
-                selectedHumanContextInputs, List.of(), repositoryContext, evolutionContext, selectionMetadata, selectionDigest);
+                selectedHumanContextInputs, List.of(), List.of(), repositoryContext, evolutionContext, selectionMetadata, selectionDigest);
     }
 
     public SelectedKnowledge(
@@ -92,7 +94,30 @@ public record SelectedKnowledge(
     ) {
         this(project, analysis, projectProfile, selectedObservations, selectedFacts, diagnostics,
                 selectedInsights, existingArchitectureKnowledge, selectedEngineeringEvents,
-                List.of(), List.of(), repositoryContext, evolutionContext, selectionMetadata, selectionDigest);
+                List.of(), List.of(), List.of(), repositoryContext, evolutionContext, selectionMetadata, selectionDigest);
+    }
+
+    public SelectedKnowledge(
+            AnalysisContext.ProjectSnapshot project,
+            AnalysisContext.AnalysisSnapshot analysis,
+            ProjectProfileResponse projectProfile,
+            List<AnalysisContext.ObservationSnapshot> selectedObservations,
+            List<AnalysisContext.FactSnapshot> selectedFacts,
+            DiagnosticSnapshot diagnostics,
+            List<InsightSnapshot> selectedInsights,
+            List<ExistingArchitectureKnowledgeSnapshot> existingArchitectureKnowledge,
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> selectedEngineeringEvents,
+            List<ProjectContextSnapshot.HumanContextInputSnapshot> selectedHumanContextInputs,
+            List<ProjectContextSnapshot.KnowledgeRelationSnapshot> knowledgeRelations,
+            RepositoryContext repositoryContext,
+            AnalysisContext.EvolutionContext evolutionContext,
+            SelectionMetadata selectionMetadata,
+            String selectionDigest
+    ) {
+        this(project, analysis, projectProfile, selectedObservations, selectedFacts, diagnostics,
+                selectedInsights, existingArchitectureKnowledge, selectedEngineeringEvents,
+                selectedHumanContextInputs, knowledgeRelations, List.of(), repositoryContext,
+                evolutionContext, selectionMetadata, selectionDigest);
     }
 
     public record DiagnosticSnapshot(boolean collectionComplete, boolean truncated,
@@ -100,6 +125,16 @@ public record SelectedKnowledge(
 
     public record InsightSnapshot(UUID id, UUID analysisId, InsightType type,
                                   InsightSeverity severity, String title, String content) { }
+
+    public record AdmissionDiagnostic(
+            UUID relationId,
+            String reason,
+            String relationType,
+            String sourceEntityType,
+            UUID sourceEntityId,
+            String targetEntityType,
+            UUID targetEntityId
+    ) { }
 
     public record ExistingArchitectureKnowledgeSnapshot(
             UUID insightId,

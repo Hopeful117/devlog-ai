@@ -34,6 +34,7 @@ import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class KnowledgeSelectionServiceTest {
@@ -108,7 +109,8 @@ class KnowledgeSelectionServiceTest {
                 .analysisId(analysisId).collectionComplete(true).warningCount(1).build();
         when(diagnostics.findById(analysisId)).thenReturn(Optional.of(diagnostic));
         when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
+                eq(projectId), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of());
         when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
 
         List<AnalysisContext.FactSnapshot> facts = new ArrayList<>();
@@ -163,6 +165,103 @@ class KnowledgeSelectionServiceTest {
         assertTrue(first.selectionMetadata().appliedRules()
                 .contains("OBSERVATION_FACT_CLOSURE"));
         assertEquals(List.of(), first.existingArchitectureKnowledge());
+    }
+
+    @Test
+    void shouldAdmitOneHopEngineeringEventEndpointWithinConfiguredCapacity() {
+        var diagnostics = mock(AnalysisExecutionDiagnosticRepository.class);
+        var insights = mock(InsightRepository.class);
+        var mapper = mock(ObjectMapper.class);
+        var repositoryContexts = mock(RepositoryContextService.class);
+        UUID projectId = UUID.randomUUID();
+        UUID analysisId = UUID.randomUUID();
+        IntentDefinition intent = new IntentDefinition("architecture-overview", "v1", "Architecture",
+                List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
+                Map.of("type", "object"), "architecture-overview-prompt-v1");
+        List<ProjectContextSnapshot.EngineeringEventSnapshot> events = IntStream.range(0, 11)
+                .mapToObj(index -> new ProjectContextSnapshot.EngineeringEventSnapshot(
+                        new UUID(0, index + 1L), "CATEGORY", "event-" + index,
+                        "summary", UUID.randomUUID(), "base", "target-" + index,
+                        Instant.ofEpochSecond(11 - index), UUID.randomUUID()))
+                .toList();
+        var relation = new ProjectContextSnapshot.KnowledgeRelationSnapshot(
+                UUID.randomUUID(), EntityType.ENGINEERING_EVENT, events.getFirst().id(),
+                EntityType.ENGINEERING_EVENT, events.get(10).id(),
+                KnowledgeRelationType.RELATES_TO, "explicit", Instant.EPOCH);
+        AnalysisContext context = new AnalysisContext(
+                new AnalysisContext.ProjectSnapshot(projectId, "Project", "project", null,
+                        ProjectStatus.ACTIVE),
+                new AnalysisContext.AnalysisSnapshot(analysisId, AnalysisType.ARCHITECTURE_REVIEW,
+                        intent.id(), intent.version(), AnalysisStatus.IN_PROGRESS,
+                        Instant.EPOCH, null, Instant.EPOCH),
+                mock(ProjectProfileResponse.class), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(), null, events, List.of(),
+                List.of(relation), List.of(), List.of());
+        when(diagnostics.findById(analysisId)).thenReturn(Optional.of(
+                AnalysisExecutionDiagnostic.builder().analysisId(analysisId).collectionComplete(true).build()));
+        when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList(), any()))
+                .thenReturn(emptyRepositoryContext());
+        when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
+
+        var service = new KnowledgeSelectionServiceImpl(
+                diagnostics, insights, mapper, repositoryContexts, 15, 1);
+
+        SelectedKnowledge result = service.select(context, intent, null);
+
+        assertEquals(10, result.selectedEngineeringEvents().size());
+        assertTrue(result.selectedEngineeringEvents().stream()
+                .anyMatch(event -> event.id().equals(events.get(10).id())));
+        assertTrue(result.admissionDiagnostics().isEmpty());
+    }
+
+    @Test
+    void shouldNotAdmitResolvesForArchitectureOverview() {
+        var diagnostics = mock(AnalysisExecutionDiagnosticRepository.class);
+        var insights = mock(InsightRepository.class);
+        var mapper = mock(ObjectMapper.class);
+        var repositoryContexts = mock(RepositoryContextService.class);
+        UUID projectId = UUID.randomUUID();
+        UUID analysisId = UUID.randomUUID();
+        IntentDefinition intent = new IntentDefinition("architecture-overview", "v1", "Architecture",
+                List.of(InsightType.ARCHITECTURE_DESCRIPTION), List.of("grounded"),
+                Map.of("type", "object"), "architecture-overview-prompt-v1");
+        List<ProjectContextSnapshot.EngineeringEventSnapshot> events = IntStream.range(0, 11)
+                .mapToObj(index -> new ProjectContextSnapshot.EngineeringEventSnapshot(
+                        new UUID(0, index + 1L), "CATEGORY", "event-" + index,
+                        "summary", UUID.randomUUID(), "base", "target-" + index,
+                        Instant.ofEpochSecond(11 - index), UUID.randomUUID()))
+                .toList();
+        var relation = new ProjectContextSnapshot.KnowledgeRelationSnapshot(
+                UUID.randomUUID(), EntityType.ENGINEERING_EVENT, events.getFirst().id(),
+                EntityType.ENGINEERING_EVENT, events.get(10).id(),
+                KnowledgeRelationType.RESOLVES, "explicit", Instant.EPOCH);
+        AnalysisContext context = new AnalysisContext(
+                new AnalysisContext.ProjectSnapshot(projectId, "Project", "project", null,
+                        ProjectStatus.ACTIVE),
+                new AnalysisContext.AnalysisSnapshot(analysisId, AnalysisType.ARCHITECTURE_REVIEW,
+                        intent.id(), intent.version(), AnalysisStatus.IN_PROGRESS,
+                        Instant.EPOCH, null, Instant.EPOCH),
+                mock(ProjectProfileResponse.class), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(), null, events, List.of(),
+                List.of(relation), List.of(), List.of());
+        when(diagnostics.findById(analysisId)).thenReturn(Optional.of(
+                AnalysisExecutionDiagnostic.builder().analysisId(analysisId).collectionComplete(true).build()));
+        when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                eq(projectId), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of());
+        when(repositoryContexts.build(eq(context), eq(intent), isNull(), anyList(), anyList(), any()))
+                .thenReturn(emptyRepositoryContext());
+        when(mapper.writeValueAsString(any())).thenReturn("stable-canonical-selection");
+
+        var service = new KnowledgeSelectionServiceImpl(
+                diagnostics, insights, mapper, repositoryContexts, 15, 1);
+
+        SelectedKnowledge result = service.select(context, intent, null);
+
+        assertEquals(10, result.selectedEngineeringEvents().size());
+        assertEquals("INELIGIBLE_FOR_INTENT", result.admissionDiagnostics().getFirst().reason());
     }
 
     private AnalysisContext.FactSnapshot fact(FactType type, String content) {
