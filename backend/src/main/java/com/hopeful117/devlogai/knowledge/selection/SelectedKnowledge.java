@@ -114,7 +114,7 @@ public record SelectedKnowledge(
             Instant createdAt
     ) {
         public ExistingArchitectureKnowledgeSnapshot {
-            evidenceReferences = List.copyOf(evidenceReferences);
+            evidenceReferences = evidenceReferences == null ? List.of() : List.copyOf(evidenceReferences);
         }
     }
 

@@ -8,7 +8,7 @@ describe('AnalysisForm', () => {
   it('requires an objective and enforces priority limits', () => {
     const component = TestBed.createComponent(AnalysisForm).componentInstance;
     expect(component.form.invalid).toBe(true);
-    component.form.controls.objective.setValue('architecture-overview-v1');
+    component.form.controls.objective.setValue('architecture-overview-v2');
     component.form.controls.priorities.setValue(
       Array.from({ length: 11 }, (_, index) => `P${index}`).join('\n'),
     );
@@ -22,14 +22,14 @@ describe('AnalysisForm', () => {
       {
         label: 'Review architecture',
         description: 'Analyze architecture',
-        intentId: 'architecture-overview-v1',
+        intentId: 'architecture-overview-v2',
         scope: 'PROJECT_SCOPE',
       },
     ];
     const emitted = vi.fn();
     component.launch.subscribe(emitted);
     component.form.patchValue({
-      objective: 'architecture-overview-v1',
+      objective: 'architecture-overview-v2',
       targetRevision: ' release-1 ',
       focus: ' architecture ',
       audience: 'team',
@@ -39,7 +39,7 @@ describe('AnalysisForm', () => {
     expect(emitted).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId: 'project-id',
-        intentId: 'architecture-overview-v1',
+        intentId: 'architecture-overview-v2',
         targetRevision: 'release-1',
         userGuidance: expect.objectContaining({
           focus: 'architecture',

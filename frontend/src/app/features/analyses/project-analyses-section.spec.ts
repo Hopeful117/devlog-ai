@@ -61,7 +61,7 @@ describe('ProjectAnalysesSection', () => {
     fixture.detectChanges();
     fixture.componentInstance.launch({
       projectId: 'project-id',
-      intentId: 'architecture-overview-v1',
+      intentId: 'architecture-overview-v2',
     });
     fixture.detectChanges();
     await fixture.whenStable();
@@ -97,7 +97,7 @@ const genericIntents = [
   },
   {
     id: 'architecture-overview',
-    version: 'v1',
+    version: 'v2',
     executionMode: 'GENERIC',
     objective: 'Architecture overview',
     supportedInsightTypes: [],

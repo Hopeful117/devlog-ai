@@ -396,7 +396,8 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
     }
 
     private boolean isArchitectureRelevantInsight(Insight insight) {
-        if (ARCHITECTURE_SOURCE_TYPES.contains(insight.getSourceType())) {
+        if (insight.getSourceType() != null
+                && ARCHITECTURE_SOURCE_TYPES.contains(insight.getSourceType())) {
             return true;
         }
         return insight.getSourceType() == null

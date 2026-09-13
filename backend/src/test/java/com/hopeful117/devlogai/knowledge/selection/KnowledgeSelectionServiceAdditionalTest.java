@@ -190,6 +190,46 @@ class KnowledgeSelectionServiceAdditionalTest {
     }
 
     @Test
+    void shouldKeepLegacyArchitecturalInsightWithNullSourceType() throws Exception {
+        var service = createService();
+        var context = createMinimalContext(testAnalysis());
+
+        AnalysisExecutionDiagnostic diagnostic = AnalysisExecutionDiagnostic.builder()
+                .analysisId(context.analysis().id())
+                .collectionComplete(true).truncated(false)
+                .warningCount(0).errorCount(0)
+                .build();
+        when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.of(diagnostic));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        RepositoryContext repoContext = new RepositoryContext(
+                "v1", null, List.of(), "v1", List.of(), List.of(),
+                Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
+                0, 0, 0, false, List.of(), List.of(), "digest");
+        when(repositoryContextService.build(any(), any(), any(), anyList(), anyList(), any())).thenReturn(repoContext);
+
+        Insight legacy = Insight.builder()
+                .id(UUID.randomUUID())
+                .analysis(com.hopeful117.devlogai.analysis.entity.Analysis.builder().id(UUID.randomUUID()).build())
+                .proposal(com.hopeful117.devlogai.proposal.entity.ValidatableProposal.builder().id(UUID.randomUUID()).build())
+                .type(InsightType.ARCHITECTURAL)
+                .severity(InsightSeverity.INFO)
+                .title("Legacy architecture")
+                .content("Legacy architecture content")
+                .evidenceReferences(null)
+                .status(InsightStatus.ACTIVE)
+                .createdAt(Instant.now())
+                .build();
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                context.project().id(), List.of(InsightStatus.ACTIVE))).thenReturn(List.of(legacy));
+
+        SelectedKnowledge result = service.select(context, architectureIntent(), null);
+
+        assertEquals(1, result.existingArchitectureKnowledge().size());
+        assertNull(result.existingArchitectureKnowledge().getFirst().sourceType());
+        assertEquals(List.of(), result.existingArchitectureKnowledge().getFirst().evidenceReferences());
+    }
+
+    @Test
     void shouldConsumeOnlyActiveInsightsFromRepository() throws Exception {
         var service = createService();
         var analysis = testAnalysis();

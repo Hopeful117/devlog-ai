@@ -7,6 +7,9 @@ import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
+import com.hopeful117.devlogai.analysis.communication.CommunicationDecision;
+import com.hopeful117.devlogai.analysis.communication.CommunicationDecisionService;
+import com.hopeful117.devlogai.analysis.communication.AnalysisCommunicationUseCase;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.fact.entity.Fact;
@@ -39,6 +42,8 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
     private final AiProposalContractValidator proposalContractValidator;
     private final ObjectMapper objectMapper;
     private final AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
+    private final CommunicationDecisionService communicationDecisionService;
+    private final AnalysisCommunicationUseCase analysisCommunicationUseCase;
 
     @Override
     @Transactional
@@ -125,6 +130,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         finishAnalysis(task, AnalysisStatus.COMPLETED, request.completedAt());
         log.info("AI task completed correlationId={} proposalCount={} hasSynthesis={}",
                 correlationId, request.proposals().size(), request.synthesis() != null);
+        evaluateAndCommunicate(task.getAnalysis().getId());
         return acknowledgement(task, false);
     }
 
@@ -382,5 +388,20 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         analyzeStoryContextUseCase.handleCallback(task.getCorrelationId(), request);
 
         return acknowledgement(task, false);
+    }
+
+    private void evaluateAndCommunicate(UUID analysisId) {
+        try {
+            CommunicationDecision decision = communicationDecisionService.evaluate(analysisId);
+            if (decision == CommunicationDecision.SPEAK) {
+                analysisCommunicationUseCase.execute(analysisId);
+                log.info("Autonomous communication sent for analysis {}", analysisId);
+            } else {
+                log.debug("Autonomous communication skipped for analysis {} (SILENCE)", analysisId);
+            }
+        } catch (Exception e) {
+            log.warn("Autonomous communication failed for analysis {}; analysis completion unaffected: {}",
+                    analysisId, e.getMessage());
+        }
     }
 }
