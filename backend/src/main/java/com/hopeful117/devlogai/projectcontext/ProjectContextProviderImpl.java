@@ -49,7 +49,7 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     static final int MAX_ARCHITECTURE_DECISIONS = 20;
     static final int MAX_RECENT_MILESTONES = 10;
     static final int MAX_RELATED_ANALYSES = 10;
-    static final int MAX_VALIDATED_ENGINEERING_EVENTS = 10;
+    static final int MAX_VALIDATED_ENGINEERING_EVENTS = 20;
     static final int MAX_OPEN_CHALLENGES = 20;
     static final int MAX_KNOWLEDGE_RELATIONS = 50;
     static final int MAX_ENGINEERING_STORIES = 20;

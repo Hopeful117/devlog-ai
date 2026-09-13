@@ -8,12 +8,17 @@ import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
+import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
+import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
+import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import com.hopeful117.devlogai.repositorycontext.intelligence.IntentTerms;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
@@ -30,6 +35,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
     private static final String BUILD = "BUILD";
     private static final String CONTAINER = "CONTAINER";
     private static final String DOCKER = "DOCKER";
+    private static final int MAX_ENGINEERING_EVENTS = 10;
     private static final Set<String> ARCHITECTURE_SOURCE_TYPES = Set.of(
             "ARCHITECTURE_DESCRIPTION", "TECHNOLOGY_DESCRIPTION",
             "INFRASTRUCTURE_DESCRIPTION", "API_DESCRIPTION");
@@ -42,19 +48,38 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
     private final ObjectMapper objectMapper;
     private final RepositoryContextService repositoryContextService;
     private final int maximumPromotedCommitDiffCandidates;
+    private final int relationalCapacity;
 
+    @Autowired
     public KnowledgeSelectionServiceImpl(
             AnalysisExecutionDiagnosticRepository diagnosticRepository,
             InsightRepository insightRepository,
             ObjectMapper objectMapper,
             RepositoryContextService repositoryContextService,
-            @Value("${devlog.analysis.commit-diff-promotion.max-items:15}") int maximumPromotedCommitDiffCandidates
+            @Value("${devlog.analysis.commit-diff-promotion.max-items:15}") int maximumPromotedCommitDiffCandidates,
+            @Value("${devlog.analysis.relationship-admission.relational-capacity:0}") int relationalCapacity
     ) {
         this.diagnosticRepository = diagnosticRepository;
         this.insightRepository = insightRepository;
         this.objectMapper = objectMapper;
         this.repositoryContextService = repositoryContextService;
         this.maximumPromotedCommitDiffCandidates = maximumPromotedCommitDiffCandidates;
+        if (relationalCapacity < 0 || relationalCapacity > BUDGET.maximumInsights()) {
+            throw new IllegalArgumentException("relationalCapacity must be between 0 and "
+                    + BUDGET.maximumInsights());
+        }
+        this.relationalCapacity = relationalCapacity;
+    }
+
+    public KnowledgeSelectionServiceImpl(
+            AnalysisExecutionDiagnosticRepository diagnosticRepository,
+            InsightRepository insightRepository,
+            ObjectMapper objectMapper,
+            RepositoryContextService repositoryContextService,
+            int maximumPromotedCommitDiffCandidates
+    ) {
+        this(diagnosticRepository, insightRepository, objectMapper, repositoryContextService,
+                maximumPromotedCommitDiffCandidates, 0);
     }
 
     @Override
@@ -106,9 +131,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 rankedObservations, rankedFacts, factOrder);
         List<AnalysisContext.ObservationSnapshot> observations = selectionSlice.observations();
         List<AnalysisContext.FactSnapshot> facts = selectionSlice.facts();
-        List<Insight> activeInsightCandidates = insightRepository
-                .findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                        context.project().id(), List.of(InsightStatus.ACTIVE));
+        List<Insight> activeInsightCandidates = findActiveInsightCandidates(context);
         List<Insight> insightCandidates = activeInsightCandidates.stream()
                 .filter(insight -> storyTerms.isEmpty()
                         || storyScore(storyTerms, insightText(insight)) > 0)
@@ -117,13 +140,20 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                                 storyScore(storyTerms, insightText(insight))).reversed()
                         .thenComparing(Insight::getCreatedAt,
                                 Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(Insight::getId))
+                .thenComparing(Insight::getId))
+                .limit(insightCandidateCapacity())
                 .toList();
-        List<SelectedKnowledge.InsightSnapshot> insights = insightCandidates.stream()
+        List<SelectedKnowledge.InsightSnapshot> standaloneInsights = insightCandidates.stream()
                 .limit(BUDGET.maximumInsights()).map(this::toInsight).toList();
         List<SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot> existingArchitectureKnowledge =
                 selectExistingArchitectureKnowledge(intent, insightCandidates);
-        var engineeringEvents = context.validatedEngineeringEvents().stream().limit(10).toList();
+        var standaloneEngineeringEvents = context.validatedEngineeringEvents().stream()
+                .limit(MAX_ENGINEERING_EVENTS).toList();
+        Admission admission = admitRelatedEndpoints(intent, standaloneInsights,
+                standaloneEngineeringEvents, insightCandidates,
+                context.validatedEngineeringEvents(), context.knowledgeRelations());
+        List<SelectedKnowledge.InsightSnapshot> insights = admission.insights();
+        var engineeringEvents = admission.engineeringEvents();
         var humanContextInputs = context.humanContextInputs().stream().limit(5).toList();
         var knowledgeRelations = context.knowledgeRelations();
         List<RepositoryEvidence> promotedCommitDiff = promoteCommitDiffCandidates(
@@ -147,9 +177,9 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
         List<String> appliedRules = new ArrayList<>(List.of(
                 "REPOSITORY_FIRST_LAYERING", "INTENT_SPECIFIC_RANKING",
                         "USER_GUIDANCE_KEYWORD_BOOST", "STABLE_TYPE_AND_SEMANTIC_ORDER",
-                        "DUPLICATE_FACT_CONTENT_ELIMINATION", "OBSERVATION_FACT_CLOSURE",
-                        "KNOWLEDGE_BUDGET", "EVOLUTION_CONTEXT_REQUIRED",
-                        "KNOWLEDGE_RELATION_PRESERVATION"));
+                "DUPLICATE_FACT_CONTENT_ELIMINATION", "OBSERVATION_FACT_CLOSURE",
+                "KNOWLEDGE_BUDGET", "EVOLUTION_CONTEXT_REQUIRED",
+                "KNOWLEDGE_RELATION_PRESERVATION", "BOUNDED_RELATIONSHIP_ADMISSION"));
         if (isStoryContextAnalysis(intent)) {
             appliedRules.add("ENGINEERING_STORY_RELEVANCE");
         }
@@ -160,12 +190,197 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 diagnostic.isCollectionComplete() ? "COMPLETE" : "PARTIAL");
         String digest = digest(context, new DigestComponents(observations, facts, diagnostics,
                 insights, existingArchitectureKnowledge, engineeringEvents, knowledgeRelations,
-                repositoryContext, metadata));
+                admission.diagnostics(), repositoryContext, metadata));
         return new SelectedKnowledge(context.project(), context.analysis(), context.projectProfile(),
                 observations, facts, diagnostics, insights, existingArchitectureKnowledge,
-                engineeringEvents, humanContextInputs, knowledgeRelations, repositoryContext,
+                engineeringEvents, humanContextInputs, knowledgeRelations, admission.diagnostics(), repositoryContext,
                 context.evolutionContext(), metadata, digest);
     }
+
+    private List<Insight> findActiveInsightCandidates(AnalysisContext context) {
+        List<InsightStatus> statuses = List.of(InsightStatus.ACTIVE);
+        return insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                context.project().id(), statuses, PageRequest.of(0, insightCandidateCapacity()));
+    }
+
+    private int insightCandidateCapacity() {
+        return BUDGET.maximumInsights() + relationalCapacity;
+    }
+
+    private Admission admitRelatedEndpoints(
+            IntentDefinition intent,
+            List<SelectedKnowledge.InsightSnapshot> standaloneInsights,
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> standaloneEvents,
+            List<Insight> insightCandidates,
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> eventCandidates,
+        List<ProjectContextSnapshot.KnowledgeRelationSnapshot> relations
+    ) {
+        if (relationalCapacity == 0) {
+            return new Admission(standaloneInsights, standaloneEvents, List.of());
+        }
+
+        Map<UUID, SelectedKnowledge.InsightSnapshot> insightsById = insightCandidates.stream()
+                .collect(java.util.stream.Collectors.toMap(Insight::getId, this::toInsight,
+                        (first, ignored) -> first, LinkedHashMap::new));
+        Map<UUID, ProjectContextSnapshot.EngineeringEventSnapshot> eventsById = eventCandidates.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        ProjectContextSnapshot.EngineeringEventSnapshot::id,
+                        event -> event, (first, ignored) -> first, LinkedHashMap::new));
+        Set<UUID> standaloneInsightIds = standaloneInsights.stream()
+                .map(SelectedKnowledge.InsightSnapshot::id).collect(java.util.stream.Collectors.toSet());
+        Set<UUID> standaloneEventIds = standaloneEvents.stream()
+                .map(ProjectContextSnapshot.EngineeringEventSnapshot::id)
+                .collect(java.util.stream.Collectors.toSet());
+        List<SelectedKnowledge.InsightSnapshot> relatedInsights = new ArrayList<>();
+        List<ProjectContextSnapshot.EngineeringEventSnapshot> relatedEvents = new ArrayList<>();
+        Set<String> admitted = new HashSet<>();
+        List<SelectedKnowledge.AdmissionDiagnostic> diagnostics = new ArrayList<>();
+        Comparator<ProjectContextSnapshot.KnowledgeRelationSnapshot> relationOrder = Comparator
+                .comparing((ProjectContextSnapshot.KnowledgeRelationSnapshot relation) ->
+                        relation.relationType().name())
+                .thenComparing(relation -> relation.sourceEntityType().name())
+                .thenComparing(relation -> relation.sourceEntityId().toString())
+                .thenComparing(relation -> relation.targetEntityType().name())
+                .thenComparing(relation -> relation.targetEntityId().toString())
+                .thenComparing(ProjectContextSnapshot.KnowledgeRelationSnapshot::id);
+
+        for (ProjectContextSnapshot.KnowledgeRelationSnapshot relation : relations.stream()
+                .sorted(relationOrder).toList()) {
+            if (!relationEligible(intent, relation)) {
+                diagnostics.add(admissionDiagnostic(relation, admissionReason(intent, relation)));
+                continue;
+            }
+            if (admitted.size() >= relationalCapacity) {
+                diagnostics.add(admissionDiagnostic(relation, "RELATIONAL_CAPACITY_EXHAUSTED"));
+                continue;
+            }
+            admitEndpoint(relation.sourceEntityType(), relation.sourceEntityId(),
+                    relation.targetEntityType(), relation.targetEntityId(), standaloneInsightIds,
+                    standaloneEventIds, insightsById,
+                    eventsById, relatedInsights, relatedEvents, admitted, diagnostics, relation);
+            if (admitted.size() >= relationalCapacity) {
+                continue;
+            }
+            admitEndpoint(relation.targetEntityType(), relation.targetEntityId(),
+                    relation.sourceEntityType(), relation.sourceEntityId(), standaloneInsightIds,
+                    standaloneEventIds, insightsById,
+                    eventsById, relatedInsights, relatedEvents, admitted, diagnostics, relation);
+        }
+        List<SelectedKnowledge.InsightSnapshot> finalInsights = composeInsights(
+                standaloneInsights, relatedInsights);
+        List<ProjectContextSnapshot.EngineeringEventSnapshot> finalEvents = composeEvents(
+                standaloneEvents, relatedEvents);
+        return new Admission(
+                finalInsights, finalEvents, List.copyOf(diagnostics));
+    }
+
+    private void admitEndpoint(
+            EntityType candidateType,
+            UUID candidateId,
+            EntityType selectedType,
+            UUID selectedId,
+            Set<UUID> standaloneInsightIds,
+            Set<UUID> standaloneEventIds,
+            Map<UUID, SelectedKnowledge.InsightSnapshot> insightsById,
+            Map<UUID, ProjectContextSnapshot.EngineeringEventSnapshot> eventsById,
+            List<SelectedKnowledge.InsightSnapshot> relatedInsights,
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> relatedEvents,
+            Set<String> admitted,
+            List<SelectedKnowledge.AdmissionDiagnostic> diagnostics,
+            ProjectContextSnapshot.KnowledgeRelationSnapshot relation
+    ) {
+        boolean selected = selectedType == EntityType.INSIGHT
+                ? standaloneInsightIds.contains(selectedId)
+                : selectedType == EntityType.ENGINEERING_EVENT && standaloneEventIds.contains(selectedId);
+        if (!selected) {
+            return;
+        }
+        String key = candidateType.name() + ":" + candidateId;
+        if (admitted.contains(key)) {
+            return;
+        }
+        if (candidateType == EntityType.INSIGHT) {
+            if (!insightsById.containsKey(candidateId)) {
+                diagnostics.add(admissionDiagnostic(relation, "CANDIDATE_NOT_AVAILABLE"));
+            } else if (!standaloneInsightIds.contains(candidateId)) {
+                relatedInsights.add(insightsById.get(candidateId));
+                admitted.add(key);
+            }
+        } else if (candidateType == EntityType.ENGINEERING_EVENT) {
+            if (!eventsById.containsKey(candidateId)) {
+                diagnostics.add(admissionDiagnostic(relation, "CANDIDATE_NOT_AVAILABLE"));
+            } else if (!standaloneEventIds.contains(candidateId)) {
+                relatedEvents.add(eventsById.get(candidateId));
+                admitted.add(key);
+            }
+        } else {
+            diagnostics.add(admissionDiagnostic(relation, "CANDIDATE_NOT_AVAILABLE"));
+        }
+    }
+
+    private List<SelectedKnowledge.InsightSnapshot> composeInsights(
+            List<SelectedKnowledge.InsightSnapshot> standalone,
+            List<SelectedKnowledge.InsightSnapshot> related) {
+        Set<UUID> relatedIds = related.stream().map(SelectedKnowledge.InsightSnapshot::id)
+                .collect(java.util.stream.Collectors.toSet());
+        return java.util.stream.Stream.concat(related.stream(), standalone.stream()
+                        .filter(insight -> !relatedIds.contains(insight.id())))
+                .limit(BUDGET.maximumInsights()).toList();
+    }
+
+    private List<ProjectContextSnapshot.EngineeringEventSnapshot> composeEvents(
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> standalone,
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> related) {
+        Set<UUID> relatedIds = related.stream()
+                .map(ProjectContextSnapshot.EngineeringEventSnapshot::id)
+                .collect(java.util.stream.Collectors.toSet());
+        return java.util.stream.Stream.concat(related.stream(), standalone.stream()
+                        .filter(event -> !relatedIds.contains(event.id())))
+                .limit(MAX_ENGINEERING_EVENTS).toList();
+    }
+
+    private SelectedKnowledge.AdmissionDiagnostic admissionDiagnostic(
+            ProjectContextSnapshot.KnowledgeRelationSnapshot relation, String reason) {
+        return new SelectedKnowledge.AdmissionDiagnostic(relation.id(), reason,
+                relation.relationType().name(), relation.sourceEntityType().name(),
+                relation.sourceEntityId(), relation.targetEntityType().name(),
+                relation.targetEntityId());
+    }
+
+    private String admissionReason(IntentDefinition intent,
+                                   ProjectContextSnapshot.KnowledgeRelationSnapshot relation) {
+        if ("architecture-overview".equals(intent.id())
+                && relation.relationType() == KnowledgeRelationType.RESOLVES) {
+            return "INELIGIBLE_FOR_INTENT";
+        }
+        if (relation.sourceEntityType() != EntityType.INSIGHT
+                && relation.sourceEntityType() != EntityType.ENGINEERING_EVENT
+                || relation.targetEntityType() != EntityType.INSIGHT
+                && relation.targetEntityType() != EntityType.ENGINEERING_EVENT) {
+            return "UNSUPPORTED_ENDPOINT_TYPE";
+        }
+        return "INELIGIBLE_FOR_INTENT";
+    }
+
+    private boolean relationEligible(IntentDefinition intent,
+                                     ProjectContextSnapshot.KnowledgeRelationSnapshot relation) {
+        if (relation.sourceEntityType() != EntityType.INSIGHT
+                && relation.sourceEntityType() != EntityType.ENGINEERING_EVENT) {
+            return false;
+        }
+        if (relation.targetEntityType() != EntityType.INSIGHT
+                && relation.targetEntityType() != EntityType.ENGINEERING_EVENT) {
+            return false;
+        }
+        return !("architecture-overview".equals(intent.id())
+                && relation.relationType() == KnowledgeRelationType.RESOLVES);
+    }
+
+    private record Admission(
+            List<SelectedKnowledge.InsightSnapshot> insights,
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> engineeringEvents,
+            List<SelectedKnowledge.AdmissionDiagnostic> diagnostics
+    ) { }
 
     private void requireMandatoryKnowledge(AnalysisContext context, IntentDefinition intent) {
         if (context == null || context.project() == null || context.analysis() == null
@@ -453,12 +668,13 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                            Object existingArchitectureKnowledge,
                            Object selectedEngineeringEvents,
                            Object knowledgeRelations,
+                           Object admissionDiagnostics,
                            Object repositoryContext, Object evolutionContext, Object selectionMetadata) { }
         byte[] serialized = objectMapper.writeValueAsString(new DigestInput(
                 context.project(), context.analysis(), context.projectProfile(), selected.observations(),
                 selected.facts(), selected.diagnostics(), selected.insights(),
                 selected.existingArchitectureKnowledge(), selected.engineeringEvents(),
-                selected.knowledgeRelations(), selected.repositoryContext(), context.evolutionContext(),
+                 selected.knowledgeRelations(), selected.admissionDiagnostics(), selected.repositoryContext(), context.evolutionContext(),
                 selected.metadata()))
                 .getBytes(StandardCharsets.UTF_8);
         try {
@@ -478,6 +694,7 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                     engineeringEvents,
             List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.KnowledgeRelationSnapshot>
                     knowledgeRelations,
+            List<SelectedKnowledge.AdmissionDiagnostic> admissionDiagnostics,
             RepositoryContext repositoryContext,
             SelectedKnowledge.SelectionMetadata metadata) { }
 

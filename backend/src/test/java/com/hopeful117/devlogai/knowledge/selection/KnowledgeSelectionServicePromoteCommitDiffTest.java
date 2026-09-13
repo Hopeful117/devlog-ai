@@ -89,7 +89,8 @@ class KnowledgeSelectionServicePromoteCommitDiffTest {
                 .build();
         when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.of(diagnostic));
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                context.project().id(), List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
+                eq(context.project().id()), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of());
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
     }
 

@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class KnowledgeSelectionServiceImplStatusExclusionTest {
@@ -59,7 +60,8 @@ class KnowledgeSelectionServiceImplStatusExclusionTest {
                 .createdAt(Instant.now())
                 .build();
         when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of(active));
+                eq(projectId), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(active));
 
         RepositoryContext repoContext = new RepositoryContext(
                 "v1", ContextProfile.ARCHITECTURE_REVIEW, List.of(), "v1", List.of(),
@@ -85,7 +87,7 @@ class KnowledgeSelectionServiceImplStatusExclusionTest {
         assertEquals(InsightStatus.ACTIVE, captor.getValue().getFirst().getStatus());
 
         verify(insights).findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                projectId, List.of(InsightStatus.ACTIVE));
+                eq(projectId), eq(List.of(InsightStatus.ACTIVE)), any(org.springframework.data.domain.Pageable.class));
         verify(insights, never()).findByProjectIdOrderByCreatedAtDesc(any(UUID.class));
         verify(insights, never()).findByProjectIdOrderByCreatedAtDescIdDesc(any(UUID.class));
     }
@@ -104,7 +106,8 @@ class KnowledgeSelectionServiceImplStatusExclusionTest {
         when(diagnostics.findById(analysisId)).thenReturn(Optional.of(diagnostic));
         when(mapper.writeValueAsString(any())).thenReturn("stable");
         when(insights.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
+                eq(projectId), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of());
 
         RepositoryContext repoContext = new RepositoryContext(
                 "v1", ContextProfile.ARCHITECTURE_REVIEW, List.of(), "v1", List.of(),
@@ -133,7 +136,7 @@ class KnowledgeSelectionServiceImplStatusExclusionTest {
                 "SelectedKnowledge must still build with a digest even when empty");
 
         verify(insights).findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                projectId, List.of(InsightStatus.ACTIVE));
+                eq(projectId), eq(List.of(InsightStatus.ACTIVE)), any(org.springframework.data.domain.Pageable.class));
         verify(insights, never()).findByProjectIdOrderByCreatedAtDesc(any(UUID.class));
         verify(insights, never()).findByProjectIdOrderByCreatedAtDescIdDesc(any(UUID.class));
     }
