@@ -7,6 +7,9 @@ import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
+import com.hopeful117.devlogai.analysis.communication.AnalysisCommunicationUseCase;
+import com.hopeful117.devlogai.analysis.communication.CommunicationDecision;
+import com.hopeful117.devlogai.analysis.communication.CommunicationDecisionService;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.fact.entity.Fact;
@@ -63,6 +66,12 @@ class AiTaskResultServiceTest {
 
     @Mock
     private AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
+
+    @Mock
+    private CommunicationDecisionService communicationDecisionService;
+
+    @Mock
+    private AnalysisCommunicationUseCase analysisCommunicationUseCase;
 
     @InjectMocks
     private AiTaskResultServiceImpl service;

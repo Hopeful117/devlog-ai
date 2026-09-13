@@ -55,7 +55,7 @@ describe('AnalysisService', () => {
   it('creates and distinctly launches an Analysis', () => {
     const body: CreateAnalysisRequest = {
       projectId: 'project-id',
-      intentId: 'architecture-overview-v1',
+      intentId: 'architecture-overview-v2',
     };
     service.createAnalysis(body).subscribe();
     const create = http.expectOne('/api/v1/analyses');
