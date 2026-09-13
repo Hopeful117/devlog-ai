@@ -37,10 +37,13 @@ public class SelectedKnowledgePromptProjectionService {
         @SuppressWarnings("unchecked")
         Map<String, Object> projected = objectMapper.convertValue(
                 project(selectedKnowledge), Map.class);
+        // Diagnostics remain deterministic Core observability, not AI-facing knowledge.
+        projected.remove("relationshipDiagnostics");
         return new LinkedHashMap<>(projected);
     }
 
     PromptProjection project(SelectedKnowledge selectedKnowledge) {
+        RelationshipProjection relationships = relationshipProjection(selectedKnowledge);
         return new PromptProjection(
                 selectedKnowledge.project(),
                 selectedKnowledge.analysis(),
@@ -52,7 +55,8 @@ public class SelectedKnowledgePromptProjectionService {
                 selectedKnowledge.existingArchitectureKnowledge(),
                 selectedKnowledge.selectedEngineeringEvents(),
                 selectedKnowledge.selectedHumanContextInputs(),
-                buildRelationshipHighlights(selectedKnowledge),
+                relationships.highlights(),
+                relationships.diagnostics(),
                 semanticSectionComposer.compose(selectedKnowledge),
                 projectRepositoryContext(selectedKnowledge.repositoryContext()),
                 selectedKnowledge.evolutionContext(),
@@ -61,8 +65,7 @@ public class SelectedKnowledgePromptProjectionService {
         );
     }
 
-    private List<PromptRelationshipHighlight> buildRelationshipHighlights(
-            SelectedKnowledge selectedKnowledge) {
+    private RelationshipProjection relationshipProjection(SelectedKnowledge selectedKnowledge) {
         Set<UUID> selectedInsightIds = new HashSet<>(selectedKnowledge.selectedInsights().stream()
                 .map(SelectedKnowledge.InsightSnapshot::id)
                 .toList());
@@ -70,6 +73,11 @@ public class SelectedKnowledgePromptProjectionService {
                 .selectedEngineeringEvents().stream()
                 .map(ProjectContextSnapshot.EngineeringEventSnapshot::id)
                 .toList());
+        Set<String> selectedRepositoryEvidence = selectedKnowledge.repositoryContext() == null
+                ? Set.of()
+                : selectedKnowledge.repositoryContext().evidence().stream()
+                .map(evidence -> evidence.kind() + "|" + evidence.reference())
+                .collect(java.util.stream.Collectors.toSet());
         Comparator<ProjectContextSnapshot.KnowledgeRelationSnapshot> ordering = Comparator
                 .comparing((ProjectContextSnapshot.KnowledgeRelationSnapshot relation) -> relation.relationType().name())
                 .thenComparing(relation -> relation.sourceEntityType().name())
@@ -77,42 +85,67 @@ public class SelectedKnowledgePromptProjectionService {
                 .thenComparing(relation -> relation.targetEntityType().name())
                 .thenComparing(relation -> relation.targetEntityId().toString())
                 .thenComparing(relation -> relation.id().toString());
-        return selectedKnowledge.knowledgeRelations().stream()
-                .filter(relation -> isPolicyAEligible(relation, selectedInsightIds,
-                        selectedEngineeringEventIds))
-                .sorted(ordering)
-                .limit(MAX_RELATIONSHIP_HIGHLIGHTS)
-                .map(relation -> new PromptRelationshipHighlight(
-                        relation.relationType().name(),
-                        new PromptRelationshipEndpoint(relation.sourceEntityType().name(),
-                                relation.sourceEntityId().toString()),
-                        new PromptRelationshipEndpoint(relation.targetEntityType().name(),
-                                relation.targetEntityId().toString())
-                ))
-                .toList();
+        List<PromptRelationshipHighlight> highlights = new java.util.ArrayList<>();
+        List<PromptRelationshipDiagnostic> diagnostics = new java.util.ArrayList<>();
+        for (ProjectContextSnapshot.KnowledgeRelationSnapshot relation
+                : selectedKnowledge.knowledgeRelations().stream().sorted(ordering).toList()) {
+            boolean sourceProjected = isSelectedProjectedEndpoint(relation.sourceEntityType(),
+                    relation.sourceEntityId(), selectedInsightIds, selectedEngineeringEventIds,
+                    selectedRepositoryEvidence);
+            boolean targetProjected = isSelectedProjectedEndpoint(relation.targetEntityType(),
+                    relation.targetEntityId(), selectedInsightIds, selectedEngineeringEventIds,
+                    selectedRepositoryEvidence);
+            if (!sourceProjected || !targetProjected) {
+                diagnostics.add(diagnostic(relation,
+                        !sourceProjected && !targetProjected
+                                ? "SOURCE_AND_TARGET_ENDPOINT_NOT_PROJECTED"
+                                : !sourceProjected
+                                ? "SOURCE_ENDPOINT_NOT_PROJECTED"
+                                : "TARGET_ENDPOINT_NOT_PROJECTED"));
+                continue;
+            }
+            if (highlights.size() >= MAX_RELATIONSHIP_HIGHLIGHTS) {
+                diagnostics.add(diagnostic(relation, "RELATIONSHIP_BUDGET_EXCEEDED"));
+                continue;
+            }
+            highlights.add(new PromptRelationshipHighlight(
+                    relation.relationType().name(),
+                    new PromptRelationshipEndpoint(relation.sourceEntityType().name(),
+                            relation.sourceEntityId().toString()),
+                    new PromptRelationshipEndpoint(relation.targetEntityType().name(),
+                            relation.targetEntityId().toString())
+            ));
+        }
+        return new RelationshipProjection(List.copyOf(highlights), List.copyOf(diagnostics));
     }
 
-    private boolean isPolicyAEligible(
+    private PromptRelationshipDiagnostic diagnostic(
             ProjectContextSnapshot.KnowledgeRelationSnapshot relation,
-            Set<UUID> selectedInsightIds,
-            Set<UUID> selectedEngineeringEventIds
-    ) {
-        return isSelectedProjectedEndpoint(relation.sourceEntityType(), relation.sourceEntityId(),
-                selectedInsightIds, selectedEngineeringEventIds)
-                && isSelectedProjectedEndpoint(relation.targetEntityType(), relation.targetEntityId(),
-                selectedInsightIds, selectedEngineeringEventIds);
+            String reason) {
+        return new PromptRelationshipDiagnostic(relation.id().toString(),
+                relation.relationType().name(),
+                new PromptRelationshipEndpoint(relation.sourceEntityType().name(),
+                        relation.sourceEntityId().toString()),
+                new PromptRelationshipEndpoint(relation.targetEntityType().name(),
+                        relation.targetEntityId().toString()), reason);
     }
 
     private boolean isSelectedProjectedEndpoint(
             EntityType entityType,
             UUID entityId,
             Set<UUID> selectedInsightIds,
-            Set<UUID> selectedEngineeringEventIds
+            Set<UUID> selectedEngineeringEventIds,
+            Set<String> selectedRepositoryEvidence
     ) {
         return switch (entityType) {
-            case INSIGHT -> selectedInsightIds.contains(entityId);
-            case ENGINEERING_EVENT -> selectedEngineeringEventIds.contains(entityId);
-            case DECISION, CHALLENGE -> false;
+            case INSIGHT -> selectedInsightIds.contains(entityId)
+                    || selectedRepositoryEvidence.contains("INSIGHT|insight:" + entityId);
+            case ENGINEERING_EVENT -> selectedEngineeringEventIds.contains(entityId)
+                    || selectedRepositoryEvidence.contains("ENGINEERING_EVENT|event:" + entityId);
+            case DECISION -> selectedRepositoryEvidence.contains(
+                    "DECISION|decision:" + entityId);
+            case CHALLENGE -> selectedRepositoryEvidence.contains(
+                    "CHALLENGE|challenge:" + entityId);
         };
     }
 
@@ -199,6 +232,7 @@ public class SelectedKnowledgePromptProjectionService {
             List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.HumanContextInputSnapshot>
                     selectedHumanContextInputs,
             List<PromptRelationshipHighlight> relationshipHighlights,
+            List<PromptRelationshipDiagnostic> relationshipDiagnostics,
             List<SemanticSection.PromptSemanticSection> semanticSections,
             PromptRepositoryContext repositoryContext,
             AnalysisContext.EvolutionContext evolutionContext,
@@ -220,9 +254,22 @@ public class SelectedKnowledgePromptProjectionService {
             PromptRelationshipEndpoint target
     ) { }
 
+    record PromptRelationshipDiagnostic(
+            String relationId,
+            String relationType,
+            PromptRelationshipEndpoint source,
+            PromptRelationshipEndpoint target,
+            String reason
+    ) { }
+
     record PromptRelationshipEndpoint(
             String entityType,
             String entityId
+    ) { }
+
+    private record RelationshipProjection(
+            List<PromptRelationshipHighlight> highlights,
+            List<PromptRelationshipDiagnostic> diagnostics
     ) { }
 
     record PromptRepositoryContext(
