@@ -272,7 +272,7 @@ async def test_selected_insight_id_reused_as_supporting_fact_gets_corrective_ret
 
     assert len(provider.requests) == 2
     assert stray_insight_id in provider.requests[1].user_message
-    assert "supportingFactIds contains references absent from AnalysisContext" in provider.requests[1].user_message
+    assert "supportingFactIds contains references absent from selected observations" in provider.requests[1].user_message
     assert callback.results[0].status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
 
 
@@ -306,7 +306,36 @@ async def test_selected_insight_id_reused_as_supporting_observation_gets_correct
 
     assert len(provider.requests) == 2
     assert stray_insight_id in provider.requests[1].user_message
-    assert "supportingObservationIds contains references absent from AnalysisContext" in provider.requests[1].user_message
+    assert "supportingObservationIds contains references absent from selected observations" in provider.requests[1].user_message
+    assert callback.results[0].status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_project_profile_observation_id_is_not_authorized_for_grounding() -> None:
+    request, fact_id, observation_id, evidence = submission()
+    profile_observation_id = str(uuid4())
+    request = request.model_copy(update={
+        "selected_knowledge": {
+            **request.selected_knowledge,
+            "projectProfile": {
+                "sourceObservations": [{"id": profile_observation_id}],
+                "sections": [{
+                    "characteristics": [{"sourceObservationIds": [profile_observation_id]}]
+                }],
+            },
+        }
+    })
+    invalid = valid_output(fact_id, profile_observation_id, evidence)
+    provider = MockLlmProvider(
+        [invalid, valid_output(fact_id, observation_id, evidence)]
+    )
+    callback = RecordingCallbackClient()
+    service = InsightGenerationService(provider, InsightPromptBuilder(), callback)  # type: ignore[arg-type]
+
+    await service.process(request, uuid4())
+
+    assert len(provider.requests) == 2
+    assert "supportingObservationIds contains references absent from selected observations" in provider.requests[1].user_message
     assert callback.results[0].status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
 
 

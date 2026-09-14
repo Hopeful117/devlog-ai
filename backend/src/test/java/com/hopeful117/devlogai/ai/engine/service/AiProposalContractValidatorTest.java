@@ -284,6 +284,33 @@ class AiProposalContractValidatorTest {
                 () -> validator.validate(task, List.of(proposal)));
     }
 
+    @Test
+    void rejectsObservationIdOnlyPresentInProjectProfileProvenance() {
+        UUID factId = UUID.randomUUID();
+        UUID selectedObservationId = UUID.randomUUID();
+        UUID unselectedObservationId = UUID.randomUUID();
+        AiTask task = AiTask.builder()
+                .intentId("describe-project")
+                .intentVersion("v1")
+                .selectedKnowledgeSnapshot(Map.of(
+                        "selectedFacts", List.of(Map.of("id", factId.toString())),
+                        "selectedObservations", List.of(Map.of("id", selectedObservationId.toString())),
+                        "projectProfile", Map.of("sourceObservations", List.of(Map.of(
+                                "id", unselectedObservationId.toString())))))
+                .build();
+        AiProposalResult proposal = new AiProposalResult(ProposalType.INSIGHT,
+                Map.of("insightType", "PROJECT_PRESENTATION",
+                        "title", "Presentation", "summary", "Summary",
+                        "rationale", "Rationale"),
+                new BigDecimal("0.9000"),
+                List.of(factId),
+                List.of(unselectedObservationId),
+                List.of());
+
+        assertThrows(InvalidAiTaskResultException.class,
+                () -> validator.validate(task, List.of(proposal)));
+    }
+
     private AiProposalResult eventProposal(String category, String title, String reference) {
         return new AiProposalResult(ProposalType.ENGINEERING_EVENT,
                 Map.of("schemaVersion", "engineering-event-proposal-v1", "category", category,
