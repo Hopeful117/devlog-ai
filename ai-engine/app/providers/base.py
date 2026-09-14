@@ -1,9 +1,21 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Protocol, TypeVar
 
 from pydantic import BaseModel
 
 StructuredOutput = TypeVar("StructuredOutput", bound=BaseModel)
+
+
+@dataclass(frozen=True)
+class ProviderGenerationResult:
+    output: Any
+    raw_output: str | None
+    started_at: datetime
+    completed_at: datetime
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
 
 
 @dataclass(frozen=True)

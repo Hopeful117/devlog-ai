@@ -17,18 +17,35 @@ public record AiTaskResultRequest(
         @Valid AiTaskResultError error,
         @Valid PromptExecutionMetadata promptExecution,
         @Valid AnalysisSynthesisResult synthesis,
-        @Valid StoryContextAnalysisResult analysisResult
+        @Valid StoryContextAnalysisResult analysisResult,
+        @Valid List<AiInteractionTraceRequest> interactionTraces
 ) {
+    public AiTaskResultRequest {
+        interactionTraces = interactionTraces == null ? List.of() : List.copyOf(interactionTraces);
+    }
+
     public AiTaskResultRequest(UUID correlationId, String externalJobId,
                                AiTaskResultStatus status, Instant completedAt,
                                List<AiProposalResult> proposals, AiTaskResultError error) {
-        this(correlationId, externalJobId, status, completedAt, proposals, error, null, null, null);
+        this(correlationId, externalJobId, status, completedAt, proposals, error,
+                null, null, null, List.of());
     }
 
     public AiTaskResultRequest(UUID correlationId, String externalJobId,
                                AiTaskResultStatus status, Instant completedAt,
                                List<AiProposalResult> proposals, AiTaskResultError error,
                                PromptExecutionMetadata promptExecution, AnalysisSynthesisResult synthesis) {
-        this(correlationId, externalJobId, status, completedAt, proposals, error, promptExecution, synthesis, null);
+        this(correlationId, externalJobId, status, completedAt, proposals, error,
+                promptExecution, synthesis, null, List.of());
+    }
+
+    public AiTaskResultRequest(UUID correlationId, String externalJobId,
+                               AiTaskResultStatus status, Instant completedAt,
+                               List<AiProposalResult> proposals, AiTaskResultError error,
+                               PromptExecutionMetadata promptExecution,
+                               AnalysisSynthesisResult synthesis,
+                               StoryContextAnalysisResult analysisResult) {
+        this(correlationId, externalJobId, status, completedAt, proposals, error,
+                promptExecution, synthesis, analysisResult, List.of());
     }
 }

@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.hopeful117.devlogai.ai.engine.dto.*;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException;
+import com.hopeful117.devlogai.ai.interactiontrace.service.AiInteractionTracePersistenceService;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
@@ -72,6 +73,9 @@ class AiTaskResultServiceTest {
 
     @Mock
     private AnalysisCommunicationUseCase analysisCommunicationUseCase;
+
+    @Mock
+    private AiInteractionTracePersistenceService interactionTracePersistenceService;
 
     @InjectMocks
     private AiTaskResultServiceImpl service;

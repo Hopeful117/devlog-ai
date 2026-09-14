@@ -25,6 +25,7 @@ from app.schemas.ai_task_result import (
     SynthesisSectionResult,
 )
 from app.schemas.insight import InsightGenerationOutput
+from app.services.interaction_trace import InteractionTraceCollector
 
 
 class InsightOutputValidationError(ValueError):
@@ -66,6 +67,7 @@ class InsightGenerationService:
                 intent_error,
             )
             return
+        traces = InteractionTraceCollector(self._provider, submission)
         require_synthesis = (
             submission.intent.id == "architecture-overview"
             and submission.intent.version == "v2"
@@ -73,6 +75,7 @@ class InsightGenerationService:
         try:
             output = await self._generate_and_validate(
                 prompt, submission.selected_knowledge, set(submission.intent.supported_insight_types),
+                traces,
                 require_synthesis=require_synthesis,
             )
         except (ValidationError, InsightOutputValidationError, ValueError) as error:
@@ -84,11 +87,13 @@ class InsightGenerationService:
             corrective_prompt = self._prompt_builder.corrective_retry(
                 prompt, error, relationship_context
             )
+            traces.retry(error)
             try:
                 output = await self._generate_and_validate(
                     corrective_prompt,
                     submission.selected_knowledge,
                     set(submission.intent.supported_insight_types),
+                    traces,
                     require_synthesis=require_synthesis,
                 )
                 prompt = corrective_prompt
@@ -99,6 +104,7 @@ class InsightGenerationService:
                     "INVALID_LLM_OUTPUT",
                     retry_error,
                     corrective_prompt,
+                    traces,
                 )
                 return
             except Exception as provider_error:
@@ -108,6 +114,7 @@ class InsightGenerationService:
                     "LLM_PROVIDER_ERROR",
                     provider_error,
                     corrective_prompt,
+                    traces,
                 )
                 return
         except Exception as provider_error:
@@ -117,6 +124,7 @@ class InsightGenerationService:
                 "LLM_PROVIDER_ERROR",
                 provider_error,
                 prompt,
+                traces,
             )
             return
 
@@ -164,6 +172,7 @@ class InsightGenerationService:
                     context_digest=prompt.traceability.context_digest,
                 ),
                 synthesis=synthesis,
+                interaction_traces=traces.traces,
             ),
         )
 
@@ -172,16 +181,17 @@ class InsightGenerationService:
         prompt: Prompt,
         context: dict[str, object],
         supported_insight_types: set[InsightType],
+        traces: InteractionTraceCollector,
         *,
         require_synthesis: bool = False,
     ) -> InsightGenerationOutput:
-        output = await self._provider.generate_structured(
+        return await traces.generate_and_validate(
             prompt,
             InsightGenerationOutput,
+            lambda output: self._validate_output(
+                output, context, supported_insight_types, require_synthesis=require_synthesis
+            ),
         )
-        validated = InsightGenerationOutput.model_validate(output)
-        self._validate_output(validated, context, supported_insight_types, require_synthesis=require_synthesis)
-        return validated
 
     def _validate_output(
         self,
@@ -491,6 +501,7 @@ class InsightGenerationService:
         error_code: str,
         error: Exception,
         prompt: Prompt | None = None,
+        traces: InteractionTraceCollector | None = None,
     ) -> None:
         await self._callback_client.send_result(
             submission.correlation_id,
@@ -505,6 +516,7 @@ class InsightGenerationService:
                     message=str(error)[:5000] or "LLM output validation failed",
                 ),
                 prompt_execution=self._execution_metadata(prompt) if prompt else None,
+                interaction_traces=traces.traces if traces else [],
             ),
         )
 
