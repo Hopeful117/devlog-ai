@@ -1,10 +1,12 @@
 import asyncio
+from datetime import datetime, timezone
+import json
 import logging
 
 from openai import AsyncOpenAI, APITimeoutError, APIStatusError
 from pydantic import BaseModel
 
-from app.providers.base import Prompt, StructuredOutput
+from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ class OpenAiLlmProvider:
         last_exception: Exception | None = None
         for attempt in range(1 + self._max_retries):
             try:
-                return await self._call_api(request, response_model)
+                return (await self._call_api(request, response_model)).output
             except (APITimeoutError, APIStatusError) as exc:
                 last_exception = exc
                 if not self._is_retryable(exc) or attempt >= self._max_retries:
@@ -59,7 +61,8 @@ class OpenAiLlmProvider:
         self,
         request: Prompt,
         response_model: type[StructuredOutput],
-    ) -> StructuredOutput:
+    ) -> ProviderGenerationResult:
+        started_at = datetime.now(timezone.utc)
         response = await self._client.responses.parse(
             model=self._model,
             input=[
@@ -74,7 +77,37 @@ class OpenAiLlmProvider:
             raise ValueError("OpenAI returned no parsed structured output")
         if isinstance(parsed, BaseModel):
             parsed = parsed.model_dump()
-        return response_model.model_validate(parsed)
+        usage = getattr(response, "usage", None)
+        completed_at = datetime.now(timezone.utc)
+        return ProviderGenerationResult(
+            output=response_model.model_validate(parsed),
+            raw_output=getattr(response, "output_text", None)
+            or json.dumps(parsed, sort_keys=True),
+            started_at=started_at,
+            completed_at=completed_at,
+            input_tokens=getattr(usage, "input_tokens", None),
+            output_tokens=getattr(usage, "output_tokens", None),
+            total_tokens=getattr(usage, "total_tokens", None),
+        )
+
+    async def generate_structured_with_trace(
+        self, request: Prompt, response_model: type[StructuredOutput]
+    ) -> ProviderGenerationResult:
+        last_exception: Exception | None = None
+        for attempt in range(1 + self._max_retries):
+            try:
+                return await self._call_api(request, response_model)
+            except (APITimeoutError, APIStatusError) as exc:
+                last_exception = exc
+                if not self._is_retryable(exc) or attempt >= self._max_retries:
+                    raise
+                delay = min(2 ** attempt, 10)
+                logger.warning(
+                    "LLM call attempt %d/%d failed (%s), retrying in %ds",
+                    attempt + 1, 1 + self._max_retries, exc, delay
+                )
+                await asyncio.sleep(delay)
+        raise last_exception  # type: ignore[misc]
 
     @staticmethod
     def _is_retryable(exc: Exception) -> bool:

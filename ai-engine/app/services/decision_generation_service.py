@@ -15,6 +15,7 @@ from app.schemas.ai_task_result import (
     PromptExecutionMetadata,
 )
 from app.schemas.decision import EngineeringDecisionGenerationOutput
+from app.services.interaction_trace import InteractionTraceCollector
 
 
 logger = logging.getLogger(__name__)
@@ -45,12 +46,14 @@ class EngineeringDecisionGenerationService:
                 intent_error,
             )
             return
+        traces = InteractionTraceCollector(self._provider, submission)
         try:
-            output = await self._generate(prompt)
+            output = await self._generate(prompt, traces)
         except (ValidationError, ValueError) as error:
             corrective_prompt = self._prompt_builder.corrective_retry(prompt, error)
+            traces.retry(error)
             try:
-                output = await self._generate(corrective_prompt)
+                output = await self._generate(corrective_prompt, traces)
                 prompt = corrective_prompt
             except (ValidationError, ValueError) as retry_error:
                 await self._send_failure(
@@ -59,6 +62,7 @@ class EngineeringDecisionGenerationService:
                     "INVALID_LLM_OUTPUT",
                     retry_error,
                     corrective_prompt,
+                    traces,
                 )
                 return
             except Exception as provider_error:
@@ -68,6 +72,7 @@ class EngineeringDecisionGenerationService:
                     "LLM_PROVIDER_ERROR",
                     provider_error,
                     corrective_prompt,
+                    traces,
                 )
                 return
         except Exception as provider_error:
@@ -77,6 +82,7 @@ class EngineeringDecisionGenerationService:
                 "LLM_PROVIDER_ERROR",
                 provider_error,
                 prompt,
+                traces,
             )
             return
 
@@ -113,14 +119,16 @@ class EngineeringDecisionGenerationService:
                     prompt_content_digest=prompt.content_digest,
                     context_digest=prompt.traceability.context_digest,
                 ),
+                interaction_traces=traces.traces,
             ),
         )
 
-    async def _generate(self, prompt: Prompt) -> EngineeringDecisionGenerationOutput:
-        output = await self._provider.generate_structured(
-            prompt, EngineeringDecisionGenerationOutput
+    async def _generate(
+        self, prompt: Prompt, traces: InteractionTraceCollector
+    ) -> EngineeringDecisionGenerationOutput:
+        return await traces.generate_and_validate(
+            prompt, EngineeringDecisionGenerationOutput, lambda output: None
         )
-        return EngineeringDecisionGenerationOutput.model_validate(output)
 
     def _payload(self, proposal: object) -> dict[str, object]:
         payload = {
@@ -140,6 +148,7 @@ class EngineeringDecisionGenerationService:
         error_code: str,
         error: Exception,
         prompt: Prompt | None = None,
+        traces: InteractionTraceCollector | None = None,
     ) -> None:
         await self._callback_client.send_result(
             submission.correlation_id,
@@ -163,5 +172,6 @@ class EngineeringDecisionGenerationService:
                     )
                     if prompt else None
                 ),
+                interaction_traces=traces.traces if traces else [],
             ),
         )

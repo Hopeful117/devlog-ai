@@ -1,10 +1,12 @@
 from collections import deque
 from collections.abc import Iterable
+from datetime import datetime, timezone
+import json
 from typing import Any
 
 from pydantic import BaseModel
 
-from app.providers.base import Prompt, StructuredOutput
+from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput
 
 
 class MockLlmProvider:
@@ -42,3 +44,19 @@ class MockLlmProvider:
         if isinstance(raw_output, BaseModel):
             raw_output = raw_output.model_dump()
         return response_model.model_validate(raw_output)
+
+    async def generate_structured_with_trace(
+        self, request: Prompt, response_model: type[StructuredOutput]
+    ) -> ProviderGenerationResult:
+        started_at = datetime.now(timezone.utc)
+        output = await self.generate_structured(request, response_model)
+        completed_at = datetime.now(timezone.utc)
+        return ProviderGenerationResult(
+            output=output,
+            raw_output=json.dumps(output.model_dump(mode="json"), sort_keys=True),
+            started_at=started_at,
+            completed_at=completed_at,
+            input_tokens=None,
+            output_tokens=None,
+            total_tokens=None,
+        )

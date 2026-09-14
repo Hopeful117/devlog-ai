@@ -8,6 +8,7 @@ from app.prompts.insight import InsightPromptBuilder
 from app.providers.mock import MockLlmProvider
 from app.schemas.ai_task import AiTaskSubmissionRequest
 from app.services.insight_generation_service import InsightGenerationService
+from app.services.interaction_trace import redact_sensitive_text
 from tests.intent_fixtures import (
     architecture_overview_intent,
     architecture_overview_v2_intent,
@@ -72,6 +73,17 @@ def valid_output(fact_id: str, observation_id: str, evidence: str) -> dict:
     }
 
 
+def test_trace_redaction_removes_provider_credentials() -> None:
+    redacted = redact_sensitive_text(
+        "Authorization: Bearer bearer-secret api_key=project-secret sk-test-secret"
+    )
+
+    assert redacted is not None
+    assert "bearer-secret" not in redacted
+    assert "project-secret" not in redacted
+    assert "sk-test-secret" not in redacted
+
+
 def architecture_submission() -> tuple[AiTaskSubmissionRequest, str, str, str, str]:
     fact_id = str(uuid4())
     observation_id = str(uuid4())
@@ -128,7 +140,29 @@ async def test_successful_generation_sends_only_insight_proposals() -> None:
     assert result.status == AiTaskResultStatus.COMPLETED  # type: ignore[attr-defined]
     assert result.proposals[0].type == ProposalType.INSIGHT  # type: ignore[attr-defined]
     assert result.proposals[0].payload["title"] == "Modular architecture"  # type: ignore[attr-defined]
+    assert len(result.interaction_traces) == 1  # type: ignore[attr-defined]
+    assert result.interaction_traces[0].attempt == 1  # type: ignore[attr-defined]
+    assert result.interaction_traces[0].validation_status == "SUCCEEDED"  # type: ignore[attr-defined]
+    assert result.interaction_traces[0].raw_model_response is None  # type: ignore[attr-defined]
     assert result.proposals[0].payload["insightType"] == "ARCHITECTURE_DESCRIPTION"  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_diagnostic_trace_captures_redacted_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AI_TRACE_LEVEL", "DIAGNOSTIC")
+    request, fact_id, observation_id, evidence = submission()
+    provider = MockLlmProvider([valid_output(fact_id, observation_id, evidence)])
+    callback = RecordingCallbackClient()
+    service = InsightGenerationService(provider, InsightPromptBuilder(), callback)  # type: ignore[arg-type]
+
+    await service.process(request, uuid4())
+
+    trace = callback.results[0].interaction_traces[0]  # type: ignore[attr-defined]
+    assert trace.trace_level == "DIAGNOSTIC"
+    assert trace.system_prompt
+    assert trace.user_prompt
+    assert trace.raw_model_response
+    assert trace.validation_diagnostics is None
 
 
 @pytest.mark.asyncio
@@ -403,6 +437,10 @@ async def test_failed_corrective_retry_sends_failed_callback() -> None:
     assert result.status == AiTaskResultStatus.FAILED  # type: ignore[attr-defined]
     assert result.proposals == []  # type: ignore[attr-defined]
     assert result.error.code == "INVALID_LLM_OUTPUT"  # type: ignore[attr-defined]
+    assert [trace.attempt for trace in result.interaction_traces] == [1, 2]  # type: ignore[attr-defined]
+    assert result.interaction_traces[0].validation_status in {"PARSING_FAILED", "VALIDATION_FAILED"}  # type: ignore[attr-defined]
+    assert result.interaction_traces[1].interaction_type == "CORRECTIVE_RETRY"  # type: ignore[attr-defined]
+    assert result.interaction_traces[1].retry_reason  # type: ignore[attr-defined]
 
 
 class FailingProvider:

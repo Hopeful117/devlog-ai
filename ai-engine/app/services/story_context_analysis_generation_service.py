@@ -16,6 +16,7 @@ from app.schemas.ai_task_result import (
     PromptExecutionMetadata,
 )
 from app.schemas.story_context_analysis import StoryContextAnalysisResult, RelationType
+from app.services.interaction_trace import InteractionTraceCollector
 
 
 class StoryContextAnalysisOutputValidationError(ValueError):
@@ -61,31 +62,33 @@ class StoryContextAnalysisGenerationService:
                 intent_error,
             )
             return
+        traces = InteractionTraceCollector(self._provider, submission)
 
         try:
             output = await self._generate_and_validate(
-                prompt, submission.selected_knowledge, submission.grounding_contract or {}
+                prompt, submission.selected_knowledge, submission.grounding_contract or {}, traces
             )
         except (ValidationError, StoryContextAnalysisOutputValidationError, ValueError) as error:
             corrective_prompt = self._prompt_builder.corrective_retry(prompt, error)
+            traces.retry(error)
             try:
                 output = await self._generate_and_validate(
-                    corrective_prompt, submission.selected_knowledge, submission.grounding_contract or {}
+                    corrective_prompt, submission.selected_knowledge, submission.grounding_contract or {}, traces
                 )
                 prompt = corrective_prompt
             except (ValidationError, StoryContextAnalysisOutputValidationError, ValueError) as retry_error:
                 await self._send_failure(
-                    submission, external_job_id, "INVALID_LLM_OUTPUT", retry_error, corrective_prompt
+                    submission, external_job_id, "INVALID_LLM_OUTPUT", retry_error, corrective_prompt, traces
                 )
                 return
             except Exception as provider_error:
                 await self._send_failure(
-                    submission, external_job_id, "LLM_PROVIDER_ERROR", provider_error, corrective_prompt
+                    submission, external_job_id, "LLM_PROVIDER_ERROR", provider_error, corrective_prompt, traces
                 )
                 return
         except Exception as provider_error:
             await self._send_failure(
-                submission, external_job_id, "LLM_PROVIDER_ERROR", provider_error, prompt
+                submission, external_job_id, "LLM_PROVIDER_ERROR", provider_error, prompt, traces
             )
             return
 
@@ -113,6 +116,7 @@ class StoryContextAnalysisGenerationService:
                 ),
                 synthesis=None,
                 analysis_result=output,
+                interaction_traces=traces.traces,
             ),
         )
 
@@ -121,11 +125,13 @@ class StoryContextAnalysisGenerationService:
         prompt: Prompt,
         context: dict[str, object],
         grounding_contract: dict[str, object],
+        traces: InteractionTraceCollector,
     ) -> StoryContextAnalysisResult:
-        output = await self._provider.generate_structured(prompt, StoryContextAnalysisResult)
-        validated = StoryContextAnalysisResult.model_validate(output)
-        self._validate_output(validated, context, grounding_contract)
-        return validated
+        return await traces.generate_and_validate(
+            prompt,
+            StoryContextAnalysisResult,
+            lambda output: self._validate_output(output, context, grounding_contract),
+        )
 
     def _validate_output(
         self,
@@ -202,6 +208,7 @@ class StoryContextAnalysisGenerationService:
         error_code: str,
         error: Exception,
         prompt: Prompt | None = None,
+        traces: InteractionTraceCollector | None = None,
     ) -> None:
         await self._callback_client.send_result(
             submission.correlation_id,
@@ -216,6 +223,7 @@ class StoryContextAnalysisGenerationService:
                     message=str(error)[:5000] or "LLM output validation failed",
                 ),
                 prompt_execution=self._execution_metadata(prompt) if prompt else None,
+                interaction_traces=traces.traces if traces else [],
             ),
         )
 

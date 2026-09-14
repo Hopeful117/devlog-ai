@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.hopeful117.devlogai.ai.engine.dto.*;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException;
+import com.hopeful117.devlogai.ai.interactiontrace.service.AiInteractionTracePersistenceService;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
@@ -44,6 +45,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
     private final AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
     private final CommunicationDecisionService communicationDecisionService;
     private final AnalysisCommunicationUseCase analysisCommunicationUseCase;
+    private final AiInteractionTracePersistenceService interactionTracePersistenceService;
 
     @Override
     @Transactional
@@ -59,6 +61,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                         "AI task correlation", correlationId
                 ));
         validateExternalJobId(task, request.externalJobId());
+        persistInteractionTraces(task, request);
 
         if (isStoryContextAnalysisIntent(task)) {
             return handleStoryContextAnalysis(task, request);
@@ -132,6 +135,15 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                 correlationId, request.proposals().size(), request.synthesis() != null);
         evaluateAndCommunicate(task.getAnalysis().getId());
         return acknowledgement(task, false);
+    }
+
+    private void persistInteractionTraces(AiTask task, AiTaskResultRequest request) {
+        try {
+            interactionTracePersistenceService.persist(task, request.interactionTraces());
+        } catch (RuntimeException traceFailure) {
+            log.warn("AI interaction trace persistence failed taskId={} traceCount={}",
+                    task.getId(), request.interactionTraces().size(), traceFailure);
+        }
     }
 
     private void finishAnalysis(AiTask task, AnalysisStatus status, Instant completedAt) {
