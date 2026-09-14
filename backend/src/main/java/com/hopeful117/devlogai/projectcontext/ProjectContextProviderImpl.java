@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.projectcontext;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
+import com.hopeful117.devlogai.history.repository.ProjectCommitRepository;
 import com.hopeful117.devlogai.artifact.entity.Artifact;
 import com.hopeful117.devlogai.artifact.entity.ArtifactType;
 import com.hopeful117.devlogai.artifact.repository.ArtifactRepository;
@@ -49,11 +50,12 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     static final int MAX_ARCHITECTURE_DECISIONS = 20;
     static final int MAX_RECENT_MILESTONES = 10;
     static final int MAX_RELATED_ANALYSES = 10;
-    static final int MAX_VALIDATED_ENGINEERING_EVENTS = 10;
+    static final int MAX_VALIDATED_ENGINEERING_EVENTS = 20;
     static final int MAX_OPEN_CHALLENGES = 20;
     static final int MAX_KNOWLEDGE_RELATIONS = 50;
     static final int MAX_ENGINEERING_STORIES = 20;
     static final int MAX_HUMAN_CONTEXT_INPUTS = 10;
+    static final int MAX_REPOSITORY_RELATIONSHIPS = 50;
 
     private static final List<ArtifactType> ARCHITECTURE_ARTIFACT_TYPES = List.of(
             ArtifactType.API,
@@ -75,6 +77,7 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
     private final KnowledgeRelationRepository knowledgeRelationRepository;
     private final EngineeringStoryRepository engineeringStoryRepository;
     private final ProjectHumanContextInputRepository humanContextInputRepository;
+    private final ProjectCommitRepository projectCommitRepository;
 
     @Override
     public ProjectContextSnapshot build(UUID projectId) {
@@ -163,6 +166,17 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                         .map(this::toHumanContextInputSnapshot)
                         .toList();
 
+        List<EngineeringRelationship> engineeringRelationships = projectCommitRepository == null
+                ? List.of()
+                : projectCommitRepository
+                        .findRecentWithChangedFiles(
+                                projectId, PageRequest.of(0, MAX_REPOSITORY_RELATIONSHIPS))
+                        .stream()
+                        .flatMap(commit -> new RepositoryRelationshipProjector().project(commit).stream())
+                        .sorted(java.util.Comparator.comparing(EngineeringRelationship::id))
+                        .limit(MAX_REPOSITORY_RELATIONSHIPS)
+                        .toList();
+
         return new ProjectContextSnapshot(
                 toProjectSnapshot(project),
                 latestProfile,
@@ -176,7 +190,8 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                 openChallenges,
                 knowledgeRelations,
                 engineeringStories,
-                humanContextInputs
+                humanContextInputs,
+                engineeringRelationships
         );
     }
 

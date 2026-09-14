@@ -31,6 +31,7 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -79,7 +80,8 @@ class KnowledgeSelectionServiceAdditionalTest {
                 .build();
         when(diagnosticRepository.findById(context.analysis().id())).thenReturn(Optional.of(diagnostic));
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                context.project().id(), List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
+                eq(context.project().id()), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of());
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
         RepositoryContext repoContext = new RepositoryContext(
                 "v1", null, List.of(), "v1", List.of(), List.of(),
@@ -180,7 +182,8 @@ class KnowledgeSelectionServiceAdditionalTest {
                     .build());
         }
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                context.project().id(), List.of(InsightStatus.ACTIVE))).thenReturn(insights);
+                eq(context.project().id()), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class))).thenReturn(insights);
 
         SelectedKnowledge result = service.select(context, architectureIntent(), null);
 
@@ -220,7 +223,8 @@ class KnowledgeSelectionServiceAdditionalTest {
                 .createdAt(Instant.now())
                 .build();
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                context.project().id(), List.of(InsightStatus.ACTIVE))).thenReturn(List.of(legacy));
+                eq(context.project().id()), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of(legacy));
 
         SelectedKnowledge result = service.select(context, architectureIntent(), null);
 
@@ -260,7 +264,8 @@ class KnowledgeSelectionServiceAdditionalTest {
                 .createdAt(Instant.now())
                 .build();
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                context.project().id(), List.of(InsightStatus.ACTIVE)))
+                eq(context.project().id()), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(List.of(active));
 
         @SuppressWarnings("unchecked")
@@ -294,7 +299,8 @@ class KnowledgeSelectionServiceAdditionalTest {
                 0, 0, 0, false, List.of(), List.of(), "digest");
         when(repositoryContextService.build(any(), any(), any(), anyList(), anyList(), any())).thenReturn(repoContext);
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                context.project().id(), List.of(InsightStatus.ACTIVE)))
+                eq(context.project().id()), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class)))
                 .thenReturn(List.of());
 
         @SuppressWarnings("unchecked")
@@ -396,7 +402,8 @@ class KnowledgeSelectionServiceAdditionalTest {
         var context = createMinimalContext(testAnalysis());
 
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                context.project().id(), List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
+                eq(context.project().id()), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class))).thenReturn(List.of());
         RepositoryContext repoContext = new RepositoryContext(
                 "v1", null, List.of(), "v1", List.of(), List.of(),
                 Map.of(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),

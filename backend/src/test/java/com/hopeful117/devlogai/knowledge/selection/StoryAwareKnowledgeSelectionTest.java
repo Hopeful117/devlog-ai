@@ -140,7 +140,8 @@ class StoryAwareKnowledgeSelectionTest {
         assertEquals(List.of(relevant.getId()), result.selectedInsights().stream()
                 .map(SelectedKnowledge.InsightSnapshot::id).toList());
         verify(insightRepository).findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                PROJECT_ID, List.of(InsightStatus.ACTIVE));
+                eq(PROJECT_ID), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class));
     }
 
     @Test
@@ -184,7 +185,8 @@ class StoryAwareKnowledgeSelectionTest {
 
     private void stubSelection(AnalysisContext context, List<Insight> insights) {
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
-                PROJECT_ID, List.of(InsightStatus.ACTIVE))).thenReturn(insights);
+                eq(PROJECT_ID), eq(List.of(InsightStatus.ACTIVE)),
+                any(org.springframework.data.domain.Pageable.class))).thenReturn(insights);
         when(repositoryContextService.build(eq(context), eq(storyIntent()),
                 org.mockito.ArgumentMatchers.nullable(UserGuidance.class), anyList(), anyList(), any()))
                 .thenReturn(emptyRepositoryContext());

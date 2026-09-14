@@ -111,6 +111,21 @@ class SelectedKnowledgePromptProjectionServiceTest {
     }
 
     @Test
+    void shouldExcludeAdmissionDiagnosticsFromPromptPayload() {
+        UUID relationId = UUID.randomUUID();
+        SelectedKnowledge selectedKnowledge = selectedKnowledge(
+                List.of(), List.of(), List.of(), List.of(), null, profile(),
+                List.of(new SelectedKnowledge.AdmissionDiagnostic(
+                        relationId, "CANDIDATE_NOT_AVAILABLE", "RELATES_TO",
+                        "INSIGHT", UUID.randomUUID(), "ENGINEERING_EVENT", UUID.randomUUID())));
+
+        Map<String, Object> projected = service.toMap(selectedKnowledge);
+
+        assertFalse(projected.containsKey("admissionDiagnostics"));
+        assertFalse(projected.containsKey("relationshipDiagnostics"));
+    }
+
+    @Test
     void shouldExposeHumanContextInputsAsDistinctPromptSection() {
         SelectedKnowledge selectedKnowledge = selectedKnowledge(
                 List.of(),
@@ -246,14 +261,20 @@ class SelectedKnowledgePromptProjectionServiceTest {
         assertEquals(1, highlights.size());
         assertEquals(eventA.toString(), highlights.getFirst().source().entityId());
         assertEquals(eventB.toString(), highlights.getFirst().target().entityId());
+        assertEquals(1, service.project(selectedKnowledge).relationshipDiagnostics().size());
+        assertEquals("TARGET_ENDPOINT_NOT_PROJECTED",
+                service.project(selectedKnowledge).relationshipDiagnostics().getFirst().reason());
     }
 
     @Test
-    void shouldExcludeDecisionAndChallengeEndpointsFromRelationshipHighlights() {
+    void shouldProjectDecisionAndChallengeEndpointsWhenTheirEvidenceIsSelected() {
         UUID insightId = uuid("00000000-0000-0000-0000-00000000000a");
         UUID eventId = uuid("00000000-0000-0000-0000-00000000000e");
         UUID decisionId = uuid("00000000-0000-0000-0000-00000000000d");
         UUID challengeId = uuid("00000000-0000-0000-0000-00000000000c");
+        RepositoryContext repositoryContext = repositoryContext(List.of(
+                endpointEvidence("DECISION", "decision:" + decisionId),
+                endpointEvidence("CHALLENGE", "challenge:" + challengeId)));
         SelectedKnowledge selectedKnowledge = selectedKnowledge(
                 List.of(insight(insightId, "A")),
                 List.of(engineeringEvent(eventId, "Event")),
@@ -267,10 +288,25 @@ class SelectedKnowledgePromptProjectionServiceTest {
                                 EntityType.CHALLENGE, challengeId,
                                 EntityType.ENGINEERING_EVENT, eventId,
                                 KnowledgeRelationType.CAUSED_BY)),
-                null,
+                repositoryContext,
                 profile());
 
-        assertTrue(service.project(selectedKnowledge).relationshipHighlights().isEmpty());
+        List<SelectedKnowledgePromptProjectionService.PromptRelationshipHighlight> highlights =
+                service.project(selectedKnowledge).relationshipHighlights();
+        assertEquals(2, highlights.size());
+        assertTrue(highlights.stream().anyMatch(value ->
+                value.source().entityType().equals("INSIGHT")
+                        && value.target().entityType().equals("DECISION")));
+        assertTrue(highlights.stream().anyMatch(value ->
+                value.source().entityType().equals("CHALLENGE")
+                        && value.target().entityType().equals("ENGINEERING_EVENT")));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> projectedHighlights =
+                (List<Map<String, Object>>) service.toMap(selectedKnowledge)
+                        .get("relationshipHighlights");
+        assertEquals(2, projectedHighlights.size());
+        assertFalse(service.toMap(selectedKnowledge).containsKey("relationshipDiagnostics"));
     }
 
     @Test
@@ -343,6 +379,19 @@ class SelectedKnowledgePromptProjectionServiceTest {
             RepositoryContext repositoryContext,
             ProjectProfileResponse profile
     ) {
+        return selectedKnowledge(insights, engineeringEvents, humanContextInputs, knowledgeRelations,
+                repositoryContext, profile, List.of());
+    }
+
+    private SelectedKnowledge selectedKnowledge(
+            List<SelectedKnowledge.InsightSnapshot> insights,
+            List<ProjectContextSnapshot.EngineeringEventSnapshot> engineeringEvents,
+            List<ProjectContextSnapshot.HumanContextInputSnapshot> humanContextInputs,
+            List<ProjectContextSnapshot.KnowledgeRelationSnapshot> knowledgeRelations,
+            RepositoryContext repositoryContext,
+            ProjectProfileResponse profile,
+            List<SelectedKnowledge.AdmissionDiagnostic> admissionDiagnostics
+    ) {
         return new SelectedKnowledge(
                 new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "DevLog", "devlog-ai",
                         "desc", ProjectStatus.ACTIVE),
@@ -356,6 +405,7 @@ class SelectedKnowledgePromptProjectionServiceTest {
                 engineeringEvents,
                 humanContextInputs,
                 knowledgeRelations,
+                admissionDiagnostics,
                 repositoryContext,
                 null,
                 METADATA,
@@ -410,6 +460,48 @@ class SelectedKnowledgePromptProjectionServiceTest {
     }
 
     private RepositoryContext repositoryContext() {
+        return repositoryContext(List.of(repositoryEvidence()));
+    }
+
+    private RepositoryContext repositoryContext(List<RepositoryEvidence> evidence) {
+        return new RepositoryContext(
+                "repository-context-engine-v1",
+                ContextProfile.PROJECT_STATE,
+                List.of("project-state-v1"),
+                "context-intelligence-v1",
+                List.of("selected for understanding refresh"),
+                evidence,
+                Map.of(RepositoryContextLayer.CURRENT_ANALYSIS, evidence.size()),
+                new RepositoryContext.ContextBudget(60, 500, 20, 6000),
+                456,
+                10,
+                9,
+                false,
+                List.of(new RepositoryContext.SelectionDecision(
+                        "backend/src/main/java/App.java", true, "top candidate", 100, 123
+                )),
+                List.of("warn"),
+                "d".repeat(64)
+        );
+    }
+
+    private RepositoryEvidence endpointEvidence(String kind, String reference) {
+        return new RepositoryEvidence(
+                RepositoryContextLayer.CURRENT_ANALYSIS,
+                kind,
+                reference,
+                kind + " endpoint",
+                Instant.EPOCH,
+                EvidenceScore.unscored(),
+                List.of(),
+                new RepositoryEvidence.EvidenceProvenance(
+                        "CORE_KNOWLEDGE", "project", null, reference),
+                Map.of(),
+                1,
+                List.of());
+    }
+
+    private RepositoryEvidence repositoryEvidence() {
         RepositoryEvidence evidence = new RepositoryEvidence(
                 RepositoryContextLayer.CURRENT_ANALYSIS,
                 "FILE",
@@ -460,25 +552,7 @@ class SelectedKnowledgePromptProjectionServiceTest {
                         ))
                 )
         );
-        return new RepositoryContext(
-                "repository-context-engine-v1",
-                ContextProfile.PROJECT_STATE,
-                List.of("project-state-v1"),
-                "context-intelligence-v1",
-                List.of("selected for understanding refresh"),
-                List.of(evidence),
-                Map.of(RepositoryContextLayer.CURRENT_ANALYSIS, 1),
-                new RepositoryContext.ContextBudget(60, 500, 20, 6000),
-                456,
-                10,
-                9,
-                false,
-                List.of(new RepositoryContext.SelectionDecision(
-                        "backend/src/main/java/App.java", true, "top candidate", 100, 123
-                )),
-                List.of("warn"),
-                "d".repeat(64)
-        );
+        return evidence;
     }
 
     private UUID uuid(String value) {

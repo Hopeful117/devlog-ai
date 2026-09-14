@@ -1,6 +1,8 @@
 package com.hopeful117.devlogai.projectcontext.projection;
 
 import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
+import com.hopeful117.devlogai.projectcontext.EngineeringRelationship;
+import com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier;
 import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextDiagnostics;
@@ -221,6 +223,31 @@ class AgentContextProjectionServiceTest {
                         || projected.warnings().contains("AGENT_PROJECTION_PROJECT_CONTEXT_LISTS_REMOVED")
                         || projected.warnings().contains("AGENT_PROJECTION_PROJECT_CONTEXT_MINIMAL"),
                 "ProjectContext reduction warnings must be present");
+    }
+
+    @Test
+    void shouldPreserveEngineeringRelationshipsDuringProjectContextCompaction() {
+        EngineeringRelationship relationship = new EngineeringRelationship(
+                "repository-change-1",
+                new EngineeringRelationship.RepositoryCommitEndpoint(
+                        PROJECT_ID, UUID.randomUUID(), "abc123"),
+                "CHANGES",
+                new EngineeringRelationship.RepositoryFileEndpoint(
+                        PROJECT_ID, UUID.randomUUID(), "abc123", "src/App.java"),
+                EngineeringRelationship.Origin.REPOSITORY_DERIVED,
+                TrustTier.TECHNICAL_EVIDENCE,
+                "abc123",
+                List.of("commit:abc123"));
+        ProjectContextSnapshot context = new ProjectContextSnapshot(
+                null, null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(relationship));
+
+        AgentEngineeringStoryContext result = service(32_768, 8_192).project(
+                PROJECT_ID, context,
+                context(List.of(evidence(RepositoryContextLayer.GIT_HISTORY,
+                        "COMMIT", "git:abc", null))), GENERATED_AT);
+
+        assertEquals(List.of(relationship), result.projectContext().engineeringRelationships());
     }
 
     @Test
