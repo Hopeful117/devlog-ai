@@ -480,7 +480,7 @@ class InsightGenerationService:
         unknown = referenced - available
         if unknown:
             raise InsightOutputValidationError(
-                f"{field_name} contains references absent from AnalysisContext: "
+                f"{field_name} contains references absent from selected observations: "
                 f"{sorted(str(value) for value in unknown)}"
             )
 

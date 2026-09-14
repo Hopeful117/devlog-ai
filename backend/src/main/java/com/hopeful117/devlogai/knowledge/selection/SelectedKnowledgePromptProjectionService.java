@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -48,7 +49,7 @@ public class SelectedKnowledgePromptProjectionService {
         return new PromptProjection(
                 selectedKnowledge.project(),
                 selectedKnowledge.analysis(),
-                selectedKnowledge.projectProfile(),
+                projectProfile(selectedKnowledge.projectProfile()),
                 selectedKnowledge.selectedFacts(),
                 selectedKnowledge.selectedObservations(),
                 selectedKnowledge.diagnostics(),
@@ -224,10 +225,48 @@ public class SelectedKnowledgePromptProjectionService {
         );
     }
 
+    private PromptProjectProfile projectProfile(ProjectProfileResponse profile) {
+        if (profile == null) return null;
+        return new PromptProjectProfile(
+                profile.id(),
+                profile.projectId(),
+                profile.analysisId(),
+                profile.profileVersion(),
+                profile.rendererVersion(),
+                profile.generatedAt(),
+                profile.requestedRevision(),
+                profile.resolvedRevisions(),
+                profile.completeness(),
+                profile.sections().stream().map(this::projectProfileSection).toList(),
+                profile.deterministicSummary(),
+                profile.characteristicCount()
+        );
+    }
+
+    private Map<String, Object> projectProfileSection(Map<String, Object> section) {
+        return projectProfileValue(section);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T projectProfileValue(T value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> projected = new LinkedHashMap<>();
+            map.forEach((key, nested) -> {
+                if ("sourceObservationIds".equals(key) || "sourceObservations".equals(key)) return;
+                projected.put(String.valueOf(key), projectProfileValue(nested));
+            });
+            return (T) Collections.unmodifiableMap(projected);
+        }
+        if (value instanceof List<?> list) {
+            return (T) list.stream().map(this::projectProfileValue).toList();
+        }
+        return value;
+    }
+
     record PromptProjection(
             AnalysisContext.ProjectSnapshot project,
             AnalysisContext.AnalysisSnapshot analysis,
-            ProjectProfileResponse projectProfile,
+            PromptProjectProfile projectProfile,
             List<AnalysisContext.FactSnapshot> selectedFacts,
             List<AnalysisContext.ObservationSnapshot> selectedObservations,
             SelectedKnowledge.DiagnosticSnapshot diagnostics,
@@ -244,6 +283,21 @@ public class SelectedKnowledgePromptProjectionService {
             AnalysisContext.EvolutionContext evolutionContext,
             SelectedKnowledge.SelectionMetadata selectionMetadata,
             String selectionDigest
+    ) { }
+
+    record PromptProjectProfile(
+            java.util.UUID id,
+            java.util.UUID projectId,
+            java.util.UUID analysisId,
+            String profileVersion,
+            String rendererVersion,
+            Instant generatedAt,
+            String requestedRevision,
+            Map<String, Object> resolvedRevisions,
+            ProjectProfileResponse.Completeness completeness,
+            List<Map<String, Object>> sections,
+            String deterministicSummary,
+            int characteristicCount
     ) { }
 
     record PromptInsightSnapshot(

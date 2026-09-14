@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
 import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
+import com.hopeful117.devlogai.observation.entity.ObservationType;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
@@ -108,6 +109,73 @@ class SelectedKnowledgePromptProjectionServiceTest {
         assertEquals("Controllers", projectedInsight.get("title"));
         assertEquals(insightId.toString(), projectedInsight.get("id"));
         assertFalse(projectedInsight.containsKey("analysisId"));
+    }
+
+    @Test
+    void shouldHideUnselectedObservationProvenanceFromPromptProfile() {
+        UUID selectedObservationId = uuid("00000000-0000-0000-0000-0000000000a1");
+        UUID unselectedObservationId = uuid("00000000-0000-0000-0000-0000000000b1");
+        ProjectProfileResponse profile = new ProjectProfileResponse(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                "v1", "r1", Instant.now(), null, Map.of(),
+                new ProjectProfileResponse.Completeness(
+                        com.hopeful117.devlogai.profile.model.ProfileCompletenessStatus.COMPLETE,
+                        true, false, 0, 0, 1, 0, 0),
+                List.of(Map.of(
+                        "category", "API",
+                        "characteristics", List.of(Map.of(
+                                "code", "REST_API",
+                                "label", "REST API",
+                                "description", "The project exposes a REST API.",
+                                "status", "CONFIRMED",
+                                "sourceObservationIds", List.of(unselectedObservationId),
+                                "evidenceCount", 1,
+                                "metadata", Map.of("scope", "project")
+                        )),
+                        "deterministicSummary", "REST API")),
+                "summary", List.of(
+                        Map.of("id", selectedObservationId, "type", "SPRING_BOOT_REST_APPLICATION"),
+                        Map.of("id", unselectedObservationId, "type", "SPRING_BOOT_REST_APPLICATION")
+                ), 1);
+        AnalysisContext.ObservationSnapshot selectedObservation =
+                new AnalysisContext.ObservationSnapshot(
+                        selectedObservationId,
+                        ObservationType.SPRING_BOOT_REST_APPLICATION,
+                        "The project exposes REST controllers.",
+                        "SPRING_BOOT_REST_APPLICATION",
+                        "1",
+                        List.of(),
+                        Instant.EPOCH);
+        SelectedKnowledge selectedKnowledge = new SelectedKnowledge(
+                new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "DevLog", "devlog-ai",
+                        "desc", ProjectStatus.ACTIVE),
+                null,
+                profile,
+                List.of(selectedObservation),
+                List.of(),
+                DIAGNOSTICS,
+                List.of(),
+                null,
+                METADATA,
+                "a".repeat(64));
+
+        Map<String, Object> projected = service.toMap(selectedKnowledge);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectedProfile =
+                (Map<String, Object>) projected.get("projectProfile");
+        assertFalse(projectedProfile.containsKey("sourceObservations"));
+        assertEquals("summary", projectedProfile.get("deterministicSummary"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectedSection =
+                ((List<Map<String, Object>>) projectedProfile.get("sections")).getFirst();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectedCharacteristic =
+                ((List<Map<String, Object>>) projectedSection.get("characteristics")).getFirst();
+        assertFalse(projectedCharacteristic.containsKey("sourceObservationIds"));
+        assertEquals("REST_API", projectedCharacteristic.get("code"));
+        assertTrue(projected.toString().contains(selectedObservationId.toString()));
+        assertFalse(projected.toString().contains(unselectedObservationId.toString()));
     }
 
     @Test
