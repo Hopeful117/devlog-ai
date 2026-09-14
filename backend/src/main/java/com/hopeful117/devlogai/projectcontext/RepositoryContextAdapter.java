@@ -167,7 +167,9 @@ public class RepositoryContextAdapter {
                 snapshot.validatedEngineeringEvents(),
                 snapshot.openChallenges(),
                 snapshot.knowledgeRelations(),
-                currentStory == null ? snapshot.engineeringStories() : List.of(currentStory));
+                currentStory == null ? snapshot.engineeringStories() : List.of(currentStory),
+                snapshot.humanContextInputs(),
+                snapshot.engineeringRelationships());
     }
 
     private ProjectContextSnapshot.EngineeringStorySnapshot resolveStory(

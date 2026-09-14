@@ -272,7 +272,8 @@ public class AnalyzeStoryContextUseCase {
                 baselineContext.openChallenges(),
                 baselineContext.knowledgeRelations(),
                 List.of(currentStorySnapshot),
-                baselineContext.humanContextInputs()
+                baselineContext.humanContextInputs(),
+                baselineContext.engineeringRelationships()
         );
     }
 
@@ -348,7 +349,8 @@ public class AnalyzeStoryContextUseCase {
                 List.of(), // openChallenges
                 List.of(), // knowledgeRelations
                 List.of(currentStorySnapshot),
-                List.of() // humanContextInputs
+                 List.of(), // humanContextInputs
+                 List.of() // engineeringRelationships
         );
     }
 

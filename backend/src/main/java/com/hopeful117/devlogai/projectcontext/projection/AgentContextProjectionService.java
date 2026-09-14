@@ -353,7 +353,8 @@ public class AgentContextProjectionService {
                 openChallenges,
                 knowledgeRelations,
                 engineeringStories,
-                humanContextInputs
+                humanContextInputs,
+                context.engineeringRelationships()
         );
     }
 

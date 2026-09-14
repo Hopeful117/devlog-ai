@@ -39,7 +39,9 @@ public record AnalysisContext(
         List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringStorySnapshot>
                 engineeringStories,
         List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.HumanContextInputSnapshot>
-                humanContextInputs
+                humanContextInputs,
+        List<com.hopeful117.devlogai.projectcontext.EngineeringRelationship>
+                engineeringRelationships
 ) {
     public AnalysisContext {
         facts = List.copyOf(facts);
@@ -55,6 +57,7 @@ public record AnalysisContext(
         knowledgeRelations = List.copyOf(knowledgeRelations);
         engineeringStories = List.copyOf(engineeringStories);
         humanContextInputs = List.copyOf(humanContextInputs);
+        engineeringRelationships = List.copyOf(engineeringRelationships);
     }
 
     public AnalysisContext(ProjectSnapshot project, AnalysisSnapshot analysis,
@@ -65,7 +68,7 @@ public record AnalysisContext(
             List<ValidatedProposalSnapshot> validatedProposals) {
         this(project, analysis, projectProfile, facts, observations, recentKnowledgeEvents,
                 relatedAnalyses, architectureArtifacts, relatedDecisions, recentMilestones,
-                validatedProposals, null, List.of(), List.of(), List.of(), List.of(), List.of());
+                validatedProposals, null, List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
     }
 
     public AnalysisContext(ProjectSnapshot project, AnalysisSnapshot analysis,
@@ -77,7 +80,7 @@ public record AnalysisContext(
         this(project, analysis, projectProfile, facts, observations, recentKnowledgeEvents,
                 relatedAnalyses, architectureArtifacts, relatedDecisions, recentMilestones,
                 validatedProposals, evolutionContext, List.of(), List.of(), List.of(), List.of(),
-                List.of());
+                List.of(), List.of());
     }
 
     public AnalysisContext(
@@ -105,7 +108,37 @@ public record AnalysisContext(
         this(project, analysis, projectProfile, facts, observations, recentKnowledgeEvents,
                 relatedAnalyses, architectureArtifacts, relatedDecisions, recentMilestones,
                 validatedProposals, evolutionContext, validatedEngineeringEvents, openChallenges,
-                knowledgeRelations, engineeringStories, List.of());
+                knowledgeRelations, engineeringStories, List.of(), List.of());
+    }
+
+    public AnalysisContext(
+            ProjectSnapshot project,
+            AnalysisSnapshot analysis,
+            ProjectProfileResponse projectProfile,
+            List<FactSnapshot> facts,
+            List<ObservationSnapshot> observations,
+            List<KnowledgeEventSnapshot> recentKnowledgeEvents,
+            List<AnalysisSnapshot> relatedAnalyses,
+            List<ArtifactSnapshot> architectureArtifacts,
+            List<DecisionSnapshot> relatedDecisions,
+            List<MilestoneSnapshot> recentMilestones,
+            List<ValidatedProposalSnapshot> validatedProposals,
+            EvolutionContext evolutionContext,
+            List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
+                    validatedEngineeringEvents,
+            List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.ChallengeSnapshot>
+                    openChallenges,
+            List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.KnowledgeRelationSnapshot>
+                    knowledgeRelations,
+            List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringStorySnapshot>
+                    engineeringStories,
+            List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.HumanContextInputSnapshot>
+                    humanContextInputs
+    ) {
+        this(project, analysis, projectProfile, facts, observations, recentKnowledgeEvents,
+                relatedAnalyses, architectureArtifacts, relatedDecisions, recentMilestones,
+                validatedProposals, evolutionContext, validatedEngineeringEvents, openChallenges,
+                knowledgeRelations, engineeringStories, humanContextInputs, List.of());
     }
 
     public record EvolutionContext(String contextVersion, UUID projectId, UUID sourceId,

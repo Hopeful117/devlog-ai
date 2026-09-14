@@ -151,11 +151,18 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 .limit(MAX_ENGINEERING_EVENTS).toList();
         Admission admission = admitRelatedEndpoints(intent, standaloneInsights,
                 standaloneEngineeringEvents, insightCandidates,
-                context.validatedEngineeringEvents(), context.knowledgeRelations());
+                context.validatedEngineeringEvents(), context.knowledgeRelations(),
+                context.engineeringRelationships());
         List<SelectedKnowledge.InsightSnapshot> insights = admission.insights();
         var engineeringEvents = admission.engineeringEvents();
         var humanContextInputs = context.humanContextInputs().stream().limit(5).toList();
         var knowledgeRelations = context.knowledgeRelations();
+        List<com.hopeful117.devlogai.projectcontext.EngineeringRelationship> engineeringRelationships =
+                java.util.stream.Stream.concat(
+                                context.knowledgeRelations().stream()
+                                        .map(com.hopeful117.devlogai.projectcontext.EngineeringRelationship::fromKnowledge),
+                                admission.repositoryRelationships().stream())
+                        .toList();
         List<RepositoryEvidence> promotedCommitDiff = promoteCommitDiffCandidates(
                 context, intent, guidance, insightCandidates);
         RepositoryContext repositoryContext = repositoryContextService.build(
@@ -190,11 +197,11 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                 diagnostic.isCollectionComplete() ? "COMPLETE" : "PARTIAL");
         String digest = digest(context, new DigestComponents(observations, facts, diagnostics,
                 insights, existingArchitectureKnowledge, engineeringEvents, knowledgeRelations,
-                admission.diagnostics(), repositoryContext, metadata));
+                engineeringRelationships, admission.diagnostics(), repositoryContext, metadata));
         return new SelectedKnowledge(context.project(), context.analysis(), context.projectProfile(),
                 observations, facts, diagnostics, insights, existingArchitectureKnowledge,
                 engineeringEvents, humanContextInputs, knowledgeRelations, admission.diagnostics(), repositoryContext,
-                context.evolutionContext(), metadata, digest);
+                context.evolutionContext(), metadata, digest, engineeringRelationships);
     }
 
     private List<Insight> findActiveInsightCandidates(AnalysisContext context) {
@@ -213,10 +220,11 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
             List<ProjectContextSnapshot.EngineeringEventSnapshot> standaloneEvents,
             List<Insight> insightCandidates,
             List<ProjectContextSnapshot.EngineeringEventSnapshot> eventCandidates,
-        List<ProjectContextSnapshot.KnowledgeRelationSnapshot> relations
+            List<ProjectContextSnapshot.KnowledgeRelationSnapshot> relations,
+            List<com.hopeful117.devlogai.projectcontext.EngineeringRelationship> engineeringRelationships
     ) {
         if (relationalCapacity == 0) {
-            return new Admission(standaloneInsights, standaloneEvents, List.of());
+            return new Admission(standaloneInsights, standaloneEvents, List.of(), List.of());
         }
 
         Map<UUID, SelectedKnowledge.InsightSnapshot> insightsById = insightCandidates.stream()
@@ -266,12 +274,39 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                     standaloneEventIds, insightsById,
                     eventsById, relatedInsights, relatedEvents, admitted, diagnostics, relation);
         }
+        List<com.hopeful117.devlogai.projectcontext.EngineeringRelationship> admittedRepositoryRelations =
+                engineeringRelationships.stream()
+                        .filter(value -> value.origin()
+                                == com.hopeful117.devlogai.projectcontext.EngineeringRelationship.Origin.REPOSITORY_DERIVED)
+                        .filter(value -> repositoryRelationEligible(intent, value))
+                        .filter(this::repositoryEndpointsAvailable)
+                        .sorted(Comparator.comparing(com.hopeful117.devlogai.projectcontext.EngineeringRelationship::relationType)
+                                .thenComparing(com.hopeful117.devlogai.projectcontext.EngineeringRelationship::id))
+                        .filter(value -> admitted.size() < relationalCapacity
+                                && admitted.add("RELATION:" + value.id()))
+                        .toList();
         List<SelectedKnowledge.InsightSnapshot> finalInsights = composeInsights(
                 standaloneInsights, relatedInsights);
         List<ProjectContextSnapshot.EngineeringEventSnapshot> finalEvents = composeEvents(
                 standaloneEvents, relatedEvents);
         return new Admission(
-                finalInsights, finalEvents, List.copyOf(diagnostics));
+                finalInsights, finalEvents, List.copyOf(diagnostics), admittedRepositoryRelations);
+    }
+
+    private boolean repositoryRelationEligible(
+            IntentDefinition intent,
+            com.hopeful117.devlogai.projectcontext.EngineeringRelationship relationship) {
+        return "architecture-overview".equals(intent.id())
+                && "CHANGES".equals(relationship.relationType())
+                && relationship.source() instanceof com.hopeful117.devlogai.projectcontext.EngineeringRelationship.RepositoryCommitEndpoint
+                && relationship.target() instanceof com.hopeful117.devlogai.projectcontext.EngineeringRelationship.RepositoryFileEndpoint;
+    }
+
+    private boolean repositoryEndpointsAvailable(
+            com.hopeful117.devlogai.projectcontext.EngineeringRelationship relationship) {
+        return relationship.source() != null && relationship.target() != null
+                && relationship.source().canonicalIdentity() != null
+                && relationship.target().canonicalIdentity() != null;
     }
 
     private void admitEndpoint(
@@ -379,7 +414,8 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
     private record Admission(
             List<SelectedKnowledge.InsightSnapshot> insights,
             List<ProjectContextSnapshot.EngineeringEventSnapshot> engineeringEvents,
-            List<SelectedKnowledge.AdmissionDiagnostic> diagnostics
+            List<SelectedKnowledge.AdmissionDiagnostic> diagnostics,
+            List<com.hopeful117.devlogai.projectcontext.EngineeringRelationship> repositoryRelationships
     ) { }
 
     private void requireMandatoryKnowledge(AnalysisContext context, IntentDefinition intent) {
@@ -668,13 +704,15 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
                            Object existingArchitectureKnowledge,
                            Object selectedEngineeringEvents,
                            Object knowledgeRelations,
+                           Object engineeringRelationships,
                            Object admissionDiagnostics,
                            Object repositoryContext, Object evolutionContext, Object selectionMetadata) { }
         byte[] serialized = objectMapper.writeValueAsString(new DigestInput(
                 context.project(), context.analysis(), context.projectProfile(), selected.observations(),
                 selected.facts(), selected.diagnostics(), selected.insights(),
                 selected.existingArchitectureKnowledge(), selected.engineeringEvents(),
-                 selected.knowledgeRelations(), selected.admissionDiagnostics(), selected.repositoryContext(), context.evolutionContext(),
+                 selected.knowledgeRelations(), selected.engineeringRelationships(),
+                 selected.admissionDiagnostics(), selected.repositoryContext(), context.evolutionContext(),
                 selected.metadata()))
                 .getBytes(StandardCharsets.UTF_8);
         try {
@@ -693,7 +731,9 @@ public class KnowledgeSelectionServiceImpl implements KnowledgeSelectionService 
             List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringEventSnapshot>
                     engineeringEvents,
             List<com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.KnowledgeRelationSnapshot>
-                    knowledgeRelations,
+                     knowledgeRelations,
+            List<com.hopeful117.devlogai.projectcontext.EngineeringRelationship>
+                    engineeringRelationships,
             List<SelectedKnowledge.AdmissionDiagnostic> admissionDiagnostics,
             RepositoryContext repositoryContext,
             SelectedKnowledge.SelectionMetadata metadata) { }
