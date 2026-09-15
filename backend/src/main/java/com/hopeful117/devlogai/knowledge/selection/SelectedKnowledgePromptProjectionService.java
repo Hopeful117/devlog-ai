@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.ai.reference.AiReferenceRegistry;
 import com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory;
 import com.hopeful117.devlogai.ai.reference.AiReferenceScope;
 import com.hopeful117.devlogai.ai.reference.AiReferenceType;
+import com.hopeful117.devlogai.ai.reference.AiReferenceResolutionException;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
@@ -83,8 +84,8 @@ public class SelectedKnowledgePromptProjectionService {
         return list.stream().filter(Map.class::isInstance).map(raw -> {
             Map<String, Object> item = new LinkedHashMap<>((Map<String, Object>) raw);
             Object id = item.remove("id");
-            if (id != null) registry.referenceFor(type, scope, id.toString())
-                    .ifPresent(reference -> item.put("reference", reference));
+            item.put("reference", requiredReference(registry, type, scope, id,
+                    "selected " + type + " item"));
             return item;
         }).toList();
     }
@@ -95,8 +96,8 @@ public class SelectedKnowledgePromptProjectionService {
         return list.stream().filter(Map.class::isInstance).map(raw -> {
             Map<String, Object> item = new LinkedHashMap<>((Map<String, Object>) raw);
             Object id = item.remove("insightId");
-            if (id != null) registry.referenceFor(AiReferenceType.INSIGHT,
-                    AiReferenceScope.PROJECT, id.toString()).ifPresent(reference -> item.put("reference", reference));
+            item.put("reference", requiredReference(registry, AiReferenceType.INSIGHT,
+                    AiReferenceScope.PROJECT, id, "architecture knowledge item"));
             return item;
         }).toList();
     }
@@ -110,9 +111,9 @@ public class SelectedKnowledgePromptProjectionService {
             context.put("evidence", list.stream().filter(Map.class::isInstance).map(item -> {
                 Map<String, Object> projected = new LinkedHashMap<>((Map<String, Object>) item);
                 Object reference = projected.remove("reference");
-                if (reference != null) registry.referenceFor(AiReferenceType.REPOSITORY_EVIDENCE,
-                        AiReferenceScope.REPOSITORY, reference.toString())
-                        .ifPresent(valueReference -> projected.put("aiReference", valueReference));
+                projected.put("aiReference", requiredReference(registry,
+                        AiReferenceType.REPOSITORY_EVIDENCE, AiReferenceScope.REPOSITORY,
+                        reference, "repository evidence"));
                 return projected;
             }).toList());
         }
@@ -141,8 +142,7 @@ public class SelectedKnowledgePromptProjectionService {
                     Map<String, Object> projected = new LinkedHashMap<>((Map<String, Object>) item);
                     String type = String.valueOf(projected.remove("itemType"));
                     Object identity = projected.remove("itemId");
-                    if (identity != null) referenceForItem(registry, type, identity.toString())
-                            .ifPresent(reference -> projected.put("reference", reference));
+                    projected.put("reference", requiredSemanticReference(registry, type, identity));
                     return projected;
                 }).toList());
             }
@@ -159,27 +159,44 @@ public class SelectedKnowledgePromptProjectionService {
                     AiReferenceScope.ANALYSIS_CONTEXT, identity);
             case "INSIGHT" -> registry.referenceFor(AiReferenceType.INSIGHT,
                     AiReferenceScope.PROJECT, identity);
-            default -> registry.referenceFor(AiReferenceType.REPOSITORY_EVIDENCE,
-                    AiReferenceScope.REPOSITORY, identity);
+            default -> throw mappingFailure("Unsupported semantic section item type: " + type);
         };
     }
 
     @SuppressWarnings("unchecked")
     private Object typedEndpoint(Object value, AiReferenceRegistry registry) {
-        if (!(value instanceof Map<?, ?> raw)) return value;
+        if (!(value instanceof Map<?, ?> raw)) throw mappingFailure("Relationship endpoint is malformed");
         Map<String, Object> endpoint = new LinkedHashMap<>((Map<String, Object>) raw);
         String kind = String.valueOf(endpoint.remove("entityType"));
         Object identity = endpoint.remove("entityId");
-        if (identity != null) {
-            AiReferenceType type = "INSIGHT".equals(kind) ? AiReferenceType.INSIGHT
-                    : "ENGINEERING_EVENT".equals(kind) ? AiReferenceType.ENGINEERING_EVENT
-                    : AiReferenceType.REPOSITORY_EVIDENCE;
-            AiReferenceScope scope = type == AiReferenceType.REPOSITORY_EVIDENCE
-                    ? AiReferenceScope.REPOSITORY : AiReferenceScope.PROJECT;
-            registry.referenceFor(type, scope, identity.toString())
-                    .ifPresent(reference -> endpoint.put("reference", reference));
-        }
+        AiReferenceType type = "INSIGHT".equals(kind) ? AiReferenceType.INSIGHT
+                : "ENGINEERING_EVENT".equals(kind) ? AiReferenceType.ENGINEERING_EVENT
+                : "REPOSITORY_EVIDENCE".equals(kind) ? AiReferenceType.REPOSITORY_EVIDENCE
+                : null;
+        if (type == null) throw mappingFailure("Unsupported relationship endpoint type: " + kind);
+        AiReferenceScope scope = type == AiReferenceType.REPOSITORY_EVIDENCE
+                ? AiReferenceScope.REPOSITORY : AiReferenceScope.PROJECT;
+        endpoint.put("reference", requiredReference(registry, type, scope, identity,
+                "relationship endpoint"));
         return endpoint;
+    }
+
+    private AiReference requiredSemanticReference(AiReferenceRegistry registry, String type,
+            Object identity) {
+        if (identity == null) throw mappingFailure("Semantic section item identity is missing");
+        return referenceForItem(registry, type, identity.toString())
+                .orElseThrow(() -> mappingFailure("Semantic section item is not mapped"));
+    }
+
+    private AiReference requiredReference(AiReferenceRegistry registry, AiReferenceType type,
+            AiReferenceScope scope, Object identity, String description) {
+        if (identity == null) throw mappingFailure(description + " identity is missing");
+        return registry.referenceFor(type, scope, identity.toString())
+                .orElseThrow(() -> mappingFailure(description + " is not mapped"));
+    }
+
+    private AiReferenceResolutionException mappingFailure(String message) {
+        return new AiReferenceResolutionException("REFERENCE_MAPPING_FAILURE", message);
     }
 
     private List<AiReference> references(AiReferenceRegistry registry, String capability) {

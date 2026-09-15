@@ -334,6 +334,13 @@ class InsightGenerationService:
                                                AiReferenceScope.ANALYSIS_CONTEXT)
         evidence = self._typed_candidates(candidates.get("evidence"), AiReferenceType.REPOSITORY_EVIDENCE,
                                           AiReferenceScope.REPOSITORY)
+        context_sections = context.get("context")
+        architecture_targets = self._typed_context_references(
+            context_sections.get("existingArchitectureKnowledge", [])
+            if isinstance(context_sections, dict) else [],
+            AiReferenceType.INSIGHT,
+            AiReferenceScope.PROJECT,
+        )
         if require_synthesis != (output.synthesis is not None):
             raise InsightOutputValidationError("Architecture Overview v3 synthesis contract is invalid")
         if output.synthesis is not None:
@@ -347,10 +354,19 @@ class InsightGenerationService:
             self._require_typed_subset(proposal.supporting_observation_refs, observations,
                                        "supportingObservationRefs")
             self._require_typed_subset(proposal.evidence_refs, evidence, "evidenceRefs")
+            if proposal.delta_type.value == "ENRICHES" and proposal.target_insight_ref is None:
+                raise InsightOutputValidationError("ENRICHES requires targetInsightRef")
+            if proposal.delta_type.value == "NEW" and proposal.target_insight_ref is not None:
+                raise InsightOutputValidationError("NEW must omit targetInsightRef")
             if proposal.target_insight_ref is not None and (
                     proposal.target_insight_ref.type != AiReferenceType.INSIGHT
                     or proposal.target_insight_ref.scope != AiReferenceScope.PROJECT):
                 raise InsightOutputValidationError("targetInsightRef must identify a project Insight")
+            if proposal.target_insight_ref is not None \
+                    and proposal.target_insight_ref not in architecture_targets:
+                raise InsightOutputValidationError(
+                    "targetInsightRef is not present in existingArchitectureKnowledge"
+                )
 
     def _typed_candidates(self, value: object, expected_type: AiReferenceType,
                           expected_scope: AiReferenceScope) -> set[ProviderAiReference]:
@@ -364,6 +380,23 @@ class InsightGenerationService:
                 raise InsightOutputValidationError("Malformed typed grounding candidate") from error
             if reference.type != expected_type or reference.scope != expected_scope:
                 raise InsightOutputValidationError("Grounding candidate namespace or scope is invalid")
+            result.add(reference)
+        return result
+
+    def _typed_context_references(self, value: object, expected_type: AiReferenceType,
+                                  expected_scope: AiReferenceScope) -> set[ProviderAiReference]:
+        if not isinstance(value, list):
+            raise InsightOutputValidationError("Typed architecture knowledge must be an array")
+        result: set[ProviderAiReference] = set()
+        for item in value:
+            if not isinstance(item, dict) or "reference" not in item:
+                raise InsightOutputValidationError("Architecture knowledge item lacks a typed reference")
+            try:
+                reference = ProviderAiReference.model_validate(item["reference"])
+            except Exception as error:
+                raise InsightOutputValidationError("Malformed architecture knowledge reference") from error
+            if reference.type != expected_type or reference.scope != expected_scope:
+                raise InsightOutputValidationError("Architecture knowledge reference namespace or scope is invalid")
             result.add(reference)
         return result
 

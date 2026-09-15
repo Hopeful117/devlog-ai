@@ -17,6 +17,7 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.fact.entity.Fact;
 import com.hopeful117.devlogai.fact.repository.FactRepository;
+import com.hopeful117.devlogai.insight.repository.InsightRepository;
 import com.hopeful117.devlogai.observation.entity.Observation;
 import com.hopeful117.devlogai.observation.repository.ObservationRepository;
 import com.hopeful117.devlogai.proposal.entity.ProposalStatus;
@@ -41,6 +42,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
     private final ValidatableProposalRepository proposalRepository;
     private final FactRepository factRepository;
     private final ObservationRepository observationRepository;
+    private final InsightRepository insightRepository;
     private final AnalysisRepository analysisRepository;
     private final AiProposalContractValidator proposalContractValidator;
     private final ObjectMapper objectMapper;
@@ -312,6 +314,18 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                     .toList();
             Map<String, Object> payload = new LinkedHashMap<>(proposal.payload());
             Object target = payload.remove("targetInsightRef");
+            if (target == null && "ENRICHES".equals(payload.get("deltaType"))) {
+                throw referenceFailure("MALFORMED_REFERENCE",
+                        "Architecture Insight ENRICHES requires targetInsightRef");
+            }
+            if (target != null && !"ENRICHES".equals(payload.get("deltaType"))) {
+                throw referenceFailure("MALFORMED_REFERENCE",
+                        "Architecture Insight NEW must omit targetInsightRef");
+            }
+            if (target != null && !(target instanceof Map<?, ?>)) {
+                throw referenceFailure("MALFORMED_REFERENCE",
+                        "Architecture target reference is malformed");
+            }
             if (target instanceof Map<?, ?> targetMap) {
                 var targetReference = toCore(targetMap);
                 if (targetReference.type() != com.hopeful117.devlogai.ai.reference.AiReferenceType.INSIGHT
@@ -319,8 +333,25 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                     throw referenceFailure("REFERENCE_NAMESPACE_MISMATCH",
                             "Architecture target must be a project Insight reference");
                 }
-                Object targetUuid = resolver.resolve(targetReference, null).canonicalSourceIdentity();
-                payload.put("targetInsightId", targetUuid);
+                String targetUuid = resolver.resolveArchitectureTarget(targetReference)
+                        .canonicalSourceIdentity();
+                UUID targetId;
+                try {
+                    targetId = UUID.fromString(targetUuid);
+                } catch (IllegalArgumentException exception) {
+                    throw referenceFailure("REFERENCE_MAPPING_FAILURE",
+                            "Architecture target does not map to a UUID domain identity");
+                }
+                var targetInsight = insightRepository.findById(targetId).orElseThrow(() ->
+                        referenceFailure("REFERENCE_MAPPING_FAILURE",
+                                "Architecture target Insight is no longer available"));
+                if (task.getAnalysis() == null || task.getAnalysis().getProject() == null
+                        || targetInsight.getProject() == null
+                        || !task.getAnalysis().getProject().getId().equals(targetInsight.getProject().getId())) {
+                    throw referenceFailure("REFERENCE_MAPPING_FAILURE",
+                            "Architecture target Insight is outside the task project");
+                }
+                payload.put("targetInsightId", targetId.toString());
             }
             return new AiProposalResult(proposal.type(), payload, proposal.confidence(),
                     facts, observations, evidence, proposal.supportingFactRefs(),

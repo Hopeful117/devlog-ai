@@ -16,6 +16,8 @@ import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.fact.entity.Fact;
 import com.hopeful117.devlogai.fact.repository.FactRepository;
+import com.hopeful117.devlogai.insight.repository.InsightRepository;
+import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.observation.entity.Observation;
 import com.hopeful117.devlogai.observation.repository.ObservationRepository;
 import com.hopeful117.devlogai.project.entity.Project;
@@ -57,6 +59,9 @@ class AiTaskResultServiceTest {
 
     @Mock
     private ObservationRepository observationRepository;
+
+    @Mock
+    private InsightRepository insightRepository;
 
     @Mock
     private AnalysisRepository analysisRepository;
@@ -209,6 +214,32 @@ class AiTaskResultServiceTest {
         var error = assertThrows(AiReferenceResolutionException.class,
                 () -> service.handle(correlationId, request));
         assertEquals("REFERENCE_MAPPING_FAILURE", error.code());
+        verify(proposalRepository, never()).saveAll(any());
+    }
+
+    @Test
+    void shouldRejectEnrichmentTargetOutsideThePersistedArchitectureSubset() {
+        UUID correlationId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("architecture-overview");
+        task.setIntentVersion("v3");
+        task.setAiReferenceMappingSnapshot(new AiReferenceMappingSnapshot(
+                AiReferenceMappingSnapshot.CONTRACT_VERSION, "digest", List.of(
+                        new AiReferenceMappingSnapshot.BindingSnapshot(
+                                AiReferenceType.INSIGHT, "insight:target", AiReferenceScope.PROJECT,
+                                targetId.toString(), Set.of()))).asMap());
+        var proposal = new AiProposalResult(ProposalType.INSIGHT, Map.of(
+                "insightType", "ARCHITECTURE_DESCRIPTION", "title", "Title",
+                "summary", "Summary", "rationale", "Rationale", "deltaType", "ENRICHES",
+                "targetInsightRef", Map.of("type", "INSIGHT", "ref", "insight:target", "scope", "PROJECT")),
+                new BigDecimal("0.8"), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId)).thenReturn(Optional.of(task));
+
+        var error = assertThrows(AiReferenceResolutionException.class,
+                () -> service.handle(correlationId, completedRequest(correlationId, Instant.now(), List.of(proposal))));
+
+        assertEquals("REFERENCE_OUTSIDE_CONTEXT", error.code());
         verify(proposalRepository, never()).saveAll(any());
     }
 

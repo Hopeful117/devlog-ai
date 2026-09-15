@@ -8,7 +8,8 @@ import java.util.Set;
 public record AiReferenceMappingSnapshot(
         String contractVersion,
         String mappingDigest,
-        List<BindingSnapshot> bindings
+        List<BindingSnapshot> bindings,
+        List<AiReference> architectureKnowledgeReferences
 ) {
     public static final String CONTRACT_VERSION = "AI_REFERENCE_MAPPING_V1";
 
@@ -20,6 +21,8 @@ public record AiReferenceMappingSnapshot(
             throw new IllegalArgumentException("mappingDigest must not be blank");
         }
         bindings = List.copyOf(bindings);
+        architectureKnowledgeReferences = architectureKnowledgeReferences == null
+                ? List.of() : List.copyOf(architectureKnowledgeReferences);
     }
 
     public AiReferenceResolver resolver() {
@@ -28,14 +31,30 @@ public record AiReferenceMappingSnapshot(
 
     public static AiReferenceMappingSnapshot from(AiReferenceRegistry registry) {
         return new AiReferenceMappingSnapshot(CONTRACT_VERSION, registry.mappingDigest(),
-                registry.bindings().stream().map(BindingSnapshot::from).toList());
+                registry.bindings().stream().map(BindingSnapshot::from).toList(),
+                registry.architectureKnowledgeReferences().stream().sorted(
+                        java.util.Comparator.comparing(AiReference::type)
+                                .thenComparing(AiReference::scope).thenComparing(AiReference::ref))
+                        .toList());
+    }
+
+    public AiReferenceMappingSnapshot(String contractVersion, String mappingDigest,
+            List<BindingSnapshot> bindings) {
+        this(contractVersion, mappingDigest, bindings, List.of());
     }
 
     public Map<String, Object> asMap() {
         return Map.of(
                 "contractVersion", contractVersion,
                 "mappingDigest", mappingDigest,
-                "bindings", bindings.stream().map(BindingSnapshot::asMap).toList());
+                "bindings", bindings.stream().map(BindingSnapshot::asMap).toList(),
+                "architectureKnowledgeReferences", architectureKnowledgeReferences.stream()
+                        .map(AiReferenceMappingSnapshot::referenceAsMap).toList());
+    }
+
+    private static Map<String, Object> referenceAsMap(AiReference reference) {
+        return Map.of("type", reference.type().name(), "ref", reference.ref(),
+                "scope", reference.scope().name());
     }
 
     public record BindingSnapshot(
