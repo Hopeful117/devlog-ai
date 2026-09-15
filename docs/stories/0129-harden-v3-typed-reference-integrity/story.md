@@ -2,19 +2,21 @@
 
 ## Status
 
-`REFINED - IMPLEMENTATION NOT AUTHORIZED`
+`IMPLEMENTED - REVIEWED - ACCEPTED`
 
 ## Baseline
 
-- Branch: `main`
-- HEAD: `d05598202413e81f64bc70a5fed171f603e535ef`
-- `origin/main`: `d05598202413e81f64bc70a5fed171f603e535ef`
+- Branch: `story/0129-refinement`
+- HEAD: `637e4d001809dc63e4139b4682978d4886ec6b68`
+- `origin/main`: `d36ba2dee340c3096a72b4666825ef8b32511438`
 - Story 0128: merged and present in the baseline
 - Related ADRs: ADR-006, ADR-060, ADR-063, ADR-064, ADR-065, ADR-067, ADR-068
-- Implementation authorization: `NOT AUTHORIZED`
-- Production code changes: `NONE`
-- Test changes: `NONE`
-- Commit/push/merge: `NONE`
+- Implementation authorization: `AUTHORIZED`
+- Production code changes: `IMPLEMENTED`
+- Test changes: `IMPLEMENTED`
+- Human review: `APPROVED`
+- Acceptance: `APPROVED`
+- Commit/push/merge: `NONE` (changes remain uncommitted)
 
 ## Goal
 
@@ -66,7 +68,7 @@ deterministically instead of producing ambiguous provider input.
 - Retrieval, RAG, embeddings, vector search, ContextPack or Agent runtime.
 - Changes to trust promotion, human validation or proposal lifecycle.
 - Public exposure of Core mapping metadata.
-- Commit, push, merge or Story acceptance.
+- Commit, push or merge.
 
 ## Authority Model
 
@@ -136,7 +138,9 @@ to the provider.
 
 ## Legacy Compatibility
 
-- v1 and v2 retain their raw callback and synthesis contracts.
+- `architecture-overview-v1` is unchanged.
+- `architecture-overview-v2` is unchanged.
+- `architecture-overview-v3` is hardened in place.
 - Historical tasks retain their stored version and existing behavior.
 - A null mapping snapshot is never reconstructed as v3.
 - Typed fields remain rejected for legacy task versions.
@@ -151,26 +155,26 @@ remain unchanged.
 
 ## Acceptance Criteria
 
-1. A v3 `NEW` proposal with no `targetInsightRef` remains valid.
-2. A v3 `ENRICHES` proposal targeting an Insight in
+1. [x] A v3 `NEW` proposal with no `targetInsightRef` remains valid.
+2. [x] A v3 `ENRICHES` proposal targeting an Insight in
    `existingArchitectureKnowledge` resolves and follows the existing
    `PROPOSED` lifecycle.
-3. A v3 `ENRICHES` proposal targeting another project Insight fails with
+3. [x] A v3 `ENRICHES` proposal targeting another project Insight fails with
    `REFERENCE_OUTSIDE_CONTEXT` before proposal persistence.
-4. A v3 target with the wrong type or scope fails with the corresponding
+4. [x] A v3 target with the wrong type or scope fails with the corresponding
    namespace or scope classification.
-5. The target check uses the originating task snapshot and never current
+5. [x] The target check uses the originating task snapshot and never current
    selected knowledge as a fallback.
-6. Unresolved v3 Fact, Observation, architecture-knowledge, semantic-section or
+6. [x] Unresolved v3 Fact, Observation, architecture-knowledge, semantic-section or
    relationship citable identities fail closed with `REFERENCE_MAPPING_FAILURE`.
-7. No unresolved identity is silently removed while producing a successful v3
+7. [x] No unresolved identity is silently removed while producing a successful v3
    provider projection.
-8. v1/v2 and null-snapshot compatibility behavior remains unchanged.
-9. Python defensive validation cannot broaden the target or grounding candidate
+8. [x] v1/v2 and null-snapshot compatibility behavior remains unchanged.
+9. [x] Python defensive validation cannot broaden the target or grounding candidate
    universe.
-10. No new reference namespace, scope, registry or retrieval infrastructure is
+10. [x] No new reference namespace, scope, registry or retrieval infrastructure is
     introduced.
-11. AI output remains a non-trusted proposal requiring human validation.
+11. [x] AI output remains a non-trusted proposal requiring human validation.
 
 ## Test Intent
 
@@ -185,6 +189,12 @@ remain unchanged.
 - Python typed subset validation remains unchanged in authority and cannot
   authorize a target absent from Core's allowed context.
 
+## Acceptance Result
+
+All eleven acceptance criteria are complete and supported by the implemented
+Core/Python changes, focused regression tests, and the reported full backend
+verification. No blocking review findings remain.
+
 ## Definition Of Done
 
 - All acceptance criteria are covered by focused Core and AI Engine tests.
@@ -193,7 +203,7 @@ remain unchanged.
 - No Story Context, Event or Decision contract is migrated.
 - ADR-006 and ADR-068 invariants are documented as preserved.
 - `git diff --check` passes.
-- Implementation remains uncommitted pending human review and acceptance.
+- Implementation remains uncommitted and is ready for human commit.
 
 ## Implementation Subtasks
 
@@ -216,9 +226,13 @@ remain unchanged.
 ```text
 NEXT = CORRECTIVE_STORY
 NEW_ADR_REQUIRED = NO
-STORY_0129_IMPLEMENTATION_AUTHORIZED = NO
+STORY_0129_IMPLEMENTATION_AUTHORIZED = YES
+STORY_0129_HUMAN_REVIEW = APPROVED
+STORY_0129_ACCEPTANCE = APPROVED
 ```
 
-Typed Story Context Analysis is the recommended follow-up after this corrective
-Story, because it is the strongest remaining independent grounding path and can
-reuse the repaired snapshot/resolution foundation.
+`NEXT_CANDIDATE = Typed Story Context Analysis`.
+
+It is the strongest remaining independent grounding path and can reuse the
+repaired snapshot/resolution foundation. Story 0130 is not refined or
+implemented here.

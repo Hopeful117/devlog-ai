@@ -9,15 +9,22 @@ import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.HexFormat;
 import java.util.stream.Collectors;
 
 public final class AiReferenceRegistry {
     private final List<AiReferenceBinding> bindings;
     private final Map<String, AiReferenceBinding> byIdentity;
+    private final Set<AiReference> architectureKnowledgeReferences;
     private final String mappingDigest;
 
     public AiReferenceRegistry(List<AiReferenceBinding> bindings) {
+        this(bindings, Set.of());
+    }
+
+    public AiReferenceRegistry(List<AiReferenceBinding> bindings,
+            Set<AiReference> architectureKnowledgeReferences) {
         Map<String, AiReferenceBinding> unique = new LinkedHashMap<>();
         Map<String, AiReferenceBinding> byReference = new LinkedHashMap<>();
         for (AiReferenceBinding binding : bindings) {
@@ -36,11 +43,15 @@ public final class AiReferenceRegistry {
         }
         this.bindings = List.copyOf(unique.values());
         this.byIdentity = Map.copyOf(unique);
+        this.architectureKnowledgeReferences = Set.copyOf(architectureKnowledgeReferences);
         this.mappingDigest = digest(this.bindings);
     }
 
     public List<AiReferenceBinding> bindings() { return bindings; }
     public String mappingDigest() { return mappingDigest; }
+    public Set<AiReference> architectureKnowledgeReferences() {
+        return architectureKnowledgeReferences;
+    }
 
     public Optional<AiReferenceBinding> find(AiReferenceType type, AiReferenceScope scope,
             String canonicalSourceIdentity) {

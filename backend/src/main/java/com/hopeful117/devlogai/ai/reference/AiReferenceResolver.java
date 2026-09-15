@@ -11,12 +11,15 @@ public final class AiReferenceResolver {
     private final String contractVersion;
     private final String mappingDigest;
     private final Map<Key, AiReferenceMappingSnapshot.BindingSnapshot> byReference;
+    private final Set<AiReference> architectureKnowledgeReferences;
 
     private AiReferenceResolver(String contractVersion, String mappingDigest,
-            Map<Key, AiReferenceMappingSnapshot.BindingSnapshot> byReference) {
+            Map<Key, AiReferenceMappingSnapshot.BindingSnapshot> byReference,
+            Set<AiReference> architectureKnowledgeReferences) {
         this.contractVersion = contractVersion;
         this.mappingDigest = mappingDigest;
         this.byReference = Map.copyOf(byReference);
+        this.architectureKnowledgeReferences = Set.copyOf(architectureKnowledgeReferences);
     }
 
     public static AiReferenceResolver from(AiReferenceMappingSnapshot snapshot) {
@@ -30,7 +33,8 @@ public final class AiReferenceResolver {
                         "Conflicting bindings claim " + key);
             }
         }
-        return new AiReferenceResolver(snapshot.contractVersion(), snapshot.mappingDigest(), reverse);
+        return new AiReferenceResolver(snapshot.contractVersion(), snapshot.mappingDigest(), reverse,
+                Set.copyOf(snapshot.architectureKnowledgeReferences()));
     }
 
     @SuppressWarnings("unchecked")
@@ -57,7 +61,26 @@ public final class AiReferenceResolver {
             snapshotBindings.add(new AiReferenceMappingSnapshot.BindingSnapshot(
                     type, ref, scope, identity, capabilities));
         }
-        return from(new AiReferenceMappingSnapshot(contractVersion, mappingDigest, snapshotBindings));
+        Set<AiReference> architectureReferences = new java.util.LinkedHashSet<>();
+        Object rawArchitectureReferences = value.get("architectureKnowledgeReferences");
+        if (rawArchitectureReferences != null) {
+            if (!(rawArchitectureReferences instanceof List<?> references)) {
+                throw failure("REFERENCE_MAPPING_FAILURE",
+                        "Architecture knowledge references are malformed");
+            }
+            for (Object rawReference : references) {
+                if (!(rawReference instanceof Map<?, ?> rawMap)) {
+                    throw failure("REFERENCE_MAPPING_FAILURE",
+                            "Architecture knowledge reference is malformed");
+                }
+                architectureReferences.add(new AiReference(
+                        enumValue(AiReferenceType.class, rawMap, "type"),
+                        text(rawMap, "ref"),
+                        enumValue(AiReferenceScope.class, rawMap, "scope")));
+            }
+        }
+        return from(new AiReferenceMappingSnapshot(contractVersion, mappingDigest,
+                snapshotBindings, architectureReferences.stream().toList()));
     }
 
     public AiReferenceMappingSnapshot.BindingSnapshot resolve(AiReference reference) {
@@ -87,6 +110,15 @@ public final class AiReferenceResolver {
                 && !binding.groundingCapabilities().contains(groundingCapability)) {
             throw failure("REFERENCE_NOT_ALLOWED_FOR_GROUNDING",
                     "Reference is not authorized for " + groundingCapability);
+        }
+        return binding;
+    }
+
+    public AiReferenceMappingSnapshot.BindingSnapshot resolveArchitectureTarget(AiReference reference) {
+        var binding = resolve(reference);
+        if (!architectureKnowledgeReferences.contains(reference)) {
+            throw failure("REFERENCE_OUTSIDE_CONTEXT",
+                    "Insight is not part of the originating architecture knowledge");
         }
         return binding;
     }

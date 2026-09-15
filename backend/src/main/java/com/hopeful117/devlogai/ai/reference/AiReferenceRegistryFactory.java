@@ -15,6 +15,7 @@ public final class AiReferenceRegistryFactory {
     public static AiReferenceRegistry create(SelectedKnowledge knowledge) {
         List<AiReferenceBinding> bindings = new ArrayList<>();
         Map<String, AiReferenceBinding> registered = new LinkedHashMap<>();
+        Set<AiReference> architectureKnowledgeReferences = new java.util.LinkedHashSet<>();
         add(bindings, AiReferenceType.PROJECT, AiReferenceScope.PROJECT,
                 "PROJECT", knowledge.project().id().toString(), "project:" + knowledge.project().id(), Set.of(), registered);
         add(bindings, AiReferenceType.ANALYSIS, AiReferenceScope.ANALYSIS_CONTEXT,
@@ -43,6 +44,8 @@ public final class AiReferenceRegistryFactory {
             if (value.insightId() != null) {
                 add(bindings, AiReferenceType.INSIGHT, AiReferenceScope.PROJECT,
                         "INSIGHT", value.insightId().toString(), "insight:" + value.insightId(), Set.of(), registered);
+                architectureKnowledgeReferences.add(new AiReference(AiReferenceType.INSIGHT,
+                        "insight:" + value.insightId(), AiReferenceScope.PROJECT));
             }
         }
         for (var value : knowledge.selectedEngineeringEvents()) {
@@ -59,7 +62,7 @@ public final class AiReferenceRegistryFactory {
                         "REPOSITORY_EVIDENCE", value.reference(), value.reference(), Set.of("EVIDENCE_REFERENCE"), registered);
             }
         }
-        return new AiReferenceRegistry(bindings);
+        return new AiReferenceRegistry(bindings, architectureKnowledgeReferences);
     }
 
     private static void add(List<AiReferenceBinding> bindings, AiReferenceType type,

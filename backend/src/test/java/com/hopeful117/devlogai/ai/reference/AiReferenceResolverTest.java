@@ -73,7 +73,30 @@ class AiReferenceResolverTest {
                 "mappingDigest", "digest",
                 "bindings", List.of(firstSnapshot(first), firstSnapshot(second)))))
                 .isInstanceOf(AiReferenceResolutionException.class)
-                .hasMessageContaining("Conflicting bindings");
+                 .hasMessageContaining("Conflicting bindings");
+    }
+
+    @Test
+    void resolvesArchitectureTargetsOnlyFromThePersistedArchitectureSubset() {
+        var target = binding(AiReferenceType.INSIGHT, AiReferenceScope.PROJECT,
+                "insight-a", "insight:target", Set.of());
+        var snapshot = new AiReferenceMappingSnapshot("AI_REFERENCE_MAPPING_V1", "digest",
+                List.of(snapshot(target)), List.of(target.reference()));
+
+        assertThat(snapshot.resolver().resolveArchitectureTarget(target.reference()))
+                .isEqualTo(snapshot(target));
+    }
+
+    @Test
+    void rejectsAProjectInsightThatIsNotInTheArchitectureSubset() {
+        var target = binding(AiReferenceType.INSIGHT, AiReferenceScope.PROJECT,
+                "insight-a", "insight:target", Set.of());
+        var resolver = new AiReferenceMappingSnapshot("AI_REFERENCE_MAPPING_V1", "digest",
+                List.of(snapshot(target))).resolver();
+
+        assertThatThrownBy(() -> resolver.resolveArchitectureTarget(target.reference()))
+                .isInstanceOf(AiReferenceResolutionException.class)
+                .extracting("code").isEqualTo("REFERENCE_OUTSIDE_CONTEXT");
     }
 
     private void assertCode(AiReferenceResolver resolver, AiReference reference, String code) {
