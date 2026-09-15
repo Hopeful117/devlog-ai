@@ -83,6 +83,32 @@ def architecture_overview_v2_intent() -> IntentDefinition:
     )
 
 
+def architecture_overview_v3_intent() -> IntentDefinition:
+    return IntentDefinition(
+        id="architecture-overview", version="v3",
+        objective="Provide a typed architecture overview.",
+        supported_insight_types=[
+            InsightType.ARCHITECTURE_DESCRIPTION, InsightType.TECHNOLOGY_DESCRIPTION,
+            InsightType.INFRASTRUCTURE_DESCRIPTION, InsightType.API_DESCRIPTION,
+        ],
+        constraints=["Use only typed Core references."],
+        output_schema={
+            "type": "object", "structured": True, "hasSynthesis": True,
+            "schemaVersion": "architecture-overview-v3", "root": "proposals",
+            "minimumProposalCount": 0, "maximumProposalCount": 10,
+            "allowedInsightTypes": ["ARCHITECTURE_DESCRIPTION", "TECHNOLOGY_DESCRIPTION",
+                                     "INFRASTRUCTURE_DESCRIPTION", "API_DESCRIPTION"],
+            "allowedDeltaTypes": ["NEW", "ENRICHES"],
+            "requiredProposalFields": ["insightType", "title", "summary", "rationale",
+                                        "deltaType", "supportingFactRefs",
+                                        "supportingObservationRefs", "evidenceRefs"],
+            "requiredSynthesisFields": ["title", "sections", "deltaConclusion", "groundingRefs"],
+        },
+        prompt_template="architecture-overview-prompt-v3",
+        context_profiles=["architecture-v1", "history-v1"],
+    )
+
+
 def selected_knowledge(
     *, facts: list[object] | None = None, observations: list[object] | None = None,
     analysis_id: object | None = None,

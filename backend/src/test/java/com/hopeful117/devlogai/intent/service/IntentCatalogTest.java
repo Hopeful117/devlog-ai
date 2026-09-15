@@ -13,7 +13,7 @@ class IntentCatalogTest {
     void shouldExposeTheFourVersionedInitialIntentsInStableOrder() {
         assertEquals(
                 java.util.List.of("describe-project-v1", "generate-readme-v1", "architecture-overview-v1",
-                        "architecture-overview-v2",
+                        "architecture-overview-v2", "architecture-overview-v3",
                         "analyze-engineering-event-v1", "analyze-engineering-decision-v1",
                         "engineering-story-context-analysis-v1"),
                 catalog.all().stream().map(

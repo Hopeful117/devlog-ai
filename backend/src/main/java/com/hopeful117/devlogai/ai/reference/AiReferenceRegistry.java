@@ -19,12 +19,19 @@ public final class AiReferenceRegistry {
 
     public AiReferenceRegistry(List<AiReferenceBinding> bindings) {
         Map<String, AiReferenceBinding> unique = new LinkedHashMap<>();
+        Map<String, AiReferenceBinding> byReference = new LinkedHashMap<>();
         for (AiReferenceBinding binding : bindings) {
             String key = key(binding.reference().type(), binding.reference().scope(),
                     binding.canonicalSourceIdentity());
             AiReferenceBinding previous = unique.putIfAbsent(key, binding);
             if (previous != null && !previous.equals(binding)) {
                 throw new IllegalArgumentException("conflicting AI reference binding: " + key);
+            }
+            String referenceKey = key(binding.reference().type(), binding.reference().scope(),
+                    binding.reference().ref());
+            AiReferenceBinding previousReference = byReference.putIfAbsent(referenceKey, binding);
+            if (previousReference != null && !previousReference.equals(binding)) {
+                throw new IllegalArgumentException("conflicting AI reference token: " + referenceKey);
             }
         }
         this.bindings = List.copyOf(unique.values());

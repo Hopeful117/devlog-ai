@@ -8,6 +8,7 @@ import com.hopeful117.devlogai.ai.interactiontrace.service.AiInteractionTracePer
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
+import com.hopeful117.devlogai.ai.reference.*;
 import com.hopeful117.devlogai.analysis.communication.AnalysisCommunicationUseCase;
 import com.hopeful117.devlogai.analysis.communication.CommunicationDecision;
 import com.hopeful117.devlogai.analysis.communication.CommunicationDecisionService;
@@ -36,6 +37,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -145,6 +147,69 @@ class AiTaskResultServiceTest {
         assertEquals(List.of(factId), saved.getSupportingFactIds());
         assertEquals(List.of(observationId), saved.getSupportingObservationIds());
         verify(aiTaskRepository).save(task);
+    }
+
+    @Test
+    void shouldResolveV3ReferencesFromTheTaskSnapshotBeforeSavingProposal() {
+        UUID correlationId = UUID.randomUUID();
+        UUID factId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("architecture-overview");
+        task.setIntentVersion("v3");
+        var binding = new AiReferenceBinding(
+                new AiReference(AiReferenceType.FACT, "F001", AiReferenceScope.ANALYSIS_CONTEXT),
+                "FACT", factId.toString(), Set.of("SUPPORTING_FACT"));
+        task.setAiReferenceMappingSnapshot(new AiReferenceMappingSnapshot(
+                AiReferenceMappingSnapshot.CONTRACT_VERSION, "digest", List.of(
+                        new AiReferenceMappingSnapshot.BindingSnapshot(
+                                binding.reference().type(), binding.reference().ref(), binding.reference().scope(),
+                                binding.canonicalSourceIdentity(), binding.groundingCapabilities()))).asMap());
+        Fact fact = Fact.builder().id(factId).analysis(task.getAnalysis()).build();
+        var proposal = new AiProposalResult(ProposalType.INSIGHT, Map.of(
+                "insightType", "ARCHITECTURE_DESCRIPTION", "title", "Title",
+                "summary", "Summary", "rationale", "Rationale", "deltaType", "NEW"),
+                new BigDecimal("0.8"), List.of(), List.of(), List.of(),
+                List.of(new ProviderAiReference(AiReferenceType.FACT, "F001", AiReferenceScope.ANALYSIS_CONTEXT)),
+                List.of(), List.of());
+        var request = new AiTaskResultRequest(correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.now(), List.of(proposal), null, new PromptExecutionMetadata(
+                        "architecture-overview-prompt-v3", "mock", "model", "a".repeat(64), "b".repeat(64)),
+                new AnalysisSynthesisResult("Architecture", List.of(
+                        new AnalysisSynthesisResult.SynthesisSection("Overview", "Summary")),
+                        AnalysisSynthesisResult.ArchitectureDeltaConclusion.DELTAS_PROPOSED,
+                        List.of(), List.of()));
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId)).thenReturn(Optional.of(task));
+        when(factRepository.findAllById(any())).thenReturn(List.of(fact));
+        when(observationRepository.findAllById(any())).thenReturn(List.of());
+        when(proposalRepository.countByAiTaskId(task.getId())).thenReturn(1L);
+
+        service.handle(correlationId, request);
+
+        ArgumentCaptor<List<ValidatableProposal>> captor = ArgumentCaptor.forClass(List.class);
+        verify(proposalRepository).saveAll(captor.capture());
+        assertEquals(List.of(factId), captor.getValue().get(0).getSupportingFactIds());
+    }
+
+    @Test
+    void shouldRejectV3CallbackWithoutItsPersistedMapping() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("architecture-overview");
+        task.setIntentVersion("v3");
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId)).thenReturn(Optional.of(task));
+
+        var request = new AiTaskResultRequest(correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.now(), List.of(), null, new PromptExecutionMetadata(
+                        "architecture-overview-prompt-v3", "mock", "model", "a".repeat(64), "b".repeat(64)),
+                new AnalysisSynthesisResult("Architecture", List.of(
+                        new AnalysisSynthesisResult.SynthesisSection("Overview", "Summary")),
+                        AnalysisSynthesisResult.ArchitectureDeltaConclusion.NO_MATERIAL_DELTA,
+                        List.of(), List.of()));
+
+        var error = assertThrows(AiReferenceResolutionException.class,
+                () -> service.handle(correlationId, request));
+        assertEquals("REFERENCE_MAPPING_FAILURE", error.code());
+        verify(proposalRepository, never()).saveAll(any());
     }
 
     @Test

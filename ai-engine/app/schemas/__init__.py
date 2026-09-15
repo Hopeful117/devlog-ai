@@ -7,7 +7,13 @@ from app.schemas.ai_task_result import (
     AiTaskResultError,
     AiTaskResultRequest,
 )
-from app.schemas.insight import InsightGenerationOutput, InsightProposalOutput
+from app.schemas.insight import (
+    InsightGenerationOutput,
+    InsightProposalOutput,
+    TypedInsightGenerationOutput,
+    TypedInsightProposalOutput,
+)
+from app.schemas.typed_reference import ProviderAiReference
 from app.schemas.story_context_analysis import (
     StoryContextAnalysisResult,
     EvidenceRef,
@@ -35,6 +41,9 @@ __all__ = [
     "AiTaskSubmissionResponse",
     "InsightGenerationOutput",
     "InsightProposalOutput",
+    "TypedInsightGenerationOutput",
+    "TypedInsightProposalOutput",
+    "ProviderAiReference",
     "StoryContextAnalysisResult",
     "EvidenceRef",
     "ObjectiveUnderstanding",

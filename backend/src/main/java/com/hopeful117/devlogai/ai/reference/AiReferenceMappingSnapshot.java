@@ -13,7 +13,17 @@ public record AiReferenceMappingSnapshot(
     public static final String CONTRACT_VERSION = "AI_REFERENCE_MAPPING_V1";
 
     public AiReferenceMappingSnapshot {
+        if (contractVersion == null || contractVersion.isBlank()) {
+            throw new IllegalArgumentException("contractVersion must not be blank");
+        }
+        if (mappingDigest == null || mappingDigest.isBlank()) {
+            throw new IllegalArgumentException("mappingDigest must not be blank");
+        }
         bindings = List.copyOf(bindings);
+    }
+
+    public AiReferenceResolver resolver() {
+        return AiReferenceResolver.from(this);
     }
 
     public static AiReferenceMappingSnapshot from(AiReferenceRegistry registry) {

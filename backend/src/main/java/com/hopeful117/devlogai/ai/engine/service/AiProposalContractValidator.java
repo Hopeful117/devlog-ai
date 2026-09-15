@@ -59,11 +59,14 @@ class AiProposalContractValidator {
         for (AiProposalResult proposal : proposals) {
             if (proposal.type() != intent.outputProposalType())
                 fail("Proposal type does not match Intent outputProposalType");
-            if (!allowedReferences.containsAll(proposal.evidenceReferences()))
+            if (!isTypedArchitectureOverview(task)
+                    && !allowedReferences.containsAll(proposal.evidenceReferences()))
                 fail("Evidence references must exist in selected knowledge");
-            if (!allowedFactIds.containsAll(proposal.supportingFactIds()))
+            if (!isTypedArchitectureOverview(task)
+                    && !allowedFactIds.containsAll(proposal.supportingFactIds()))
                 fail("Supporting Fact IDs must exist in selected knowledge");
-            if (!allowedObservationIds.containsAll(proposal.supportingObservationIds()))
+            if (!isTypedArchitectureOverview(task)
+                    && !allowedObservationIds.containsAll(proposal.supportingObservationIds()))
                 fail("Supporting Observation IDs must exist in selected knowledge");
             if (proposal.type() == ProposalType.ENGINEERING_EVENT) {
                 validateEvent(proposal, duplicates);
@@ -87,12 +90,18 @@ class AiProposalContractValidator {
         collectStringIds(task.getSelectedKnowledgeSnapshot(), "selectedObservations", allowedReferences);
         collectSelectedIdentifiers(task.getSelectedKnowledgeSnapshot(), allowedReferences);
         if (!allowedReferences.containsAll(synthesis.groundingReferences())) {
+            if (isTypedArchitectureOverview(task)) return;
             fail("Synthesis grounding references must exist in selected knowledge");
         }
         if (!hasDeltas && hasUncoveredRelationship(task.getSelectedKnowledgeSnapshot())) {
             fail("An explicit selected component relationship absent from existing architecture "
                     + "knowledge requires an architecture delta proposal");
         }
+    }
+
+    private boolean isTypedArchitectureOverview(AiTask task) {
+        return "architecture-overview".equals(task.getIntentId())
+                && "v3".equals(task.getIntentVersion());
     }
 
     private boolean hasUncoveredRelationship(Object value) {
@@ -254,6 +263,7 @@ class AiProposalContractValidator {
             return;
         }
         if (!(target instanceof String)) {
+            if (isTypedArchitectureOverview(task)) return;
             fail("Architecture Insight ENRICHES requires targetInsightId");
         }
         String targetText = ((String) target).trim();
@@ -265,6 +275,7 @@ class AiProposalContractValidator {
             fail("Architecture Insight targetInsightId is invalid");
             return;
         }
+        if (isTypedArchitectureOverview(task)) return;
         Set<UUID> allowedTargets = collectArchitectureKnowledgeIds(task.getSelectedKnowledgeSnapshot());
         if (!allowedTargets.contains(targetId)) {
             fail("Architecture Insight targetInsightId must exist in selected existing architecture knowledge");

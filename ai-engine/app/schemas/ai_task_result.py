@@ -8,6 +8,7 @@ from app.models.proposal import AiTaskResultStatus, ProposalType
 from app.schemas.insight import ArchitectureDeltaConclusion
 from app.schemas.story_context_analysis import StoryContextAnalysisResult
 from app.schemas.interaction_trace import AiInteractionTrace
+from app.schemas.typed_reference import ProviderAiReference
 
 
 class ResultContractModel(BaseModel):
@@ -18,11 +19,14 @@ class AiProposalResult(ResultContractModel):
     type: ProposalType
     payload: dict[str, Any]
     confidence: float = Field(ge=0.0, le=1.0)
-    supporting_fact_ids: list[UUID] = Field(alias="supportingFactIds")
-    supporting_observation_ids: list[UUID] = Field(
-        alias="supportingObservationIds"
+    supporting_fact_ids: list[UUID] | None = Field(default=None, alias="supportingFactIds")
+    supporting_observation_ids: list[UUID] | None = Field(
+        default=None, alias="supportingObservationIds"
     )
-    evidence_references: list[str] = Field(alias="evidenceReferences")
+    evidence_references: list[str] | None = Field(default=None, alias="evidenceReferences")
+    supporting_fact_refs: list[ProviderAiReference] | None = Field(default=None, alias="supportingFactRefs")
+    supporting_observation_refs: list[ProviderAiReference] | None = Field(default=None, alias="supportingObservationRefs")
+    evidence_refs: list[ProviderAiReference] | None = Field(default=None, alias="evidenceRefs")
 
 
 class SynthesisSectionResult(ResultContractModel):
@@ -34,9 +38,8 @@ class AnalysisSynthesisResult(ResultContractModel):
     title: str = Field(min_length=1, max_length=500)
     sections: list[SynthesisSectionResult] = Field(min_length=1, max_length=20)
     delta_conclusion: ArchitectureDeltaConclusion = Field(alias="deltaConclusion")
-    grounding_references: list[str] = Field(
-        default_factory=list, alias="groundingReferences"
-    )
+    grounding_references: list[str] | None = Field(default=None, alias="groundingReferences")
+    grounding_refs: list[ProviderAiReference] | None = Field(default=None, alias="groundingRefs")
 
 
 class AiTaskResultError(ResultContractModel):

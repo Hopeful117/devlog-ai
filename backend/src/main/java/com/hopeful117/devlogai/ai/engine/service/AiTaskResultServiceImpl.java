@@ -4,6 +4,8 @@ import tools.jackson.databind.ObjectMapper;
 import com.hopeful117.devlogai.ai.engine.dto.*;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException;
+import com.hopeful117.devlogai.ai.reference.AiReferenceResolver;
+import com.hopeful117.devlogai.ai.reference.AiReferenceResolutionException;
 import com.hopeful117.devlogai.ai.interactiontrace.service.AiInteractionTracePersistenceService;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
@@ -61,6 +63,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                         "AI task correlation", correlationId
                 ));
         validateExternalJobId(task, request.externalJobId());
+        rejectTypedPayloadForLegacyTask(task, request);
         persistInteractionTraces(task, request);
 
         if (isStoryContextAnalysisIntent(task)) {
@@ -122,12 +125,16 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             return acknowledgement(task, false);
         }
 
-        validateReferences(task, request.proposals());
-        proposalContractValidator.validate(task, request.proposals());
-        validateSynthesis(task, request);
+        List<AiProposalResult> proposals = isTypedArchitectureOverview(task)
+                ? resolveTypedProposals(task, request.proposals()) : request.proposals();
+        AnalysisSynthesisResult synthesis = isTypedArchitectureOverview(task)
+                ? resolveTypedSynthesis(task, request.synthesis()) : request.synthesis();
+        validateReferences(task, proposals);
+        proposalContractValidator.validate(task, proposals);
+        validateSynthesis(task, request, synthesis);
         applyPromptExecution(task, request.promptExecution());
-        persistSynthesis(task, request.synthesis());
-        proposalRepository.saveAll(toProposals(task, request.proposals()));
+        persistSynthesis(task, synthesis);
+        proposalRepository.saveAll(toProposals(task, proposals));
         completeTask(task, request.completedAt());
         aiTaskRepository.save(task);
         finishAnalysis(task, AnalysisStatus.COMPLETED, request.completedAt());
@@ -221,43 +228,174 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         log.info("Persisting synthesis snapshot taskId={} title={}", task.getId(), synthesis.title());
     }
 
-    private void validateSynthesis(AiTask task, AiTaskResultRequest request) {
+    private void validateSynthesis(AiTask task, AiTaskResultRequest request,
+            AnalysisSynthesisResult synthesis) {
         if (request.status() != AiTaskResultStatus.COMPLETED) {
             return;
         }
         boolean synthesisIntent = isSynthesisIntent(task);
-        if (synthesisIntent && request.synthesis() == null) {
+        if (synthesisIntent && synthesis == null) {
             throw new InvalidAiTaskResultException(
                     "Architecture Overview v2 callback must include synthesis"
             );
         }
-        if (!synthesisIntent && request.synthesis() != null) {
+        if (!synthesisIntent && synthesis != null) {
             throw new InvalidAiTaskResultException(
                     "Synthesis is not allowed for this Intent version"
             );
         }
-        if (request.synthesis() != null) {
-            if (request.synthesis().title() == null || request.synthesis().title().isBlank()) {
+        if (synthesis != null) {
+            if (synthesis.title() == null || synthesis.title().isBlank()) {
                 throw new InvalidAiTaskResultException("Synthesis title must not be blank");
             }
-            if (request.synthesis().sections() == null || request.synthesis().sections().isEmpty()) {
+            if (synthesis.sections() == null || synthesis.sections().isEmpty()) {
                 throw new InvalidAiTaskResultException("Synthesis must have at least one section");
             }
             boolean hasDeltas = !request.proposals().isEmpty();
-            boolean declaresDeltas = request.synthesis().deltaConclusion()
+            boolean declaresDeltas = synthesis.deltaConclusion()
                     == AnalysisSynthesisResult.ArchitectureDeltaConclusion.DELTAS_PROPOSED;
             if (hasDeltas != declaresDeltas) {
                 throw new InvalidAiTaskResultException(
                         "Synthesis delta conclusion must match whether proposals are present"
                 );
             }
-            proposalContractValidator.validateSynthesis(task, request.synthesis(), hasDeltas);
+            proposalContractValidator.validateSynthesis(task, synthesis, hasDeltas);
         }
     }
 
     private boolean isSynthesisIntent(AiTask task) {
         return "architecture-overview".equals(task.getIntentId())
-                && "v2".equals(task.getIntentVersion());
+                && Set.of("v2", "v3").contains(task.getIntentVersion());
+    }
+
+    private boolean isTypedArchitectureOverview(AiTask task) {
+        return "architecture-overview".equals(task.getIntentId())
+                && "v3".equals(task.getIntentVersion());
+    }
+
+    private void rejectTypedPayloadForLegacyTask(AiTask task, AiTaskResultRequest request) {
+        if (isTypedArchitectureOverview(task)) return;
+        boolean typedProposal = request.proposals().stream().anyMatch(proposal ->
+                proposal.supportingFactRefs() != null
+                        || proposal.supportingObservationRefs() != null
+                        || proposal.evidenceRefs() != null);
+        boolean typedSynthesis = request.synthesis() != null
+                && request.synthesis().groundingRefs() != null;
+        if (typedProposal || typedSynthesis) {
+            throw new AiReferenceResolutionException("INCOMPATIBLE_TYPED_CONTRACT",
+                    "Typed references are not accepted for a legacy Intent version");
+        }
+    }
+
+    private List<AiProposalResult> resolveTypedProposals(AiTask task,
+            List<AiProposalResult> proposals) {
+        var resolver = typedResolver(task);
+        return proposals.stream().map(proposal -> {
+            if (proposal.supportingFactRefs() == null
+                    || proposal.supportingObservationRefs() == null
+                    || proposal.evidenceRefs() == null
+                    || !proposal.supportingFactIds().isEmpty()
+                    || !proposal.supportingObservationIds().isEmpty()
+                    || !proposal.evidenceReferences().isEmpty()) {
+                throw referenceFailure("MALFORMED_REFERENCE",
+                        "Architecture Overview v3 requires typed grounding fields only");
+            }
+            List<UUID> facts = proposal.supportingFactRefs().stream()
+                    .map(reference -> resolveDomainUuid(resolver, reference, "SUPPORTING_FACT"))
+                    .toList();
+            List<UUID> observations = proposal.supportingObservationRefs().stream()
+                    .map(reference -> resolveDomainUuid(resolver, reference, "SUPPORTING_OBSERVATION"))
+                    .toList();
+            List<String> evidence = proposal.evidenceRefs().stream()
+                    .map(reference -> resolver.resolve(toCore(reference), "EVIDENCE_REFERENCE")
+                            .canonicalSourceIdentity())
+                    .toList();
+            Map<String, Object> payload = new LinkedHashMap<>(proposal.payload());
+            Object target = payload.remove("targetInsightRef");
+            if (target instanceof Map<?, ?> targetMap) {
+                var targetReference = toCore(targetMap);
+                if (targetReference.type() != com.hopeful117.devlogai.ai.reference.AiReferenceType.INSIGHT
+                        || targetReference.scope() != com.hopeful117.devlogai.ai.reference.AiReferenceScope.PROJECT) {
+                    throw referenceFailure("REFERENCE_NAMESPACE_MISMATCH",
+                            "Architecture target must be a project Insight reference");
+                }
+                Object targetUuid = resolver.resolve(targetReference, null).canonicalSourceIdentity();
+                payload.put("targetInsightId", targetUuid);
+            }
+            return new AiProposalResult(proposal.type(), payload, proposal.confidence(),
+                    facts, observations, evidence, proposal.supportingFactRefs(),
+                    proposal.supportingObservationRefs(), proposal.evidenceRefs());
+        }).toList();
+    }
+
+    private AnalysisSynthesisResult resolveTypedSynthesis(AiTask task,
+            AnalysisSynthesisResult synthesis) {
+        if (synthesis == null) return null;
+        if (synthesis.groundingRefs() == null || !synthesis.groundingReferences().isEmpty()) {
+            throw referenceFailure("MALFORMED_REFERENCE",
+                    "Architecture Overview v3 synthesis requires groundingRefs only");
+        }
+        var resolver = typedResolver(task);
+        List<String> resolved = synthesis.groundingRefs().stream()
+                .map(reference -> {
+                    var coreReference = toCore(reference);
+                    String capability = switch (coreReference.type()) {
+                        case FACT -> "SUPPORTING_FACT";
+                        case OBSERVATION -> "SUPPORTING_OBSERVATION";
+                        case REPOSITORY_EVIDENCE -> "EVIDENCE_REFERENCE";
+                        default -> throw referenceFailure("REFERENCE_NOT_ALLOWED_FOR_GROUNDING",
+                                "Synthesis reference is not a grounding candidate");
+                    };
+                    return resolver.resolve(coreReference, capability).canonicalSourceIdentity();
+                })
+                .toList();
+        return new AnalysisSynthesisResult(synthesis.title(), synthesis.sections(),
+                synthesis.deltaConclusion(), resolved, synthesis.groundingRefs());
+    }
+
+    private AiReferenceResolver typedResolver(AiTask task) {
+        if (task.getAiReferenceMappingSnapshot() == null) {
+            throw referenceFailure("REFERENCE_MAPPING_FAILURE",
+                    "Architecture Overview v3 requires an AI reference mapping snapshot");
+        }
+        return AiReferenceResolver.fromMap(task.getAiReferenceMappingSnapshot());
+    }
+
+    private UUID resolveDomainUuid(AiReferenceResolver resolver, ProviderAiReference reference,
+            String capability) {
+        String identity = resolver.resolve(toCore(reference), capability).canonicalSourceIdentity();
+        try {
+            return UUID.fromString(identity);
+        } catch (IllegalArgumentException exception) {
+            throw referenceFailure("REFERENCE_MAPPING_FAILURE",
+                    "Typed reference does not map to a UUID domain identity");
+        }
+    }
+
+    private com.hopeful117.devlogai.ai.reference.AiReference toCore(ProviderAiReference reference) {
+        if (reference == null || reference.type() == null || reference.ref() == null
+                || reference.ref().isBlank() || reference.scope() == null) {
+            throw referenceFailure("MALFORMED_REFERENCE", "Typed AI reference is malformed");
+        }
+        return new com.hopeful117.devlogai.ai.reference.AiReference(reference.type(),
+                reference.ref(), reference.scope());
+    }
+
+    private com.hopeful117.devlogai.ai.reference.AiReference toCore(Map<?, ?> reference) {
+        try {
+            return new com.hopeful117.devlogai.ai.reference.AiReference(
+                    com.hopeful117.devlogai.ai.reference.AiReferenceType.valueOf(
+                            String.valueOf(reference.get("type"))),
+                    String.valueOf(reference.get("ref")),
+                    com.hopeful117.devlogai.ai.reference.AiReferenceScope.valueOf(
+                            String.valueOf(reference.get("scope"))));
+        } catch (RuntimeException exception) {
+            throw referenceFailure("MALFORMED_REFERENCE", "Typed AI reference is malformed");
+        }
+    }
+
+    private AiReferenceResolutionException referenceFailure(String code, String message) {
+        return new AiReferenceResolutionException(code, message);
     }
 
     private void validateReferences(

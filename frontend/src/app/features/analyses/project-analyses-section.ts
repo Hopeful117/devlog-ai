@@ -151,7 +151,7 @@ export class ProjectAnalysesSection {
       {
         label: 'Review the architecture',
         description: 'Analyze the architecture of the project across all repositories.',
-        intentId: 'architecture-overview-v2',
+        intentId: 'architecture-overview-v3',
         scope: 'PROJECT_SCOPE' as const,
       },
       {

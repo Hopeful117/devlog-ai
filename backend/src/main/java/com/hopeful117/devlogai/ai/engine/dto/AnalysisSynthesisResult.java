@@ -10,8 +10,18 @@ public record AnalysisSynthesisResult(
         @NotBlank String title,
         @NotNull List<@Valid SynthesisSection> sections,
         @NotNull ArchitectureDeltaConclusion deltaConclusion,
-        @NotNull List<@NotBlank String> groundingReferences
+        List<@NotBlank String> groundingReferences,
+        List<@Valid ProviderAiReference> groundingRefs
 ) {
+    public AnalysisSynthesisResult {
+        groundingReferences = groundingReferences == null ? List.of() : List.copyOf(groundingReferences);
+        groundingRefs = groundingRefs == null ? null : List.copyOf(groundingRefs);
+    }
+
+    public AnalysisSynthesisResult(String title, List<SynthesisSection> sections,
+            ArchitectureDeltaConclusion deltaConclusion, List<String> groundingReferences) {
+        this(title, sections, deltaConclusion, groundingReferences, null);
+    }
     public enum ArchitectureDeltaConclusion {
         NO_MATERIAL_DELTA,
         DELTAS_PROPOSED,
