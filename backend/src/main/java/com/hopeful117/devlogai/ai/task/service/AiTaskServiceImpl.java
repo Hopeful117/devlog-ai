@@ -236,7 +236,10 @@ public class AiTaskServiceImpl implements AiTaskService {
         if (task.getSelectedKnowledgeSnapshot() != null) {
             throw new ConflictException("Selected knowledge is already attached to AI task " + id);
         }
-        Map<String, Object> snapshot = promptProjectionService.toMap(selectedKnowledge);
+        Map<String, Object> snapshot = "architecture-overview".equals(task.getIntentId())
+                && "v3".equals(task.getIntentVersion())
+                ? promptProjectionService.toTypedArchitectureOverviewMap(selectedKnowledge)
+                : promptProjectionService.toMap(selectedKnowledge);
         task.setSelectedKnowledgeSnapshot(snapshot);
         task.setAiReferenceMappingSnapshot(
                 AiReferenceMappingSnapshot.from(

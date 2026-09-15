@@ -24,7 +24,11 @@ from app.schemas.ai_task_result import (
     PromptExecutionMetadata,
     SynthesisSectionResult,
 )
-from app.schemas.insight import InsightGenerationOutput
+from app.schemas.insight import (
+    InsightGenerationOutput,
+    TypedInsightGenerationOutput,
+)
+from app.schemas.typed_reference import AiReferenceScope, AiReferenceType, ProviderAiReference
 from app.services.interaction_trace import InteractionTraceCollector
 
 
@@ -70,12 +74,17 @@ class InsightGenerationService:
         traces = InteractionTraceCollector(self._provider, submission)
         require_synthesis = (
             submission.intent.id == "architecture-overview"
-            and submission.intent.version == "v2"
+            and submission.intent.version in {"v2", "v3"}
         )
+        response_model = (TypedInsightGenerationOutput
+                          if submission.intent.id == "architecture-overview"
+                          and submission.intent.version == "v3"
+                          else InsightGenerationOutput)
         try:
             output = await self._generate_and_validate(
                 prompt, submission.selected_knowledge, set(submission.intent.supported_insight_types),
                 traces,
+                response_model=response_model,
                 require_synthesis=require_synthesis,
             )
         except (ValidationError, InsightOutputValidationError, ValueError) as error:
@@ -94,6 +103,7 @@ class InsightGenerationService:
                     submission.selected_knowledge,
                     set(submission.intent.supported_insight_types),
                     traces,
+                    response_model=response_model,
                     require_synthesis=require_synthesis,
                 )
                 prompt = corrective_prompt
@@ -128,19 +138,18 @@ class InsightGenerationService:
             )
             return
 
-        proposals = [
-            AiProposalResult(
-                type=ProposalType.INSIGHT,
-                payload=self._payload(submission, proposal),
-                confidence=proposal.confidence,
-                supporting_fact_ids=proposal.supporting_fact_ids,
-                supporting_observation_ids=proposal.supporting_observation_ids,
-                evidence_references=proposal.evidence_references,
-            )
-            for proposal in output.proposals
-        ]
+        proposals = [self._result_proposal(submission, proposal) for proposal in output.proposals]
         synthesis = None
-        if output.synthesis is not None:
+        if output.synthesis is not None and submission.intent.version == "v3":
+            synthesis = AnalysisSynthesisResult(
+                title=output.synthesis.title,
+                sections=[SynthesisSectionResult(name=s.name, content=s.content)
+                          for s in output.synthesis.sections],
+                delta_conclusion=output.synthesis.delta_conclusion,
+                grounding_references=[],
+                grounding_refs=output.synthesis.grounding_refs,
+            )
+        elif output.synthesis is not None:
             synthesis = AnalysisSynthesisResult(
                 title=output.synthesis.title,
                 sections=[
@@ -183,11 +192,12 @@ class InsightGenerationService:
         supported_insight_types: set[InsightType],
         traces: InteractionTraceCollector,
         *,
+        response_model: type[object] = InsightGenerationOutput,
         require_synthesis: bool = False,
-    ) -> InsightGenerationOutput:
+    ) -> object:
         return await traces.generate_and_validate(
             prompt,
-            InsightGenerationOutput,
+            response_model,
             lambda output: self._validate_output(
                 output, context, supported_insight_types, require_synthesis=require_synthesis
             ),
@@ -201,6 +211,10 @@ class InsightGenerationService:
         *,
         require_synthesis: bool = False,
     ) -> None:
+        if isinstance(output, TypedInsightGenerationOutput):
+            self._validate_typed_output(output, context, supported_insight_types,
+                                         require_synthesis=require_synthesis)
+            return
         facts = context.get("selectedFacts", [])
         observations = context.get("selectedObservations", [])
         repository_context = context.get("repositoryContext", {})
@@ -302,6 +316,79 @@ class InsightGenerationService:
                     raise InsightOutputValidationError(
                         "targetInsightId must exist in existingArchitectureKnowledge"
                     )
+
+    def _validate_typed_output(
+        self,
+        output: TypedInsightGenerationOutput,
+        context: dict[str, object],
+        supported_insight_types: set[InsightType],
+        *,
+        require_synthesis: bool,
+    ) -> None:
+        candidates = context.get("groundingCandidates")
+        if not isinstance(candidates, dict):
+            raise InsightOutputValidationError("Typed groundingCandidates must be an object")
+        facts = self._typed_candidates(candidates.get("facts"), AiReferenceType.FACT,
+                                       AiReferenceScope.ANALYSIS_CONTEXT)
+        observations = self._typed_candidates(candidates.get("observations"), AiReferenceType.OBSERVATION,
+                                               AiReferenceScope.ANALYSIS_CONTEXT)
+        evidence = self._typed_candidates(candidates.get("evidence"), AiReferenceType.REPOSITORY_EVIDENCE,
+                                          AiReferenceScope.REPOSITORY)
+        if require_synthesis != (output.synthesis is not None):
+            raise InsightOutputValidationError("Architecture Overview v3 synthesis contract is invalid")
+        if output.synthesis is not None:
+            self._require_typed_subset(output.synthesis.grounding_refs, facts | observations | evidence,
+                                       "groundingRefs")
+        for proposal in output.proposals:
+            if proposal.insight_type not in supported_insight_types:
+                raise InsightOutputValidationError(
+                    f"insightType {proposal.insight_type.value} is not supported by Intent")
+            self._require_typed_subset(proposal.supporting_fact_refs, facts, "supportingFactRefs")
+            self._require_typed_subset(proposal.supporting_observation_refs, observations,
+                                       "supportingObservationRefs")
+            self._require_typed_subset(proposal.evidence_refs, evidence, "evidenceRefs")
+            if proposal.target_insight_ref is not None and (
+                    proposal.target_insight_ref.type != AiReferenceType.INSIGHT
+                    or proposal.target_insight_ref.scope != AiReferenceScope.PROJECT):
+                raise InsightOutputValidationError("targetInsightRef must identify a project Insight")
+
+    def _typed_candidates(self, value: object, expected_type: AiReferenceType,
+                          expected_scope: AiReferenceScope) -> set[ProviderAiReference]:
+        if not isinstance(value, list):
+            raise InsightOutputValidationError("Typed grounding candidates must be arrays")
+        result: set[ProviderAiReference] = set()
+        for item in value:
+            try:
+                reference = ProviderAiReference.model_validate(item)
+            except Exception as error:
+                raise InsightOutputValidationError("Malformed typed grounding candidate") from error
+            if reference.type != expected_type or reference.scope != expected_scope:
+                raise InsightOutputValidationError("Grounding candidate namespace or scope is invalid")
+            result.add(reference)
+        return result
+
+    def _require_typed_subset(self, referenced: list[ProviderAiReference],
+                              available: set[ProviderAiReference], field_name: str) -> None:
+        unknown = set(referenced) - available
+        if unknown:
+            raise InsightOutputValidationError(f"{field_name} contains unauthorized references")
+
+    def _result_proposal(self, submission: AiTaskSubmissionRequest, proposal: object) -> AiProposalResult:
+        if submission.intent.version == "v3":
+            return AiProposalResult(
+                type=ProposalType.INSIGHT, payload=self._payload(submission, proposal),
+                confidence=proposal.confidence, supporting_fact_ids=None,
+                supporting_observation_ids=None, evidence_references=None,
+                supporting_fact_refs=proposal.supporting_fact_refs,
+                supporting_observation_refs=proposal.supporting_observation_refs,
+                evidence_refs=proposal.evidence_refs,
+            )
+        return AiProposalResult(
+            type=ProposalType.INSIGHT, payload=self._payload(submission, proposal),
+            confidence=proposal.confidence, supporting_fact_ids=proposal.supporting_fact_ids,
+            supporting_observation_ids=proposal.supporting_observation_ids,
+            evidence_references=proposal.evidence_references,
+        )
 
     def _collect_ids(self, items: list[object]) -> set[UUID]:
         identifiers: set[UUID] = set()
@@ -477,7 +564,11 @@ class InsightGenerationService:
         }
         if submission.intent.id == "architecture-overview":
             payload["deltaType"] = proposal.delta_type.value
-            if proposal.target_insight_id is not None:
+            if submission.intent.version == "v3" and proposal.target_insight_ref is not None:
+                payload["targetInsightRef"] = proposal.target_insight_ref.model_dump(
+                    by_alias=True, mode="json"
+                )
+            elif proposal.target_insight_id is not None:
                 payload["targetInsightId"] = str(proposal.target_insight_id)
         return payload
 

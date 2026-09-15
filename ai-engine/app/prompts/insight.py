@@ -75,6 +75,11 @@ Return only the grounded structured output required by the Intent contract."""
             {"ARCHITECTURE_DESCRIPTION", "TECHNOLOGY_DESCRIPTION", "INFRASTRUCTURE_DESCRIPTION", "API_DESCRIPTION"},
             "Provide a current-state architecture synthesis and detect meaningful architecture deltas.",
         ),
+        "architecture-overview-prompt-v3": (
+            "architecture-overview", "v3",
+            {"ARCHITECTURE_DESCRIPTION", "TECHNOLOGY_DESCRIPTION", "INFRASTRUCTURE_DESCRIPTION", "API_DESCRIPTION"},
+            "Provide a current-state architecture synthesis using only typed references supplied by Core.",
+        ),
     }
 
     def supports(self, request: PromptRequest) -> bool:
@@ -100,6 +105,14 @@ Return only the grounded structured output required by the Intent contract."""
             raise PromptConstructionError(
                 "Expected output contract does not match the versioned Intent"
             )
+        selection_digest = request.selected_knowledge.get("selectionDigest")
+        if not isinstance(selection_digest, str) or len(selection_digest) != 64 or any(
+            character not in "0123456789abcdef" for character in selection_digest
+        ):
+            raise PromptConstructionError("SelectedKnowledge selectionDigest is invalid")
+        if request.intent.id == "architecture-overview" and request.intent.version == "v3":
+            return self._build_typed_architecture_prompt(request, selection_digest, template)
+
         required_sections = {
             "project", "analysis", "projectProfile", "selectedFacts",
             "selectedObservations", "diagnostics", "selectedInsights",
@@ -110,12 +123,6 @@ Return only the grounded structured output required by the Intent contract."""
             raise PromptConstructionError(
                 f"SelectedKnowledge is missing required sections: {', '.join(missing)}"
             )
-        selection_digest = request.selected_knowledge.get("selectionDigest")
-        if not isinstance(selection_digest, str) or len(selection_digest) != 64 or any(
-            character not in "0123456789abcdef" for character in selection_digest
-        ):
-            raise PromptConstructionError("SelectedKnowledge selectionDigest is invalid")
-
         knowledge_json = self._canonical(request.selected_knowledge)
         intent_json = self._canonical(
             request.intent.model_dump(by_alias=True, mode="json")
@@ -265,6 +272,57 @@ Return only the grounded structured output required by the Intent contract."""
             generation_policy=GenerationPolicy(10, 2_000, True),
             traceability=traceability,
             content_digest=digest,
+        )
+
+    def _build_typed_architecture_prompt(
+        self, request: PromptRequest, selection_digest: str, template: tuple[object, ...]
+    ) -> Prompt:
+        context = request.selected_knowledge.get("context")
+        candidates = request.selected_knowledge.get("groundingCandidates")
+        if not isinstance(context, dict) or not isinstance(candidates, dict):
+            raise PromptConstructionError(
+                "Typed architecture context and groundingCandidates are required"
+            )
+        intent_json = self._canonical(request.intent.model_dump(by_alias=True, mode="json"))
+        schema_json = self._canonical(request.expected_output_contract)
+        context_json = self._canonical(context)
+        candidates_json = self._canonical(candidates)
+        guidance_json = self._canonical(
+            request.user_guidance.model_dump(
+                by_alias=True, mode="json", exclude_none=True
+            ) if request.user_guidance else {}
+        )
+        user_message = (
+            f"{template[3]}\n\nBUSINESS INTENT\n{intent_json}\n\n"
+            "Use only the typed references in the Core-issued context and grounding candidates. "
+            "Treat ref values as opaque handles: copy them exactly and never construct, parse, "
+            "shorten, or replace them with UUIDs. Fact refs are valid only in supportingFactRefs; "
+            "Observation refs only in supportingObservationRefs; evidence refs only in evidenceRefs "
+            "or groundingRefs. Do not use contextual Insight refs as Fact or Observation evidence. "
+            "Return an empty array when no authorized reference supports a claim.\n\n"
+            f"TYPED CONTEXT\n{context_json}\n\n"
+            f"GROUNDING CANDIDATES\n{candidates_json}\n\n"
+            f"USER GUIDANCE\n{guidance_json}\n\n"
+            f"EXPECTED OUTPUT CONTRACT\n{schema_json}\n"
+        )
+        digest = self._content_digest(self.SYSTEM_MESSAGE, user_message, schema_json)
+        traceability = PromptTraceability(
+            request_id=str(request.request_id), correlation_id=str(request.correlation_id),
+            ai_task_id=str(request.ai_task_id), analysis_id=str(request.analysis_id),
+            intent_id=request.intent.id, intent_version=request.intent.version,
+            context_digest=selection_digest,
+            analysis_context_id=self._metadata_text(request, "analysisContextId"),
+            profile_id=self._metadata_text(request, "profileId"),
+            profile_version=self._metadata_text(request, "profileVersion"),
+        )
+        return Prompt(
+            prompt_id=str(uuid.uuid5(uuid.NAMESPACE_URL, digest)),
+            prompt_version=request.intent.prompt_template,
+            intent_id=request.intent.id, intent_version=request.intent.version,
+            system_message=self.SYSTEM_MESSAGE, user_message=user_message,
+            expected_output_schema=request.expected_output_contract,
+            generation_policy=GenerationPolicy(10, 2_000, True),
+            traceability=traceability, content_digest=digest,
         )
 
     def corrective_retry(

@@ -50,7 +50,7 @@ class CoreCallbackClient:
         if correlation_id != result.correlation_id:
             raise ValueError("Path and payload correlation identifiers must match")
 
-        payload = result.model_dump(mode="json", by_alias=True)
+        payload = result.model_dump(mode="json", by_alias=True, exclude_none=True)
         logger = logging.getLogger(__name__)
         logger.info(
             "Sending AI task result callback",

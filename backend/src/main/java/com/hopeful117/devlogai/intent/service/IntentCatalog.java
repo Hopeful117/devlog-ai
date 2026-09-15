@@ -52,7 +52,18 @@ public class IntentCatalog {
                         "Produire une synthèse de l'architecture actuelle ancrée dans le contexte sélectionné.",
                         "Ne proposer que les deltas d'architecture réellement nouveaux ou enrichissants.",
                         "Ne jamais présenter une proposition comme une connaissance validée."),
-                synthesisOutputContract(), "architecture-overview-prompt-v2",
+                 synthesisOutputContract(), "architecture-overview-prompt-v2",
+                 List.of("architecture-v1", HISTORY_PROFILE)));
+        register(result, new IntentDefinition(
+                "architecture-overview", "v3",
+                "Provide a current-state architecture synthesis and detect meaningful architecture deltas using typed grounding references.",
+                ProposalType.INSIGHT, IntentExecutionMode.GENERIC,
+                List.of(InsightType.ARCHITECTURE_DESCRIPTION, InsightType.TECHNOLOGY_DESCRIPTION,
+                        InsightType.INFRASTRUCTURE_DESCRIPTION, InsightType.API_DESCRIPTION),
+                List.of("Utiliser uniquement le contexte typé fourni par AnalysisContext.",
+                        "Copier exclusivement les références typées autorisées.",
+                        "Ne jamais présenter une proposition comme une connaissance validée."),
+                typedSynthesisOutputContract(), "architecture-overview-prompt-v3",
                 List.of("architecture-v1", HISTORY_PROFILE)));
         register(result, new IntentDefinition(
                 "analyze-engineering-event", "v1",
@@ -172,6 +183,26 @@ public class IntentCatalog {
                         "supportingFactIds", "supportingObservationIds", "evidenceReferences"),
                 "requiredSynthesisFields", List.of(
                         "title", "sections", "deltaConclusion", "groundingReferences"));
+    }
+
+    private static Map<String, Object> typedSynthesisOutputContract() {
+        Map<String, Object> contract = new LinkedHashMap<>();
+        contract.put("type", "object");
+        contract.put("structured", true);
+        contract.put("hasSynthesis", true);
+        contract.put("schemaVersion", "architecture-overview-v3");
+        contract.put("root", "proposals");
+        contract.put("minimumProposalCount", 0);
+        contract.put("maximumProposalCount", 10);
+        contract.put("allowedInsightTypes", List.of(InsightType.ARCHITECTURE_DESCRIPTION.name(),
+                        InsightType.TECHNOLOGY_DESCRIPTION.name(),
+                        InsightType.INFRASTRUCTURE_DESCRIPTION.name(),
+                        InsightType.API_DESCRIPTION.name()));
+        contract.put("allowedDeltaTypes", List.of("NEW", "ENRICHES"));
+        contract.put("requiredProposalFields", List.of("insightType", "title", "summary", "rationale",
+                "deltaType", "supportingFactRefs", "supportingObservationRefs", "evidenceRefs"));
+        contract.put("requiredSynthesisFields", List.of("title", "sections", "deltaConclusion", "groundingRefs"));
+        return contract;
     }
 
     private static Map<String, Object> storyContextAnalysisOutputContract() {

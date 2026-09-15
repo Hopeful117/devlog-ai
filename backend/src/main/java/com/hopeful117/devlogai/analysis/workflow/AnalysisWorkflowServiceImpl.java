@@ -80,7 +80,9 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
                             createdTask.taskType(),
                             intent,
                             guidance,
-                            promptProjectionService.toMap(selectedKnowledge),
+                            "architecture-overview".equals(intent.id()) && "v3".equals(intent.version())
+                                    ? promptProjectionService.toTypedArchitectureOverviewMap(selectedKnowledge)
+                                    : promptProjectionService.toMap(selectedKnowledge),
                             intent.outputSchema(),
                             Map.of(), // groundingContract - not used for standard analysis
                             java.util.Map.of(

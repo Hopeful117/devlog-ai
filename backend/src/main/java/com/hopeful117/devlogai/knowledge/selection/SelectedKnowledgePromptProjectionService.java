@@ -1,5 +1,10 @@
 package com.hopeful117.devlogai.knowledge.selection;
 
+import com.hopeful117.devlogai.ai.reference.AiReference;
+import com.hopeful117.devlogai.ai.reference.AiReferenceRegistry;
+import com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory;
+import com.hopeful117.devlogai.ai.reference.AiReferenceScope;
+import com.hopeful117.devlogai.ai.reference.AiReferenceType;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
@@ -42,6 +47,144 @@ public class SelectedKnowledgePromptProjectionService {
         // Diagnostics remain deterministic Core observability, not AI-facing knowledge.
         projected.remove("relationshipDiagnostics");
         return new LinkedHashMap<>(projected);
+    }
+
+    /** Projects only the v3 provider contract; Core-only binding metadata stays internal. */
+    public Map<String, Object> toTypedArchitectureOverviewMap(SelectedKnowledge selectedKnowledge) {
+        Map<String, Object> legacy = toMap(selectedKnowledge);
+        AiReferenceRegistry registry = AiReferenceRegistryFactory.create(selectedKnowledge);
+        Map<String, Object> context = new LinkedHashMap<>(legacy);
+        context.put("selectedFacts", typedItems(legacy.get("selectedFacts"), registry,
+                AiReferenceType.FACT, AiReferenceScope.ANALYSIS_CONTEXT));
+        context.put("selectedObservations", typedItems(legacy.get("selectedObservations"), registry,
+                AiReferenceType.OBSERVATION, AiReferenceScope.ANALYSIS_CONTEXT));
+        context.put("selectedInsights", typedItems(legacy.get("selectedInsights"), registry,
+                AiReferenceType.INSIGHT, AiReferenceScope.PROJECT));
+        context.put("existingArchitectureKnowledge",
+                typedArchitectureKnowledge(legacy.get("existingArchitectureKnowledge"), registry));
+        context.put("repositoryContext", typedRepositoryContext(legacy.get("repositoryContext"), registry));
+        context.put("relationshipHighlights", typedRelationships(legacy.get("relationshipHighlights"), registry));
+        context.put("semanticSections", typedSemanticSections(legacy.get("semanticSections"), registry));
+        Map<String, Object> groundingCandidates = new LinkedHashMap<>();
+        groundingCandidates.put("facts", references(registry, "SUPPORTING_FACT"));
+        groundingCandidates.put("observations", references(registry, "SUPPORTING_OBSERVATION"));
+        groundingCandidates.put("evidence", references(registry, "EVIDENCE_REFERENCE"));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("context", context);
+        result.put("groundingCandidates", groundingCandidates);
+        result.put("selectionMetadata", legacy.get("selectionMetadata"));
+        result.put("selectionDigest", legacy.get("selectionDigest"));
+        return result;
+    }
+
+    private List<Map<String, Object>> typedItems(Object value, AiReferenceRegistry registry,
+            AiReferenceType type, AiReferenceScope scope) {
+        if (!(value instanceof List<?> list)) return List.of();
+        return list.stream().filter(Map.class::isInstance).map(raw -> {
+            Map<String, Object> item = new LinkedHashMap<>((Map<String, Object>) raw);
+            Object id = item.remove("id");
+            if (id != null) registry.referenceFor(type, scope, id.toString())
+                    .ifPresent(reference -> item.put("reference", reference));
+            return item;
+        }).toList();
+    }
+
+    private List<Map<String, Object>> typedArchitectureKnowledge(Object value,
+            AiReferenceRegistry registry) {
+        if (!(value instanceof List<?> list)) return List.of();
+        return list.stream().filter(Map.class::isInstance).map(raw -> {
+            Map<String, Object> item = new LinkedHashMap<>((Map<String, Object>) raw);
+            Object id = item.remove("insightId");
+            if (id != null) registry.referenceFor(AiReferenceType.INSIGHT,
+                    AiReferenceScope.PROJECT, id.toString()).ifPresent(reference -> item.put("reference", reference));
+            return item;
+        }).toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object typedRepositoryContext(Object value, AiReferenceRegistry registry) {
+        if (!(value instanceof Map<?, ?> raw)) return value;
+        Map<String, Object> context = new LinkedHashMap<>((Map<String, Object>) raw);
+        Object evidence = context.get("evidence");
+        if (evidence instanceof List<?> list) {
+            context.put("evidence", list.stream().filter(Map.class::isInstance).map(item -> {
+                Map<String, Object> projected = new LinkedHashMap<>((Map<String, Object>) item);
+                Object reference = projected.remove("reference");
+                if (reference != null) registry.referenceFor(AiReferenceType.REPOSITORY_EVIDENCE,
+                        AiReferenceScope.REPOSITORY, reference.toString())
+                        .ifPresent(valueReference -> projected.put("aiReference", valueReference));
+                return projected;
+            }).toList());
+        }
+        return context;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> typedRelationships(Object value, AiReferenceRegistry registry) {
+        if (!(value instanceof List<?> list)) return List.of();
+        return list.stream().filter(Map.class::isInstance).map(raw -> {
+            Map<String, Object> relationship = new LinkedHashMap<>((Map<String, Object>) raw);
+            relationship.put("source", typedEndpoint(relationship.get("source"), registry));
+            relationship.put("target", typedEndpoint(relationship.get("target"), registry));
+            return relationship;
+        }).toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> typedSemanticSections(Object value, AiReferenceRegistry registry) {
+        if (!(value instanceof List<?> list)) return List.of();
+        return list.stream().filter(Map.class::isInstance).map(raw -> {
+            Map<String, Object> section = new LinkedHashMap<>((Map<String, Object>) raw);
+            Object items = section.get("items");
+            if (items instanceof List<?> itemList) {
+                section.put("items", itemList.stream().filter(Map.class::isInstance).map(item -> {
+                    Map<String, Object> projected = new LinkedHashMap<>((Map<String, Object>) item);
+                    String type = String.valueOf(projected.remove("itemType"));
+                    Object identity = projected.remove("itemId");
+                    if (identity != null) referenceForItem(registry, type, identity.toString())
+                            .ifPresent(reference -> projected.put("reference", reference));
+                    return projected;
+                }).toList());
+            }
+            return section;
+        }).toList();
+    }
+
+    private java.util.Optional<AiReference> referenceForItem(AiReferenceRegistry registry,
+            String type, String identity) {
+        return switch (type) {
+            case "FACT" -> registry.referenceFor(AiReferenceType.FACT,
+                    AiReferenceScope.ANALYSIS_CONTEXT, identity);
+            case "OBSERVATION" -> registry.referenceFor(AiReferenceType.OBSERVATION,
+                    AiReferenceScope.ANALYSIS_CONTEXT, identity);
+            case "INSIGHT" -> registry.referenceFor(AiReferenceType.INSIGHT,
+                    AiReferenceScope.PROJECT, identity);
+            default -> registry.referenceFor(AiReferenceType.REPOSITORY_EVIDENCE,
+                    AiReferenceScope.REPOSITORY, identity);
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object typedEndpoint(Object value, AiReferenceRegistry registry) {
+        if (!(value instanceof Map<?, ?> raw)) return value;
+        Map<String, Object> endpoint = new LinkedHashMap<>((Map<String, Object>) raw);
+        String kind = String.valueOf(endpoint.remove("entityType"));
+        Object identity = endpoint.remove("entityId");
+        if (identity != null) {
+            AiReferenceType type = "INSIGHT".equals(kind) ? AiReferenceType.INSIGHT
+                    : "ENGINEERING_EVENT".equals(kind) ? AiReferenceType.ENGINEERING_EVENT
+                    : AiReferenceType.REPOSITORY_EVIDENCE;
+            AiReferenceScope scope = type == AiReferenceType.REPOSITORY_EVIDENCE
+                    ? AiReferenceScope.REPOSITORY : AiReferenceScope.PROJECT;
+            registry.referenceFor(type, scope, identity.toString())
+                    .ifPresent(reference -> endpoint.put("reference", reference));
+        }
+        return endpoint;
+    }
+
+    private List<AiReference> references(AiReferenceRegistry registry, String capability) {
+        return registry.groundingCandidates(capability).stream()
+                .map(binding -> binding.reference()).toList();
     }
 
     PromptProjection project(SelectedKnowledge selectedKnowledge) {
