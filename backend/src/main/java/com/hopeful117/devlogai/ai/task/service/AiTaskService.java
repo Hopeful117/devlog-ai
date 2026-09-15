@@ -6,6 +6,7 @@ import com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.response.AiTaskResponse;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
+import com.hopeful117.devlogai.ai.reference.AiReferenceRegistry;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 
@@ -44,6 +45,19 @@ public interface AiTaskService {
             String contextDigest,
             Map<String, Object> groundingContract,
             Map<String, Object> userGuidance
+    );
+
+    AiTask createForStoryContextAnalysisEntity(
+            UUID analysisId,
+            AiTaskType taskType,
+            String intentId,
+            String intentVersion,
+            String promptTemplate,
+            Map<String, Object> selectedKnowledgeSnapshot,
+            String contextDigest,
+            Map<String, Object> groundingContract,
+            Map<String, Object> userGuidance,
+            AiReferenceRegistry referenceRegistry
     );
 
     AiTaskResponse attachSelectedKnowledge(UUID id, SelectedKnowledge selectedKnowledge);

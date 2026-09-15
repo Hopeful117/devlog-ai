@@ -8,6 +8,7 @@ import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
+import com.hopeful117.devlogai.ai.reference.AiReferenceRegistry;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
@@ -209,7 +210,7 @@ class AnalyzeStoryContextUseCaseTest {
         when(aiTaskService.createForStoryContextAnalysisEntity(
                 eq(projectId), eq(AiTaskType.STORY_CONTEXT_ANALYSIS), eq(INTENT_ID), eq("v1"),
                 eq("story-context-analysis-prompt-v1"), any(), eq(CONTEXT_DIGEST),
-                any(), eq(null)))
+                 any(), eq(null), any(AiReferenceRegistry.class)))
                 .thenReturn(task);
 
         UUID result = useCase.execute(
