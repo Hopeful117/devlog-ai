@@ -1,0 +1,13 @@
+{
+  "captureVersion": "1.0.0",
+  "status": "NOT_EXECUTED",
+  "condition": "DIRECT_REPOSITORY",
+  "project": "trading-os",
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "toolCalls": null,
+  "searches": null,
+  "fileReads": null,
+  "elapsedMilliseconds": null,
+  "reason": "No pinned Trading OS checkout is available in the workspace, and this condition cannot use DevLog APIs, MCP, database, projections, context, or oracle data.",
+  "humanUtility": {"status": "NOT_MEASURED"}
+}
