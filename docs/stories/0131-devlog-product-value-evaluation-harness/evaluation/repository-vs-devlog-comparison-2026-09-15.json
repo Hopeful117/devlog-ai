@@ -1,0 +1,119 @@
+{
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "rows": [
+    {
+      "artifact": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "devlogRetrieval": "RESOLVED",
+      "interpretation": "RETRIEVED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+      "devlogRetrieval": "RESOLVED",
+      "interpretation": "RETRIEVED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+      "devlogRetrieval": "RESOLVED",
+      "interpretation": "RETRIEVED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+      "devlogRetrieval": "RESOLVED",
+      "interpretation": "RETRIEVED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "docs/architecture/adr/ADR-042.md",
+      "devlogRetrieval": "NOT_FOUND",
+      "interpretation": "TRUE_BENCHMARK_EVIDENCE_MISSED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "docs/architecture/adr/ADR-043.md",
+      "devlogRetrieval": "NOT_FOUND",
+      "interpretation": "TRUE_BENCHMARK_EVIDENCE_MISSED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+      "devlogRetrieval": "NOT_FOUND",
+      "interpretation": "TRUE_BENCHMARK_EVIDENCE_MISSED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+      "devlogRetrieval": "NOT_FOUND",
+      "interpretation": "TRUE_BENCHMARK_EVIDENCE_MISSED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+      "devlogRetrieval": "RESOLVED",
+      "interpretation": "RETRIEVED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+      "devlogRetrieval": "RESOLVED",
+      "interpretation": "RETRIEVED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+      "devlogRetrieval": "NOT_FOUND",
+      "interpretation": "TRUE_BENCHMARK_EVIDENCE_MISSED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+      "devlogRetrieval": "RESOLVED",
+      "interpretation": "RETRIEVED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/aggregate/ExecutionIntent.java",
+      "devlogRetrieval": "NOT_FOUND",
+      "interpretation": "TRUE_BENCHMARK_EVIDENCE_MISSED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/service/ExecutionValidationService.java",
+      "devlogRetrieval": "RESOLVED",
+      "interpretation": "RETRIEVED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+      "devlogRetrieval": "RESOLVED",
+      "interpretation": "RETRIEVED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "trading-core/src/main/java/com/hope/trading/trading_core/model/Account.java",
+      "devlogRetrieval": "NOT_FOUND",
+      "interpretation": "TRUE_BENCHMARK_EVIDENCE_MISSED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "trading-core/src/test/java/com/hope/trading/trading_core/controller/PositionControllerTest.java",
+      "devlogRetrieval": "NOT_FOUND",
+      "interpretation": "TRUE_BENCHMARK_EVIDENCE_MISSED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+      "devlogRetrieval": "NOT_FOUND",
+      "interpretation": "TRUE_BENCHMARK_EVIDENCE_MISSED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    },
+    {
+      "artifact": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+      "devlogRetrieval": "RESOLVED",
+      "interpretation": "RETRIEVED_BY_DEVLOG",
+      "repositoryGroundTruth": "RESOLVED"
+    }
+  ]
+}

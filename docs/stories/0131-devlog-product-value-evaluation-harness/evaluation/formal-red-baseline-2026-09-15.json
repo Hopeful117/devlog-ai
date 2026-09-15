@@ -1,0 +1,15 @@
+{
+  "acceptanceAuthorized": false,
+  "status": "PARTIAL_RED_DIRECT_REPOSITORY_BLOCKED",
+  "oracleStatus": "HUMAN_APPROVED",
+  "oracleFrozen": true,
+  "conditions": {
+    "DIRECT_REPOSITORY": "BLOCKED_NO_COMPARABLE_AGENT_CAPTURE",
+    "DEVLOG_CONTEXT": "EXECUTED_12_RUNS",
+    "GROUND_TRUTH_CONTEXT": "EXECUTED_12_RUNS"
+  },
+  "provider": "openai",
+  "model": "gpt-4.1-mini",
+  "formalThreeConditionBaseline": false,
+  "reason": "Direct Repository requires an agent with ordinary pinned repository tools; an untooled model prompt would not be a valid direct condition."
+}

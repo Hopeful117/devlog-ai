@@ -1,0 +1,23 @@
+{
+  "captureVersion": "1.0.0",
+  "status": "TEMPLATE_NOT_EXECUTED",
+  "capturedAt": null,
+  "project": "trading-os",
+  "projectId": "94c7517b-8a70-4e04-8232-59e4be359b16",
+  "repositoryId": "1feead5d-dfc9-4b2c-aa9c-045a8524a9f8",
+  "expectedRepositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "actualRepositoryRevision": null,
+  "mode": "TODO: direct_repository | devlog_live | replay",
+  "provider": null,
+  "model": null,
+  "cases": [
+    {"caseId": "CASE-01", "status": "NOT_EXECUTED"},
+    {"caseId": "CASE-02", "status": "NOT_EXECUTED"},
+    {"caseId": "CASE-03", "status": "NOT_EXECUTED"},
+    {"caseId": "CASE-04", "status": "NOT_EXECUTED"}
+  ],
+  "humanUtility": {
+    "status": "NOT_MEASURED",
+    "reason": "Complete the Story 0130 human evaluation protocol separately."
+  }
+}
