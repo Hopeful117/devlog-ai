@@ -4,6 +4,8 @@ import com.hopeful117.devlogai.ai.task.dto.request.CreateAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.request.FailAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.dto.response.AiTaskResponse;
+import com.hopeful117.devlogai.ai.reference.AiReferenceMappingSnapshot;
+import com.hopeful117.devlogai.ai.reference.AiReferenceRegistry;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
@@ -139,6 +141,24 @@ public class AiTaskServiceImpl implements AiTaskService {
             Map<String, Object> groundingContract,
             Map<String, Object> userGuidance
     ) {
+        return createForStoryContextAnalysisEntity(projectId, taskType, intentId, intentVersion,
+                promptTemplate, selectedKnowledgeSnapshot, contextDigest, groundingContract,
+                userGuidance, null);
+    }
+
+    @Override
+    public AiTask createForStoryContextAnalysisEntity(
+            UUID projectId,
+            AiTaskType taskType,
+            String intentId,
+            String intentVersion,
+            String promptTemplate,
+            Map<String, Object> selectedKnowledgeSnapshot,
+            String contextDigest,
+            Map<String, Object> groundingContract,
+            Map<String, Object> userGuidance,
+            AiReferenceRegistry referenceRegistry
+    ) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new EntityNotFoundException("Project", projectId));
 
@@ -192,6 +212,8 @@ public class AiTaskServiceImpl implements AiTaskService {
         task.setPromptRequestId(task.getCorrelationId());
         task.setContextSnapshot(contextSnapshot);
         task.setSelectedKnowledgeSnapshot(selectedKnowledgeSnapshot);
+        task.setAiReferenceMappingSnapshot(referenceRegistry == null ? null
+                : AiReferenceMappingSnapshot.from(referenceRegistry).asMap());
         // Use v5 for SCA intent (Story-aware selection)
         task.setSelectionVersion("engineering-story-context-analysis".equals(intentId)
                 ? "knowledge-selection-v5" : "knowledge-selection-v1");
@@ -216,6 +238,10 @@ public class AiTaskServiceImpl implements AiTaskService {
         }
         Map<String, Object> snapshot = promptProjectionService.toMap(selectedKnowledge);
         task.setSelectedKnowledgeSnapshot(snapshot);
+        task.setAiReferenceMappingSnapshot(
+                AiReferenceMappingSnapshot.from(
+                        com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory.create(selectedKnowledge))
+                        .asMap());
         task.setSelectionVersion(selectedKnowledge.selectionMetadata().selectionVersion());
         task.setSelectionDigest(selectedKnowledge.selectionDigest());
         return saveAndMap(task);
@@ -249,6 +275,10 @@ public class AiTaskServiceImpl implements AiTaskService {
         task.setPromptRequestId(task.getCorrelationId());
         task.setContextSnapshot(contextSnapshot);
         task.setSelectedKnowledgeSnapshot(selectedKnowledgeSnapshot);
+        task.setAiReferenceMappingSnapshot(selectedKnowledge == null ? null
+                : AiReferenceMappingSnapshot.from(
+                        com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory.create(selectedKnowledge))
+                        .asMap());
         task.setSelectionVersion(selectedKnowledge == null ? null
                 : selectedKnowledge.selectionMetadata().selectionVersion());
         task.setSelectionDigest(selectedKnowledge == null ? null

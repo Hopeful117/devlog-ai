@@ -78,6 +78,10 @@ public class AiTask {
     @Column(name = "selected_knowledge_snapshot", columnDefinition = "jsonb")
     private Map<String, Object> selectedKnowledgeSnapshot;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "ai_reference_mapping_snapshot", columnDefinition = "jsonb")
+    private Map<String, Object> aiReferenceMappingSnapshot;
+
     @Column(name = "selection_version", length = 100)
     private String selectionVersion;
 

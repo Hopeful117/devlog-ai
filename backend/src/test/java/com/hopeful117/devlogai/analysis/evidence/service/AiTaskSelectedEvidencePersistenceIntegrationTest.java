@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.analysis.evidence.service;
 
 import com.hopeful117.devlogai.analysis.evidence.dto.AiTaskSelectedEvidenceResponse;
 import com.hopeful117.devlogai.analysis.evidence.projection.HistoricalSelectedEvidenceSnapshotProjector;
+import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,6 +38,32 @@ class AiTaskSelectedEvidencePersistenceIntegrationTest {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private AiTaskSelectedEvidenceService selectedEvidenceService;
+    @Autowired private AiTaskRepository aiTaskRepository;
+
+    @Test
+    void shouldReloadReferenceMappingSnapshotAndAllowLegacyNull() {
+        UUID projectId = UUID.randomUUID();
+        UUID analysisId = insertProjectAndAnalysis(projectId);
+        UUID taskId = UUID.randomUUID();
+        insertTask(taskId, analysisId, "COMPLETED", minimalSnapshot(projectId, analysisId),
+                VERSION, DIGEST, OffsetDateTime.now());
+
+        assertNull(aiTaskRepository.findById(taskId).orElseThrow()
+                .getAiReferenceMappingSnapshot());
+
+        String mappingJson = "{\"contractVersion\":\"AI_REFERENCE_MAPPING_V1\","
+                + "\"mappingDigest\":\"" + "a".repeat(64) + "\",\"bindings\":[]}";
+        jdbc.update("""
+                update ai_tasks
+                set ai_reference_mapping_snapshot = cast(? as jsonb)
+                where id = ?
+                """, mappingJson, taskId);
+
+        Map<String, Object> reloaded = aiTaskRepository.findById(taskId).orElseThrow()
+                .getAiReferenceMappingSnapshot();
+        assertEquals("AI_REFERENCE_MAPPING_V1", reloaded.get("contractVersion"));
+        assertEquals("a".repeat(64), reloaded.get("mappingDigest"));
+    }
 
     @Test
     void shouldReadPersistedSnapshotAfterCurrentKnowledgeChanges() {

@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.ai.engine.dto.*;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
+import com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
@@ -152,7 +153,8 @@ public class AnalyzeStoryContextUseCase {
                 selectedKnowledgeSnapshot,
                 contextDigest,
                 groundingContract,
-                guidance
+                guidance,
+                AiReferenceRegistryFactory.create(selectedKnowledge)
         );
 
         // Capture and store freshness snapshot

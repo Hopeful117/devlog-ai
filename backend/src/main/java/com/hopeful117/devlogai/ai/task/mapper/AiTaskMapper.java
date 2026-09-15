@@ -24,6 +24,7 @@ public interface AiTaskMapper {
     @Mapping(target = "promptContentDigest", ignore = true)
     @Mapping(target = "contextDigest", ignore = true)
     @Mapping(target = "selectedKnowledgeSnapshot", ignore = true)
+    @Mapping(target = "aiReferenceMappingSnapshot", ignore = true)
     @Mapping(target = "selectionVersion", ignore = true)
     @Mapping(target = "selectionDigest", ignore = true)
     @Mapping(target = "contextSnapshot", ignore = true)

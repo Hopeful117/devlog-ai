@@ -1,0 +1,17 @@
+package com.hopeful117.devlogai.ai.reference;
+
+public enum AiReferenceType {
+    FACT,
+    OBSERVATION,
+    INSIGHT,
+    ANALYSIS,
+    PROJECT,
+    PROJECT_PROFILE,
+    HUMAN_CONTEXT,
+    ENGINEERING_EVENT,
+    ARCHITECTURE_KNOWLEDGE,
+    REPOSITORY_EVIDENCE,
+    ENGINEERING_STORY,
+    DECISION,
+    CHALLENGE
+}
