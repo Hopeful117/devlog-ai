@@ -1,0 +1,136 @@
+{
+  "suiteId": "devlog-product-value",
+  "suiteVersion": "1.0.0",
+  "project": "trading-os",
+  "projectId": "94c7517b-8a70-4e04-8232-59e4be359b16",
+  "repositoryId": "1feead5d-dfc9-4b2c-aa9c-045a8524a9f8",
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "groundTruthVersion": "1.0.0-candidate",
+  "benchmarkCreatedAt": "2026-09-15",
+  "oracleStatus": "CANDIDATE_REQUIRES_HUMAN_VALIDATION",
+  "frozenBeforeImplementation": true,
+  "cases": [
+    {
+      "caseId": "CASE-01",
+      "version": "1.0.0",
+      "project": "trading-os",
+      "question": "Why did PAPER account execution and settlement evolve across Stories 0039-0042, which architectural decisions caused that evolution, and what is the resulting authority model?",
+      "scope": {
+        "storyNumbers": ["0039", "0040", "0041", "0042"],
+        "adrNumbers": ["ADR-042", "ADR-043"],
+        "components": ["trading-core account identity", "paper execution", "position valuation", "paper settlement"],
+        "revision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+      },
+      "expectedEvidence": [
+        "docs/architecture/adr/ADR-042.md",
+        "docs/architecture/adr/ADR-043.md",
+        "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+        "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+        "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+        "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+        "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+        "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+        "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+        "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+        "trading-core/src/main/java/com/hope/trading/trading_core/model/Account.java",
+        "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+        "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+        "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+      ],
+      "expectedConstraints": [
+        "PAPER authority is local and must not require broker submission",
+        "account identity and paper profile assignment are persisted explicitly",
+        "risk facts are mode-aware and neutral rather than silently LIVE-only",
+        "paper position valuation uses market data and has distinct presentation semantics",
+        "paper full exit preserves settlement, PnL and fee behavior",
+        "optimistic concurrency and idempotency protect repeated exit execution",
+        "broker isolation and rollback behavior remain explicit"
+      ],
+      "expectedConstraintIds": ["C-01", "C-02", "C-03", "C-04", "C-05", "C-06", "C-07"],
+      "expectedCausalLinks": [
+        {"id": "CL-01", "from": "ADR-042", "to": "Story-0039", "strength": "EXPLICITLY_DOCUMENTED"},
+        {"id": "CL-02", "from": "ADR-043", "to": "Story-0040", "strength": "EXPLICITLY_DOCUMENTED"},
+        {"id": "CL-03", "from": "Story-0039", "to": "persisted Account identity and PAPER assignment", "strength": "STRONGLY_SUPPORTED"},
+        {"id": "CL-04", "from": "Story-0041", "to": "paper position valuation", "strength": "EXPLICITLY_DOCUMENTED"},
+        {"id": "CL-05", "from": "Story-0042", "to": "paper local full exit and optimistic locking", "strength": "EXPLICITLY_DOCUMENTED"}
+      ],
+      "expectedAffectedComponents": ["Account", "ExecutionIntent", "ExecutionConfiguration", "PaperSettlementService", "position query/valuation", "paper execution API"],
+      "expectedAffectedComponentIds": ["COMP-ACCOUNT", "COMP-EXECUTION-INTENT", "COMP-EXECUTION-CONFIG", "COMP-PAPER-SETTLEMENT", "COMP-POSITION-VALUATION", "COMP-PAPER-API"],
+      "expectedAffectedTests": ["PaperExecutionVerticalRegressionTest", "PositionControllerTest", "PaperSettlementExitTest"],
+      "expectedAffectedTestIds": ["TEST-PAPER-REGRESSION", "TEST-POSITION-CONTROLLER", "TEST-PAPER-EXIT"],
+      "expectedMissingEvidence": ["Any causal link not explicitly documented or strongly supported must be classified as NOT_ESTABLISHED."],
+      "negativeCase": false
+    },
+    {
+      "caseId": "CASE-02",
+      "version": "1.0.0",
+      "project": "trading-os",
+      "question": "If PAPER execution or settlement is modified, which architectural and domain constraints must remain true?",
+      "scope": {
+        "storyNumbers": ["0039", "0040", "0041", "0042"],
+        "adrNumbers": ["ADR-042", "ADR-043"],
+        "components": ["Account", "ExecutionIntent", "ExecutionConfiguration", "PaperSettlementService"],
+        "revision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+      },
+      "expectedEvidence": ["docs/architecture/adr/ADR-042.md", "docs/architecture/adr/ADR-043.md", "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md", "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md", "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md", "docs/architecture/stories/0042-paper-local-full-exit/story.md", "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java", "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/service/ExecutionValidationService.java"],
+      "expectedConstraints": ["PAPER must remain locally authoritative", "LIVE broker submission must not be introduced into PAPER-only settlement", "risk validation must remain mode-aware", "settlement must preserve PnL/fees and transaction consistency", "concurrent/repeated requests must remain safe", "existing API/frontend PAPER semantics must remain consistent"],
+      "expectedConstraintIds": ["C-01", "C-08", "C-03", "C-09", "C-05", "C-10"],
+      "expectedCausalLinks": [
+        {"id": "CL-06", "from": "ADR-042", "to": "PAPER local authority", "strength": "EXPLICITLY_DOCUMENTED"},
+        {"id": "CL-07", "from": "ADR-043", "to": "mode-aware risk behavior", "strength": "EXPLICITLY_DOCUMENTED"},
+        {"id": "CL-08", "from": "Story-0042", "to": "optimistic locking/idempotent exit", "strength": "EXPLICITLY_DOCUMENTED"}
+      ],
+      "expectedAffectedComponents": ["Account", "ExecutionIntent", "ExecutionValidationService", "ExecutionConfiguration", "PaperSettlementService"],
+      "expectedAffectedComponentIds": ["COMP-ACCOUNT", "COMP-EXECUTION-INTENT", "COMP-VALIDATION", "COMP-EXECUTION-CONFIG", "COMP-PAPER-SETTLEMENT"],
+      "expectedAffectedTests": ["PaperExecutionVerticalRegressionTest", "PaperSettlementExitTest", "PositionControllerTest"],
+      "expectedAffectedTestIds": ["TEST-PAPER-REGRESSION", "TEST-PAPER-EXIT", "TEST-POSITION-CONTROLLER"],
+      "expectedMissingEvidence": ["The oracle does not require a constraint unless an ADR, Story, implementation or test artifact supports it."],
+      "negativeCase": false
+    },
+    {
+      "caseId": "CASE-03",
+      "version": "1.0.0",
+      "project": "trading-os",
+      "question": "If the PAPER settlement strategy changes, which production components and tests are likely affected, and why?",
+      "scope": {
+        "storyNumbers": ["0041", "0042"],
+        "adrNumbers": ["ADR-042", "ADR-043"],
+        "components": ["paper settlement", "execution intent", "position valuation", "execution configuration"],
+        "revision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+      },
+      "expectedEvidence": ["trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java", "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java", "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/aggregate/ExecutionIntent.java", "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java", "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java", "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java", "trading-core/src/test/java/com/hope/trading/trading_core/controller/PositionControllerTest.java", "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149", "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3"],
+      "expectedConstraints": ["preserve paper-only authority", "preserve valuation and settlement consistency", "preserve concurrency/idempotency guarantees", "preserve API and frontend-facing position semantics"],
+      "expectedConstraintIds": ["C-01", "C-09", "C-05", "C-10"],
+      "expectedCausalLinks": [{"id": "CL-09", "from": "PaperSettlementService", "to": "PaperSettlementExitTest", "strength": "STRONGLY_SUPPORTED"}, {"id": "CL-10", "from": "Story-0041", "to": "PositionControllerTest", "strength": "EXPLICITLY_DOCUMENTED"}],
+      "expectedAffectedComponents": ["PaperSettlementService", "ExecuteTradeService", "ExecutionIntent", "ExecutionConfiguration", "position API/valuation"],
+      "expectedAffectedComponentIds": ["COMP-PAPER-SETTLEMENT", "COMP-EXECUTE-TRADE", "COMP-EXECUTION-INTENT", "COMP-EXECUTION-CONFIG", "COMP-POSITION-VALUATION"],
+      "expectedAffectedTests": ["PaperSettlementExitTest", "PaperExecutionVerticalRegressionTest", "PositionControllerTest"],
+      "expectedAffectedTestIds": ["TEST-PAPER-EXIT", "TEST-PAPER-REGRESSION", "TEST-POSITION-CONTROLLER"],
+      "expectedMissingEvidence": ["Exact impact outside the listed components/tests is not established by this benchmark."],
+      "negativeCase": false
+    },
+    {
+      "caseId": "CASE-04",
+      "version": "1.0.0",
+      "project": "trading-os",
+      "question": "Did ADR-043 cause the specific ExecutionConfiguration refactor delivered by Story 0042?",
+      "scope": {
+        "storyNumbers": ["0042"],
+        "adrNumbers": ["ADR-043"],
+        "components": ["ExecutionConfiguration"],
+        "revision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+      },
+      "expectedEvidence": ["docs/architecture/adr/ADR-043.md", "docs/architecture/stories/0042-paper-local-full-exit/story.md", "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java", "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"],
+      "expectedConstraints": [],
+      "expectedConstraintIds": [],
+      "expectedCausalLinks": [],
+      "expectedAffectedComponents": ["ExecutionConfiguration"],
+      "expectedAffectedComponentIds": ["COMP-EXECUTION-CONFIG"],
+      "expectedAffectedTests": [],
+      "expectedAffectedTestIds": [],
+      "expectedMissingEvidence": ["No explicit ADR-043 -> ExecutionConfiguration causal statement is established by the frozen evidence set; temporal co-occurrence and shared topic are insufficient."],
+      "negativeCase": true,
+      "expectedOutcome": "NOT_ESTABLISHED"
+    }
+  ]
+}
