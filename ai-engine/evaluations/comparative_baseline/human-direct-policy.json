@@ -1,0 +1,8 @@
+{
+  "policyVersion": "story0133-human-direct-policy-1.0.0",
+  "condition": "HUMAN_DIRECT",
+  "mode": "DESIGNED_NOT_EXECUTABLE",
+  "allowed": ["normal direct repository inspection under a future read-only session policy"],
+  "requiredCapture": ["start time", "end time", "sources consulted", "operations where practical", "answer", "confidence", "facilitator metadata"],
+  "forbidden": ["oracle before submission", "agent answers before submission", "other human answers before submission"]
+}
