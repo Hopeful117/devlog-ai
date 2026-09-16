@@ -905,23 +905,27 @@ class CollectionRuntime:
                     try:
                         operation_index = budget.attempt()
                     except BudgetExhausted:
-                        tool_trace.append({
-                            "operationIndex": None,
-                            "operationType": operation,
-                            "targetOrQuery": arguments,
-                            "repositoryRevision": REPOSITORY_REVISION,
-                            "executionStatus": "NOT_EXECUTED_BUDGET_EXHAUSTED",
-                            "resultIdentity": None,
-                            "resultByteCount": 0,
-                            "resultSha256": None,
-                            "durationMs": 0,
-                            "truncated": False,
-                            "errorState": "BudgetExhausted",
-                            "errorMessage": "maximum tool operations exhausted",
-                        })
+                        for skipped in requested_calls[call_index:]:
+                            skipped_operation = skipped.get("operation") if isinstance(skipped, dict) else None
+                            skipped_arguments = skipped.get("arguments", {}) if isinstance(skipped, dict) else {}
+                            tool_trace.append({
+                                "operationIndex": None,
+                                "operationType": skipped_operation,
+                                "targetOrQuery": skipped_arguments,
+                                "repositoryRevision": REPOSITORY_REVISION,
+                                "executionStatus": "NOT_EXECUTED_BUDGET_EXHAUSTED",
+                                "resultIdentity": None,
+                                "resultByteCount": 0,
+                                "resultSha256": None,
+                                "durationMs": 0,
+                                "truncated": False,
+                                "errorState": "BudgetExhausted",
+                                "errorMessage": "maximum tool operations exhausted",
+                            })
                         budget_exhausted = True
                         not_executed_this_turn = len(requested_calls) - call_index
                         break
+                    traced = None
                     try:
                         result = tool_server.execute(operation, {**arguments, "repositoryRevision": REPOSITORY_REVISION})
                         traced = canonical_tool_result(operation, arguments, result, revision=REPOSITORY_REVISION)
@@ -931,23 +935,44 @@ class CollectionRuntime:
                         observation["toolSuccessfulOperations"] += 1
                         previous_results.append(traced)
                     except BudgetExhausted as error:
-                        traced = {
-                            "operationIndex": operation_index,
-                            "operationType": operation,
-                            "targetOrQuery": arguments,
-                            "repositoryRevision": REPOSITORY_REVISION,
-                            "executionStatus": "EXECUTED_FAILURE",
-                            "resultIdentity": None,
-                            "resultByteCount": 0,
-                            "resultSha256": None,
-                            "durationMs": 0,
-                            "truncated": False,
-                            "errorState": type(error).__name__,
-                            "errorMessage": str(error),
-                        }
+                        if traced is None:
+                            traced = {
+                                "operationIndex": operation_index,
+                                "operationType": operation,
+                                "targetOrQuery": arguments,
+                                "repositoryRevision": REPOSITORY_REVISION,
+                                "resultIdentity": None,
+                                "resultByteCount": 0,
+                                "resultSha256": None,
+                                "durationMs": 0,
+                                "truncated": False,
+                            }
+                        else:
+                            traced.pop("result", None)
+                        traced["executionStatus"] = "EXECUTED_FAILURE"
+                        traced["errorState"] = type(error).__name__
+                        traced["errorMessage"] = str(error)
                         observation["toolFailedOperations"] += 1
                         assert_secret_free(traced)
                         tool_trace.append(traced)
+                        for skipped in requested_calls[call_index + 1:]:
+                            skipped_operation = skipped.get("operation") if isinstance(skipped, dict) else None
+                            skipped_arguments = skipped.get("arguments", {}) if isinstance(skipped, dict) else {}
+                            tool_trace.append({
+                                "operationIndex": None,
+                                "operationType": skipped_operation,
+                                "targetOrQuery": skipped_arguments,
+                                "repositoryRevision": REPOSITORY_REVISION,
+                                "executionStatus": "NOT_EXECUTED_BUDGET_EXHAUSTED",
+                                "resultIdentity": None,
+                                "resultByteCount": 0,
+                                "resultSha256": None,
+                                "durationMs": 0,
+                                "truncated": False,
+                                "errorState": "BudgetExhausted",
+                                "errorMessage": "repository byte budget exhausted",
+                            })
+                        observation["toolNotExecutedOperations"] += len(requested_calls) - call_index - 1
                         raise
                     except Exception as error:
                         traced = {

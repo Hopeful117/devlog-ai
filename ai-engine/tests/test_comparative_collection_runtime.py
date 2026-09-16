@@ -269,6 +269,53 @@ def test_multiple_tool_calls_record_unexecuted_call_at_remaining_budget():
     assert observation["rawOutput"]["toolTrace"][-1]["targetOrQuery"] == {"query": "also-missing"}
 
 
+def test_byte_budget_exhaustion_traces_remaining_provider_calls_in_order():
+    calls = [
+        {"operation": "read_file", "arguments": {"path": "docs/one.md"}},
+        {"operation": "read_file", "arguments": {"path": "docs/two.md"}},
+        {"operation": "read_file", "arguments": {"path": "docs/three.md"}},
+        {"operation": "read_file", "arguments": {"path": "docs/four.md"}},
+    ]
+
+    class HugeTools:
+        def execute(self, operation, arguments):
+            return {"reference": arguments["path"], "content": "x" * 50000}
+
+    provider = ScriptedProvider([ProviderResponse("TOOL_CALL", {"calls": calls}, {})])
+    runtime = CollectionRuntime(provider, tool_factory=lambda _assignment: HugeTools())
+    observation = runtime.run_assignment(_row("AGENT_DIRECT"))
+    trace = observation["rawOutput"]["toolTrace"]
+    assert [item["targetOrQuery"]["path"] for item in trace] == [
+        "docs/one.md", "docs/two.md", "docs/three.md", "docs/four.md",
+    ]
+    assert trace[0]["executionStatus"] == "EXECUTED_FAILURE"
+    assert [item["executionStatus"] for item in trace[1:]] == [
+        "NOT_EXECUTED_BUDGET_EXHAUSTED",
+        "NOT_EXECUTED_BUDGET_EXHAUSTED",
+        "NOT_EXECUTED_BUDGET_EXHAUSTED",
+    ]
+    assert observation["toolOperations"] == 1
+    assert observation["toolFailedOperations"] == 1
+    assert observation["toolNotExecutedOperations"] == 3
+
+
+def test_byte_budget_trace_accounts_every_requested_call_without_executing_remainder():
+    calls = [
+        {"operation": "read_file", "arguments": {"path": "docs/one.md"}},
+        {"operation": "read_file", "arguments": {"path": "docs/two.md"}},
+    ]
+
+    class HugeTools:
+        def execute(self, operation, arguments):
+            return {"reference": arguments["path"], "content": "x" * 50000}
+
+    provider = ScriptedProvider([ProviderResponse("TOOL_CALL", {"calls": calls}, {})])
+    runtime = CollectionRuntime(provider, tool_factory=lambda _assignment: HugeTools())
+    observation = runtime.run_assignment(_row("AGENT_DIRECT"))
+    statuses = [item["executionStatus"] for item in observation["rawOutput"]["toolTrace"]]
+    assert len(calls) == statuses.count("EXECUTED_FAILURE") + statuses.count("NOT_EXECUTED_BUDGET_EXHAUSTED")
+
+
 def test_live_pilot_runtime_classifies_writes_and_replays_outside_official_baseline(tmp_path):
     pilot = PilotStorage(tmp_path / "pilot", "run-1", tmp_path / "official")
     provider = ScriptedProvider([final_answer("CASE-03", "1.0.0")])
