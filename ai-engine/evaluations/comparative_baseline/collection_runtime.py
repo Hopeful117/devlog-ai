@@ -51,6 +51,8 @@ ORDER_STRATEGY = "STORY0133_SEEDED_CONSTRAINED_SHUFFLE_V1"
 PAIRING_POLICY = "story0133-ai-pairing-policy-1.0.0"
 FINAL_SCHEMA = "story0134-common-answer-1.0.0"
 TOOL_SCHEMA = "story0134-agent-direct-tools-1.0.0"
+COMPARATIVE_GROUNDING_CONTRACT_VERSION = "story0135-comparative-grounding-1.0.0"
+COMPARATIVE_SCORING_PROJECTION_VERSION = "story0135-comparative-scoring-projection-1.0.0"
 ALLOWED_TOOL_OPERATIONS = (
     "read_file", "search_repository", "git_log", "git_show", "git_diff", "inspect_commit",
 )
@@ -179,6 +181,7 @@ class EvidenceItem:
     content: str
     source_type: str = "DOCUMENT"
     locator_contract_version: str = "story0134-locator-1.0.0"
+    provider_visible_source_identity: str = "NOT_CONFIGURED"
 
     @property
     def byte_length(self) -> int:
@@ -197,6 +200,7 @@ class EvidenceItem:
             "contentByteLength": self.byte_length,
             "contentSha256": self.sha256,
             "locatorContractVersion": self.locator_contract_version,
+            "providerVisibleSourceIdentity": self.provider_visible_source_identity,
         }
 
 
@@ -407,6 +411,29 @@ def grounding_error(error: str | None) -> str:
     if error and "UNAUTHORIZED" in error:
         return "UNAUTHORIZED_REFERENCE"
     return "EVIDENCE_EXCERPT_MISMATCH"
+
+
+def record_grounding_metadata(observation: dict[str, Any], grounding: dict[str, Any]) -> None:
+    passed = grounding.get("status") == "PASS"
+    observation["groundingValid"] = "YES" if passed else "NO"
+    observation["groundingStatus"] = grounding.get("status", "FAIL")
+    observation["groundingDiagnostics"] = grounding.get("diagnostic", grounding.get("error"))
+    observation["canonicalEvidenceIdentity"] = [
+        item.get("canonicalEvidenceIdentity")
+        for resolution in grounding.get("resolutions", [])
+        for item in [resolution]
+        if item.get("canonicalEvidenceIdentity") is not None
+    ]
+    observation["resolvedContentDigest"] = [
+        resolution.get("resolvedContentDigest")
+        for resolution in grounding.get("resolutions", [])
+        if resolution.get("resolvedContentDigest") is not None
+    ]
+    observation["resolvedExcerptMatchMetadata"] = [
+        resolution.get("excerptMatchOffsets", [])
+        for resolution in grounding.get("resolutions", [])
+        if "excerptMatchOffsets" in resolution
+    ]
 
 
 def validate_answer(answer: dict[str, Any], assignment: Assignment) -> None:
@@ -630,6 +657,18 @@ class CollectionRuntime:
             "capturedAt": time.time(),
             "executionMode": "OFFLINE_DRY_RUN",
             "questionText": question["question"],
+            "structuralValid": "NOT_EVALUATED",
+            "groundingValid": "NOT_EVALUATED",
+            "semanticCorrect": "NOT_EVALUATED",
+            "semanticEligible": False,
+            "groundingStatus": "NOT_EVALUATED",
+            "groundingDiagnostics": None,
+            "canonicalEvidenceIdentity": [],
+            "resolvedContentDigest": [],
+            "resolvedExcerptMatchMetadata": [],
+            "layerSpecificErrorClassification": "NOT_EVALUATED",
+            "comparativeGroundingContractVersion": COMPARATIVE_GROUNDING_CONTRACT_VERSION,
+            "comparativeScoringProjectionVersion": COMPARATIVE_SCORING_PROJECTION_VERSION,
         }
 
     def _finalize(self, observation: dict[str, Any], state: ObservationStateMachine) -> dict[str, Any]:
@@ -725,19 +764,27 @@ class CollectionRuntime:
                 state.transition("RAW_CAPTURED")
             validate_answer(response.payload, assignment)
             observation["validationResults"]["structural"] = "PASS"
+            observation["structuralValid"] = "YES"
             state.transition("STRUCTURALLY_VALIDATED")
             grounding = self.grounding.validate(answer=response.payload, evidence=list(context.evidence), assignment=assignment)
             observation["validationResults"]["grounding"] = grounding
+            record_grounding_metadata(observation, grounding)
             state.transition("GROUNDING_VALIDATED")
             if grounding.get("status") == "PASS":
                 state.transition("SEMANTICALLY_ELIGIBLE")
+                observation["semanticEligible"] = True
+                observation["layerSpecificErrorClassification"] = "NONE"
                 observation["semanticOutcome"] = "YES"
             else:
                 observation["primaryError"] = grounding_error(grounding.get("error"))
+                observation["layerSpecificErrorClassification"] = observation["primaryError"]
         except (TransportFailure, BudgetExhausted, RuntimeContractError) as error:
             observation["executionStatus"] = "INVALID"
             observation["primaryError"] = "INFRASTRUCTURE_FAILURE" if isinstance(error, (TransportFailure, BudgetExhausted)) else "STRUCTURAL_FAILURE"
             observation["validationResults"]["error"] = str(error)
+            if observation["structuralValid"] == "NOT_EVALUATED":
+                observation["structuralValid"] = "NO"
+            observation["layerSpecificErrorClassification"] = observation["primaryError"]
             if captures:
                 observation["rawOutput"] = {"responses": captures}
             if state.state == "RUNNING":
@@ -845,20 +892,33 @@ class CollectionRuntime:
             if not references.issubset(seen_references):
                 raise RuntimeContractError("answer references were not returned by direct tools")
             observation["validationResults"]["structural"] = "PASS"
+            observation["structuralValid"] = "YES"
             state.transition("STRUCTURALLY_VALIDATED")
-            evidence = [EvidenceItem(reference=reference, content=str(seen_evidence[reference].get("content", ""))) for reference in sorted(seen_references)]
+            evidence = [EvidenceItem(
+                reference=reference,
+                content=str(seen_evidence[reference].get("content", "")),
+                source_type="TOOL_RESULT",
+                provider_visible_source_identity="AGENT_DIRECT_TOOL_RESULT",
+            ) for reference in sorted(seen_references)]
             grounding = self.grounding.validate(answer=final_answer, evidence=evidence, assignment=assignment)
             observation["validationResults"]["grounding"] = grounding
+            record_grounding_metadata(observation, grounding)
             state.transition("GROUNDING_VALIDATED")
             if grounding.get("status") == "PASS":
                 state.transition("SEMANTICALLY_ELIGIBLE")
+                observation["semanticEligible"] = True
+                observation["layerSpecificErrorClassification"] = "NONE"
                 observation["semanticOutcome"] = "YES"
             else:
                 observation["primaryError"] = grounding_error(grounding.get("error"))
+                observation["layerSpecificErrorClassification"] = observation["primaryError"]
         except (TransportFailure, BudgetExhausted, RuntimeContractError) as error:
             observation["executionStatus"] = "INVALID"
             observation["primaryError"] = "INFRASTRUCTURE_FAILURE" if isinstance(error, (TransportFailure, BudgetExhausted)) else "STRUCTURAL_FAILURE"
             observation["validationResults"]["error"] = str(error)
+            if observation["structuralValid"] == "NOT_EVALUATED":
+                observation["structuralValid"] = "NO"
+            observation["layerSpecificErrorClassification"] = observation["primaryError"]
             observation["rawOutput"] = {"responses": captures, "toolTrace": tool_trace} if captures or tool_trace else "NOT_APPLICABLE"
             observation["toolOperations"] = len(tool_trace)
             observation["repositoryBytesInspected"] = budget.bytes_returned

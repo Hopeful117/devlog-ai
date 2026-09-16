@@ -90,6 +90,11 @@ def test_devlog_captures_raw_response_and_never_constructs_repository_tools():
     assert observation["providerCalls"] == 1
     assert observation["rawOutput"]["responses"][0]["rawResponse"]
     assert observation["stateHistory"][-1] == "FINALIZED"
+    assert observation["structuralValid"] == "YES"
+    assert observation["groundingValid"] == "YES"
+    assert observation["semanticCorrect"] == "NOT_EVALUATED"
+    assert observation["comparativeGroundingContractVersion"] == "story0135-comparative-grounding-1.0.0"
+    assert observation["comparativeScoringProjectionVersion"] == "story0135-comparative-scoring-projection-1.0.0"
 
 
 def test_agent_direct_uses_bounded_tools_and_common_final_contract():

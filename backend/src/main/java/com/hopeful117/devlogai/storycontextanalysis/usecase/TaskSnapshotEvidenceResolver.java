@@ -71,6 +71,139 @@ final class TaskSnapshotEvidenceResolver {
                 assessment.explanation());
     }
 
+    /**
+     * Comparative Baseline evidence-only resolution. This deliberately does not
+     * construct or validate a causal assessment.
+     */
+    Map<String, Object> resolveComparativeCitation(
+            Map<String, Object> citation,
+            AiTask task,
+            String repositoryId,
+            String repositoryRevision,
+            String providerVisibleSourceIdentity
+    ) {
+        String reference = text(citation, "reference");
+        AiReferenceResolver references = AiReferenceResolver.fromMap(task.getAiReferenceMappingSnapshot());
+        references.resolve(new AiReference(AiReferenceType.REPOSITORY_EVIDENCE,
+                reference, AiReferenceScope.REPOSITORY), "EVIDENCE_REFERENCE");
+
+        Map<String, Object> evidence = findEvidence(task.getSelectedKnowledgeSnapshot(), reference);
+        String content = contentText(evidence);
+        String status = contentValue(evidence, "status");
+        if (content == null || !"COMPLETE".equals(status)) {
+            throw failure("Evidence content is not resolvable for " + reference);
+        }
+        Map<String, Object> contentMap = contentMap(evidence);
+        validateRevision(reference, contentMap);
+        if (!repositoryRevision.equals(contentMap.get("revision"))) {
+            throw failure("Evidence revision does not match the comparative repository revision: " + reference);
+        }
+
+        Map<String, Object> locator = citation.get("locator") instanceof Map<?, ?> value
+                ? castMap(value) : null;
+        String resolvedContent = locator == null ? content : resolveComparativeLocator(content, locator);
+        String resolvedDigest = sha256(resolvedContent);
+        List<Map<String, Object>> matches = new ArrayList<>();
+        String excerpt = citation.get("excerpt") instanceof String value ? value : null;
+        if (locator != null || excerpt != null) {
+            if (excerpt == null || excerpt.isEmpty()) {
+                throw failure("Comparative evidence excerpt must be non-empty");
+            }
+            int offset = resolvedContent.indexOf(excerpt);
+            while (offset >= 0) {
+                int startByte = resolvedContent.substring(0, offset).getBytes(StandardCharsets.UTF_8).length;
+                int endByte = startByte + excerpt.getBytes(StandardCharsets.UTF_8).length;
+                matches.add(Map.of("startByte", startByte, "endByte", endByte));
+                offset = resolvedContent.indexOf(excerpt, offset + 1);
+            }
+            if (matches.isEmpty()) {
+                throw failure("Comparative evidence excerpt does not match resolved content");
+            }
+        }
+
+        Map<String, Object> canonicalIdentity = new LinkedHashMap<>();
+        canonicalIdentity.put("repositoryId", repositoryId);
+        canonicalIdentity.put("repositoryRevision", repositoryRevision);
+        canonicalIdentity.put("typedReferenceKind", typedReferenceKind(reference, locator));
+        canonicalIdentity.put("canonicalReference", reference);
+        if (locator != null) {
+            if (locator.get("path") != null) canonicalIdentity.put("path", locator.get("path"));
+            if (locator.get("commit") != null) canonicalIdentity.put("commit", locator.get("commit"));
+            if (locator.get("header") != null) canonicalIdentity.put("hunkIdentity", locator.get("header"));
+        } else if (!reference.startsWith("commit:")) {
+            canonicalIdentity.put("path", reference);
+        } else {
+            canonicalIdentity.put("commit", reference.substring("commit:".length()));
+        }
+        canonicalIdentity.put("normalizedLocator", locator == null ? Map.of() : locator);
+        canonicalIdentity.put("resolvedContentDigest", resolvedDigest);
+        canonicalIdentity.put("providerVisibleSourceIdentity", providerVisibleSourceIdentity);
+
+        return Map.of(
+                "reference", reference,
+                "resolvedContentDigest", resolvedDigest,
+                "excerptMatchOffsets", matches,
+                "canonicalEvidenceIdentity", canonicalIdentity
+        );
+    }
+
+    private String resolveComparativeLocator(String content, Map<String, Object> locator) {
+        String kind = text(locator, "kind");
+        return switch (kind) {
+            case "LINE_RANGE" -> {
+                int start = integer(locator, "startLine");
+                int end = integer(locator, "endLine");
+                yield resolveLocator(content, new EvidenceLocator(
+                        EvidenceLocator.LocatorKind.LINE_RANGE, start, end, null));
+            }
+            case "SECTION" -> resolveLocator(content, new EvidenceLocator(
+                    EvidenceLocator.LocatorKind.SECTION, null, null, text(locator, "heading")));
+            case "COMMIT_HUNK" -> resolveCommitHunk(content, locator);
+            default -> throw failure("Unsupported comparative locator kind: " + kind);
+        };
+    }
+
+    private String resolveCommitHunk(String content, Map<String, Object> locator) {
+        String header = text(locator, "header");
+        List<String> lines = Arrays.asList(content.split("\\R", -1));
+        int start = lines.indexOf(header);
+        if (start < 0) throw failure("Commit hunk header is not present: " + header);
+        int end = lines.size();
+        for (int index = start + 1; index < lines.size(); index++) {
+            if (lines.get(index).startsWith("@@")) {
+                end = index;
+                break;
+            }
+        }
+        return String.join("\n", lines.subList(start, end));
+    }
+
+    private String typedReferenceKind(String reference, Map<String, Object> locator) {
+        if (locator != null && "COMMIT_HUNK".equals(locator.get("kind"))) return "COMMIT_HUNK";
+        return reference.startsWith("commit:") ? "COMMIT" : "DOCUMENT";
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> castMap(Map<?, ?> value) {
+        return (Map<String, Object>) value;
+    }
+
+    private String text(Map<String, Object> value, String key) {
+        Object raw = value.get(key);
+        if (!(raw instanceof String text) || text.isBlank()) {
+            throw failure("Comparative citation field is invalid: " + key);
+        }
+        return text;
+    }
+
+    private int integer(Map<String, Object> value, String key) {
+        Object raw = value.get(key);
+        if (!(raw instanceof Number number) || number.intValue() < 1) {
+            throw failure("Comparative citation line field is invalid: " + key);
+        }
+        return number.intValue();
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> findEvidence(Map<String, Object> snapshot, String reference) {
         if (snapshot == null) throw failure("Selected knowledge snapshot is missing");

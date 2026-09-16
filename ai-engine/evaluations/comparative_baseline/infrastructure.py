@@ -226,6 +226,7 @@ def raw_output_hash(raw_output: Any) -> str:
 
 def validate_raw_observation(observation: dict[str, Any], *, manifest: dict[str, Any] | None = None) -> None:
     source = manifest or load_manifest()
+    assert_official_baseline_eligible(observation)
     required = {
         "observationId", "benchmarkVersion", "questionId", "questionVersion", "caseId",
         "condition", "conditionPolicyVersion", "conditionPolicyCompatibilityKey", "repetition",
@@ -372,6 +373,8 @@ def classify_historical_case01(artifact_reference: str) -> dict[str, Any]:
 def assert_official_baseline_eligible(observation: dict[str, Any]) -> None:
     if observation.get("historicalClassification") == "HISTORICAL_PRE_BASELINE":
         raise ValueError("historical observation cannot enter official baseline")
+    if observation.get("executionClass") == "LIVE_PILOT" or observation.get("baselineEligible") is False:
+        raise ValueError("live pilot observation cannot enter official baseline")
 
 
 def write_immutable_json(path: str | Path, value: Any) -> None:
