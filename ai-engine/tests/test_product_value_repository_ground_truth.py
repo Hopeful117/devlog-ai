@@ -3,6 +3,7 @@ import subprocess
 import pytest
 
 from evaluations.product_value.repository_ground_truth import compare_resolution, resolve_repository
+from evaluations.product_value.v2_live_runner import _resolve_locator, _sha256
 
 
 def make_repo(tmp_path):
@@ -40,3 +41,25 @@ def test_unavailable_pinned_revision_fails_closed(tmp_path):
     make_repo(tmp_path)
     with pytest.raises(ValueError, match="pinned revision is unavailable"):
         resolve_repository({"repositoryRevision": "0" * 40, "cases": [{"expectedEvidence": []}]}, tmp_path)
+
+
+def test_locator_resolution_preserves_java_terminal_newline_semantics():
+    content = "# Heading\nfirst\nlast\n"
+
+    resolved = _resolve_locator(content, {"kind": "SECTION", "heading": "Heading"})
+
+    assert resolved.endswith("\n")
+    assert _sha256(resolved) == _sha256("# Heading\nfirst\nlast\n")
+
+
+def test_line_range_remains_one_based_inclusive_without_terminal_newline():
+    content = "one\ntwo\nthree\n"
+
+    resolved = _resolve_locator(content, {
+        "kind": "LINE_RANGE",
+        "startLine": 1,
+        "endLine": 3,
+    })
+
+    assert resolved == "one\ntwo\nthree"
+    assert not resolved.endswith("\n")

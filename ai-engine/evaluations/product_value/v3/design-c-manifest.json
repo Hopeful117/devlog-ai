@@ -1,0 +1,59 @@
+{
+  "manifestVersion": "story0132-v3-design-c-1.0.0",
+  "semanticTaskIdentityChanged": false,
+  "semanticMappingIdentityChanged": false,
+  "benchmarkCaseIdentityChanged": false,
+  "mappingHash": "67474f09e41c07899c8c7117754b21e794f285380ffd50675e701a0a3c2c40c0",
+  "contextSelection": {
+    "revision": "story0132-v3-design-c-context-selection-1.0.0",
+    "digest": "de3d7236b83f752c68347c9a3bf03ec2f97c15f8869ba170c9b83ecdad1dbf90",
+    "projectionManifest": "ai-engine/evaluations/product_value/v3/projection-manifest.json"
+  },
+  "providerSchema": {
+    "revision": "story0132-v3-design-c-causal-provider-schema-1.0.1",
+    "digest": "6b291e77e1708b0bc3a745869544f8ba9215389d469811e1205b9cd3e129dd24"
+  },
+  "executionConfiguration": {
+    "revision": "story0132-v3-design-c-execution-config-1.2.1",
+    "digest": "b47bb5205d7757b3998ebdb2aa88f85989fb7f23a5bd921767d8fe0c46aaa2cf",
+    "maxOutputTokens": 2500,
+    "maximumTotalAttemptsPerSlot": 2,
+    "timeoutSeconds": 90,
+    "temperature": "PROVIDER_DEFAULT",
+    "topP": "PROVIDER_DEFAULT",
+    "seed": "NOT_CONFIGURED",
+    "tools": "NOT_CONFIGURED",
+    "reasoning": "NOT_CONFIGURED",
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "openaiSdkMaxRetries": 0,
+    "providerAdapterMaxRetries": 0,
+    "technicalRetryMax": 1,
+    "semanticRetry": "DISABLED",
+    "rawCaptureBoundary": "SDK_RESPONSE_BEFORE_PARSE"
+  },
+  "projectionDigestByCase": {
+    "CASE-01": "e76cd34467fcf9897a0ac0a0a54a9aad9693ccd2e60c7c17f98df851506a2f39",
+    "CASE-04": "58460a6ef22cc374fe65fb691976e45a6dfd04f64e7b0ebc5955f21071da1c97",
+    "CASE-03": "36d04037f59952cefd9c5685a188477585d9f42e9d980d620fffae59870ec0e7"
+  },
+  "providerVisibleEvidence": {
+    "CASE-01": [
+      "docs/architecture/adr/ADR-042.md",
+      "docs/architecture/adr/ADR-043.md",
+      "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+      "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929"
+    ],
+    "CASE-04": [
+      "docs/architecture/adr/ADR-043.md",
+      "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+      "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+      "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+    ],
+    "CASE-03": [
+      "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+      "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+      "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+    ]
+  }
+}

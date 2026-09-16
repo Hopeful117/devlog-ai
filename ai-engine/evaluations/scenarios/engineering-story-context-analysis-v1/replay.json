@@ -54,7 +54,7 @@
         "promptVersion": "story-context-analysis-prompt-v1",
         "provider": "mock",
         "modelIdentifier": "deterministic-v1",
-        "promptContentDigest": "20c631cc088a149087e4af6112805700c12a59207db853764890caa5cace5e06",
+        "promptContentDigest": "54c179670d62cf84d7abb054ab3c7ae79a36e90291555987e2f4c3bd2cb88d5a",
         "intentId": "engineering-story-context-analysis",
         "intentVersion": "v1",
         "guidanceKeys": [],
@@ -82,8 +82,8 @@
     "provider": "mock",
     "model": "deterministic-v1",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "20c631cc088a149087e4af6112805700c12a59207db853764890caa5cace5e06",
-    "schemaDigest": "ee34b6de67ef87b15f2d184d4cf894e0e80feaccb2cdda0a955dd1db78f95cee"
+        "promptContentDigest": "54c179670d62cf84d7abb054ab3c7ae79a36e90291555987e2f4c3bd2cb88d5a",
+        "schemaDigest": "7186cf1d381c7dca857f0481c283609d100e372afdf098811a3666ffff1c9f90"
   },
   "qualitativeGrounding": {
     "status": "REVIEWED",

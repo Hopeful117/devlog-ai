@@ -69,6 +69,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -80,6 +81,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -325,6 +327,117 @@ class AnalyzeStoryContextUseCaseTest {
         verify(aiTaskRepository, never()).save(any());
     }
 
+    @Test
+    void relationshipBearingFindingsRequireRelationType() {
+        List<StoryContextAnalysisResult> results = List.of(
+                resultWithSections(List.of(new StoryContextAnalysisResult.ArchitectureFinding(
+                                "Architecture", "Description", groundingWithoutRelation())),
+                        List.of(), List.of(), List.of(), List.of(), List.of()),
+                resultWithSections(List.of(), List.of(new StoryContextAnalysisResult.DecisionFinding(
+                                "Decision", "Context", "Choice", "Rationale", groundingWithoutRelation())),
+                        List.of(), List.of(), List.of(), List.of()),
+                resultWithSections(List.of(), List.of(), List.of(new StoryContextAnalysisResult.HistoricalContextItem(
+                                "History", "Description", "2026", List.of(), groundingWithoutRelation())),
+                        List.of(), List.of(), List.of()),
+                resultWithSections(List.of(), List.of(), List.of(), List.of(new StoryContextAnalysisResult.ImpactedComponentFinding(
+                                "Component", "Impact", "MODIFIED", groundingWithoutRelation())),
+                        List.of(), List.of())
+        );
+
+        for (StoryContextAnalysisResult result : results) {
+            UUID correlationId = UUID.randomUUID();
+            UUID storyId = UUID.randomUUID();
+            when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                    .thenReturn(Optional.of(callbackTask(correlationId, storyId, CANONICAL_REFERENCE, Map.of())));
+
+            IllegalStateException error = assertThrows(
+                    IllegalStateException.class,
+                    () -> useCase.handleCallback(correlationId, completedRequest(
+                            correlationId, Instant.parse("2026-09-09T10:00:00Z"), result))
+            );
+
+            assertTrue(error.getMessage().contains("relationType"), error.getMessage());
+        }
+    }
+
+    @Test
+    void nonRelationshipFindingsMayOmitRelationType() {
+        Project project = project(UUID.randomUUID());
+        EngineeringStory story = story(UUID.randomUUID(), project);
+        when(storyRepository.findById(any())).thenReturn(Optional.of(story));
+
+        List<StoryContextAnalysisResult> results = List.of(
+                resultWithSections(List.of(), List.of(), List.of(), List.of(),
+                        List.of(new StoryContextAnalysisResult.EvidenceFinding(
+                                "Evidence", "Description", "SOURCE", groundingWithoutRelation())), List.of()),
+                resultWithSections(List.of(), List.of(), List.of(), List.of(), List.of(),
+                        List.of(new StoryContextAnalysisResult.ConstraintFinding(
+                                "Constraint", "Description", "POLICY", groundingWithoutRelation())))
+        );
+
+        for (StoryContextAnalysisResult result : results) {
+            UUID correlationId = UUID.randomUUID();
+            UUID storyId = UUID.randomUUID();
+            when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                    .thenReturn(Optional.of(callbackTask(correlationId, storyId, CANONICAL_REFERENCE, Map.of())));
+
+            useCase.handleCallback(correlationId, completedRequest(
+                    correlationId, Instant.parse("2026-09-09T10:00:00Z"), result));
+        }
+
+        verify(storyContextAnalysisRepository, times(2)).save(any());
+    }
+
+    @Test
+    void handleCallbackRejectsUnauthorizedCausalClaimReference() {
+        UUID storyId = UUID.randomUUID();
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = callbackTask(correlationId, storyId, CANONICAL_REFERENCE, Map.of());
+        StoryContextAnalysisResult.CausalClaim claim = new StoryContextAnalysisResult.CausalClaim(
+                "ADR-043", "ExecutionConfiguration",
+                StoryContextAnalysisResult.CausalClassification.EXPLICITLY_DOCUMENTED,
+                StoryContextAnalysisResult.CausalEvidenceBasis.DIRECT_DOCUMENTATION,
+                List.of(new EvidenceRef("not-authorized", "devlog://evidence/not-authorized",
+                        EvidenceRef.CausalEvidenceRole.DIRECT_RELATIONSHIP_STATEMENT)),
+                "The cited evidence directly states the relationship.");
+        AiTaskResultRequest request = completedRequest(
+                correlationId,
+                Instant.parse("2026-09-09T10:00:00Z"),
+                resultWithCausalClaims(claim));
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId)).thenReturn(Optional.of(task));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> useCase.handleCallback(correlationId, request));
+
+        assertTrue(error.getMessage().contains("Causal claim references unauthorized evidence"));
+        verify(storyContextAnalysisRepository, never()).save(any());
+    }
+
+    @Test
+    void causalClaimRejectsAffirmativeBasisForNotEstablished() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new StoryContextAnalysisResult.CausalClaim(
+                        "ADR-043", "ExecutionConfiguration",
+                        StoryContextAnalysisResult.CausalClassification.NOT_ESTABLISHED,
+                        StoryContextAnalysisResult.CausalEvidenceBasis.DIRECT_DOCUMENTATION,
+                List.of(), "Chronology does not establish causality."));
+    }
+
+    @Test
+    void causalClaimRejectsStrongSupportWithOneEvidenceReference() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new StoryContextAnalysisResult.CausalClaim(
+                        "Story-0039", "Account",
+                        StoryContextAnalysisResult.CausalClassification.STRONGLY_SUPPORTED,
+                        StoryContextAnalysisResult.CausalEvidenceBasis.MATERIAL_CORROBORATION,
+                        List.of(new EvidenceRef(CANONICAL_REFERENCE, "devlog://evidence/canonical",
+                                EvidenceRef.CausalEvidenceRole.MATERIAL_RELATIONSHIP_SUPPORT)),
+                        "One item is insufficient for strong support."));
+    }
+
     private Project project(UUID projectId) {
         return Project.builder()
                 .id(projectId)
@@ -373,6 +486,39 @@ class AnalyzeStoryContextUseCaseTest {
                 List.of(observation),
                 List.of(), List.of(), List.of(), List.of(), List.of(), List.of()
         );
+    }
+
+    @Test
+    void causalClaimRejectsAffirmativeClassificationWithNonCausalContext() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new StoryContextAnalysisResult.CausalClaim(
+                        "ADR-043", "ExecutionConfiguration",
+                        StoryContextAnalysisResult.CausalClassification.EXPLICITLY_DOCUMENTED,
+                        StoryContextAnalysisResult.CausalEvidenceBasis.DIRECT_DOCUMENTATION,
+                        List.of(
+                                new EvidenceRef("direct", "devlog://evidence/direct",
+                                        EvidenceRef.CausalEvidenceRole.DIRECT_RELATIONSHIP_STATEMENT),
+                                new EvidenceRef("chronology", "devlog://evidence/chronology",
+                                        EvidenceRef.CausalEvidenceRole.NON_CAUSAL_CONTEXT)),
+                        "The evidence does not establish the relationship."));
+    }
+
+    @Test
+    void handleCallbackRejectsEmptyCausalClaimsWhenCausalAnswerIsRequired() {
+        UUID storyId = UUID.randomUUID();
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = callbackTask(correlationId, storyId, CANONICAL_REFERENCE, Map.of(), true);
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId)).thenReturn(Optional.of(task));
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> useCase.handleCallback(
+                        correlationId,
+                        completedRequest(correlationId, Instant.parse("2026-09-09T10:00:00Z"), groundedResult(CANONICAL_REFERENCE))));
+
+        assertTrue(error.getMessage().contains("causalClaims must not be empty"));
+        verify(storyContextAnalysisRepository, never()).save(any());
     }
 
     private SelectedKnowledge selectedKnowledge(
@@ -450,6 +596,19 @@ class AnalyzeStoryContextUseCaseTest {
             String allowedReference,
             Map<String, Object> freshness
     ) {
+        return callbackTask(correlationId, storyId, allowedReference, freshness, false);
+    }
+
+    private AiTask callbackTask(
+            UUID correlationId,
+            UUID storyId,
+            String allowedReference,
+            Map<String, Object> freshness,
+            boolean causalAnswerRequired
+    ) {
+        Map<String, Object> groundingContract = new LinkedHashMap<>();
+        groundingContract.put("allowedEvidenceReferences", List.of(allowedReference));
+        groundingContract.put("causalAnswerRequired", causalAnswerRequired);
         return AiTask.builder()
                 .id(UUID.randomUUID())
                 .correlationId(correlationId)
@@ -460,8 +619,7 @@ class AnalyzeStoryContextUseCaseTest {
                 .contextDigest(CONTEXT_DIGEST)
                 .contextSnapshot(Map.of(
                         "storyId", storyId.toString(),
-                        "groundingContract", Map.of(
-                                "allowedEvidenceReferences", List.of(allowedReference)),
+                        "groundingContract", groundingContract,
                         "contextFreshness", freshness
                 ))
                 .build();
@@ -508,5 +666,38 @@ class AnalyzeStoryContextUseCaseTest {
                 List.of(finding), List.of(), List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), StoryContextAnalysisResult.Confidence.HIGH,
                 provenance, classification);
+    }
+
+    private StoryContextAnalysisResult.GroundingMetadata groundingWithoutRelation() {
+        return new StoryContextAnalysisResult.GroundingMetadata(
+                List.of(new EvidenceRef(CANONICAL_REFERENCE, "devlog://evidence/canonical")),
+                "FACTUAL_EXTRACTION", true, null);
+    }
+
+    private StoryContextAnalysisResult resultWithSections(
+            List<StoryContextAnalysisResult.ArchitectureFinding> architecture,
+            List<StoryContextAnalysisResult.DecisionFinding> decisions,
+            List<StoryContextAnalysisResult.HistoricalContextItem> history,
+            List<StoryContextAnalysisResult.ImpactedComponentFinding> impacted,
+            List<StoryContextAnalysisResult.EvidenceFinding> evidence,
+            List<StoryContextAnalysisResult.ConstraintFinding> constraints
+    ) {
+        StoryContextAnalysisResult base = groundedResult(CANONICAL_REFERENCE);
+        return new StoryContextAnalysisResult(
+                base.objectiveUnderstanding(), architecture, decisions, evidence, history, constraints,
+                impacted, base.uncertainties(), base.missingInformation(), base.implementationQuestions(),
+                base.confidence(), base.provenance(), base.outputClassification(), List.of(), null);
+    }
+
+    private StoryContextAnalysisResult resultWithCausalClaims(
+            StoryContextAnalysisResult.CausalClaim... claims
+    ) {
+        StoryContextAnalysisResult base = groundedResult(CANONICAL_REFERENCE);
+        return new StoryContextAnalysisResult(
+                base.objectiveUnderstanding(), base.architectureFindings(), base.decisionFindings(),
+                base.evidenceFindings(), base.historicalContext(), base.constraintFindings(),
+                base.impactedComponentFindings(), base.uncertainties(), base.missingInformation(),
+                base.implementationQuestions(), base.confidence(), base.provenance(),
+                base.outputClassification(), List.of(claims));
     }
 }

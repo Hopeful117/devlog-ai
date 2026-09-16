@@ -16,7 +16,9 @@ public record StoryContextAnalysisResult(
         List<ImplementationQuestion> implementationQuestions,
         Confidence confidence,
         Provenance provenance,
-        OutputClassification outputClassification
+        OutputClassification outputClassification,
+        List<CausalClaim> causalClaims,
+        CausalAssessment causalAssessment
 ) {
     public StoryContextAnalysisResult {
         objectiveUnderstanding = objectiveUnderstanding != null ? objectiveUnderstanding : new ObjectiveUnderstanding(null);
@@ -32,6 +34,54 @@ public record StoryContextAnalysisResult(
         confidence = confidence != null ? confidence : Confidence.LOW;
         provenance = provenance != null ? provenance : new Provenance(null, null, null);
         outputClassification = outputClassification != null ? outputClassification : new OutputClassification(List.of());
+        causalClaims = causalClaims != null ? List.copyOf(causalClaims) : List.of();
+    }
+
+    /** Backward-compatible constructor for payloads produced before causalClaims. */
+    public StoryContextAnalysisResult(
+            ObjectiveUnderstanding objectiveUnderstanding,
+            List<ArchitectureFinding> architectureFindings,
+            List<DecisionFinding> decisionFindings,
+            List<EvidenceFinding> evidenceFindings,
+            List<HistoricalContextItem> historicalContext,
+            List<ConstraintFinding> constraintFindings,
+            List<ImpactedComponentFinding> impactedComponentFindings,
+            List<Uncertainty> uncertainties,
+            List<MissingInformation> missingInformation,
+            List<ImplementationQuestion> implementationQuestions,
+            Confidence confidence,
+            Provenance provenance,
+            OutputClassification outputClassification
+    ) {
+        this(objectiveUnderstanding, architectureFindings, decisionFindings,
+                evidenceFindings, historicalContext, constraintFindings,
+                impactedComponentFindings, uncertainties, missingInformation,
+                implementationQuestions, confidence, provenance,
+                outputClassification, List.of(), null);
+    }
+
+    /** Legacy causal-claim constructor retained for historical payloads. */
+    public StoryContextAnalysisResult(
+            ObjectiveUnderstanding objectiveUnderstanding,
+            List<ArchitectureFinding> architectureFindings,
+            List<DecisionFinding> decisionFindings,
+            List<EvidenceFinding> evidenceFindings,
+            List<HistoricalContextItem> historicalContext,
+            List<ConstraintFinding> constraintFindings,
+            List<ImpactedComponentFinding> impactedComponentFindings,
+            List<Uncertainty> uncertainties,
+            List<MissingInformation> missingInformation,
+            List<ImplementationQuestion> implementationQuestions,
+            Confidence confidence,
+            Provenance provenance,
+            OutputClassification outputClassification,
+            List<CausalClaim> causalClaims
+    ) {
+        this(objectiveUnderstanding, architectureFindings, decisionFindings,
+                evidenceFindings, historicalContext, constraintFindings,
+                impactedComponentFindings, uncertainties, missingInformation,
+                implementationQuestions, confidence, provenance,
+                outputClassification, causalClaims, null);
     }
 
     public record ObjectiveUnderstanding(
@@ -139,6 +189,167 @@ public record StoryContextAnalysisResult(
         }
     }
 
+    public record CausalClaim(
+            String source,
+            String target,
+            CausalClassification causalClassification,
+            CausalEvidenceBasis evidenceBasis,
+            List<EvidenceRef> evidenceReferences,
+            String explanation
+    ) {
+        public CausalClaim {
+            if (source == null || source.isBlank()) throw new IllegalArgumentException("source must not be blank");
+            if (target == null || target.isBlank()) throw new IllegalArgumentException("target must not be blank");
+            if (source.equals(target)) throw new IllegalArgumentException("source and target must differ");
+            if (causalClassification == null) throw new IllegalArgumentException("causalClassification must not be null");
+            if (evidenceBasis == null) throw new IllegalArgumentException("evidenceBasis must not be null");
+            evidenceReferences = evidenceReferences != null ? List.copyOf(evidenceReferences) : List.of();
+            if (explanation == null || explanation.isBlank()) throw new IllegalArgumentException("explanation must not be blank");
+            if (evidenceReferences.stream().anyMatch(reference -> reference == null || reference.role() == null)) {
+                throw new IllegalArgumentException("causal evidenceReferences require a role");
+            }
+            if (causalClassification != CausalClassification.NOT_ESTABLISHED && evidenceReferences.isEmpty()) {
+                throw new IllegalArgumentException("affirmative causal claims require evidenceReferences");
+            }
+            if (causalClassification == CausalClassification.STRONGLY_SUPPORTED
+                    && evidenceReferences.stream()
+                    .filter(reference -> reference.role() == EvidenceRef.CausalEvidenceRole.MATERIAL_RELATIONSHIP_SUPPORT)
+                    .map(EvidenceRef::reference).distinct().count() < 2) {
+                throw new IllegalArgumentException("STRONGLY_SUPPORTED requires multiple distinct MATERIAL_RELATIONSHIP_SUPPORT references");
+            }
+            boolean affirmativeBasis = evidenceBasis == CausalEvidenceBasis.DIRECT_DOCUMENTATION
+                    || evidenceBasis == CausalEvidenceBasis.MATERIAL_CORROBORATION;
+            if (causalClassification == CausalClassification.NOT_ESTABLISHED && affirmativeBasis) {
+                throw new IllegalArgumentException("NOT_ESTABLISHED requires non-affirmative evidenceBasis");
+            }
+            if (causalClassification == CausalClassification.EXPLICITLY_DOCUMENTED
+                    && evidenceBasis != CausalEvidenceBasis.DIRECT_DOCUMENTATION) {
+                throw new IllegalArgumentException("EXPLICITLY_DOCUMENTED requires DIRECT_DOCUMENTATION");
+            }
+            if (causalClassification == CausalClassification.STRONGLY_SUPPORTED
+                    && evidenceBasis != CausalEvidenceBasis.MATERIAL_CORROBORATION) {
+                throw new IllegalArgumentException("STRONGLY_SUPPORTED requires MATERIAL_CORROBORATION");
+            }
+            boolean contradictory = evidenceReferences.stream().anyMatch(reference ->
+                    reference.role() == EvidenceRef.CausalEvidenceRole.CONTRADICTORY_EVIDENCE);
+            boolean nonCausalContext = evidenceReferences.stream().anyMatch(reference ->
+                    reference.role() == EvidenceRef.CausalEvidenceRole.NON_CAUSAL_CONTEXT);
+            boolean direct = evidenceReferences.stream().anyMatch(reference ->
+                    reference.role() == EvidenceRef.CausalEvidenceRole.DIRECT_RELATIONSHIP_STATEMENT);
+            boolean material = evidenceReferences.stream()
+                    .filter(reference -> reference.role() == EvidenceRef.CausalEvidenceRole.MATERIAL_RELATIONSHIP_SUPPORT)
+                    .map(EvidenceRef::reference).distinct().count() >= 2;
+            if (causalClassification == CausalClassification.EXPLICITLY_DOCUMENTED
+                    && (!direct || contradictory || nonCausalContext)) {
+                throw new IllegalArgumentException("EXPLICITLY_DOCUMENTED requires direct relationship evidence without context or contradiction");
+            }
+            if (causalClassification == CausalClassification.STRONGLY_SUPPORTED
+                    && (!material || contradictory || nonCausalContext)) {
+                throw new IllegalArgumentException("STRONGLY_SUPPORTED exceeds the defensible evidence level");
+            }
+        }
+    }
+
+    /** Core-owned question whose identity cannot be changed by the model. */
+    public record CausalQuestion(
+            String source,
+            String target,
+            String relationAsked,
+            boolean answerRequired
+    ) {
+        public CausalQuestion {
+            if (source == null || source.isBlank()) throw new IllegalArgumentException("source must not be blank");
+            if (target == null || target.isBlank()) throw new IllegalArgumentException("target must not be blank");
+            if (source.equals(target)) throw new IllegalArgumentException("source and target must differ");
+            if (relationAsked == null || relationAsked.isBlank()) {
+                throw new IllegalArgumentException("relationAsked must not be blank");
+            }
+        }
+    }
+
+    public record EvidenceLocator(
+            LocatorKind kind,
+            Integer startLine,
+            Integer endLine,
+            String heading
+    ) {
+        public EvidenceLocator {
+            if (kind == null) throw new IllegalArgumentException("locator kind must not be null");
+            switch (kind) {
+                case LINE_RANGE -> {
+                    if (startLine == null || endLine == null || startLine < 1 || endLine < startLine) {
+                        throw new IllegalArgumentException("line locator requires a positive ordered range");
+                    }
+                }
+                case SECTION -> {
+                    if (heading == null || heading.isBlank()) {
+                        throw new IllegalArgumentException("section locator requires a heading");
+                    }
+                }
+            }
+        }
+
+        public enum LocatorKind {
+            LINE_RANGE,
+            SECTION
+        }
+    }
+
+    /** Content-level support over an existing authorized EvidenceRef identity. */
+    public record EvidenceAssertion(
+            EvidenceRef evidenceReference,
+            EvidenceLocator locator,
+            String resolvedContentDigest,
+            String resolvedContent,
+            String excerpt,
+            EvidenceRef.CausalEvidenceRole assertionRole
+    ) {
+        public EvidenceAssertion {
+            if (evidenceReference == null) throw new IllegalArgumentException("evidenceReference must not be null");
+            if (locator == null) throw new IllegalArgumentException("locator must not be null");
+            if (assertionRole == null) throw new IllegalArgumentException("assertionRole must not be null");
+            if (resolvedContentDigest != null && resolvedContentDigest.isBlank()) {
+                throw new IllegalArgumentException("resolvedContentDigest must not be blank");
+            }
+        }
+
+        public EvidenceAssertion withResolvedContent(String content, String digest) {
+            return new EvidenceAssertion(evidenceReference, locator, digest, content, excerpt, assertionRole);
+        }
+    }
+
+    public record CausalAssessment(
+            CausalQuestion question,
+            CausalClassification classification,
+            List<EvidenceAssertion> evidenceAssertions,
+            String explanation
+    ) {
+        public CausalAssessment {
+            if (question == null) throw new IllegalArgumentException("question must not be null");
+            if (classification == null) throw new IllegalArgumentException("classification must not be null");
+            evidenceAssertions = evidenceAssertions != null ? List.copyOf(evidenceAssertions) : List.of();
+            if (explanation == null || explanation.isBlank()) throw new IllegalArgumentException("explanation must not be blank");
+        }
+    }
+
+    public enum CausalClassification {
+        EXPLICITLY_DOCUMENTED,
+        STRONGLY_SUPPORTED,
+        NOT_ESTABLISHED
+    }
+
+    public enum CausalEvidenceBasis {
+        DIRECT_DOCUMENTATION,
+        MATERIAL_CORROBORATION,
+        CHRONOLOGY_ONLY,
+        TEMPORAL_PROXIMITY_ONLY,
+        SHARED_TOPIC_ONLY,
+        ARCHITECTURAL_COMPATIBILITY_ONLY,
+        POSSIBLE_RELEVANCE_ONLY,
+        CONFLICTING,
+        INSUFFICIENT
+    }
+
     public record Uncertainty(
             String description,
             String reason,
@@ -195,7 +406,6 @@ public record StoryContextAnalysisResult(
         public GroundingMetadata {
             evidenceReferences = evidenceReferences != null ? List.copyOf(evidenceReferences) : List.of();
             if (classification == null || classification.isBlank()) throw new IllegalArgumentException("classification must not be blank");
-            if (relationType == null) throw new IllegalArgumentException("relationType must not be null");
         }
     }
 

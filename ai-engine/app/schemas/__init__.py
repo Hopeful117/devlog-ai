@@ -28,6 +28,7 @@ from app.schemas.story_context_analysis import (
     MissingInformation,
     ImplementationQuestion,
     Confidence,
+    ClassificationEntry,
     Provenance,
     OutputClassification,
 )
@@ -57,6 +58,7 @@ __all__ = [
     "MissingInformation",
     "ImplementationQuestion",
     "Confidence",
+    "ClassificationEntry",
     "Provenance",
     "OutputClassification",
 ]

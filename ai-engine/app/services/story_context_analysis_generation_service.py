@@ -15,12 +15,28 @@ from app.schemas.ai_task_result import (
     AiTaskResultRequest,
     PromptExecutionMetadata,
 )
-from app.schemas.story_context_analysis import StoryContextAnalysisResult, RelationType
+from app.schemas.story_context_analysis import (
+    CausalEvidenceBasis,
+    CausalClassification,
+    CausalEvidenceRole,
+    StoryContextAnalysisResult,
+    RelationType,
+    maximum_defensible_classification,
+    CausalAssessment,
+)
 from app.services.interaction_trace import InteractionTraceCollector
 
 
 class StoryContextAnalysisOutputValidationError(ValueError):
-    pass
+    failure_category = "STRUCTURAL_CONTRACT_ERROR"
+
+
+class StoryContextAnalysisGroundingError(StoryContextAnalysisOutputValidationError):
+    failure_category = "GROUNDING_ERROR"
+
+
+class StoryContextAnalysisSemanticSupportError(StoryContextAnalysisOutputValidationError):
+    failure_category = "SEMANTIC_SUPPORT_ERROR"
 
 
 # Findings that express relationships and must have relationType
@@ -156,6 +172,82 @@ class StoryContextAnalysisGenerationService:
             + output.impacted_component_findings
         )
 
+        causal_assessment = getattr(output, "causal_assessment", None)
+        if grounding_contract.get("causalContractVersion") == "V2":
+            self._validate_v2_assessment(causal_assessment, output, allowed_refs, grounding_contract)
+        causal_claims = output.causal_claims
+        if grounding_contract.get("causalContractVersion") != "V2" \
+                and grounding_contract.get("causalAnswerRequired") is True and not causal_claims:
+            raise StoryContextAnalysisOutputValidationError(
+                "causal answer is required; causalClaims must contain an explicit claim"
+            )
+        required_relationship = grounding_contract.get("causalRelationship")
+        if grounding_contract.get("causalContractVersion") != "V2" \
+                and grounding_contract.get("causalAnswerRequired") is True and isinstance(required_relationship, dict):
+            source = required_relationship.get("source")
+            target = required_relationship.get("target")
+            if isinstance(source, str) and isinstance(target, str):
+                if len(causal_claims) != 1 or (causal_claims[0].source, causal_claims[0].target) != (source, target):
+                    raise StoryContextAnalysisOutputValidationError(
+                        f"causal answer must contain exactly the required relationship: {source} -> {target}"
+                    )
+        seen_pairs: set[tuple[str, str]] = set()
+        for claim in causal_claims:
+            pair = (claim.source, claim.target)
+            if pair in seen_pairs:
+                raise StoryContextAnalysisOutputValidationError(
+                    f"Duplicate causal relationship: {claim.source} -> {claim.target}"
+                )
+            seen_pairs.add(pair)
+            if claim.source == claim.target:
+                raise StoryContextAnalysisOutputValidationError(
+                    f"Causal claim source and target must differ: {claim.source}"
+                )
+            if claim.causal_classification in {
+                CausalClassification.EXPLICITLY_DOCUMENTED,
+                CausalClassification.STRONGLY_SUPPORTED,
+            } and not claim.evidence_references:
+                raise StoryContextAnalysisGroundingError(
+                    f"Affirmative causal claim {claim.source} -> {claim.target} requires evidence"
+                )
+            if claim.causal_classification.value == "NOT_ESTABLISHED" and claim.evidence_basis in {
+                CausalEvidenceBasis.DIRECT_DOCUMENTATION,
+                CausalEvidenceBasis.MATERIAL_CORROBORATION,
+            }:
+                raise StoryContextAnalysisSemanticSupportError(
+                    f"NOT_ESTABLISHED causal claim {claim.source} -> {claim.target} has affirmative evidenceBasis"
+                )
+            claim_refs = {er.reference for er in claim.evidence_references}
+            unknown = claim_refs - allowed_refs
+            if unknown:
+                raise StoryContextAnalysisGroundingError(
+                    f"Causal claim {claim.source} -> {claim.target} references unknown evidence: {sorted(unknown)}"
+                )
+            if any(er.role is None for er in claim.evidence_references):
+                raise StoryContextAnalysisOutputValidationError(
+                    f"Causal claim {claim.source} -> {claim.target} requires an evidence role for every reference"
+                )
+            maximum = maximum_defensible_classification(claim.evidence_references)
+            rank = {
+                CausalClassification.NOT_ESTABLISHED: 0,
+                CausalClassification.STRONGLY_SUPPORTED: 1,
+                CausalClassification.EXPLICITLY_DOCUMENTED: 2,
+            }
+            if rank[claim.causal_classification] > rank[maximum]:
+                raise StoryContextAnalysisSemanticSupportError(
+                    f"Causal claim {claim.source} -> {claim.target} classification exceeds defensible evidence level: "
+                    f"selected={claim.causal_classification.value}, maximum={maximum.value}"
+                )
+            if claim.causal_classification is CausalClassification.STRONGLY_SUPPORTED:
+                material_refs = {
+                    er.reference for er in claim.evidence_references
+                    if er.role is CausalEvidenceRole.MATERIAL_RELATIONSHIP_SUPPORT
+                }
+                if len(material_refs) < 2:
+                    raise StoryContextAnalysisSemanticSupportError(
+                        f"Causal claim {claim.source} -> {claim.target} requires two distinct material supports"
+                    )
+
         for finding in all_findings:
             finding_refs = {er.reference for er in finding.grounding.evidence_references}
             unknown = finding_refs - allowed_refs
@@ -175,11 +267,11 @@ class StoryContextAnalysisGenerationService:
             finding_type = type(finding).__name__.lower().replace("finding", "_findings").replace("historicalcontextitem", "historical_context")
             if finding_type in RELATIONSHIP_BEARING_FINDING_TYPES:
                 if finding.grounding.relation_type is None:
-                    raise StoryContextAnalysisOutputValidationError(
+                    raise StoryContextAnalysisGroundingError(
                         f"Finding {finding.title} must have relationType"
                     )
                 if finding.grounding.relation_type.value not in VALID_RELATION_TYPES:
-                    raise StoryContextAnalysisOutputValidationError(
+                    raise StoryContextAnalysisGroundingError(
                         f"Finding {finding.title} has invalid relationType: {finding.grounding.relation_type.value}"
                     )
 
@@ -195,10 +287,72 @@ class StoryContextAnalysisGenerationService:
                 f"Invalid confidence level: {output.confidence.level}"
             )
 
-        for cls in output.output_classification:
+        for cls in output.output_classification.entries:
             if cls.classification not in {"FACTUAL_EXTRACTION", "AI_INTERPRETATION", "RECOMMENDATION"}:
                 raise StoryContextAnalysisOutputValidationError(
                     f"Invalid output classification: {cls.classification}"
+                )
+
+    def _validate_v2_assessment(
+        self,
+        assessment: CausalAssessment | None,
+        output: StoryContextAnalysisResult,
+        allowed_refs: set[str],
+        grounding_contract: dict[str, object],
+    ) -> None:
+        if assessment is None:
+            if grounding_contract.get("causalAnswerRequired") is True:
+                raise StoryContextAnalysisOutputValidationError(
+                    "causal answer is required; causalAssessment must be present"
+                )
+            return
+        if getattr(output, "causal_claims", []) and grounding_contract.get("causalAnswerRequired") is True:
+            raise StoryContextAnalysisOutputValidationError(
+                "V2 causal output must not contain legacy causalClaims"
+            )
+        question = grounding_contract.get("causalQuestion")
+        if not isinstance(question, dict):
+            raise StoryContextAnalysisOutputValidationError("V2 causalQuestion is missing")
+        expected = (
+            question.get("source"), question.get("target"),
+            question.get("relationAsked"), bool(question.get("answerRequired")),
+        )
+        actual = (
+            assessment.question.source, assessment.question.target,
+            assessment.question.relation_asked, assessment.question.answer_required,
+        )
+        if actual != expected:
+            raise StoryContextAnalysisOutputValidationError(
+                "causalAssessment question does not match the Core-owned causalQuestion"
+            )
+        references = [assertion.evidence_reference.reference for assertion in assessment.evidence_assertions]
+        unknown = set(references) - allowed_refs
+        if unknown:
+            raise StoryContextAnalysisGroundingError(
+                f"causalAssessment references unknown evidence: {sorted(unknown)}"
+            )
+        keys = [
+            (assertion.evidence_reference.reference, assertion.locator.model_dump_json())
+            for assertion in assessment.evidence_assertions
+        ]
+        if len(keys) != len(set(keys)):
+            raise StoryContextAnalysisOutputValidationError("causalAssessment contains duplicate assertions")
+        if assessment.classification is CausalClassification.EXPLICITLY_DOCUMENTED:
+            if not any(
+                assertion.assertion_role is CausalEvidenceRole.DIRECT_RELATIONSHIP_STATEMENT
+                for assertion in assessment.evidence_assertions
+            ):
+                raise StoryContextAnalysisSemanticSupportError(
+                    "EXPLICITLY_DOCUMENTED requires a direct evidence assertion"
+                )
+        if assessment.classification is CausalClassification.STRONGLY_SUPPORTED:
+            distinct_references = {
+                assertion.evidence_reference.reference
+                for assertion in assessment.evidence_assertions
+            }
+            if len(distinct_references) < 2:
+                raise StoryContextAnalysisSemanticSupportError(
+                    "STRONGLY_SUPPORTED requires two distinct evidence assertions"
                 )
 
     async def _send_failure(
