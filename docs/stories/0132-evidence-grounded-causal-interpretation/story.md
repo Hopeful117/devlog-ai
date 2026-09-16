@@ -2,7 +2,7 @@
 
 ## Status
 
-`DETERMINISTIC_IMPLEMENTATION_COMPLETE - HISTORICAL_LIVE_BENCHMARK_INVALID`
+`DETERMINISTIC_IMPLEMENTATION_COMPLETE - CORRECTED_LIVE_SMOKE_PARTIAL - SEMANTIC_CAPABILITY_NOT_ESTABLISHED`
 
 ## Authorization
 
@@ -255,3 +255,18 @@ validation remains strict and unchanged in authority.
 The complete closure record, change classification, future benchmark
 requirements, and verification results are in
 `deterministic-implementation-closure-report.md`.
+
+## Corrected Design C Smoke
+
+The human-authorized corrected Design C smoke was started on the dedicated
+evaluation branch. The provider accepted schema revision
+`story0132-v3-design-c-causal-provider-schema-1.0.1` and returned a complete
+response for `CASE-01::CL-01` within the frozen 2500-token envelope. Core
+rejected the generated evidence excerpt because it did not match the resolved
+authoritative content. The response was preserved without repair and was not
+retried. CASE-04 and CASE-03 were not executed by the current fail-closed
+runner, so this is a partial smoke result and not Story acceptance.
+
+The immutable artifact and full identity/accounting details are recorded in
+`corrected-live-smoke-report.md` and
+`ai-engine/evaluations/product_value/v3/design-c-smoke/0a19e309-fb9b-424e-b2ff-22d81805e006.json`.
