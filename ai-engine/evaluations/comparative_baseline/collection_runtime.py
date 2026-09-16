@@ -42,6 +42,9 @@ MAX_PROVIDER_CALLS_PER_DEVLOG_OBSERVATION = 2
 MAX_PROVIDER_CALLS_PER_AGENT_DIRECT_OBSERVATION = 9
 MAX_PROVIDER_CALLS_FULL_BASELINE = 99
 REPOSITORY_REVISION = "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+EXECUTION_MODE_OFFICIAL = "LIVE"
+EXECUTION_MODE_PILOT = "LIVE_PILOT"
+EXECUTION_MODE_OFFLINE = "OFFLINE_DRY_RUN"
 REPOSITORY_BYTE_BUDGETS = {
     "CASE-01-COMPARATIVE": 32401,
     "CASE-03": 31683,
@@ -591,6 +594,7 @@ class CollectionRuntime:
         tool_factory: Any | None = None,
         run_id: str | None = None,
         execution_class: str = "OFFLINE_DRY_RUN",
+        execution_mode: str | None = None,
         baseline_eligible: bool | None = None,
         artifact_writer: Callable[[dict[str, Any]], Any] | None = None,
     ):
@@ -602,6 +606,14 @@ class CollectionRuntime:
         self.tool_factory = tool_factory
         self.run_id = run_id or str(uuid4())
         self.execution_class = execution_class
+        expected_mode = {
+            "OFFICIAL_BASELINE": EXECUTION_MODE_OFFICIAL,
+            "LIVE_PILOT": EXECUTION_MODE_PILOT,
+            "OFFLINE_DRY_RUN": EXECUTION_MODE_OFFLINE,
+        }.get(execution_class)
+        if expected_mode is None:
+            raise RuntimeContractError(f"unknown execution class: {execution_class}")
+        self.execution_mode = execution_mode or expected_mode
         self.baseline_eligible = baseline_eligible
         self.artifact_writer = artifact_writer
         self.provider_calls = 0
@@ -610,6 +622,13 @@ class CollectionRuntime:
         self._preflight()
 
     def _preflight(self) -> None:
+        expected_mode = {
+            "OFFICIAL_BASELINE": EXECUTION_MODE_OFFICIAL,
+            "LIVE_PILOT": EXECUTION_MODE_PILOT,
+            "OFFLINE_DRY_RUN": EXECUTION_MODE_OFFLINE,
+        }[self.execution_class]
+        if self.execution_mode != expected_mode:
+            raise RuntimeContractError("execution class and execution mode are contradictory")
         if self.manifest["repositoryRevision"] != REPOSITORY_REVISION:
             raise RuntimeContractError("Story0133 repository revision mismatch")
         load_policies()
@@ -668,7 +687,7 @@ class CollectionRuntime:
             "repositoryOperations": 0,
             "stateHistory": [],
             "capturedAt": time.time(),
-            "executionMode": "LIVE_PILOT" if self.execution_class == "LIVE_PILOT" else "OFFLINE_DRY_RUN",
+            "executionMode": self.execution_mode,
             "questionText": question["question"],
             "structuralValid": "NOT_EVALUATED",
             "groundingValid": "NOT_EVALUATED",

@@ -71,6 +71,33 @@ def test_configuration_freezes_runtime_limits_and_order_is_reproducible():
     assert set(execution_order(42)["assignments"]) == {row["assignmentId"] for row in assignment_matrix()}
 
 
+def test_official_live_mode_is_explicit_and_contradictory_mode_fails_before_provider_call():
+    row = _row()
+    provider = ScriptedProvider([final_answer("CASE-03", "1.0.0")])
+    runtime = CollectionRuntime(
+        provider,
+        devlog_contexts={"CASE-03": _context()},
+        run_id="official-mode-test",
+        execution_class="OFFICIAL_BASELINE",
+        baseline_eligible=True,
+    )
+    observation = runtime.run_assignment(row)
+    assert observation["executionMode"] == "LIVE"
+    assert observation["executionClass"] == "OFFICIAL_BASELINE"
+    assert len(provider.requests) == 1
+
+    contradictory = ScriptedProvider([final_answer("CASE-03", "1.0.0")])
+    with pytest.raises(RuntimeContractError, match="execution class and execution mode"):
+        CollectionRuntime(
+            contradictory,
+            devlog_contexts={"CASE-03": _context()},
+            execution_class="OFFICIAL_BASELINE",
+            execution_mode="OFFLINE_DRY_RUN",
+            baseline_eligible=True,
+        )
+    assert contradictory.requests == []
+
+
 def test_common_answer_contract_rejects_extra_oracle_fields():
     answer = final_answer("CASE-03", "1.0.0").payload
     assignment = Assignment.from_manifest_row(_row())
