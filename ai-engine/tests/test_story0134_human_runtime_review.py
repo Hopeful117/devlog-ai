@@ -215,7 +215,9 @@ def test_agent_direct_operation_seven_budget_byte_budget_devlog_and_mutation_fai
     observation = CollectionRuntime(SevenOperations(), tool_factory=lambda assignment: DryRunTools(assignment)).run_assignment(row)
     assert observation["executionStatus"] == "INVALID"
     assert observation["validationResults"]["error"] == "maximum tool operations exhausted"
-    assert observation["toolOperations"] == 7
+    assert observation["toolOperations"] == 6
+    assert len(observation["rawOutput"]["toolTrace"]) == 7
+    assert observation["rawOutput"]["toolTrace"][-1]["executionStatus"] == "NOT_EXECUTED_BUDGET_EXHAUSTED"
 
     class HugeTools(DryRunTools):
         def execute(self, operation, arguments):

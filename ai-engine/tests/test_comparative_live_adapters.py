@@ -3,17 +3,24 @@ import json
 import pytest
 
 from evaluations.comparative_baseline import live_adapters
-from evaluations.comparative_baseline.collection_runtime import RuntimeContractError
+from evaluations.comparative_baseline.collection_runtime import Assignment, RuntimeContractError
 from evaluations.comparative_baseline.infrastructure import assert_official_baseline_eligible, load_manifest
 
 
 def test_common_schema_is_strict_and_matches_frozen_answer_fields():
-    schema = live_adapters.common_answer_schema()
+    assignment = Assignment("a", "CASE-01-COMPARATIVE", "1.0.0", "CASE-01", "DEVLOG", 1)
+    schema = live_adapters.common_answer_schema(assignment)
     assert schema["additionalProperties"] is False
     assert schema["required"] == [
         "questionId", "questionVersion", "answerText", "relationshipResult",
         "abstention", "claims", "evidence", "confidence",
     ]
+    assert schema["properties"]["questionId"]["enum"] == ["CASE-01-COMPARATIVE"]
+    assert schema["properties"]["questionVersion"]["enum"] == ["1.0.0"]
+    branches = schema["properties"]["evidence"]["items"]["properties"]["locator"]["anyOf"]
+    commit_branch = next(branch for branch in branches if branch["properties"]["kind"]["enum"] == ["COMMIT_HUNK"])
+    assert "header" in commit_branch["required"]
+    assert commit_branch["properties"]["header"] == {"type": "string"}
 
 
 def test_devlog_adapter_preserves_case01_projection_identity(monkeypatch, tmp_path):
@@ -37,6 +44,8 @@ def test_devlog_adapter_preserves_case01_projection_identity(monkeypatch, tmp_pa
     assert len(context.evidence) == 4
     assert context.context_digest == "a" * 64
     assert context.projection_revision == "CASE-01:" + "b" * 64
+    assert "QUESTION_ID\nCASE-01-COMPARATIVE" in context.prompt_user
+    assert "QUESTION_VERSION\n1.0.0" in context.prompt_user
 
 
 def test_devlog_adapter_uses_per_question_projection_cardinality():
@@ -48,6 +57,9 @@ def test_devlog_adapter_uses_per_question_projection_cardinality():
     assert len(contexts["CASE-01-COMPARATIVE"].evidence) == 4
     assert len(contexts["CASE-03"].evidence) == 3
     assert len(contexts["CASE-04"].evidence) == 4
+    for question_id, context in contexts.items():
+        assert f"QUESTION_ID\n{question_id}" in context.prompt_user
+        assert f"QUESTION_VERSION\n{context.question_version}" in context.prompt_user
 
 
 def test_pinned_repository_rejects_wrong_revision_before_tools(monkeypatch, tmp_path):
@@ -55,6 +67,24 @@ def test_pinned_repository_rejects_wrong_revision_before_tools(monkeypatch, tmp_
     tools = live_adapters.PinnedGitRepositoryTools(tmp_path)
     with pytest.raises(RuntimeContractError):
         tools.execute("read_file", {"path": "docs/example.md", "repositoryRevision": "0" * 40})
+
+
+def test_pinned_repository_search_parses_matches_with_colons_and_empty_results():
+    tools = live_adapters.PinnedGitRepositoryTools("/home/ludo/Bureau/workspace/trading-os")
+    matches = tools.execute("search_repository", {"query": "ADR-042", "maxMatches": 20})["matches"]
+    assert len(matches) == 20
+    assert all(isinstance(item["line"], int) for item in matches)
+    assert any(":" in item["text"] for item in matches)
+    assert tools.execute("search_repository", {"query": "__story0136_no_match__"})["matches"] == []
+
+
+def test_pinned_repository_search_rejects_malformed_output(monkeypatch, tmp_path):
+    monkeypatch.setattr(live_adapters, "_git_command", lambda *_args, **_kwargs: "malformed")
+    tools = live_adapters.PinnedGitRepositoryTools.__new__(live_adapters.PinnedGitRepositoryTools)
+    tools.repository = tmp_path
+    tools.revision = live_adapters.FROZEN_REPOSITORY_REVISION
+    with pytest.raises(RuntimeContractError, match="search output is malformed"):
+        tools.execute("search_repository", {"query": "anything"})
 
 
 def test_live_preflight_requires_explicit_core_grounding(monkeypatch, tmp_path):

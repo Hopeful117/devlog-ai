@@ -14,7 +14,7 @@ import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Callable, Literal, Protocol
 from uuid import uuid4
 
 from .infrastructure import (
@@ -315,13 +315,16 @@ class ToolBudget:
     operations: int = 0
     bytes_returned: int = 0
 
-    def reserve(self, result: dict[str, Any]) -> None:
+    def attempt(self) -> int:
         if self.operations >= self.max_operations:
             raise BudgetExhausted("maximum tool operations exhausted")
+        self.operations += 1
+        return self.operations
+
+    def reserve(self, result: dict[str, Any]) -> None:
         result_bytes = len(canonical(result).encode("utf-8"))
         if self.bytes_returned + result_bytes > self.max_bytes:
             raise BudgetExhausted("question-specific repository byte budget exhausted")
-        self.operations += 1
         self.bytes_returned += result_bytes
 
 
@@ -587,6 +590,9 @@ class CollectionRuntime:
         devlog_contexts: dict[str, DevlogContext] | None = None,
         tool_factory: Any | None = None,
         run_id: str | None = None,
+        execution_class: str = "OFFLINE_DRY_RUN",
+        baseline_eligible: bool | None = None,
+        artifact_writer: Callable[[dict[str, Any]], Any] | None = None,
     ):
         self.manifest = manifest or load_manifest()
         self.configuration = configuration or RuntimeConfiguration()
@@ -595,6 +601,9 @@ class CollectionRuntime:
         self.devlog_contexts = devlog_contexts or {}
         self.tool_factory = tool_factory
         self.run_id = run_id or str(uuid4())
+        self.execution_class = execution_class
+        self.baseline_eligible = baseline_eligible
+        self.artifact_writer = artifact_writer
         self.provider_calls = 0
         self.logical_model_calls = 0
         self.technical_retry_calls = 0
@@ -613,7 +622,7 @@ class CollectionRuntime:
 
     def _base_observation(self, assignment: Assignment, exact_input: dict[str, Any]) -> dict[str, Any]:
         question = next(item for item in self.manifest["questions"] if item["questionId"] == assignment.question_id)
-        return {
+        observation = {
             "observationId": f"{self.run_id}:{assignment.assignment_id}",
             "benchmarkVersion": self.manifest["benchmarkVersion"],
             "questionId": assignment.question_id,
@@ -643,6 +652,10 @@ class CollectionRuntime:
             "logicalModelCalls": 0,
             "technicalRetryCalls": 0,
             "toolOperations": 0,
+            "toolAttempts": 0,
+            "toolSuccessfulOperations": 0,
+            "toolFailedOperations": 0,
+            "toolNotExecutedOperations": 0,
             "finalAnswerCount": 0,
             "providerCalls": 0,
             "inputTokens": "NOT_MEASURED",
@@ -655,7 +668,7 @@ class CollectionRuntime:
             "repositoryOperations": 0,
             "stateHistory": [],
             "capturedAt": time.time(),
-            "executionMode": "OFFLINE_DRY_RUN",
+            "executionMode": "LIVE_PILOT" if self.execution_class == "LIVE_PILOT" else "OFFLINE_DRY_RUN",
             "questionText": question["question"],
             "structuralValid": "NOT_EVALUATED",
             "groundingValid": "NOT_EVALUATED",
@@ -670,19 +683,31 @@ class CollectionRuntime:
             "comparativeGroundingContractVersion": COMPARATIVE_GROUNDING_CONTRACT_VERSION,
             "comparativeScoringProjectionVersion": COMPARATIVE_SCORING_PROJECTION_VERSION,
         }
+        if self.execution_class != "OFFLINE_DRY_RUN":
+            observation["executionClass"] = self.execution_class
+        if self.baseline_eligible is not None:
+            observation["baselineEligible"] = self.baseline_eligible
+        return observation
 
     def _finalize(self, observation: dict[str, Any], state: ObservationStateMachine) -> dict[str, Any]:
         observation["stateHistory"] = state.history
         if observation["rawOutput"] != "NOT_APPLICABLE":
             observation["rawOutputSha256"] = raw_output_hash(observation["rawOutput"])
         assert_secret_free(observation)
-        validate_raw_observation(observation, manifest=self.manifest)
+        validate_raw_observation(
+            observation,
+            manifest=self.manifest,
+            enforce_official_baseline=self.baseline_eligible is not False,
+        )
+        if self.artifact_writer is not None:
+            self.artifact_writer(observation)
         return observation
 
     def _call(self, request: ProviderRequest, *, response_seen: bool, observation: dict[str, Any], captures: list[dict[str, Any]]) -> ProviderResponse:
         max_calls = MAX_PROVIDER_CALLS_PER_DEVLOG_OBSERVATION if request.mode == "DEVLOG" else MAX_PROVIDER_CALLS_PER_AGENT_DIRECT_OBSERVATION
         if observation["providerCalls"] >= max_calls or self.provider_calls >= MAX_PROVIDER_CALLS_FULL_BASELINE:
             raise BudgetExhausted("provider-call budget exhausted")
+        started_at = time.perf_counter()
         try:
             self.provider_calls += 1
             observation["providerCalls"] += 1
@@ -695,6 +720,9 @@ class CollectionRuntime:
             self.provider_calls += 1
             observation["providerCalls"] += 1
             response = self.transport.complete(request)
+        observation["latencyMs"] = (
+            0 if observation["latencyMs"] == "NOT_MEASURED" else observation["latencyMs"]
+        ) + round((time.perf_counter() - started_at) * 1000)
         self.logical_model_calls += 1
         observation["logicalModelCalls"] += 1
         for usage_key, observation_key in (("inputTokens", "inputTokens"), ("outputTokens", "outputTokens")):
@@ -706,6 +734,7 @@ class CollectionRuntime:
             "turn": request.turn_index,
             "mode": request.mode,
             "kind": response.kind,
+            "responseId": response.raw_response.get("id"),
             "rawResponse": response.raw_response,
             "usage": response.usage,
             "finishReason": response.finish_reason,
@@ -826,58 +855,133 @@ class CollectionRuntime:
                     break
                 if response.kind != "TOOL_CALL":
                     raise RuntimeContractError("provider response kind is invalid")
-                operation = response.payload.get("operation")
-                arguments = response.payload.get("arguments", {})
-                if not isinstance(operation, str) or not isinstance(arguments, dict):
-                    raise RuntimeContractError("tool request is structurally invalid")
-                if operation not in ALLOWED_TOOL_OPERATIONS or len(canonical(response.payload).encode("utf-8")) > AGENT_INTERMEDIATE_OUTPUT_TOKENS * 4:
-                    raise RuntimeContractError("tool action exceeds the intermediate action envelope")
-                try:
-                    result = tool_server.execute(operation, {**arguments, "repositoryRevision": REPOSITORY_REVISION})
-                    traced = canonical_tool_result(operation, arguments, result, revision=REPOSITORY_REVISION)
-                    budget.reserve(result)
-                    traced["operationIndex"] = budget.operations
-                except (BudgetExhausted, RuntimeContractError) as error:
-                    traced = {
-                        "operationIndex": budget.operations + 1,
-                        "operationType": operation,
-                        "targetOrQuery": arguments,
-                        "repositoryRevision": REPOSITORY_REVISION,
-                        "resultIdentity": None,
-                        "resultByteCount": 0,
-                        "resultSha256": None,
-                        "durationMs": 0,
-                        "truncated": False,
-                        "errorState": type(error).__name__,
-                        "errorMessage": str(error),
-                    }
-                    if isinstance(error, BudgetExhausted):
+                requested_calls = response.payload.get("calls")
+                if requested_calls is None:
+                    requested_calls = [response.payload]
+                if not isinstance(requested_calls, list) or not requested_calls:
+                    raise RuntimeContractError("tool request list is structurally invalid")
+                previous_results: list[dict[str, Any]] = []
+                budget_exhausted = False
+                not_executed_this_turn = 0
+                for call_index, call in enumerate(requested_calls):
+                    operation = call.get("operation") if isinstance(call, dict) else None
+                    arguments = call.get("arguments", {}) if isinstance(call, dict) else {}
+                    if not isinstance(operation, str) or not isinstance(arguments, dict):
+                        traced = {
+                            "operationIndex": None,
+                            "operationType": operation,
+                            "targetOrQuery": arguments,
+                            "repositoryRevision": REPOSITORY_REVISION,
+                            "executionStatus": "NOT_EXECUTED_INVALID_REQUEST",
+                            "resultIdentity": None,
+                            "resultByteCount": 0,
+                            "resultSha256": None,
+                            "durationMs": 0,
+                            "truncated": False,
+                            "errorState": "RuntimeContractError",
+                            "errorMessage": "tool request is structurally invalid",
+                        }
+                        assert_secret_free(traced)
+                        tool_trace.append(traced)
+                        raise RuntimeContractError("tool request is structurally invalid")
+                    if operation not in ALLOWED_TOOL_OPERATIONS or len(canonical(call).encode("utf-8")) > AGENT_INTERMEDIATE_OUTPUT_TOKENS * 4:
+                        traced = {
+                            "operationIndex": None,
+                            "operationType": operation,
+                            "targetOrQuery": arguments,
+                            "repositoryRevision": REPOSITORY_REVISION,
+                            "executionStatus": "NOT_EXECUTED_INVALID_REQUEST",
+                            "resultIdentity": None,
+                            "resultByteCount": 0,
+                            "resultSha256": None,
+                            "durationMs": 0,
+                            "truncated": False,
+                            "errorState": "RuntimeContractError",
+                            "errorMessage": "tool action exceeds the intermediate action envelope or allowlist",
+                        }
+                        assert_secret_free(traced)
+                        tool_trace.append(traced)
+                        raise RuntimeContractError("tool action exceeds the intermediate action envelope")
+                    try:
+                        operation_index = budget.attempt()
+                    except BudgetExhausted:
+                        tool_trace.append({
+                            "operationIndex": None,
+                            "operationType": operation,
+                            "targetOrQuery": arguments,
+                            "repositoryRevision": REPOSITORY_REVISION,
+                            "executionStatus": "NOT_EXECUTED_BUDGET_EXHAUSTED",
+                            "resultIdentity": None,
+                            "resultByteCount": 0,
+                            "resultSha256": None,
+                            "durationMs": 0,
+                            "truncated": False,
+                            "errorState": "BudgetExhausted",
+                            "errorMessage": "maximum tool operations exhausted",
+                        })
+                        budget_exhausted = True
+                        not_executed_this_turn = len(requested_calls) - call_index
+                        break
+                    try:
+                        result = tool_server.execute(operation, {**arguments, "repositoryRevision": REPOSITORY_REVISION})
+                        traced = canonical_tool_result(operation, arguments, result, revision=REPOSITORY_REVISION)
+                        budget.reserve(result)
+                        traced["operationIndex"] = operation_index
+                        traced["executionStatus"] = "EXECUTED_SUCCESS" if not result.get("matches") == [] else "EXECUTED_EMPTY"
+                        observation["toolSuccessfulOperations"] += 1
+                        previous_results.append(traced)
+                    except BudgetExhausted as error:
+                        traced = {
+                            "operationIndex": operation_index,
+                            "operationType": operation,
+                            "targetOrQuery": arguments,
+                            "repositoryRevision": REPOSITORY_REVISION,
+                            "executionStatus": "EXECUTED_FAILURE",
+                            "resultIdentity": None,
+                            "resultByteCount": 0,
+                            "resultSha256": None,
+                            "durationMs": 0,
+                            "truncated": False,
+                            "errorState": type(error).__name__,
+                            "errorMessage": str(error),
+                        }
+                        observation["toolFailedOperations"] += 1
+                        assert_secret_free(traced)
                         tool_trace.append(traced)
                         raise
+                    except Exception as error:
+                        traced = {
+                            "operationIndex": operation_index,
+                            "operationType": operation,
+                            "targetOrQuery": arguments,
+                            "repositoryRevision": REPOSITORY_REVISION,
+                            "executionStatus": "EXECUTED_FAILURE",
+                            "resultIdentity": None,
+                            "resultByteCount": 0,
+                            "resultSha256": None,
+                            "durationMs": 0,
+                            "truncated": False,
+                            "errorState": type(error).__name__,
+                            "errorMessage": str(error),
+                        }
+                        observation["toolFailedOperations"] += 1
+                    assert_secret_free(traced)
                     tool_trace.append(traced)
-                    raise
-                except Exception as error:
-                    traced = {
-                        "operationIndex": budget.operations + 1,
-                        "operationType": operation,
-                        "targetOrQuery": arguments,
-                        "repositoryRevision": REPOSITORY_REVISION,
-                        "resultIdentity": None,
-                        "resultByteCount": 0,
-                        "resultSha256": None,
-                        "durationMs": 0,
-                        "truncated": False,
-                        "errorState": type(error).__name__,
-                        "errorMessage": str(error),
-                    }
-                assert_secret_free(traced)
-                tool_trace.append(traced)
-                current_input = {**input_payload, "previousToolResult": traced}
+                if budget_exhausted:
+                    observation["toolNotExecutedOperations"] += not_executed_this_turn
+                    raise BudgetExhausted("maximum tool operations exhausted")
+                if not previous_results and tool_trace:
+                    current_input = {**input_payload, "previousToolResult": tool_trace[-1]}
+                elif len(previous_results) == 1:
+                    current_input = {**input_payload, "previousToolResult": previous_results[0]}
+                else:
+                    current_input = {**input_payload, "previousToolResults": previous_results}
             if final_answer is None:
                 raise BudgetExhausted("AGENT_DIRECT model-turn budget exhausted without final answer")
             observation["rawOutput"] = {"responses": captures, "toolTrace": tool_trace, "finalResponse": final_answer}
             observation["finalAnswerCount"] = 1
-            observation["toolOperations"] = len(tool_trace)
+            observation["toolOperations"] = budget.operations
+            observation["toolAttempts"] = budget.operations
             observation["repositoryBytesInspected"] = budget.bytes_returned
             observation["repositoryOperations"] = budget.operations
             state.transition("RAW_CAPTURED")
@@ -920,7 +1024,8 @@ class CollectionRuntime:
                 observation["structuralValid"] = "NO"
             observation["layerSpecificErrorClassification"] = observation["primaryError"]
             observation["rawOutput"] = {"responses": captures, "toolTrace": tool_trace} if captures or tool_trace else "NOT_APPLICABLE"
-            observation["toolOperations"] = len(tool_trace)
+            observation["toolOperations"] = budget.operations
+            observation["toolAttempts"] = budget.operations
             observation["repositoryBytesInspected"] = budget.bytes_returned
             observation["repositoryOperations"] = budget.operations
             if state.state == "RUNNING":
@@ -935,11 +1040,20 @@ class CollectionRuntime:
         write_immutable_json(destination, observation)
 
 
-def replay_observation(observation: dict[str, Any], *, manifest: dict[str, Any] | None = None) -> dict[str, Any]:
+def replay_observation(
+    observation: dict[str, Any],
+    *,
+    manifest: dict[str, Any] | None = None,
+    enforce_official_baseline: bool = True,
+) -> dict[str, Any]:
     """Replay identity, hashes, parsing, and captured traces without a provider."""
 
     source = manifest or load_manifest()
-    validate_raw_observation(observation, manifest=source)
+    validate_raw_observation(
+        observation,
+        manifest=source,
+        enforce_official_baseline=enforce_official_baseline,
+    )
     raw_output = observation["rawOutput"]
     if not (isinstance(raw_output, str) and raw_output in MISSING_STATES) and observation["rawOutputSha256"] != raw_output_hash(raw_output):
         raise RuntimeContractError("raw output hash mismatch during replay")

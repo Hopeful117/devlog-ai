@@ -1,4 +1,5 @@
 import copy
+import json
 
 import pytest
 
@@ -24,6 +25,7 @@ from evaluations.comparative_baseline.collection_runtime import (
     validate_answer,
 )
 from evaluations.comparative_baseline.infrastructure import assignment_matrix, load_manifest, validate_raw_observation
+from evaluations.comparative_baseline.live_adapters import PilotStorage
 from evaluations.comparative_baseline.testing import ScriptedProvider, final_answer
 
 
@@ -77,6 +79,32 @@ def test_common_answer_contract_rejects_extra_oracle_fields():
     contaminated["expectedEvidence"] = []
     with pytest.raises(RuntimeContractError):
         validate_answer(contaminated, assignment)
+
+
+def test_wrong_or_missing_identity_is_rejected_without_repair():
+    assignment = Assignment.from_manifest_row(_row())
+    wrong = final_answer("story0134", "1.0").payload
+    with pytest.raises(RuntimeContractError, match="question identity"):
+        validate_answer(wrong, assignment)
+    missing = final_answer("CASE-03", "1.0.0").payload
+    missing.pop("questionId")
+    with pytest.raises(RuntimeContractError, match="contract fields"):
+        validate_answer(missing, assignment)
+
+
+def test_commit_hunk_locator_requires_header_without_repair():
+    answer = final_answer("CASE-03", "1.0.0").payload
+    answer["evidence"][0]["locator"] = {
+        "kind": "COMMIT_HUNK",
+        "startLine": 1,
+        "endLine": 2,
+        "heading": None,
+        "commit": "a" * 40,
+        "path": "docs/example.md",
+        "header": None,
+    }
+    with pytest.raises(RuntimeContractError, match="commit-hunk locator"):
+        validate_answer(answer, Assignment.from_manifest_row(_row()))
 
 
 def test_devlog_captures_raw_response_and_never_constructs_repository_tools():
@@ -173,6 +201,99 @@ def test_write_once_replay_and_secret_guard(tmp_path):
     assert replay["capturedRawOutputVerified"] is True
     with pytest.raises(RuntimeContractError):
         assert_secret_free({"Authorization": "Bearer secret-value"})
+
+
+def test_tool_budget_counts_failed_attempts_and_rejects_seventh_execution():
+    class FailingTools:
+        def execute(self, operation, arguments):
+            raise ValueError("adapter failure")
+
+    provider = ScriptedProvider([
+        ProviderResponse("TOOL_CALL", {"operation": "search_repository", "arguments": {"query": "x"}}, {})
+    ] * 7)
+    runtime = CollectionRuntime(provider, tool_factory=lambda _assignment: FailingTools())
+    observation = runtime.run_assignment(_row("AGENT_DIRECT"))
+    assert observation["toolOperations"] == 6
+    assert observation["toolAttempts"] == 6
+    assert observation["toolFailedOperations"] == 6
+    assert observation["toolNotExecutedOperations"] == 1
+    assert len(observation["rawOutput"]["toolTrace"]) == 7
+    assert observation["rawOutput"]["toolTrace"][-1]["executionStatus"] == "NOT_EXECUTED_BUDGET_EXHAUSTED"
+    assert len(provider.requests) == 7
+
+
+def test_empty_tool_results_consume_attempt_budget():
+    provider = ScriptedProvider([
+        ProviderResponse("TOOL_CALL", {"operation": "search_repository", "arguments": {"query": "missing"}}, {})
+    ] * 7)
+    tools = InMemoryRepositoryTools(revision=load_manifest()["repositoryRevision"], files={})
+    runtime = CollectionRuntime(provider, tool_factory=lambda _assignment: tools)
+    observation = runtime.run_assignment(_row("AGENT_DIRECT"))
+    assert observation["toolOperations"] == 6
+    assert observation["toolSuccessfulOperations"] == 6
+    assert observation["toolFailedOperations"] == 0
+    assert observation["rawOutput"]["toolTrace"][0]["executionStatus"] == "EXECUTED_EMPTY"
+
+
+def test_multiple_tool_calls_execute_in_provider_order():
+    calls = [
+        {"operation": "read_file", "arguments": {"path": "docs/example.md"}},
+        {"operation": "read_file", "arguments": {"path": "docs/example.md"}},
+    ]
+    provider = ScriptedProvider([
+        ProviderResponse("TOOL_CALL", {"calls": calls}, {}),
+        final_answer("CASE-03", "1.0.0"),
+    ])
+    tools = InMemoryRepositoryTools(revision=load_manifest()["repositoryRevision"], files={"docs/example.md": "captured direct evidence"})
+    runtime = CollectionRuntime(provider, tool_factory=lambda _assignment: tools)
+    observation = runtime.run_assignment(_row("AGENT_DIRECT"))
+    assert observation["executionStatus"] == "EXECUTED"
+    assert observation["toolOperations"] == 2
+    assert [trace["executionStatus"] for trace in observation["rawOutput"]["toolTrace"]] == ["EXECUTED_SUCCESS", "EXECUTED_SUCCESS"]
+    assert [trace["targetOrQuery"]["path"] for trace in observation["rawOutput"]["toolTrace"]] == ["docs/example.md", "docs/example.md"]
+
+
+def test_multiple_tool_calls_record_unexecuted_call_at_remaining_budget():
+    single = ProviderResponse("TOOL_CALL", {"operation": "search_repository", "arguments": {"query": "missing"}}, {})
+    final_turn = ProviderResponse("TOOL_CALL", {"calls": [
+        {"operation": "search_repository", "arguments": {"query": "missing"}},
+        {"operation": "search_repository", "arguments": {"query": "also-missing"}},
+    ]}, {})
+    provider = ScriptedProvider([single] * 5 + [final_turn])
+    tools = InMemoryRepositoryTools(revision=load_manifest()["repositoryRevision"], files={})
+    runtime = CollectionRuntime(provider, tool_factory=lambda _assignment: tools)
+    observation = runtime.run_assignment(_row("AGENT_DIRECT"))
+    assert observation["toolOperations"] == 6
+    assert observation["toolNotExecutedOperations"] == 1
+    assert observation["rawOutput"]["toolTrace"][-1]["executionStatus"] == "NOT_EXECUTED_BUDGET_EXHAUSTED"
+    assert observation["rawOutput"]["toolTrace"][-1]["targetOrQuery"] == {"query": "also-missing"}
+
+
+def test_live_pilot_runtime_classifies_writes_and_replays_outside_official_baseline(tmp_path):
+    pilot = PilotStorage(tmp_path / "pilot", "run-1", tmp_path / "official")
+    provider = ScriptedProvider([final_answer("CASE-03", "1.0.0")])
+    runtime = CollectionRuntime(
+        provider,
+        devlog_contexts={"CASE-03": _context()},
+        run_id="pilot-run-1",
+        execution_class=pilot.execution_class,
+        baseline_eligible=pilot.baseline_eligible,
+        artifact_writer=pilot.write_observation,
+    )
+
+    observation = runtime.run_assignment(_row())
+    assert observation["executionMode"] == "LIVE_PILOT"
+    assert observation["executionClass"] == "LIVE_PILOT"
+    assert observation["baselineEligible"] is False
+    with pytest.raises(ValueError, match="live pilot"):
+        validate_raw_observation(observation)
+
+    artifact = json.loads(pilot.artifact_path(_row()["assignmentId"]).read_text(encoding="utf-8"))
+    assert artifact["executionClass"] == "LIVE_PILOT"
+    assert artifact["baselineEligible"] is False
+    replay = replay_observation(artifact["observation"], enforce_official_baseline=False)
+    assert replay["providerCalls"] == 0
+    assert pilot.ledger_path.exists()
 
 
 def test_repository_tools_pin_revision_and_reject_unsafe_operations():

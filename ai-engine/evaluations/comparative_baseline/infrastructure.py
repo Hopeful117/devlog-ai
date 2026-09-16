@@ -224,9 +224,15 @@ def raw_output_hash(raw_output: Any) -> str:
     return sha256_value(raw_output)
 
 
-def validate_raw_observation(observation: dict[str, Any], *, manifest: dict[str, Any] | None = None) -> None:
+def validate_raw_observation(
+    observation: dict[str, Any],
+    *,
+    manifest: dict[str, Any] | None = None,
+    enforce_official_baseline: bool = True,
+) -> None:
     source = manifest or load_manifest()
-    assert_official_baseline_eligible(observation)
+    if enforce_official_baseline:
+        assert_official_baseline_eligible(observation)
     required = {
         "observationId", "benchmarkVersion", "questionId", "questionVersion", "caseId",
         "condition", "conditionPolicyVersion", "conditionPolicyCompatibilityKey", "repetition",
@@ -396,11 +402,14 @@ def build_raw_artifact(observation: dict[str, Any]) -> dict[str, Any]:
     return artifact
 
 
-def validate_raw_artifact(artifact: dict[str, Any]) -> None:
+def validate_raw_artifact(artifact: dict[str, Any], *, enforce_official_baseline: bool = True) -> None:
     if artifact.get("immutable") is not True or "observation" not in artifact:
         raise ValueError("raw artifact is incomplete")
     expected = artifact.get("artifactSha256")
     unsigned = {key: value for key, value in artifact.items() if key != "artifactSha256"}
     if expected != sha256_value(unsigned):
         raise ValueError("raw artifact hash mismatch")
-    validate_raw_observation(artifact["observation"])
+    validate_raw_observation(
+        artifact["observation"],
+        enforce_official_baseline=enforce_official_baseline,
+    )
