@@ -23,6 +23,20 @@ _SECRET_PATTERNS = (
 )
 
 
+def _failure_category(error: Exception) -> str:
+    explicit = getattr(error, "failure_category", None)
+    if explicit:
+        return explicit
+    message = str(error).casefold()
+    if isinstance(error, ValidationError):
+        if any(term in message for term in ("defensible evidence", "relationship support", "causalclassification", "evidencebasis")):
+            return "SEMANTIC_SUPPORT_ERROR"
+        return "STRUCTURAL_CONTRACT_ERROR"
+    if "json" in message or "schema" in message:
+        return "FORMAT_ERROR"
+    return "PROVIDER_ERROR"
+
+
 def redact_sensitive_text(value: str | None) -> str | None:
     if value is None:
         return None
@@ -102,20 +116,24 @@ class InteractionTraceCollector:
                 parsed = response_model.model_validate(generation.output)
             except Exception:
                 status = "PARSING_FAILED"
-                failure_category = "PARSING_FAILED"
+                failure_category = "FORMAT_ERROR"
                 raise
             try:
                 validator(parsed)
-            except Exception:
+            except Exception as validation_error:
                 status = "VALIDATION_FAILED"
-                failure_category = "VALIDATION_FAILED"
+                failure_category = _failure_category(validation_error)
                 raise
             return parsed
         except Exception as error:
             failure_message = str(error)[:5000]
             if failure_category is None:
-                status = "PARSING_FAILED" if isinstance(error, ValidationError) else "PROVIDER_FAILED"
-                failure_category = status
+                if isinstance(error, ValidationError):
+                    status = "PARSING_FAILED"
+                    failure_category = _failure_category(error)
+                else:
+                    status = "PROVIDER_FAILED"
+                    failure_category = _failure_category(error)
             raise
         finally:
             completed_at = datetime.now(timezone.utc)

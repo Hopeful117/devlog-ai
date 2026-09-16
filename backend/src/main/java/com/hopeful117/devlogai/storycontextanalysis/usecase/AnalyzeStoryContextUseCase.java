@@ -78,6 +78,7 @@ public class AnalyzeStoryContextUseCase {
     private final HistoricalKnowledgeCandidateService historicalKnowledgeCandidateService;
     private final SourceRepository sourceRepository;
     private final WorkspaceManager workspaceManager;
+    private static final TaskSnapshotEvidenceResolver evidenceResolver = new TaskSnapshotEvidenceResolver();
 
     public UUID execute(
             String projectSlug,
@@ -141,7 +142,7 @@ public class AnalyzeStoryContextUseCase {
 
         // Authorize only the canonical repository evidence projected into this prompt.
         Map<String, Object> groundingContract = buildGroundingContract(
-                selectedKnowledge.repositoryContext());
+                selectedKnowledge.repositoryContext(), guidance);
 
         // Create AiTask with selected knowledge and grounding contract
         AiTask aiTask = aiTaskService.createForStoryContextAnalysisEntity(
@@ -198,7 +199,10 @@ public class AnalyzeStoryContextUseCase {
         return aiTask.getId();
     }
 
-    private Map<String, Object> buildGroundingContract(RepositoryContext context) {
+    private Map<String, Object> buildGroundingContract(
+            RepositoryContext context,
+            Map<String, Object> guidance
+    ) {
         Set<String> allowedRefs = new LinkedHashSet<>();
         for (var evidence : context.evidence()) {
             // Use canonical reference for grounding (RepositoryEvidence.reference)
@@ -206,7 +210,32 @@ public class AnalyzeStoryContextUseCase {
                 allowedRefs.add(evidence.reference());
             }
         }
-        return Map.of("allowedEvidenceReferences", new ArrayList<>(allowedRefs));
+        Map<String, Object> contract = new LinkedHashMap<>();
+        contract.put("allowedEvidenceReferences", new ArrayList<>(allowedRefs));
+        boolean causalAnswerRequired = guidance != null
+                && Boolean.TRUE.equals(guidance.get("causalAnswerRequired"));
+        contract.put("causalAnswerRequired", causalAnswerRequired);
+        if (causalAnswerRequired && guidance != null && guidance.get("causalRelationship") instanceof Map<?, ?> relationship) {
+            Object source = relationship.get("source");
+            Object target = relationship.get("target");
+            if (source instanceof String sourceValue && !sourceValue.isBlank()
+                    && target instanceof String targetValue && !targetValue.isBlank()) {
+                String relationAsked = guidance.get("relationAsked") instanceof String value && !value.isBlank()
+                        ? value : "CAUSAL";
+                contract.put("causalContractVersion", "V2");
+                contract.put("causalQuestion", Map.of(
+                        "source", sourceValue,
+                        "target", targetValue,
+                        "relationAsked", relationAsked,
+                        "answerRequired", true));
+                // Keep the old shape in the snapshot for historical diagnostics only.
+                contract.put("causalRelationship", Map.of("source", sourceValue, "target", targetValue));
+            }
+        }
+        if (causalAnswerRequired && !contract.containsKey("causalQuestion")) {
+            throw new IllegalArgumentException("causalAnswerRequired requires a valid causalRelationship");
+        }
+        return contract;
     }
 
     @SuppressWarnings("unchecked")
@@ -478,7 +507,7 @@ public class AnalyzeStoryContextUseCase {
         }
 
         // Authoritative Java validation of AI output
-        validateStoryContextAnalysisResult(analysisResult, task);
+        analysisResult = validateStoryContextAnalysisResult(analysisResult, task);
 
         UUID storyId = UUID.fromString(
                 task.getContextSnapshot().get("storyId").toString()
@@ -515,7 +544,7 @@ public class AnalyzeStoryContextUseCase {
      * Validates grounding, trust, relationships, classification, and digest consistency.
      * Per Story 0112 D14 and ADR-067: Java/Core is sole grounding authority.
      */
-    private void validateStoryContextAnalysisResult(StoryContextAnalysisResult result, AiTask task) {
+    static StoryContextAnalysisResult validateStoryContextAnalysisResult(StoryContextAnalysisResult result, AiTask task) {
         // Extract grounding contract from task context
         @SuppressWarnings("unchecked")
         Map<String, Object> groundingContract = task.getContextSnapshot() != null
@@ -534,12 +563,17 @@ public class AnalyzeStoryContextUseCase {
         }
 
         // Validate all finding types that have GroundingMetadata
-        validateGroundedFindings(result.architectureFindings(), allowedRefSet);
-        validateGroundedFindings(result.decisionFindings(), allowedRefSet);
-        validateGroundedFindings(result.evidenceFindings(), allowedRefSet);
-        validateGroundedFindings(result.historicalContext(), allowedRefSet);
-        validateGroundedFindings(result.constraintFindings(), allowedRefSet);
-        validateGroundedFindings(result.impactedComponentFindings(), allowedRefSet);
+        validateGroundedFindings(result.architectureFindings(), allowedRefSet, true);
+        validateGroundedFindings(result.decisionFindings(), allowedRefSet, true);
+        validateGroundedFindings(result.evidenceFindings(), allowedRefSet, false);
+        validateGroundedFindings(result.historicalContext(), allowedRefSet, true);
+        validateGroundedFindings(result.constraintFindings(), allowedRefSet, false);
+        validateGroundedFindings(result.impactedComponentFindings(), allowedRefSet, true);
+        if ("V2".equals(groundingContract.get("causalContractVersion"))) {
+            result = validateV2CausalAssessment(result, task, groundingContract);
+        } else {
+            validateCausalClaims(result.causalClaims(), allowedRefSet, groundingContract);
+        }
 
         // Validate uncertainties
         for (StoryContextAnalysisResult.Uncertainty uncertainty : result.uncertainties()) {
@@ -566,9 +600,173 @@ public class AnalyzeStoryContextUseCase {
 
         // Forbidden outputs check: no proposals should be generated for this intent
         // (Story 0112: ValidatableProposal is forbidden in V1)
+        return result;
     }
 
-    private void validateGroundedFindings(List<? extends Record> findings, Set<String> allowedRefs) {
+    @SuppressWarnings("unchecked")
+    private static StoryContextAnalysisResult validateV2CausalAssessment(
+            StoryContextAnalysisResult result,
+            AiTask task,
+            Map<String, Object> groundingContract
+    ) {
+        boolean required = Boolean.TRUE.equals(groundingContract.get("causalAnswerRequired"));
+        StoryContextAnalysisResult.CausalAssessment assessment = result.causalAssessment();
+        if (required && assessment == null) {
+            throw new IllegalStateException("causal answer is required; causalAssessment must not be null");
+        }
+        if (assessment == null) return result;
+        StoryContextAnalysisResult.CausalQuestion expected = causalQuestion(groundingContract);
+        if (!sameQuestion(expected, assessment.question())) {
+            throw new IllegalStateException("causalAssessment question does not match the Core-owned CausalQuestion");
+        }
+        if (!result.causalClaims().isEmpty()) {
+            throw new IllegalStateException("V2 causal output must not contain legacy causalClaims");
+        }
+        StoryContextAnalysisResult.CausalAssessment bound = evidenceResolver.bind(
+                assessment, task);
+        validateV2Admissibility(bound);
+        return new StoryContextAnalysisResult(
+                result.objectiveUnderstanding(), result.architectureFindings(), result.decisionFindings(),
+                result.evidenceFindings(), result.historicalContext(), result.constraintFindings(),
+                result.impactedComponentFindings(), result.uncertainties(), result.missingInformation(),
+                result.implementationQuestions(), result.confidence(), result.provenance(),
+                result.outputClassification(), List.of(), bound);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static StoryContextAnalysisResult.CausalQuestion causalQuestion(Map<String, Object> contract) {
+        Object raw = contract.get("causalQuestion");
+        if (!(raw instanceof Map<?, ?> question)) {
+            throw new IllegalStateException("V2 causalQuestion is missing");
+        }
+        Object source = question.get("source");
+        Object target = question.get("target");
+        Object relation = question.get("relationAsked");
+        Object answerRequired = question.get("answerRequired");
+        if (!(source instanceof String sourceValue) || !(target instanceof String targetValue)
+                || !(relation instanceof String relationValue)) {
+            throw new IllegalStateException("V2 causalQuestion is malformed");
+        }
+        return new StoryContextAnalysisResult.CausalQuestion(sourceValue, targetValue, relationValue,
+                Boolean.TRUE.equals(answerRequired));
+    }
+
+    private static boolean sameQuestion(
+            StoryContextAnalysisResult.CausalQuestion expected,
+            StoryContextAnalysisResult.CausalQuestion actual
+    ) {
+        return expected.source().equals(actual.source())
+                && expected.target().equals(actual.target())
+                && expected.relationAsked().equals(actual.relationAsked())
+                && expected.answerRequired() == actual.answerRequired();
+    }
+
+    private static void validateV2Admissibility(StoryContextAnalysisResult.CausalAssessment assessment) {
+        var assertions = assessment.evidenceAssertions();
+        if (assessment.classification() == StoryContextAnalysisResult.CausalClassification.EXPLICITLY_DOCUMENTED
+                && assertions.stream().noneMatch(assertion ->
+                assertion.assertionRole() == EvidenceRef.CausalEvidenceRole.DIRECT_RELATIONSHIP_STATEMENT)) {
+            throw new IllegalStateException("EXPLICITLY_DOCUMENTED requires an inspectable direct assertion");
+        }
+        if (assessment.classification() == StoryContextAnalysisResult.CausalClassification.STRONGLY_SUPPORTED) {
+            long distinctReferences = assertions.stream().map(assertion -> assertion.evidenceReference().reference())
+                    .distinct().count();
+            long distinctDigests = assertions.stream().map(StoryContextAnalysisResult.EvidenceAssertion::resolvedContentDigest)
+                    .distinct().count();
+            if (distinctReferences < 2 || distinctDigests < 2) {
+                throw new IllegalStateException("STRONGLY_SUPPORTED requires two distinct resolved assertions");
+            }
+        }
+    }
+
+    private static void validateCausalClaims(
+            List<StoryContextAnalysisResult.CausalClaim> claims,
+            Set<String> allowedRefs,
+            Map<String, Object> groundingContract
+    ) {
+        if (Boolean.TRUE.equals(groundingContract.get("causalAnswerRequired")) && claims.isEmpty()) {
+            throw new IllegalStateException("causal answer is required; causalClaims must not be empty");
+        }
+        Object relationshipValue = groundingContract.get("causalRelationship");
+        if (Boolean.TRUE.equals(groundingContract.get("causalAnswerRequired"))
+                && relationshipValue instanceof Map<?, ?> relationship
+                && relationship.get("source") instanceof String source
+                && relationship.get("target") instanceof String target
+                && (claims.size() != 1
+                || !source.equals(claims.getFirst().source())
+                || !target.equals(claims.getFirst().target()))) {
+            throw new IllegalStateException("causal answer must contain exactly the required relationship: "
+                    + source + " -> " + target);
+        }
+        Set<String> relationships = new HashSet<>();
+        for (StoryContextAnalysisResult.CausalClaim claim : claims) {
+            String relationship = claim.source() + "\u0000" + claim.target();
+            if (!relationships.add(relationship)) {
+                throw new IllegalStateException("Duplicate causal relationship: "
+                        + claim.source() + " -> " + claim.target());
+            }
+            if (claim.causalClassification() != StoryContextAnalysisResult.CausalClassification.NOT_ESTABLISHED
+                    && claim.evidenceReferences().isEmpty()) {
+                throw new IllegalStateException("Affirmative causal claim requires evidence references: "
+                        + claim.source() + " -> " + claim.target());
+            }
+            boolean affirmativeBasis = claim.evidenceBasis()
+                    == StoryContextAnalysisResult.CausalEvidenceBasis.DIRECT_DOCUMENTATION
+                    || claim.evidenceBasis()
+                    == StoryContextAnalysisResult.CausalEvidenceBasis.MATERIAL_CORROBORATION;
+            if (claim.causalClassification()
+                    == StoryContextAnalysisResult.CausalClassification.NOT_ESTABLISHED
+                    && affirmativeBasis) {
+                throw new IllegalStateException("NOT_ESTABLISHED causal claim has affirmative evidence basis");
+            }
+            for (EvidenceRef evidenceRef : claim.evidenceReferences()) {
+                if (!allowedRefs.contains(evidenceRef.reference())) {
+                    throw new IllegalStateException(
+                            "Causal claim references unauthorized evidence: " + evidenceRef.reference());
+                }
+            }
+            StoryContextAnalysisResult.CausalClassification maximum = maximumDefensibleClassification(
+                    claim.evidenceReferences());
+            if (causalRank(claim.causalClassification()) > causalRank(maximum)) {
+                throw new IllegalStateException("Causal claim exceeds defensible evidence level: "
+                        + claim.source() + " -> " + claim.target());
+            }
+        }
+    }
+
+    private static StoryContextAnalysisResult.CausalClassification maximumDefensibleClassification(
+            List<EvidenceRef> evidenceReferences
+    ) {
+        if (evidenceReferences.isEmpty() || evidenceReferences.stream().anyMatch(reference ->
+                reference.role() == EvidenceRef.CausalEvidenceRole.NON_CAUSAL_CONTEXT
+                        || reference.role() == EvidenceRef.CausalEvidenceRole.CONTRADICTORY_EVIDENCE)) {
+            return StoryContextAnalysisResult.CausalClassification.NOT_ESTABLISHED;
+        }
+        if (evidenceReferences.stream().anyMatch(reference ->
+                reference.role() == EvidenceRef.CausalEvidenceRole.DIRECT_RELATIONSHIP_STATEMENT)) {
+            return StoryContextAnalysisResult.CausalClassification.EXPLICITLY_DOCUMENTED;
+        }
+        long materialReferences = evidenceReferences.stream()
+                .filter(reference -> reference.role() == EvidenceRef.CausalEvidenceRole.MATERIAL_RELATIONSHIP_SUPPORT)
+                .map(EvidenceRef::reference).distinct().count();
+        return materialReferences >= 2
+                ? StoryContextAnalysisResult.CausalClassification.STRONGLY_SUPPORTED
+                : StoryContextAnalysisResult.CausalClassification.NOT_ESTABLISHED;
+    }
+
+    private static int causalRank(StoryContextAnalysisResult.CausalClassification classification) {
+        return switch (classification) {
+            case NOT_ESTABLISHED -> 0;
+            case STRONGLY_SUPPORTED -> 1;
+            case EXPLICITLY_DOCUMENTED -> 2;
+        };
+    }
+
+    private static void validateGroundedFindings(
+            List<? extends Record> findings,
+            Set<String> allowedRefs,
+            boolean relationTypeRequired
+    ) {
         for (Record finding : findings) {
             try {
                 // Use reflection to access grounding() method
@@ -581,9 +779,8 @@ public class AnalyzeStoryContextUseCase {
                 List<EvidenceRef> evidenceRefs = (List<EvidenceRef>) evidenceRefsMethod.invoke(grounding);
 
                 for (EvidenceRef evidenceRef : evidenceRefs) {
-                    if (!allowedRefs.contains(evidenceRef.reference())) {
-                        var titleMethod = finding.getClass().getMethod("title");
-                        String title = (String) titleMethod.invoke(finding);
+                if (!allowedRefs.contains(evidenceRef.reference())) {
+                        String title = findingLabel(finding);
                         throw new IllegalStateException(
                                 "Finding '" + title + "' references unauthorized evidence: " + evidenceRef.reference()
                         );
@@ -594,8 +791,7 @@ public class AnalyzeStoryContextUseCase {
                 var classificationMethod = grounding.getClass().getMethod("classification");
                 String classification = (String) classificationMethod.invoke(grounding);
                 if (!Set.of("FACTUAL_EXTRACTION", "AI_INTERPRETATION", "RECOMMENDATION").contains(classification)) {
-                    var titleMethod = finding.getClass().getMethod("title");
-                    String title = (String) titleMethod.invoke(finding);
+                    String title = findingLabel(finding);
                     throw new IllegalStateException(
                             "Finding '" + title + "' has invalid classification: " + classification
                     );
@@ -604,8 +800,7 @@ public class AnalyzeStoryContextUseCase {
                 // Factual/Interpretative findings must be grounded with at least one evidence reference
                 if (("FACTUAL_EXTRACTION".equals(classification) || "AI_INTERPRETATION".equals(classification))
                         && evidenceRefs.isEmpty()) {
-                    var titleMethod = finding.getClass().getMethod("title");
-                    String title = (String) titleMethod.invoke(finding);
+                    String title = findingLabel(finding);
                     throw new IllegalStateException(
                             "Finding '" + title + "' of type " + classification + " must have at least one evidence reference"
                     );
@@ -614,17 +809,18 @@ public class AnalyzeStoryContextUseCase {
                 // Validate relationType
                 var relationTypeMethod = grounding.getClass().getMethod("relationType");
                 Object relationType = relationTypeMethod.invoke(grounding);
-                if (relationType == null) {
-                    var titleMethod = finding.getClass().getMethod("title");
-                    String title = (String) titleMethod.invoke(finding);
+                if (relationTypeRequired && relationType == null) {
+                    String title = findingLabel(finding);
                     throw new IllegalStateException(
-                            "Finding '" + title + "' must have relationType"
+                        "Finding '" + title + "' must have relationType"
                     );
+                }
+                if (relationType == null) {
+                    continue;
                 }
                 if (!Set.of("EXPLICIT", "TEMPORAL_PROXIMITY", "POSSIBLE_RELEVANCE", "INFERRED_HYPOTHESIS")
                         .contains(relationType.toString())) {
-                    var titleMethod = finding.getClass().getMethod("title");
-                    String title = (String) titleMethod.invoke(finding);
+                    String title = findingLabel(finding);
                     throw new IllegalStateException(
                             "Finding '" + title + "' has invalid relationType: " + relationType
                     );
@@ -633,5 +829,16 @@ public class AnalyzeStoryContextUseCase {
                 throw new IllegalStateException("Validation failed for finding: " + e.getMessage(), e);
             }
         }
+    }
+
+    private static String findingLabel(Record finding) throws ReflectiveOperationException {
+        for (String methodName : List.of("title", "componentName")) {
+            try {
+                return (String) finding.getClass().getMethod(methodName).invoke(finding);
+            } catch (NoSuchMethodException ignored) {
+                // Finding categories use either title or componentName as their display label.
+            }
+        }
+        throw new IllegalStateException("Finding has no display label: " + finding.getClass().getSimpleName());
     }
 }

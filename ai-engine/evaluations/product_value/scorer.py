@@ -12,7 +12,7 @@ from .experimental import (
     validate_comparable_metadata,
     validate_three_condition_capture,
 )
-from .interpretation import score_interpretation
+from .interpretation import adapt_production_story_context_result, score_interpretation
 
 
 def _set(value: Iterable[Any] | None) -> set[str]:
@@ -155,10 +155,15 @@ def evaluate_experimental_capture(
             expected = set(case.get("expectedEvidence", []))
             context_recall = None if not expected else len(expected & supplied) / len(expected)
             context_precision = None if not supplied else len(expected & supplied) / len(supplied)
+            interpretation_payload = actual.get("interpretation", {})
+            if actual.get("productionResult") is not None:
+                interpretation_payload = adapt_production_story_context_result(
+                    case, actual["productionResult"]
+                )
             interpretation = score_interpretation(
                 case,
                 context,
-                actual.get("interpretation", {}),
+                interpretation_payload,
                 constraint_support=(constraint_support or {}).get(case["caseId"]),
                 impact_support=(impact_support or {}).get(case["caseId"]),
             )

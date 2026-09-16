@@ -1,0 +1,1732 @@
+{
+  "benchmarkChanged": false,
+  "redArtifactPreserved": true,
+  "redArtifact": "ground-truth-live-2026-09-15.json",
+  "redArtifactSha256": "bf148c3ed4b5e697478d7dc3325dd7c39a0e8b3ec604fec85e4c1545145f4128",
+  "captureVersion": "2.0.0",
+  "capturedAt": "2026-09-15T19:40:33.920500+00:00",
+  "condition": "GROUND_TRUTH_CONTEXT",
+  "contextSource": "frozen Story0131 Ground-Truth Context",
+  "diagnostics": {
+    "abstentionAccuracy": 0.0,
+    "causalClaimStability": 0.5833333333333334,
+    "causalOverclaimRate": 1.0,
+    "roleAdmissibilityRate": 0.43333333333333335
+  },
+  "evidenceRemovalTests": {
+    "status": "FAIL",
+    "tests": [
+      {
+        "caseId": "CASE-01",
+        "pass": false,
+        "productionResult": {
+          "causalClaims": [
+            {
+              "causalClassification": "EXPLICITLY_DOCUMENTED",
+              "evidenceBasis": "DIRECT_DOCUMENTATION",
+              "evidenceReferences": [
+                {
+                  "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                  "resource": null,
+                  "role": "DIRECT_RELATIONSHIP_STATEMENT"
+                }
+              ],
+              "explanation": "The PaperSettlementService.java source explicitly demonstrates how PAPER execution mode leads to a particular settlement flow for accounts identified as PAPER accounts. It includes balance updates, position management, and trade exits tailored for PAPER execution, showing the detailed implementation of PAPER execution and settlement.",
+              "source": "Architectural decisions in Stories 0039-0042 regarding PAPER account execution and settlement",
+              "target": "Evolution of PAPER account execution and settlement"
+            },
+            {
+              "causalClassification": "EXPLICITLY_DOCUMENTED",
+              "evidenceBasis": "DIRECT_DOCUMENTATION",
+              "evidenceReferences": [
+                {
+                  "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                  "resource": null,
+                  "role": "DIRECT_RELATIONSHIP_STATEMENT"
+                }
+              ],
+              "explanation": "Within PaperSettlementService, identity consistency checks between BrokerAccount and Account user and broker fields prevent proceeding with inconsistent PAPER execution, which evolves settlement to ensure correctness and robustness.",
+              "source": "Architectural decision to enforce PAPER account identity consistency and execution mode checking",
+              "target": "Robustness and correctness of PAPER account execution and settlement flow"
+            },
+            {
+              "causalClassification": "EXPLICITLY_DOCUMENTED",
+              "evidenceBasis": "DIRECT_DOCUMENTATION",
+              "evidenceReferences": [
+                {
+                  "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                  "resource": null,
+                  "role": "DIRECT_RELATIONSHIP_STATEMENT"
+                }
+              ],
+              "explanation": "The code calls TradingCalculatorService to calculate profit and loss during exit settlement, affecting account equity and trade status, evolving PAPER settlement to accurately reflect financial results.",
+              "source": "Use of TradingCalculatorService to compute PnL during PAPER exit settlement",
+              "target": "Accurate equity and profit and loss calculations in PAPER account settlement"
+            },
+            {
+              "causalClassification": "EXPLICITLY_DOCUMENTED",
+              "evidenceBasis": "DIRECT_DOCUMENTATION",
+              "evidenceReferences": [
+                {
+                  "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+                  "resource": null,
+                  "role": "DIRECT_RELATIONSHIP_STATEMENT"
+                }
+              ],
+              "explanation": "The regression test explicitly routes PAPER execution to simulation fills and validates settlement and finalization, providing concrete evidence that evolution across Stories 0039-0042 includes test coverage ensuring fidelity of PAPER execution logic.",
+              "source": "Simulated execution adapter usage in test scenarios for PAPER execution",
+              "target": "Verification and robustness of PAPER execution and settlement implementation"
+            },
+            {
+              "causalClassification": "EXPLICITLY_DOCUMENTED",
+              "evidenceBasis": "DIRECT_DOCUMENTATION",
+              "evidenceReferences": [
+                {
+                  "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                  "resource": null,
+                  "role": "DIRECT_RELATIONSHIP_STATEMENT"
+                }
+              ],
+              "explanation": "PaperSettlementService validates that Account user equals BrokerAccount owner and that account broker matches provider name, establishing an authority model where execution and settlement only occur if account identity aligns with broker ownership, ensuring proper authority alignment in PAPER execution.",
+              "source": "Architectural decisions enforcing authority model linking BrokerAccount ownership and Account user identity",
+              "target": "Resulting authority model for PAPER account execution and settlement"
+            }
+          ]
+        },
+        "remainingEvidenceReferences": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/model/Account.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+        ],
+        "removedEvidenceReferences": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+          "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+          "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "retryCount": 0,
+        "validationError": null
+      },
+      {
+        "caseId": "CASE-02",
+        "pass": false,
+        "productionResult": {
+          "causalClaims": [
+            {
+              "causalClassification": "EXPLICITLY_DOCUMENTED",
+              "evidenceBasis": "DIRECT_DOCUMENTATION",
+              "evidenceReferences": [
+                {
+                  "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                  "resource": null,
+                  "role": "DIRECT_RELATIONSHIP_STATEMENT"
+                }
+              ],
+              "explanation": "The entire Story 0041 document explicitly states the architectural and domain constraints that must be preserved when PAPER execution or settlement mechanisms are modified. This includes preserving Account identity, execution mode boundaries, authority source, Market Data usage, domain failure semantics, UI adaptation, persistence and consistency promises, and security boundaries as authoritative constraints tied to PAPER modifications.",
+              "source": "PAPER execution or settlement is modified",
+              "target": "architectural and domain constraints must remain true"
+            }
+          ]
+        },
+        "remainingEvidenceReferences": [
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/service/ExecutionValidationService.java"
+        ],
+        "removedEvidenceReferences": [
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java"
+        ],
+        "retryCount": 0,
+        "validationError": null
+      },
+      {
+        "caseId": "CASE-03",
+        "pass": false,
+        "productionResult": {
+          "causalClaims": [
+            {
+              "causalClassification": "EXPLICITLY_DOCUMENTED",
+              "evidenceBasis": "DIRECT_DOCUMENTATION",
+              "evidenceReferences": [
+                {
+                  "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                  "resource": null,
+                  "role": "DIRECT_RELATIONSHIP_STATEMENT"
+                }
+              ],
+              "explanation": "The commit 18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149 explicitly documents implementing paper local full exit and modifying PaperSettlementService and PaperExitService, indicating that changes to the PAPER settlement strategy affect these production components that manage paper settlements and exits locally.",
+              "source": "PAPER settlement strategy changes",
+              "target": "production components managing paper local positions and executions (e.g., PaperSettlementService, PaperExitService)"
+            },
+            {
+              "causalClassification": "EXPLICITLY_DOCUMENTED",
+              "evidenceBasis": "DIRECT_DOCUMENTATION",
+              "evidenceReferences": [
+                {
+                  "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                  "resource": null,
+                  "role": "DIRECT_RELATIONSHIP_STATEMENT"
+                }
+              ],
+              "explanation": "The same commit adds tests such as PaperExitAcceptanceIntegrationTest and PaperSettlementExitTest to validate the new paper local full exit functionality, showing that changes in PAPER settlement affect the related test suites.",
+              "source": "PAPER settlement strategy changes",
+              "target": "tests related to paper positions and exits, e.g., PaperExitAcceptanceIntegrationTest, PaperSettlementExitTest"
+            },
+            {
+              "causalClassification": "STRONGLY_SUPPORTED",
+              "evidenceBasis": "MATERIAL_CORROBORATION",
+              "evidenceReferences": [
+                {
+                  "reference": "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+                  "resource": null,
+                  "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+                },
+                {
+                  "reference": "trading-core/src/test/java/com/hope/trading/trading_core/controller/PositionControllerTest.java",
+                  "resource": null,
+                  "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+                }
+              ],
+              "explanation": "The commit bc5e9872549e15b4cb292b51cbf6baf88ad97ed3 together with PositionControllerTest.java shows enhanced exposure and querying of paper positions, and the test verifies behavior for paper execution mode using internal state, supporting that changes in PAPER settlement strategy impact position query and controller components and their tests.",
+              "source": "PAPER settlement strategy changes",
+              "target": "PositionQueryService and PositionController handling paper positions"
+            }
+          ]
+        },
+        "remainingEvidenceReferences": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/aggregate/ExecutionIntent.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/controller/PositionControllerTest.java",
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3"
+        ],
+        "removedEvidenceReferences": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+        ],
+        "retryCount": 0,
+        "validationError": null
+      }
+    ]
+  },
+  "humanUtility": "NOT_YET_ESTABLISHED",
+  "interpretationStability": 0.7983058608058609,
+  "model": "gpt-4.1-mini",
+  "modelChanged": false,
+  "oracleChanged": false,
+  "provider": "openai",
+  "repetitionsPerCase": 3,
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "retrievalChanged": false,
+  "runs": [
+    {
+      "caseId": "CASE-01",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "Story 0039 explicitly establishes a durable canonical relation from Account to BrokerAccount and mandates explicit PAPER provisioning with a valid versioned RiskProfile, replacing ambiguous owner/provider inference and legacy rules. Migration safety and ownership invariants are enforced, evolving the PAPER account identity model.",
+            "source": "Canonical Account to BrokerAccount relationship and explicit PAPER provisioning (Story 0039)",
+            "target": "PAPER account identity and provisioning evolution"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "Story 0040 defines a neutral application-level Risk Facts router that resolves canonical financial Account and linked BrokerAccount and selects authoritative PAPER or LIVE facts sources, ensuring T0 and T1 risk evaluations use the same financial Account and RiskProfile, preserving deterministic fail-closed behavior.",
+            "source": "Mode-aware neutral Risk Facts boundary (Story 0040)",
+            "target": "Risk facts sourcing and T0/T1 evaluation consistent across PAPER and LIVE"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "Story 0041 introduces mode-specific position querying by resolving Account and linked BrokerAccount, selecting PAPER position state and Market Data for valuation, distinct from LIVE broker facts, producing a neutral position response with mode/source markers and valuation freshness semantics.",
+            "source": "PAPER local position query and valuation exposed via normal product endpoint (Story 0041)",
+            "target": "Position query evolution to support PAPER specific authority and valuation"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "Story 0042 implements PAPER full exit semantics distinct from LIVE by resolving and authorizing local OPEN PAPER Trade, simulating exit fills, performing atomic local settlement with realized PnL and CLOSED state persistence, preserving idempotency and audit, without Broker Service involvement.",
+            "source": "PAPER full exit implemented locally with distinct semantics from LIVE (Story 0042)",
+            "target": "Execution and settlement evolution for PAPER full close"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-042 and ADR-043 decisions specify that LIVE position authority remains with external brokers and BrokerAccount execution mode, while PAPER position authority and financial state reside within Trading Core, represented minimally by the legacy Trade aggregate, with an explicit, durable Account-BrokerAccount relation establishing identity and execution boundaries.",
+            "source": "Stories 0039-0042 architectural decisions (ADR-042 and ADR-043)",
+            "target": "Resulting authority model for PAPER and LIVE"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 1,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": null,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            null,
+            []
+          ],
+          [
+            "claim-2",
+            null,
+            []
+          ],
+          [
+            "claim-3",
+            "EXPLICITLY_DOCUMENTED",
+            [
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "DIRECT_RELATIONSHIP_STATEMENT"
+            ]
+          ],
+          [
+            "claim-4",
+            "EXPLICITLY_DOCUMENTED",
+            [
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "DIRECT_RELATIONSHIP_STATEMENT"
+            ]
+          ],
+          [
+            "claim-5",
+            "EXPLICITLY_DOCUMENTED",
+            [
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "DIRECT_RELATIONSHIP_STATEMENT"
+            ]
+          ]
+        ],
+        "causalClaimsMeasured": 5,
+        "causalOverclaimRate": null,
+        "causalReasoningAccuracy": 0.4,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+          "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+          "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java"
+        ],
+        "roleAdmissibilityRate": 0.6,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-01",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-042 clearly documents the evolution of PAPER account execution and settlement, establishing explicit mode boundaries and the distinct architecture for PAPER with Trading Core owning simulated financial truth, differentiating it from LIVE mode. It defines MODE_SPECIFIC position authority, PAPER settlement semantics, exit semantics, and explicit requirements for PAPER without reusing LIVE provider mutation models, directly explaining the evolution across the specified Stories.",
+            "source": "ADR-042 - Position Authority and Close Semantics by Execution Mode",
+            "target": "Evolution of PAPER account execution and settlement across Stories 0039-0042"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-042 defines the architectural decision that LIVE_POSITION_AUTHORITY is the external BROKER, while PAPER_POSITION_AUTHORITY is TRADING_CORE. It mandates mode-specific authority boundaries, product close routing, explicit EXIT execution intents for PAPER, and use of the existing Trade as minimal PAPER position projection. These decisions directly cause the evolution in execution and settlement and define the resulting authority model.",
+            "source": "Architectural decisions in ADR-042 causing evolution in PAPER execution and settlement",
+            "target": "Resulting authority model for PAPER and LIVE positions"
+          },
+          {
+            "causalClassification": "STRONGLY_SUPPORTED",
+            "evidenceBasis": "MATERIAL_CORROBORATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              }
+            ],
+            "explanation": "Story 0039 implements the explicit durable relation between financial Account and BrokerAccount, establishes explicit PAPER provisioning with versioned RiskProfile assignment, and makes provisioning deterministic and fail-closed. These implementation activities concretize the architectural decisions from ADR-042 into an evolved PAPER account identity and provisioning model, supporting the evolution of PAPER execution and settlement.",
+            "source": "Story 0039 - Persisted Account Identity and Explicit PAPER Provisioning",
+            "target": "Evolution of PAPER account execution and settlement"
+          },
+          {
+            "causalClassification": "STRONGLY_SUPPORTED",
+            "evidenceBasis": "MATERIAL_CORROBORATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              }
+            ],
+            "explanation": "Story 0040 introduces a mode-aware neutral Risk Facts boundary resolving canonical financial Account, linked BrokerAccount, and execution mode to select authoritative LIVE or PAPER fact sources. This supports the distinct authority and fact acquisition model required by ADR-042 and ADR-043, constituting an evolution in execution validation and risk evaluation supporting the PAPER model.",
+            "source": "Story 0040 - Mode-Aware Neutral Risk Facts for Canonical T0/T1 Evaluation",
+            "target": "Evolution and authority model of PAPER execution and settlement"
+          },
+          {
+            "causalClassification": "STRONGLY_SUPPORTED",
+            "evidenceBasis": "MATERIAL_CORROBORATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/model/Account.java",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              }
+            ],
+            "explanation": "Story 0041 evolves the PAPER position query to be observable through normal product position queries using local persisted OPEN Trade state, preserving mode-specific source selection and authority. PAPER uses local Trading Core state for position authority while LIVE continues using Broker Service/provider facts, supporting the authority boundary defined in ADR-042.",
+            "source": "Story 0041 - PAPER Local Position Query and Valuation",
+            "target": "Evolution and authority of PAPER position query and valuation"
+          },
+          {
+            "causalClassification": "STRONGLY_SUPPORTED",
+            "evidenceBasis": "MATERIAL_CORROBORATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              }
+            ],
+            "explanation": "Story 0042 implements human-authorized full local PAPER position exit using explicit EXIT execution intents, local Trade resolution, atomic settlement of realized PnL and CLOSED status, preserving idempotency and audit without invoking LIVE Broker Service mutation. These implementations realize the architectural plan in ADR-042, evolving PAPER execution and settlement with a distinct authority and mechanism model.",
+            "source": "Story 0042 - PAPER Local Full Exit",
+            "target": "Evolution, architectural decisions, and authority model for PAPER exit and settlement"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 2,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": null,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            "EXPLICITLY_DOCUMENTED",
+            [
+              "DIRECT_RELATIONSHIP_STATEMENT"
+            ]
+          ],
+          [
+            "claim-2",
+            null,
+            []
+          ],
+          [
+            "claim-3",
+            "STRONGLY_SUPPORTED",
+            [
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT"
+            ]
+          ],
+          [
+            "claim-4",
+            "STRONGLY_SUPPORTED",
+            [
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT"
+            ]
+          ],
+          [
+            "claim-5",
+            "STRONGLY_SUPPORTED",
+            [
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT"
+            ]
+          ]
+        ],
+        "causalClaimsMeasured": 5,
+        "causalOverclaimRate": null,
+        "causalReasoningAccuracy": 0.4,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+          "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+          "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/model/Account.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+        ],
+        "roleAdmissibilityRate": 0.8,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-01",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "The evolution of PAPER account execution and settlement across Stories 0039-0042 is directly caused by the architectural decisions documented in ADR-042 and ADR-043, which establish strict execution mode boundaries, distinct account identities, and mode-specific risk facts sourcing. Story 0039 establishes persisted account identity with an explicit canonical relation to the BrokerAccount and makes PAPER provisioning deterministic and fail-closed. Story 0040 implements a mode-aware neutral Risk Facts boundary ensuring T0 and T1 evaluations use the correct financial account identity and assigned risk profile. Story 0041 exposes PAPER local positions and valuation through the normal product position query while preserving LIVE broker authority. Story 0042 implements PAPER local full exit, routing the full close through the local simulation and settlement without Broker Service involvement, maintaining idempotency and proper accounting.",
+            "source": "Architectural decisions in ADR-042, ADR-043, and Stories 0039-0042",
+            "target": "Evolution of PAPER account execution and settlement"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-042 explicitly defines the resulting authority model where LIVE_POSITION_AUTHORITY is the external BROKER, and PAPER_POSITION_AUTHORITY is TRADING_CORE. It further specifies that PAPER does not rely on external reconciliation or broker credentials and instead maintains local authoritative state in Trading Core. This model directly causes mode-specific authority separation for execution, mutation mechanics, and risk evaluation.",
+            "source": "Key architectural decisions in ADR-042",
+            "target": "Resulting authority model for PAPER and LIVE modes"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              }
+            ],
+            "explanation": "Story 0039 documents and implements creating a durable canonical link between Account and BrokerAccount along with an explicit RiskProfile assignment for PAPER provisioning. The commit shows implementation enforcing these constraints, making provisioning deterministic and fail-closed without introducing ambiguity or risking partial state.",
+            "source": "Changes made in Story 0039 provisioning and persistence",
+            "target": "Deterministic and fail-closed PAPER provisioning with explicit risk profile assignment"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              }
+            ],
+            "explanation": "Story 0040 introduces a neutral Risk Facts boundary that resolves the canonical financial Account and linked BrokerAccount, selects authoritative fact sources per execution mode (LIVE or PAPER), and assembles accurate Risk Domain snapshots for T0 and T1. The implementation commit adds mode-aware routing preserving independent external BROKER authority for LIVE and Trading Core local authority for PAPER, preventing incorrect substitutions and preserving fail-closed behavior.",
+            "source": "Implementation of mode-aware neutral Risk Facts in Story 0040",
+            "target": "Accurate T0/T1 risk evaluation respecting PAPER and LIVE authority"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              }
+            ],
+            "explanation": "Story 0041 implements a mode-specific position query that respects the execution mode to select either persisted OPEN PAPER Trades locally or Broker Service facts for LIVE. The implementation explicitly avoids Broker Service calls for PAPER and exposes valuation based on Market Data snapshots and local state, along with adequate freshness and status metadata, fulfilling the product goal for the PAPER position observable.",
+            "source": "Story 0041 PAPER local position query and valuation implementation",
+            "target": "Mode-specific position query and valuation returning open PAPER positions without Broker Service calls"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              }
+            ],
+            "explanation": "Story 0042 delivers human-authorized, full position exit functionality for PAPER that uses a semantically distinct EXIT execution intent, simulates the opposite side execution using Market Data and order/fill paths, and conducts atomic settlement and persistence locally. It ensures idempotency, proper profit and loss accounting, state closure, and rejects invalid or concurrent exits. The LIVE close path is preserved unchanged through the Broker Service. The commit and service code show concrete implementation details and supporting regressions.",
+            "source": "Story 0042 PAPER local full exit implementation",
+            "target": "Full close execution and settlement using local PAPER authority without Broker Service"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 3,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": null,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            "EXPLICITLY_DOCUMENTED",
+            [
+              "DIRECT_RELATIONSHIP_STATEMENT"
+            ]
+          ],
+          [
+            "claim-2",
+            null,
+            []
+          ],
+          [
+            "claim-3",
+            "EXPLICITLY_DOCUMENTED",
+            [
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "MATERIAL_RELATIONSHIP_SUPPORT"
+            ]
+          ],
+          [
+            "claim-4",
+            "EXPLICITLY_DOCUMENTED",
+            [
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "MATERIAL_RELATIONSHIP_SUPPORT"
+            ]
+          ],
+          [
+            "claim-5",
+            "EXPLICITLY_DOCUMENTED",
+            [
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT"
+            ]
+          ]
+        ],
+        "causalClaimsMeasured": 5,
+        "causalOverclaimRate": null,
+        "causalReasoningAccuracy": 0.6,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+          "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+          "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+        ],
+        "roleAdmissibilityRate": 0.8,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-02",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-042 explicitly defines and documents the architectural and domain constraints that must remain true if PAPER execution or settlement is modified, including mode-specific position authority, separation of LIVE and PAPER concerns, the use of local Trade as PAPER position projection, explicit EXIT execution intent for PAPER closes, atomic settlement, idempotency, and domain invariants forbidding PAPER from calling Broker Service mutation or reconciliation APIs.",
+            "source": "Modification of PAPER execution or settlement",
+            "target": "Architectural and domain constraints for PAPER positions"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-043 explicitly defines and documents the requirements for distinct Account and BrokerAccount identities, their explicit durable canonical relationship, ownership and provider consistency, execution mode authority on BrokerAccount, and mode-specific risk facts sourcing essential for correct PAPER execution or settlement.",
+            "source": "Modification of PAPER execution or settlement",
+            "target": "Account and BrokerAccount identity and risk facts correctness"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "The PaperSettlementService.java source explicitly embodies the domain constraints and methods for PAPER execution settlement, including atomic mutation of balances and Trades, correct PnL calculation, use of local Account authority, enforcement of PAPER-specific invariants such as no opposite exposure creation on exit, and role of fills and execution intents.",
+            "source": "Modification of PAPER execution or settlement",
+            "target": "PAPER settlement domain logic and financial state mutation"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/service/ExecutionValidationService.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "The ExecutionValidationService.java code enforces domain constraints around execution intents, including mandatory risk approval for ENTRY intents but not for EXIT intents, ensuring that PAPER exit intents conform to reducing position semantics distinct from entry.",
+            "source": "Modification of PAPER execution or settlement",
+            "target": "Execution validation rules distinguishing ENTRY and EXIT intents"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 1,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": null,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            null,
+            []
+          ],
+          [
+            "claim-2",
+            null,
+            []
+          ],
+          [
+            "claim-3",
+            null,
+            []
+          ]
+        ],
+        "causalClaimsMeasured": 3,
+        "causalOverclaimRate": null,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/service/ExecutionValidationService.java"
+        ],
+        "roleAdmissibilityRate": 0.0,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-02",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-042 thoroughly documents that when PAPER execution or settlement is modified, specific architectural and domain constraints must remain true. These constraints include explicit, mode-specific position authority, with PAPER position authority vested in Trading Core, not external broker/provider. The architecture mandates that PAPER executions do not depend on broker identity, mutation scope, or Broker Service, and must use local persisted state for positions and settlement. Key constraints include executing full close only with local authority, enforcing deterministic reducing-exit risk validation without entry-only prerequisites, atomic transaction boundaries over local financial effects, idempotency in exit actions, and preventing PAPER from calling Broker Service mutation APIs. The decision summary and architectural invariants clearly state these mode-specific constraints that must remain true upon any modification to PAPER execution or settlement.",
+            "source": "Modification of PAPER execution or settlement",
+            "target": "Architectural and domain constraints adherence"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-043 explains that PAPER mode depends on correct, durable identity management between the financial Account and the execution/routing BrokerAccount. Modifying PAPER execution or settlement must preserve distinct identities, maintain explicit canonical relations between Account and BrokerAccount, enforce ownership and provider invariants, ensure execution mode is authoritative on BrokerAccount, and require explicit, versioned risk profile assignments for PAPER accounts. This identity and risk facts management is a domain-level constraint that must be true for safe and deterministic PAPER execution and settlement.",
+            "source": "Modification of PAPER execution or settlement",
+            "target": "Account and BrokerAccount identity and risk facts management"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "The PaperSettlementService implementation evidences the domain constraint that PAPER settlement must transact atomically the local financial mutations, including balances, positions (Trades), execution attempts, and intents. It demonstrates enforcing ownership verification, mode checking, updating balances and positions for entries and exits separately, state persistence, and recalculating equity atomically under a transaction boundary. This source shows concrete application enforcement of the architectural constraints requiring that modifying PAPER execution or settlement preserves transactional atomicity and local authority semantics.",
+            "source": "Modification of PAPER execution or settlement",
+            "target": "Consistent, atomic accounting and state mutation for PAPER positions"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 2,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": null,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            null,
+            []
+          ],
+          [
+            "claim-2",
+            null,
+            []
+          ],
+          [
+            "claim-3",
+            null,
+            []
+          ]
+        ],
+        "causalClaimsMeasured": 3,
+        "causalOverclaimRate": null,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java"
+        ],
+        "roleAdmissibilityRate": 0.0,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-02",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-042 explicitly documents that Trading OS SHALL maintain explicit, mode-specific position authority with PAPER_POSITION_AUTHORITY = TRADING_CORE. PAPER execution and settlement must not rely on external Broker Service mutation or reconciliation. PAPER entry and exit commands use local simulated fills and PAPER settlement mutates local Account and Trade state with atomic transactions. PAPER mode execution SHALL share concepts with LIVE mode such as human authorization, idempotency, deterministic safety validation, execution audit, and provider-neutral outcome concepts only where meanings overlap, but must keep authority, mutation mechanics, and reconciliation assumptions mode-specific and distinct. PAPER full close is represented as a local EXIT with explicit purpose and local Open Trade target, supporting only full close with no partial close or exposure reversal. Risk evaluation for PAPER exit uses deterministic reducing-exit validation without requiring entry-only trade plan approval. PAPER settlement cannot silently complete without financial state. Local PAPER position projection uses legacy Trade entity as minimal and authoritative local state. Market Data provides valuation inputs but does not own position lifecycle. PAPER exit does not call Broker Service APIs. These architectural and domain constraints establish the boundaries and requirements that must be maintained if PAPER execution or settlement is changed.",
+            "source": "PAPER execution or settlement modification",
+            "target": "Architectural and domain constraints for PAPER mode"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-043 defines the explicit, durable canonical relation between financial Account.accountId and execution/routing BrokerAccount.id, with ownership and provider invariants required to maintain consistent identity and authorization. This is required for correct resolution in PAPER mode, keeping identities distinct and preventing ambiguous lookups. Story 0039 implements persisted canonical Account-to-BrokerAccount relation and explicit versioned RiskProfile assignment required for deterministic fail-closed PAPER provisioning and risk evaluation. These identity and risk configuration constraints must hold true if PAPER execution or settlement is modified.",
+            "source": "Modification of PAPER position execution or settlement",
+            "target": "Requirement for canonical Account and BrokerAccount identity relation and risk configuration"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "Story 0040 mandates that risk evaluation for PAPER and LIVE modes must use a single neutral Risk Facts boundary that selects authoritative fact sources by execution mode, using the financial Account and linked BrokerAccount identity. For PAPER, local Trading Core financial facts including Account, AccountBalance, Trade, and execution/fill state authorize the Risk Facts facts and valuation inputs, supplemented only by Market Data for current prices. PAPER risk evaluation cannot rely on Broker Service or external provider facts or credentials. Fail-closed behavior is mandated if required facts, configuration, or valuation data is missing or inconsistent. This architectural constraint must remain if PAPER execution or settlement is modified to preserve safety and correctness of risk evaluation.",
+            "source": "Modification to PAPER position execution and settlement",
+            "target": "Use of mode-neutral, authoritative Risk Facts boundary with mode-specific fact providers for PAPER"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-042 requires PAPER local financial application mutations such as BrokerOrder, Fill, Account balance mutation, Trade/position mutation, ExecutionAttempt and ExecutionIntent finalization to have a single transaction owner and commit atomically. PAPER settlement must not silently complete without financial state. Story 0042 explicitly implements atomic local mutation of balances, trades, and realized PnL during PAPER exit settlement. PaperSettlementService sets and persists CLOSED status, exit price, realized PnL, updated balances and equity atomically and enforces idempotency and conflict protections. These atomicity and persistence constraints must be maintained if PAPER execution or settlement is changed to preserve consistency and correctness.",
+            "source": "Modification of PAPER execution or settlement logic",
+            "target": "Persistence and atomicity constraints on local PAPER financial effect mutations"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-042 mandates that LIVE full close remains routed through PositionCloseCommand and Broker Service with broker authority and external reconciliation, while PAPER full close is via a separate EXIT execution intent processed by local simulation and settlement with Trading Core authority. Story 0042 implements PAPER local full exit that keeps LIVE close path unchanged and preserves separate authorities and mutation mechanisms. PAPER never calls Broker Service mutation or reconciliation APIs. These separation constraints on execution and settlement paths by mode must be upheld if PAPER execution or settlement is modified.",
+            "source": "Modification to PAPER execution or settlement",
+            "target": "Separation of LIVE and PAPER close execution paths and authorities"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 3,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": null,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            null,
+            []
+          ],
+          [
+            "claim-2",
+            null,
+            []
+          ],
+          [
+            "claim-3",
+            null,
+            []
+          ]
+        ],
+        "causalClaimsMeasured": 3,
+        "causalOverclaimRate": null,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java"
+        ],
+        "roleAdmissibilityRate": 0.0,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-03",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": "PaperSettlementService source code",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+                "resource": "ExecutionConfiguration wiring PaperSettlementService bean",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "The PaperSettlementService class handles the paper settlement strategy logic explicitly and is wired as a service bean in ExecutionConfiguration. Changes in paper settlement strategy would directly affect this production component as it implements the settlement logic for PAPER executionMode.",
+            "source": "PAPER settlement strategy change",
+            "target": "PaperSettlementService production component"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+                "resource": "Unit tests for PaperSettlementService exit scenarios",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+                "resource": "Vertical regression test invoking PaperSettlementService",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "Tests specifically target PaperSettlementService functionality and validate settlement logic for PAPER execution mode, indicating these tests are affected by any change in Paper settlement strategy.",
+            "source": "PAPER settlement strategy change",
+            "target": "PaperSettlementService regressions and exit tests"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+                "resource": "ExecuteTradeService source invoking PaperSettlementService via ExecutionFinalizationStep",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+                "resource": "ExecutionConfiguration wiring ExecuteTradeService and ExecutionFinalizationStep with PaperSettlementService",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ExecuteTradeService coordinates the trade execution including finalization step, which uses PaperSettlementService to settle PAPER mode executions, so changes in paper settlement impact this service and its orchestration.",
+            "source": "PAPER settlement strategy change",
+            "target": "ExecuteTradeService execution flow involving PaperSettlementService"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 1,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": null,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            null,
+            []
+          ],
+          [
+            "claim-2",
+            null,
+            []
+          ]
+        ],
+        "causalClaimsMeasured": 2,
+        "causalOverclaimRate": null,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+        ],
+        "roleAdmissibilityRate": 0.0,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-03",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": "PaperSettlementService source code",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+                "resource": "ExecutionConfiguration wiring showing paperSettlementService and ExecutionFinalizationStep beans",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+                "resource": "ExecuteTradeService orchestrates execution and includes paper settlement step",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "The PaperSettlementService.java source explicitly defines how paper settlement operates on Orders and Accounts only when the BrokerAccount is in ExecutionMode.PAPER. The ExecutionConfiguration.java defines PaperSettlementService as a bean used by the ExecutionFinalizationStep. The ExecuteTradeService invokes this finalization step, implying that any change in PAPER settlement strategy affects the components involved in execution, specifically PaperSettlementService and ExecutionFinalizationStep.",
+            "source": "change of PAPER settlement strategy",
+            "target": "production components related to paper trading"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+                "resource": "Vertical regression tests showing execution flow and verifying PaperSettlementService settlement calls",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+                "resource": "Unit tests targeting paper exit scenario affecting balances and trade status via PaperSettlementService",
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "The tests in PaperExecutionVerticalRegressionTest verify that paper executions use PaperSettlementService to settle accounts and update balances correctly. The PaperSettlementExitTest includes scenarios specifically for paper exit settlement verifying cash, equity, and PnL calculations. Thus, any change in the PAPER settlement strategy would affect these test components and require corresponding updates.",
+            "source": "change of PAPER settlement strategy",
+            "target": "tests in PaperExecutionVerticalRegressionTest and PaperSettlementExitTest"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 2,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": null,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            null,
+            []
+          ],
+          [
+            "claim-2",
+            null,
+            []
+          ]
+        ],
+        "causalClaimsMeasured": 2,
+        "causalOverclaimRate": null,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+        ],
+        "roleAdmissibilityRate": 0.0,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-03",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "The PaperSettlementService class explicitly performs settlements only if the broker account's execution mode is PAPER. The ExecuteTradeService uses a pipeline that includes the ExecutionFinalizationStep, which receives PaperSettlementService as a dependency, indicating that finalization involves paper settlement logic. The configuration class ExecutionConfiguration defines beans that route paper execution to SimulatedExecutionAdapter and PaperSettlementService, documented in bean definitions. The PaperExecutionVerticalRegressionTest validates that execution with PAPER mode routes to simulation and uses PaperSettlementService to settle and finalize, confirming the causal link from PAPER strategy change to impacts on these components.",
+            "source": "PAPER settlement strategy",
+            "target": "production components: PaperSettlementService, ExecuteTradeService, ExecutionFinalizationStep, RoutingBrokerExecutionAdapter, SimulatedExecutionAdapter"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "The PaperSettlementExitTest explicitly tests PAPER settlement behavior for exit trades, demonstrating the effect of PAPER settlement strategy on account state changes and trade lifecycle. The PaperExecutionVerticalRegressionTest covers executions routed through PAPER mode which trigger settlement and finalization steps. These tests validate that changes in PAPER settlement logic directly affect test outcomes and coverage for production components handling PAPER settlements.",
+            "source": "PAPER settlement strategy",
+            "target": "tests related to paper execution and settlement"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 3,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": null,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            null,
+            []
+          ],
+          [
+            "claim-2",
+            null,
+            []
+          ]
+        ],
+        "causalClaimsMeasured": 2,
+        "causalOverclaimRate": null,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+        ],
+        "roleAdmissibilityRate": 0.0,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-04",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-043 outlines the architectural decisions and invariants for account identity and risk facts handling, including explicit durable relations and mode-correct risk facts routing. Story 0042 implements a PAPER local full exit without routing through Broker Service, explicitly referencing and conforming to ADR-043 (see Story 0042 metadata: Related ADRs include ADR-043). The commit merging Story 0042 includes implementation consistent with ADR-043. The ExecutionConfiguration Java source shows configuration beans supporting both LIVE and PAPER execution adapters consistent with ADR-043's architectural boundaries, confirming the refactor's causal link to ADR-043. Thus, ADR-043 caused the specific ExecutionConfiguration refactor delivered by Story 0042.",
+            "source": "ADR-043",
+            "target": "ExecutionConfiguration refactor delivered by Story 0042"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 1,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": 0.0,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            "EXPLICITLY_DOCUMENTED",
+            [
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "DIRECT_RELATIONSHIP_STATEMENT"
+            ]
+          ]
+        ],
+        "causalClaimsMeasured": 1,
+        "causalOverclaimRate": 1.0,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java"
+        ],
+        "roleAdmissibilityRate": 1.0,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 0.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-04",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "STRONGLY_SUPPORTED",
+            "evidenceBasis": "MATERIAL_CORROBORATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": "docs/architecture/adr/ADR-043.md",
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              },
+              {
+                "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                "resource": null,
+                "role": "MATERIAL_RELATIONSHIP_SUPPORT"
+              }
+            ],
+            "explanation": "ADR-043 defines architectural principles and requirements about the explicit durable canonical Account-to-BrokerAccount relation, mode-aware Risk Facts routing, and identity flows that Story 0042 relies upon. Story 0042's acceptance criteria and architectural constraints explicitly reference ADR-043 for account ownership and canonical relationships to validate before mutation, indicating that the implementation follows ADR-043's requirements. The merged commit for Story 0042 includes related code changes respecting these principles, corroborating that ADR-043 concepts causally influenced the execution configuration and implementation delivered by Story 0042.",
+            "source": "ADR-043",
+            "target": "Story 0042 - PAPER Local Full Exit"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 2,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": 0.0,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            "STRONGLY_SUPPORTED",
+            [
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT",
+              "MATERIAL_RELATIONSHIP_SUPPORT"
+            ]
+          ]
+        ],
+        "causalClaimsMeasured": 1,
+        "causalOverclaimRate": 1.0,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "roleAdmissibilityRate": 1.0,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 0.0
+      },
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-04",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              },
+              {
+                "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                "resource": null,
+                "role": "DIRECT_RELATIONSHIP_STATEMENT"
+              }
+            ],
+            "explanation": "ADR-043 is the architectural decision record that defines the explicit durable canonical Account-to-BrokerAccount relationship and the overall architecture for PAPER account identity and mode-aware risk facts routing. Story 0042 implements PAPER Local Full Exit functionality that depends on and uses the architectural principles from ADR-043, including the canonical Account-to-BrokerAccount relation, execution mode separation, and risk facts boundaries. The ExecutionConfiguration.java file shows the configuration beans that support execution services aligned with ADR-043 architecture. The merge commit 18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149 integrates Story 0042 implementation adhering to the ADR-043 decisions, confirming that ADR-043 caused the delivery of the specific refactor and functionality in Story 0042.",
+            "source": "ADR-043",
+            "target": "Story 0042 - PAPER Local Full Exit ExecutionConfiguration refactor"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 3,
+      "retryCount": 0,
+      "score": {
+        "abstentionAccuracy": 0.0,
+        "causalClaimSignature": [
+          [
+            "claim-1",
+            "EXPLICITLY_DOCUMENTED",
+            [
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "DIRECT_RELATIONSHIP_STATEMENT",
+              "DIRECT_RELATIONSHIP_STATEMENT"
+            ]
+          ]
+        ],
+        "causalClaimsMeasured": 1,
+        "causalOverclaimRate": 1.0,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java"
+        ],
+        "roleAdmissibilityRate": 1.0,
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 0.0
+      },
+      "validationError": null
+    }
+  ],
+  "status": "EXECUTED",
+  "story": "0132",
+  "thresholdEvaluation": {
+    "case04NotEstablishedRuns": 0,
+    "case04Runs": 3,
+    "diagnostics": {
+      "abstentionAccuracy": 0.0,
+      "causalClaimStability": 0.5833333333333334,
+      "causalOverclaimRate": 1.0,
+      "roleAdmissibilityRate": 0.43333333333333335
+    },
+    "groundingPass": true,
+    "pass": false,
+    "positiveCausalAccuracy": 0.15555555555555556,
+    "stability": 0.7983058608058609,
+    "thresholdVersion": "1.0.0",
+    "unsupportedInferencePass": false
+  },
+  "thresholds": {
+    "case04": {
+      "requiredClassification": "NOT_ESTABLISHED",
+      "requiredPasses": 3,
+      "requiredRuns": 3
+    },
+    "groundingRequired": true,
+    "positiveCausalAccuracyMin": 0.8,
+    "stabilityMin": 0.9,
+    "thresholdVersion": "1.0.0",
+    "unsupportedInferenceRateMax": 0.0
+  },
+  "thresholdsChanged": false,
+  "tradingOsModified": false
+}

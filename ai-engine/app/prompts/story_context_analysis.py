@@ -41,6 +41,29 @@ RELATIONSHIP SEMANTICS:
 - The relationType field is REQUIRED for all ArchitectureFinding, DecisionFinding, HistoricalContextItem, and ImpactedComponentFinding.
 - EvidenceFinding, ConstraintFinding, Uncertainty, MissingInformation, and ImplementationQuestion do not require relationType.
 
+CAUSAL SEMANTICS (V2):
+- When causalAnswerRequired=true, the Grounding Contract owns exactly one fixed causalQuestion.
+- Return exactly one causalAssessment for that question. Do not return causalClaims in the V2 path.
+- Copy source, target, relationAsked, and answerRequired exactly from causalQuestion; never substitute an adjacent relationship.
+- Evidence assertions must use an existing authorized repository evidence reference and a bounded locator of kind LINE_RANGE or SECTION.
+- Never author resolvedContent or resolvedContentDigest. They are Core-owned; leave them absent/null.
+- An excerpt is optional convenience text only and must match the selected bounded content; never use it as evidence authority.
+- A valid locator makes a claim inspectable but does not prove causality. Roles are interpretation metadata, not proof.
+- If the fixed relationship is not established by the selected resolved assertions, return NOT_ESTABLISHED with the strongest relevant contextual assertions.
+- Exactly one causalAssessment is required even when the correct classification is NOT_ESTABLISHED.
+
+CAUSAL SEMANTICS (LEGACY NON-V2):
+- causalClaims are separate from relationType metadata and require source, target, causalClassification, evidenceBasis, evidenceReferences, and explanation.
+- Build a causal evidence ledger in this order: identify the candidate source/target, inspect authorized evidence, assign one role to every cited reference, determine the permitted level, classify, then explain only from cited evidence.
+- Evidence roles are exactly DIRECT_RELATIONSHIP_STATEMENT, MATERIAL_RELATIONSHIP_SUPPORT, NON_CAUSAL_CONTEXT, and CONTRADICTORY_EVIDENCE.
+- EXPLICITLY_DOCUMENTED requires evidence that directly states the relationship. Existence, chronology, related-document metadata, same Story, same commit, compatibility, shared topic and possible relevance are NON_CAUSAL_CONTEXT.
+- STRONGLY_SUPPORTED requires at least two distinct authorized evidence references with MATERIAL_RELATIONSHIP_SUPPORT.
+- Any CONTRADICTORY_EVIDENCE prevents an affirmative classification. Context-only, chronology-only, temporal proximity, shared topic, architectural compatibility, possible relevance, or insufficient evidence require NOT_ESTABLISHED.
+- TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE, and INFERRED_HYPOTHESIS relation metadata never establishes affirmative causality.
+- Confidence, wording, plausibility, and model preference never promote a causal classification.
+- evidenceBasis must be DIRECT_DOCUMENTATION for EXPLICITLY_DOCUMENTED, MATERIAL_CORROBORATION for STRONGLY_SUPPORTED, and a non-affirmative basis for NOT_ESTABLISHED.
+- Every causal evidence reference requires a role. NOT_ESTABLISHED is an explicit successful abstention and must include a bounded explanation.
+
 OUTPUT CLASSIFICATION:
 - Each finding must be classified as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION.
 - FACTUAL_EXTRACTION: directly observable from evidence, grounded=true
@@ -123,6 +146,13 @@ class StoryContextAnalysisPromptBuilder:
             "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
             "Classify each finding as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION in outputClassification.\n"
             "ArchitectureFinding, DecisionFinding, HistoricalContextItem, and ImpactedComponentFinding MUST include relationType (EXPLICIT, TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE, or INFERRED_HYPOTHESIS).\n"
+            "For V2 causal analysis, build one causalAssessment for the exact Core-owned causalQuestion. Select only bounded LINE_RANGE or SECTION locators over authorized repository evidence; do not fabricate resolved content or digests.\n"
+            "For legacy causal analysis, causal claims are separate from relationType. Build the evidence ledger first: candidate source/target, authorized references, one role per cited reference, permitted level, classification, bounded explanation.\n"
+            "Use only DIRECT_RELATIONSHIP_STATEMENT, MATERIAL_RELATIONSHIP_SUPPORT, NON_CAUSAL_CONTEXT, or CONTRADICTORY_EVIDENCE roles.\n"
+            "Use EXPLICITLY_DOCUMENTED only for direct causal statements; use STRONGLY_SUPPORTED only with at least two distinct material relationship supports.\n"
+            "Chronology, temporal proximity, shared topic, related-document metadata, same Story, same commit, compatibility, possible relevance, contradictory, or insufficient evidence require NOT_ESTABLISHED.\n"
+            "Never promote causality using confidence, plausibility, wording, or relationType alone. Every cited causal reference requires a role.\n"
+            "If causalAnswerRequired=true and causalContractVersion=V2, return exactly one causalAssessment whose question equals causalQuestion; use NOT_ESTABLISHED rather than inventing support. Otherwise follow the legacy causalClaims contract.\n"
             "If a section has no grounded findings, return an empty array for that section.\n"
             "Do not fabricate content to populate sections."
         )
@@ -165,11 +195,21 @@ class StoryContextAnalysisPromptBuilder:
         relationship_context: object | None = None,
     ) -> Prompt:
         error_message = str(error)
+        failure_category = getattr(error, "failure_category", None)
+        if failure_category is None:
+            lowered = error_message.casefold()
+            failure_category = (
+                "SEMANTIC_SUPPORT_ERROR"
+                if any(term in lowered for term in ("defensible evidence", "relationship support", "causalclassification", "evidencebasis"))
+                else "FORMAT_ERROR"
+            )
         corrective_user_message = (
             original_prompt.user_message
             + "\n\nCORRECTIVE RETRY\n"
+            f"Failure category: {failure_category}\n"
             "The previous output was invalid. Fix the following error:\n"
             f"{error_message}\n\n"
+            "The failure category is explicit. For SEMANTIC_SUPPORT_ERROR, downgrade the claim to NOT_ESTABLISHED when support is insufficient; do not invent evidence or add references outside the authoritative contract.\n"
             "Produce a corrected StoryContextAnalysisResult that satisfies all constraints."
         )
         content = f"{SYSTEM_MESSAGE}\n\n{corrective_user_message}"

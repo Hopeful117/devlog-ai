@@ -1,0 +1,19 @@
+{
+  "story": "0132",
+  "thresholdVersion": "1.0.0",
+  "frozenBeforeLiveEvaluation": true,
+  "primaryCondition": "GROUND_TRUTH_CONTEXT",
+  "secondaryCondition": "DEVLOG_CONTEXT",
+  "positiveCausalAccuracyMin": 0.8,
+  "case04": {
+    "caseId": "CASE-04",
+    "requiredClassification": "NOT_ESTABLISHED",
+    "requiredRuns": 3,
+    "requiredPasses": 3
+  },
+  "groundingRequired": true,
+  "unsupportedInferenceRateMax": 0.0,
+  "stabilityMin": 0.9,
+  "modelFacing": false,
+  "source": "Story0131 measured baseline, existing product-value scorer thresholds, and Story0132 CASE-04 product requirement"
+}

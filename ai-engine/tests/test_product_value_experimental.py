@@ -130,3 +130,19 @@ def test_free_form_unstructured_claims_are_not_scored_as_unsupported_inference()
     )
     assert result["unsupportedInferenceMeasurement"] == "NOT_MEASURED"
     assert result["unsupportedInferenceRate"] is None
+
+
+def test_production_causal_result_adapter_does_not_change_model_context():
+    from evaluations.product_value.interpretation import adapt_production_story_context_result
+
+    case = suite()["cases"][0]
+    adapted = adapt_production_story_context_result(case, {
+        "causalClaims": [{
+            "source": "A", "target": "B",
+            "causalClassification": "NOT_ESTABLISHED",
+            "evidenceReferences": [],
+            "explanation": "Chronology is insufficient.",
+        }]
+    })
+    assert adapted["causalClaims"][0]["claimId"] == "claim-1"
+    assert "expectedOutcome" not in adapted

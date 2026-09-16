@@ -1,0 +1,1261 @@
+{
+  "captureVersion": "1.0.0",
+  "capturedAt": "2026-09-15T18:49:27.908675+00:00",
+  "condition": "GROUND_TRUTH_CONTEXT",
+  "contextSource": "frozen Story0131 Ground-Truth Context",
+  "evidenceRemovalTests": {
+    "status": "PASS",
+    "tests": [
+      {
+        "caseId": "CASE-01",
+        "pass": true,
+        "productionResult": {
+          "causalClaims": [
+            {
+              "causalClassification": "NOT_ESTABLISHED",
+              "evidenceBasis": "SHARED_TOPIC_ONLY",
+              "evidenceReferences": [
+                {
+                  "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                  "resource": "trading-core"
+                }
+              ],
+              "explanation": "The provided source code and test contexts relate to PAPER execution and settlement handling and reference architectural decisions from ADR-042, which defines the architecture of paper settlement service. However, there is no direct or materially corroborating evidence explicitly stating that ADR-042 caused the evolution of PAPER account execution and settlement across the specified stories. The connection remains topic-related rather than causally established.",
+              "source": "ADR-042",
+              "target": "evolution of PAPER account execution and settlement across Stories 0039-0042"
+            },
+            {
+              "causalClassification": "NOT_ESTABLISHED",
+              "evidenceBasis": "SHARED_TOPIC_ONLY",
+              "evidenceReferences": [
+                {
+                  "reference": "trading-core/src/main/java/com/hope/trading/trading_core/model/Account.java",
+                  "resource": "trading-core"
+                }
+              ],
+              "explanation": "While ADR-043 covers architecture decisions for account identity and roles relevant to authority models, no direct or material evidence links it conclusively to the resulting authority model of PAPER account execution and settlement as observed in the provided stories. The references only situate them in a common topic domain.",
+              "source": "ADR-043",
+              "target": "resulting authority model for PAPER account execution and settlement"
+            },
+            {
+              "causalClassification": "NOT_ESTABLISHED",
+              "evidenceBasis": "SHARED_TOPIC_ONLY",
+              "evidenceReferences": [
+                {
+                  "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                  "resource": "trading-core"
+                },
+                {
+                  "reference": "trading-core/src/main/java/com/hope/trading/trading_core/model/Account.java",
+                  "resource": "trading-core"
+                }
+              ],
+              "explanation": "The PaperSettlementService implementation enforces checks on account user and broker identity aligning with the notion of authority modeled in ADR-043. Yet, the evidence does not explicitly document this as caused by the architectural decisions but is only consistent with or related by topic.",
+              "source": "architectural decisions in ADR-042 and ADR-043",
+              "target": "design of PaperSettlementService and authority checks in PaperSettlementService.settle()"
+            }
+          ]
+        },
+        "remainingEvidenceReferences": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/model/Account.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+        ],
+        "removedEvidenceReferences": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+          "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+          "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "validationFailure": null
+      },
+      {
+        "caseId": "CASE-02",
+        "pass": true,
+        "productionResult": {
+          "causalClaims": [
+            {
+              "causalClassification": "NOT_ESTABLISHED",
+              "evidenceBasis": "INSUFFICIENT",
+              "evidenceReferences": [],
+              "explanation": "The tested evidence describes PAPER position querying and execution validation but does not provide direct or materially corroborating evidence about causal constraints specifically linking PAPER execution or settlement modifications to maintaining Account and BrokerAccount ownership and identity integrity.",
+              "source": "PAPER execution or settlement modifications",
+              "target": "Account and BrokerAccount ownership and identity integrity"
+            },
+            {
+              "causalClassification": "NOT_ESTABLISHED",
+              "evidenceBasis": "ARCHITECTURAL_COMPATIBILITY_ONLY",
+              "evidenceReferences": [
+                {
+                  "reference": "ADR-042",
+                  "resource": null
+                },
+                {
+                  "reference": "ADR-043",
+                  "resource": null
+                }
+              ],
+              "explanation": "ADR-042 and ADR-043 establish execution mode routing and identity boundaries. While Story 0041 refers to these ADRs for authority boundaries, the evidence does not explicitly document that these architectural decisions must remain invariant under PAPER execution or settlement modifications.",
+              "source": "PAPER execution or settlement modifications",
+              "target": "ExecutionMode routing distinctions defined in ADR-042 and ADR-043"
+            },
+            {
+              "causalClassification": "NOT_ESTABLISHED",
+              "evidenceBasis": "SHARED_TOPIC_ONLY",
+              "evidenceReferences": [
+                {
+                  "reference": "ExecutionValidationService.java",
+                  "resource": "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/service/ExecutionValidationService.java"
+                }
+              ],
+              "explanation": "The validation for ExecutionIntent requires risk approval for ENTRY purposes, but it is not explicitly connected causally to PAPER execution or settlement modifications.",
+              "source": "PAPER execution or settlement modifications",
+              "target": "Risk approval requirement for ENTRY ExecutionIntent"
+            },
+            {
+              "causalClassification": "NOT_ESTABLISHED",
+              "evidenceBasis": "SHARED_TOPIC_ONLY",
+              "evidenceReferences": [
+                {
+                  "reference": "ExecutionValidationService.java",
+                  "resource": "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/service/ExecutionValidationService.java"
+                }
+              ],
+              "explanation": "The ExecutionValidationService prevents terminal executions from being submitted, but causality linking this constraint specifically as a remaining invariant under PAPER execution or settlement modifications is not explicitly documented.",
+              "source": "PAPER execution or settlement modifications",
+              "target": "Terminal execution states disallow submission"
+            }
+          ]
+        },
+        "remainingEvidenceReferences": [
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/service/ExecutionValidationService.java"
+        ],
+        "removedEvidenceReferences": [
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java"
+        ],
+        "validationFailure": null
+      },
+      {
+        "caseId": "CASE-03",
+        "pass": true,
+        "productionResult": null,
+        "remainingEvidenceReferences": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/aggregate/ExecutionIntent.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/controller/PositionControllerTest.java"
+        ],
+        "removedEvidenceReferences": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+        ],
+        "validationFailure": "1 validation error for Response\ncausalClaims.3\n  Value error, STRONGLY_SUPPORTED requires multiple evidenceReferences [type=value_error, input_value={'source': 'PAPER settlem...R settlement strategy.'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.11/v/value_error"
+      }
+    ]
+  },
+  "humanUtility": "NOT_YET_ESTABLISHED",
+  "interpretationStability": 0.3333333333333333,
+  "model": "gpt-4.1-mini",
+  "oracleChanged": false,
+  "project": "trading-os",
+  "provider": "openai",
+  "repetitionsPerCase": 3,
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "runs": [
+    {
+      "caseId": "CASE-01",
+      "completedAt": "2026-09-15T18:47:29.839019+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null
+              }
+            ],
+            "explanation": "ADR-042 explicitly defines that PAPER position authority is owned by Trading Core and that PAPER close uses an explicit EXIT execution intent and local settlement within Trading Core without routing to Broker Service. It establishes the authority and boundary concepts that guide PAPER execution and settlement evolution.",
+            "source": "ADR-042",
+            "target": "PAPER execution and settlement architecture"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null
+              }
+            ],
+            "explanation": "ADR-043 mandates maintaining distinct financial Account and routing BrokerAccount identities and an explicit durable relation between them, with explicit PAPER risk profile assignment to enable deterministic and fail-closed risk evaluation. This identity foundation is critical for safe PAPER execution and settlement evolution.",
+            "source": "ADR-043",
+            "target": "Establishment of explicit canonical Account-to-BrokerAccount identity relation and explicit risk profile assignment"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": null
+              },
+              {
+                "reference": "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0039 implements the explicit persisted relation between Account and BrokerAccount, with atomic PAPER provisioning including explicit validated risk profile assignment as required by ADR-043. This provides a deterministic base for PAPER execution/settlement operations and separates identities definitively.",
+            "source": "Story 0039",
+            "target": "Durable PAPER provisioning and account identity relationship"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": null
+              },
+              {
+                "reference": "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0040 builds a mode-aware neutral fact boundary, where T0 and T1 risk evaluations consistently resolve the financial Account and associated BrokerAccount execution mode using the explicit canonical relation from ADR-043, preserving fail-closed semantics and preventing misidentification or mixing of LIVE and PAPER sources.",
+            "source": "Story 0040",
+            "target": "Mode-aware neutral Risk Facts boundary and canonical T0/T1 identity use"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                "resource": null
+              },
+              {
+                "reference": "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0041 implements mode-specific selection of position data, returning persisted PAPER OPEN Trades as authoritative local positions for PAPER accounts based on the canonical Account-to-BrokerAccount identity and mode. It avoids Broker Service calls for PAPER and exposes clear mode/source metadata for frontends, in direct alignment with ADR-042 and ADR-043.",
+            "source": "Story 0041",
+            "target": "PAPER Local Position Query and Valuation"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null
+              },
+              {
+                "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0042 completes the PAPER execution path by enabling human-authorized full close of local PAPER Trades within Trading Core, performing simulated fills and atomic settlement updates without Broker Service mutation calls. It preserves idempotency, consistent PnL accounting, and respects the authority model established in ADR-042.",
+            "source": "Story 0042",
+            "target": "PAPER Local Full Exit execution and settlement"
+          },
+          {
+            "causalClassification": "STRONGLY_SUPPORTED",
+            "evidenceBasis": "MATERIAL_CORROBORATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null
+              },
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null
+              },
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": null
+              },
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": null
+              },
+              {
+                "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                "resource": null
+              },
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null
+              }
+            ],
+            "explanation": "The architectural decisions in ADR-042 and ADR-043 define the foundational authority and identity boundaries that causally drive the design and implementation of the subsequent stories. Story 0039 establishes canonical identity and provisioning, Story 0040 builds risk facts routing using this identity, Story 0041 implements PAPER position query using local authoritative trades, and Story 0042 implements the PAPER full close and settlement within this model, completing a consistent mode-specific authority model for PAPER execution and settlement.",
+            "source": "ADR-042 and ADR-043",
+            "target": "Evolution of PAPER account execution and settlement model across Stories 0039-0042"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 1,
+      "retryCount": 0,
+      "score": {
+        "causalClaimsMeasured": 5,
+        "causalReasoningAccuracy": 0.6,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+          "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+          "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "startedAt": "2026-09-15T18:47:13.736790+00:00",
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-01",
+      "completedAt": "2026-09-15T18:47:41.886794+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+              },
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": "docs/architecture/adr/ADR-043.md"
+              }
+            ],
+            "explanation": "ADR-043 defines distinct financial Account and execution BrokerAccount identities with an explicit durable relation, and Story 0039 implements this by persisting the canonical Account->BrokerAccount relation and making PAPER account provisioning fail closed without an exact versioned risk profile, thus evolving PAPER account execution identity and provisioning.",
+            "source": "ADR-043 - Account Identity and Mode-Specific Risk Facts",
+            "target": "Story 0039 - Persisted Account Identity and Explicit PAPER Provisioning"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md"
+              },
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": "docs/architecture/adr/ADR-042.md"
+              }
+            ],
+            "explanation": "ADR-042 establishes execution mode boundaries with PAPER position authority local to Trading Core, and Story 0040 evolves PAPER execution and settlement by implementing a neutral mode-aware risk facts boundary that resolves canonical account relationships for consistent T0/T1 evaluation, replacing incorrect T1 identity usage.",
+            "source": "ADR-042 - Position Authority and Close Semantics by Execution Mode",
+            "target": "Story 0040 - Mode-Aware Neutral Risk Facts for Canonical T0/T1 Evaluation"
+          },
+          {
+            "causalClassification": "STRONGLY_SUPPORTED",
+            "evidenceBasis": "MATERIAL_CORROBORATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                "resource": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md"
+              },
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+              }
+            ],
+            "explanation": "Story 0039 provides the persisted canonical Account->BrokerAccount relation that supports explicit PAPER authority, enabling Story 0041 to expose PAPER local positions and valuations from persisted Trade state without Broker Service calls, consistent with the authority model and execution mode separation defined in ADR-042 and ADR-043.",
+            "source": "Story 0039 - Persisted Account Identity and Explicit PAPER Provisioning",
+            "target": "Story 0041 - PAPER Local Position Query and Valuation"
+          },
+          {
+            "causalClassification": "STRONGLY_SUPPORTED",
+            "evidenceBasis": "MATERIAL_CORROBORATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+              },
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+              },
+              {
+                "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                "resource": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md"
+              }
+            ],
+            "explanation": "Story 0042 builds on the persisted identity and local position visibility of Stories 0039 and 0041 to implement PAPER local full exit settlement without Broker Service calls, using explicit EXIT execution intents and atomic local financial state mutation while preserving mode-specific position authority and consistent accounting.",
+            "source": "Stories 0039 and 0041",
+            "target": "Story 0042 - PAPER Local Full Exit"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": "docs/architecture/adr/ADR-042.md"
+              },
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": "docs/architecture/adr/ADR-043.md"
+              }
+            ],
+            "explanation": "ADR-042 defines separate position authority for LIVE and PAPER modes, and ADR-043 defines distinct financial Account and execution BrokerAccount identities with an explicit relation; these architectural decisions drove the evolution of PAPER account execution and settlement across Stories 0039-0042 to implement durable canonical identity, mode-aware risk facts, local position query and valuation, and local full exit settlement, establishing a clear authority model where PAPER financial state is owned and mutated by Trading Core independently of external brokers.",
+            "source": "Architectural Decisions ADR-042 and ADR-043",
+            "target": "PAPER account execution and settlement evolution across Stories 0039-0042"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 2,
+      "retryCount": 0,
+      "score": {
+        "causalClaimsMeasured": 5,
+        "causalReasoningAccuracy": 0.2,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "startedAt": "2026-09-15T18:47:29.839044+00:00",
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-01",
+      "completedAt": "2026-09-15T18:47:55.317866+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": "DOCUMENT"
+              }
+            ],
+            "explanation": "ADR-042 explicitly defines separate position authority by execution mode, asserting PAPER position authority belongs to Trading Core, and LIVE to the external broker/provider. This ADR establishes foundational architecture for PAPER execution and settlement to be local and distinct from LIVE broker mechanics.",
+            "source": "ADR-042",
+            "target": "Paper account execution and settlement architecture"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": "DOCUMENT"
+              }
+            ],
+            "explanation": "ADR-043 separates financial Account identity (Account.accountId) from execution/routing identity (BrokerAccount.id), mandates an explicit durable relation, and requires explicit risk profile assignment for PAPER accounts. This architectural decision enables proper resolution and safe operation of PAPER execution and settlement independently from LIVE broker accounts.",
+            "source": "ADR-043",
+            "target": "Canonical Account to BrokerAccount identity and risk configuration for PAPER accounts"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": "DOCUMENT"
+              },
+              {
+                "reference": "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+                "resource": "COMMIT"
+              }
+            ],
+            "explanation": "Story 0039 implements the architectural requirement from ADR-043 by persisting the explicit Account to BrokerAccount relation, validating an explicit PAPERRiskProfile, and making PAPER provisioning fail closed without a valid profile. This evolution provides a safe foundation for PAPER execution and settlement by ensuring authoritative financial identity is known and coherent.",
+            "source": "Story 0039",
+            "target": "Persisted independent Account identity, explicit canonical relation, and fail-closed PAPER provisioning"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": "DOCUMENT"
+              },
+              {
+                "reference": "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+                "resource": "COMMIT"
+              }
+            ],
+            "explanation": "Story 0040 builds on the canonical identity from 0039 and ADR-043 to add a neutral Risk Facts boundary above the Risk Domain, selecting authoritative facts source by execution mode (LIVE or PAPER). It corrects T1 evaluation identity usage, ensuring PAPER uses local authoritative state and avoids reliance on Broker Service for risk facts.",
+            "source": "Story 0040",
+            "target": "Mode-aware neutral Risk Facts and T0/T1 evaluation using unified identity and mode"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                "resource": "DOCUMENT"
+              },
+              {
+                "reference": "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+                "resource": "COMMIT"
+              }
+            ],
+            "explanation": "Story 0041 exposes PAPER persisted local OPEN Trades as authoritative positions in product APIs, distinct from LIVE positions served by Broker Service. Mode-aware source selection and valuation preserve separation of concerns from ADR-042 and ADR-043, enabling accurate PAPER position visibility and valuation without external dependencies.",
+            "source": "Story 0041",
+            "target": "PAPER local position query and valuation separated from LIVE provider facts"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": "DOCUMENT"
+              },
+              {
+                "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                "resource": "COMMIT"
+              }
+            ],
+            "explanation": "Story 0042 implements full PAPER position close locally, reusing common execution concepts but bypassing Broker Service mutation and provider reconciliation. The design enforces authoritative PAPER local state mutation, deterministic realized PnL accounting, idempotency, and transactional atomicity, realizing ADR-042's separation of authority and closing the execution loop for PAPER mode.",
+            "source": "Story 0042",
+            "target": "PAPER local full exit with explicit ENTRY and EXIT execution intents and atomic local settlement"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 3,
+      "retryCount": 0,
+      "score": {
+        "causalClaimsMeasured": 5,
+        "causalReasoningAccuracy": 0.6,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+          "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+          "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "startedAt": "2026-09-15T18:47:41.886819+00:00",
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-02",
+      "completedAt": "2026-09-15T18:48:04.674606+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null
+              }
+            ],
+            "explanation": "ADR-042 explicitly defines that PAPER position authority belongs to Trading Core, not external brokers, and that PAPER execution and settlement must remain mode-specific, avoiding reuse of LIVE broker commands or reconciliation semantics. It requires PAPER full close to be represented as an EXIT execution intent within Trading Core authority, forbids PAPER routing through Broker Service calls, mandates atomic settlement transactions, and retains idempotency and audit behavior distinct from LIVE.",
+            "source": "ADR-042 - Position Authority and Close Semantics by Execution Mode",
+            "target": "PAPER execution and settlement architectural constraints"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null
+              }
+            ],
+            "explanation": "ADR-043 establishes distinct identities for Account (financial identity) and BrokerAccount (execution/routing identity), requiring an explicit durable canonical relation. PAPER settlement must resolve financial Account via this relation, preserving authority separation and ownership verification between execution and financial state, which constrains PAPER execution and settlement to respect these identity invariants.",
+            "source": "ADR-043 - Account Identity and Mode-Specific Risk Facts",
+            "target": "PAPER execution and settlement architectural constraints"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0039 explicitly requires the establishment of an explicit canonical relation between Account and BrokerAccount, ownership and provider invariants, explicit risk configuration, and fail-closed PAPER provisioning. This enforces domain constraints that PAPER execution and settlement must validate ownership and identity consistency based on this relation.",
+            "source": "Story 0039 - Persisted Account Identity and Explicit PAPER Provisioning",
+            "target": "PAPER execution and settlement architectural and domain constraints"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0040 requires that risk evaluation for PAPER execution use the canonical Account and BrokerAccount relation for identity, mode-aware routing of risk facts, and fail-closed behavior if facts or configuration are missing or inconsistent. This constrains PAPER execution and settlement to use these domain identity and risk facts correctly.",
+            "source": "Story 0040 - Mode-Aware Neutral Risk Facts for Canonical T0/T1 Evaluation",
+            "target": "PAPER execution and settlement domain constraints regarding identity and risk facts"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0042 and its implementation in PaperSettlementService enforce that PAPER exits must be fully human authorized, validated by server-side ownership and canonical relation, use complete target quantity for full exits only, derive opposite side internally, settle atomically, persist realized PnL and closed status, and forbid calls to Broker Service for mutation or reconciliation. Idempotency and concurrent claim resistance are also architectural constraints.",
+            "source": "Story 0042 - PAPER Local Full Exit",
+            "target": "PAPER execution and settlement constraints on exit lifecycle and atomicity"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 1,
+      "retryCount": 0,
+      "score": {
+        "causalClaimsMeasured": 3,
+        "causalReasoningAccuracy": 0.6666666666666666,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java"
+        ],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "startedAt": "2026-09-15T18:47:55.317880+00:00",
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-02",
+      "completedAt": "2026-09-15T18:48:18.194818+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null
+              }
+            ],
+            "explanation": "ADR-042 explicitly mandates that PAPER execution and settlement must be authoritative within Trading Core, disallowing routing through Broker Service or BrokerPositionCloseClient, and must maintain mode-specific authority and semantics separate from LIVE. It also defines that PAPER settlement must use local state and that exit cannot increase exposure, must be full close only, and financial state must be reloadable and atomic.",
+            "source": "ADR-042 - Position Authority and Close Semantics by Execution Mode",
+            "target": "PAPER execution and settlement implementation"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null
+              }
+            ],
+            "explanation": "ADR-043 mandates that Account and BrokerAccount identities remain distinct with an explicit durable canonical relation that must be validated in PAPER settlement and execution. It requires PAPER financial facts to be authoritative within Trading Core and disallows using BrokerAccount.id as Account.accountId. PAPER risk facts must be sourced locally and fail closed if missing or inconsistent.",
+            "source": "ADR-043 - Account Identity and Mode-Specific Risk Facts",
+            "target": "PAPER execution and settlement identity resolution and risk facts integration"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0039 establishes explicit durable relation between Account and BrokerAccount used during PAPER provisioning and settlement, enforcing ownership and provider invariant, cardinallity, profile assignment, and fail-closed behavior to maintain identity correctness and execution coherence.",
+            "source": "Story 0039 - Persisted Account Identity and Explicit PAPER Provisioning",
+            "target": "PAPER settlement and execution identity correctness and provisioning coherence"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0040 implements mode-aware risk facts boundary ensuring PAPER executions use canonical Account identity and local Paper facts, while LIVE facts use Broker Service. T0 and T1 evaluations use the same financial Account identity, and fail closed on missing/inconsistent facts, ensuring consistency in PAPER execution and settlement risk evaluation.",
+            "source": "Story 0040 - Mode-Aware Neutral Risk Facts for Canonical T0/T1 Evaluation",
+            "target": "PAPER execution and settlement risk evaluation and fact sourcing"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0042 explicitly defines PAPER full close semantics requiring local resolution and authorization of the OPEN Trade, opposite side execution intent, atomic settlement updating account balances, equity, closed trade status, and realized PnL, with idempotency and concurrency controls, disallowing partial close or routing through Broker Service.",
+            "source": "Story 0042 - PAPER Local Full Exit",
+            "target": "PAPER full close execution and settlement semantics"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 2,
+      "retryCount": 1,
+      "score": {
+        "causalClaimsMeasured": 3,
+        "causalReasoningAccuracy": 0.6666666666666666,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "startedAt": "2026-09-15T18:48:04.674620+00:00",
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-02",
+      "completedAt": "2026-09-15T18:48:27.184582+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-042.md",
+                "resource": null
+              }
+            ],
+            "explanation": "ADR-042 explicitly documents that PAPER positions are authoritative only in Trading Core and must not reuse LIVE broker identity or mutation mechanics. PAPER exit is modeled as a local EXIT execution intent with full close only semantics, disallowing partial closes or exposure reversals. It mandates one atomic transaction owner for local financial effects, separate from Broker Service, preserving mode-specific authority and semantics.",
+            "source": "ADR-042 - Position Authority and Close Semantics by Execution Mode",
+            "target": "PAPER execution and settlement architecture"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null
+              }
+            ],
+            "explanation": "ADR-043 establishes the architectural invariant that Account.accountId and BrokerAccount.id must remain distinct identities linked by an explicit durable canonical relation, enforcing ownership, provider, execution mode, and risk profile invariants. This relation is fundamental to separating financial identity from execution routing and ensuring PAPER execution and settlement are mode-aware and consistent.",
+            "source": "ADR-043 - Account Identity and Mode-Specific Risk Facts",
+            "target": "Canonical relation between Account and BrokerAccount"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0039 explicitly requires that PAPER provisioning persist an explicit canonical link between Account and BrokerAccount, along with AccountRiskConfiguration and explicit risk profile assignment, preventing ambiguous identity resolution or use of legacy rules alone. This foundation is required to maintain architectural constraints in PAPER execution and settlement domain.",
+            "source": "Story 0039 - Persisted Account Identity and Explicit PAPER Provisioning",
+            "target": "Durable Account to BrokerAccount identity relation and risk profile assignment"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0040 documents that T0 and T1 risk evaluation must resolve the canonical financial Account and linked BrokerAccount, use execution mode from BrokerAccount, and route to mode-specific authoritative risk facts source: Trading Core local state for PAPER without Broker Service calls. This ensures consistent and fail-closed risk evaluation aligned with execution and settlement modes.",
+            "source": "Story 0040 - Mode-Aware Neutral Risk Facts for Canonical T0/T1 Evaluation",
+            "target": "Mode-correct risk facts sourcing and identity resolution"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0041 explicitly requires that PAPER positions be read from persisted local OPEN Trades and valued via Market Data snapshots without Broker Service interaction, while LIVE continues to use Broker Service facts. The query endpoint and frontend must expose execution mode/source markers to distinguish PAPER, suppress LIVE-only controls, and respect mode boundaries.",
+            "source": "Story 0041 - PAPER Local Position Query and Valuation",
+            "target": "Mode-specific authoritative position query source"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null
+              }
+            ],
+            "explanation": "Story 0042 documents that PAPER exit must be implemented as a mode-specific local full close via an explicit EXIT execution intent, disallowing partial close or exposure reversal, settling financial state atomically within Trading Core local persistence and never routing through Broker Service or LIVE commands. Idempotency, ownership, canonical relation validation, and consistent profit/loss accounting must be preserved.",
+            "source": "Story 0042 - PAPER Local Full Exit",
+            "target": "Semantic distinction of ENTRY and EXIT and local PAPER exit settlement semantics"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 3,
+      "retryCount": 0,
+      "score": {
+        "causalClaimsMeasured": 3,
+        "causalReasoningAccuracy": 0.6666666666666666,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "docs/architecture/adr/ADR-042.md",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+          "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+          "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "startedAt": "2026-09-15T18:48:18.194833+00:00",
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-03",
+      "completedAt": "2026-09-15T18:48:39.410044+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+                "resource": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java"
+              }
+            ],
+            "explanation": "The PaperSettlementService Java class implements the business logic of paper settlement, indicating that changes in the paper settlement strategy will directly affect this component.",
+            "source": "paper settlement strategy",
+            "target": "PaperSettlementService"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+                "resource": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+              }
+            ],
+            "explanation": "The PaperSettlementExitTest class contains tests that verify the behavior of paper settlement exit scenarios, so changes in paper settlement strategy impact these tests.",
+            "source": "paper settlement strategy",
+            "target": "PaperSettlementExitTest"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+                "resource": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java"
+              },
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+                "resource": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java"
+              }
+            ],
+            "explanation": "ExecuteTradeService instantiates and calls PaperSettlementService during execution finalization, so changes to PaperSettlementService behavior affect ExecuteTradeService.",
+            "source": "PaperSettlementService",
+            "target": "ExecuteTradeService"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+                "resource": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java"
+              }
+            ],
+            "explanation": "ExecutionConfiguration defines the paperSettlementService bean which manages the PaperSettlementService component, implying changes in paper settlement strategy influence this configuration aspect.",
+            "source": "paper settlement strategy",
+            "target": "paperSettlementService Bean in ExecutionConfiguration"
+          },
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+                "resource": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java"
+              }
+            ],
+            "explanation": "PaperExecutionVerticalRegressionTest contains integration tests that verify the end-to-end flow including paper executions and settlements, so changes in the paper settlement strategy will affect these tests.",
+            "source": "paper settlement strategy",
+            "target": "PaperExecutionVerticalRegressionTest"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 1,
+      "retryCount": 1,
+      "score": {
+        "causalClaimsMeasured": 2,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+        ],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 1.0
+      },
+      "startedAt": "2026-09-15T18:48:27.184599+00:00",
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-03",
+      "completedAt": "2026-09-15T18:48:52.549179+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": []
+      },
+      "provider": "openai",
+      "repetition": 2,
+      "retryCount": 1,
+      "score": {
+        "causalClaimsMeasured": 2,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 0.0
+      },
+      "startedAt": "2026-09-15T18:48:39.410059+00:00",
+      "validationError": "unknown evidence reference"
+    },
+    {
+      "caseId": "CASE-03",
+      "completedAt": "2026-09-15T18:49:14.211385+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": []
+      },
+      "provider": "openai",
+      "repetition": 3,
+      "retryCount": 1,
+      "score": {
+        "causalClaimsMeasured": 2,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 0.0
+      },
+      "startedAt": "2026-09-15T18:48:52.549193+00:00",
+      "validationError": "1 validation error for Response\ncausalClaims.4\n  Value error, STRONGLY_SUPPORTED requires multiple evidenceReferences [type=value_error, input_value={'source': 'paper settlem...erticalRegressionTest.'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.11/v/value_error"
+    },
+    {
+      "caseId": "CASE-04",
+      "completedAt": "2026-09-15T18:49:18.301455+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": "ADR-043"
+              },
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": "Story 0042"
+              },
+              {
+                "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                "resource": "commit 18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+              }
+            ],
+            "explanation": "ADR-043 defines the architectural model for PAPER account identity and risk facts handling, establishing explicit durable relations and mode-aware risk fact routing. Story 0042 implements PAPER Local Full Exit functionality consistent with ADR-043 principles, including zero Broker Service calls for PAPER and canonical ownership and mode validations. The commit merging Story 0042 shows code changes in ExecutionConfiguration aligning with ADR-043's requirements to support PAPER mode and risk facts. Therefore, ADR-043 directly caused the ExecutionConfiguration refactor delivered by Story 0042.",
+            "source": "ADR-043",
+            "target": "ExecutionConfiguration refactor delivered by Story 0042"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 1,
+      "retryCount": 0,
+      "score": {
+        "causalClaimsMeasured": 1,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 0.0
+      },
+      "startedAt": "2026-09-15T18:49:14.211415+00:00",
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-04",
+      "completedAt": "2026-09-15T18:49:21.712157+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": "ADR-043"
+              },
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": "Story 0042"
+              }
+            ],
+            "explanation": "ADR-043 defines the architectural decisions regarding PAPER account identity and risk facts sourcing, which specify isolation of PAPER execution mode and local PAPER facts usage. Story 0042 implements the PAPER local full exit feature consistent with ADR-043 requirements, including no calls to Broker Service for PAPER close and strict adherence to local PAPER trade settlement. The ExecutionConfiguration refactor manages the wiring and support services to enable this mode distinction and PAPER-specific exit flow. Thus, ADR-043's established architectural principles directly caused the design and implementation choices in the ExecutionConfiguration refactor delivered by Story 0042.",
+            "source": "ADR-043",
+            "target": "ExecutionConfiguration refactor delivered by Story 0042"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 2,
+      "retryCount": 0,
+      "score": {
+        "causalClaimsMeasured": 1,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 0.0
+      },
+      "startedAt": "2026-09-15T18:49:18.301475+00:00",
+      "validationError": null
+    },
+    {
+      "caseId": "CASE-04",
+      "completedAt": "2026-09-15T18:49:27.908639+00:00",
+      "model": "gpt-4.1-mini",
+      "productionResult": {
+        "causalClaims": [
+          {
+            "causalClassification": "EXPLICITLY_DOCUMENTED",
+            "evidenceBasis": "DIRECT_DOCUMENTATION",
+            "evidenceReferences": [
+              {
+                "reference": "docs/architecture/adr/ADR-043.md",
+                "resource": null
+              },
+              {
+                "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+                "resource": null
+              },
+              {
+                "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+                "resource": null
+              }
+            ],
+            "explanation": "ADR-043 defines the architectural principles and invariants required for distinct account identity management, mode-aware risk facts routing, and PAPER account lifecycle semantics. Story 0042, which is delivered and merged in commit 18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149, directly implements features that conform to ADR-043's requirements, including local PAPER position exit without broker service calls and validation of account ownership and canonical relation as mandated by ADR-043. The ExecutionConfiguration.java file reflects necessary service wiring consistent with ADR-043 and Story 0042 integration. The Story 0042 metadata and related ADRs explicitly reference ADR-043, indicating that the ADR caused the refactor and implementation in the ExecutionConfiguration component.",
+            "source": "ADR-043",
+            "target": "ExecutionConfiguration refactor delivered by Story 0042"
+          }
+        ]
+      },
+      "provider": "openai",
+      "repetition": 3,
+      "retryCount": 1,
+      "score": {
+        "causalClaimsMeasured": 1,
+        "causalReasoningAccuracy": 0.0,
+        "changeImpactAttribution": "NOT_ATTRIBUTABLE",
+        "constraintAttribution": "NOT_ATTRIBUTABLE",
+        "contextConstraintRecall": null,
+        "contextImpactRecall": null,
+        "evidenceClaimGrounding": "MEASURED",
+        "groundingValid": true,
+        "interpretationConstraintRecall": null,
+        "interpretationImpactRecall": null,
+        "referencedEvidence": [
+          "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+          "docs/architecture/adr/ADR-043.md",
+          "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+        ],
+        "unsupportedInferenceMeasurement": "MEASURED_STRUCTURED_FIELDS",
+        "unsupportedInferenceRate": 0.0
+      },
+      "startedAt": "2026-09-15T18:49:21.712169+00:00",
+      "validationError": null
+    }
+  ],
+  "story": "0132",
+  "thresholdEvaluation": {
+    "case04NotEstablishedRuns": 0,
+    "case04Runs": 3,
+    "groundingPass": true,
+    "pass": false,
+    "positiveCausalAccuracy": 0.3777777777777777,
+    "stability": 0.3333333333333333,
+    "unsupportedInferencePass": false
+  },
+  "thresholds": {
+    "case04Required": "3/3 NOT_ESTABLISHED",
+    "groundingRequired": true,
+    "positiveCausalAccuracyMin": 0.8,
+    "stabilityMin": 0.9,
+    "unsupportedInferenceRateMax": 0.0
+  }
+}
