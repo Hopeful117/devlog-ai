@@ -224,8 +224,15 @@ def raw_output_hash(raw_output: Any) -> str:
     return sha256_value(raw_output)
 
 
-def validate_raw_observation(observation: dict[str, Any], *, manifest: dict[str, Any] | None = None) -> None:
+def validate_raw_observation(
+    observation: dict[str, Any],
+    *,
+    manifest: dict[str, Any] | None = None,
+    enforce_official_baseline: bool = True,
+) -> None:
     source = manifest or load_manifest()
+    if enforce_official_baseline:
+        assert_official_baseline_eligible(observation)
     required = {
         "observationId", "benchmarkVersion", "questionId", "questionVersion", "caseId",
         "condition", "conditionPolicyVersion", "conditionPolicyCompatibilityKey", "repetition",
@@ -372,6 +379,8 @@ def classify_historical_case01(artifact_reference: str) -> dict[str, Any]:
 def assert_official_baseline_eligible(observation: dict[str, Any]) -> None:
     if observation.get("historicalClassification") == "HISTORICAL_PRE_BASELINE":
         raise ValueError("historical observation cannot enter official baseline")
+    if observation.get("executionClass") == "LIVE_PILOT" or observation.get("baselineEligible") is False:
+        raise ValueError("live pilot observation cannot enter official baseline")
 
 
 def write_immutable_json(path: str | Path, value: Any) -> None:
@@ -393,11 +402,14 @@ def build_raw_artifact(observation: dict[str, Any]) -> dict[str, Any]:
     return artifact
 
 
-def validate_raw_artifact(artifact: dict[str, Any]) -> None:
+def validate_raw_artifact(artifact: dict[str, Any], *, enforce_official_baseline: bool = True) -> None:
     if artifact.get("immutable") is not True or "observation" not in artifact:
         raise ValueError("raw artifact is incomplete")
     expected = artifact.get("artifactSha256")
     unsigned = {key: value for key, value in artifact.items() if key != "artifactSha256"}
     if expected != sha256_value(unsigned):
         raise ValueError("raw artifact hash mismatch")
-    validate_raw_observation(artifact["observation"])
+    validate_raw_observation(
+        artifact["observation"],
+        enforce_official_baseline=enforce_official_baseline,
+    )
