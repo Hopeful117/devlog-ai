@@ -1,0 +1,9 @@
+{
+  "policyVersion": "story0133-agent-direct-policy-1.0.0",
+  "condition": "AGENT_DIRECT",
+  "mode": "EXECUTABLE_FUTURE_ONLY",
+  "allowed": ["read files", "search files", "git log", "git show", "git diff", "inspect ADRs", "inspect Engineering Stories", "inspect source", "inspect tests", "inspect documentation"],
+  "forbidden": ["DevLog", "DevLog projections", "DevLog answers", "oracle", "human answers", "other condition output", "web", "external memory", "package installation", "arbitrary code execution", "mutable repository", "side-effecting tests"],
+  "repositoryAccess": "READ_ONLY_PINNED_REVISION",
+  "oracleAccess": "NONE"
+}

@@ -1,0 +1,115 @@
+{
+  "manifestVersion": "story0133-comparative-baseline-1.0.0",
+  "benchmarkVersion": "devlog-comparative-baseline-1.0.0",
+  "benchmarkSource": "devlog-product-value:1.0.0",
+  "repositoryId": "1feead5d-dfc9-4b2c-aa9c-045a8524a9f8",
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "oracleReference": "docs/stories/0131-devlog-product-value-evaluation-harness/evaluation/oracle-freeze-v1.json",
+  "oracleVersion": "1.0.0",
+  "oracleStatus": "HUMAN_APPROVED",
+  "mappingReference": "docs/stories/0132-evidence-grounded-causal-interpretation/v2-frozen-causal-question-mapping.md",
+  "mappingHash": "67474f09e41c07899c8c7117754b21e794f285380ffd50675e701a0a3c2c40c0",
+  "scoringContractVersion": "story0133-comparative-scoring-boundary-1.0.0",
+  "rawObservationSchemaVersion": "story0133-raw-observation-1.0.0",
+  "conditionPolicyVersions": {
+    "DEVLOG": "story0133-devlog-policy-1.0.0",
+    "AGENT_DIRECT": "story0133-agent-direct-policy-1.0.0",
+    "HUMAN_DIRECT": "story0133-human-direct-policy-1.0.0"
+  },
+  "repetitionCount": 3,
+  "executableConditions": ["DEVLOG", "AGENT_DIRECT"],
+  "questions": [
+    {
+      "questionId": "CASE-01-COMPARATIVE",
+      "questionVersion": "1.0.0",
+      "caseId": "CASE-01",
+      "category": "CAUSAL_RELATIONSHIP",
+      "question": "Does the available evidence establish a causal relationship between ADR-042 and Story-0039's persisted account identity and explicit PAPER provisioning?",
+      "sourceIdentity": "ADR-042",
+      "targetIdentity": "Story-0039: Persisted Account Identity and Explicit PAPER Provisioning",
+      "adaptation": {
+        "originalQuestionId": "CASE-01",
+        "originalQuestionVersion": "1.0.0",
+        "mappingClaimId": "CL-01",
+        "oracleCompatibility": "UNCHANGED",
+        "humanApproval": "YES"
+      },
+      "authorizedEvidence": [
+        "docs/architecture/adr/ADR-042.md",
+        "docs/architecture/adr/ADR-043.md",
+        "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+        "docs/architecture/stories/0040-mode-aware-neutral-risk-facts/story.md",
+        "docs/architecture/stories/0041-paper-local-position-query-valuation/story.md",
+        "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+        "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+        "commit:3e89646c4a9cd80dea8cdad31de0fcbb4f8ea486",
+        "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3",
+        "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+        "trading-core/src/main/java/com/hope/trading/trading_core/model/Account.java",
+        "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+        "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+        "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+      ],
+      "providerVisibleEvidence": [
+        "docs/architecture/adr/ADR-042.md",
+        "docs/architecture/adr/ADR-043.md",
+        "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+        "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929"
+      ],
+      "expectedGroundingEvidence": [
+        "docs/architecture/adr/ADR-042.md",
+        "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+      ],
+      "supportingAllowedEvidence": [
+        "docs/architecture/adr/ADR-043.md",
+        "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929"
+      ]
+    },
+    {
+      "questionId": "CASE-03",
+      "questionVersion": "1.0.0",
+      "caseId": "CASE-03",
+      "category": "FEATURE_EVOLUTION",
+      "question": "If the PAPER settlement strategy changes, which production components and tests are likely affected, and why?",
+      "sourceIdentity": "PAPER settlement strategy",
+      "targetIdentity": "affected production components and tests",
+      "authorizedEvidence": [
+        "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+        "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/ExecuteTradeService.java",
+        "trading-core/src/main/java/com/hope/trading/trading_core/execution/domain/aggregate/ExecutionIntent.java",
+        "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+        "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+        "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+        "trading-core/src/test/java/com/hope/trading/trading_core/controller/PositionControllerTest.java",
+        "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+        "commit:bc5e9872549e15b4cb292b51cbf6baf88ad97ed3"
+      ],
+      "providerVisibleEvidence": [
+        "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+        "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+        "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+      ]
+    },
+    {
+      "questionId": "CASE-04",
+      "questionVersion": "1.0.0",
+      "caseId": "CASE-04",
+      "category": "CAUSAL_RELATIONSHIP",
+      "question": "Did ADR-043 cause the specific ExecutionConfiguration refactor delivered by Story 0042?",
+      "sourceIdentity": "ADR-043",
+      "targetIdentity": "ExecutionConfiguration refactor delivered by Story 0042",
+      "authorizedEvidence": [
+        "docs/architecture/adr/ADR-043.md",
+        "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+        "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+        "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+      ],
+      "providerVisibleEvidence": [
+        "docs/architecture/adr/ADR-043.md",
+        "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+        "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+        "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+      ]
+    }
+  ]
+}

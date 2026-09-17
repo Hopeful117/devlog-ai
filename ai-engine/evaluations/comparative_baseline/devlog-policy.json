@@ -1,0 +1,9 @@
+{
+  "policyVersion": "story0133-devlog-policy-1.0.0",
+  "condition": "DEVLOG",
+  "mode": "EXECUTABLE_FUTURE_ONLY",
+  "allowed": ["frozen DevLog evaluation context/projection only"],
+  "forbidden": ["direct repository", "Git", "shell", "oracle", "other condition output", "human answer"],
+  "repositoryAccess": "NONE",
+  "oracleAccess": "NONE"
+}
