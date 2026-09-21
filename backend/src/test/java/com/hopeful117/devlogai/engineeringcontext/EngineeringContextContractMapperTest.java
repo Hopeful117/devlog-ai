@@ -462,6 +462,18 @@ class EngineeringContextContractMapperTest {
                 com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier.HUMAN_AUTHORED);
     }
 
+    @Test
+    void factReferenceDoesNotImplyTrustedKnowledge() {
+        assertTrustTierForKind("FACT", "DETERMINISTIC_EXTRACTION",
+                com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier.TECHNICAL_EVIDENCE);
+    }
+
+    @Test
+    void decisionReferenceDoesNotImplyTrustWithoutCoreKnowledgeProvenance() {
+        assertTrustTierForKind("DECISION", "DETERMINISTIC_EXTRACTION",
+                com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier.TECHNICAL_EVIDENCE);
+    }
+
     private void assertTrustTierForKind(String kind, String sourceType,
                                          com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier expectedTier) {
         ProjectContextSnapshot projectSnapshot = projectSnapshotWithSlug();

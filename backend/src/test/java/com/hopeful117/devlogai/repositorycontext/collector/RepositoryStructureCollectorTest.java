@@ -35,6 +35,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -103,6 +104,13 @@ class RepositoryStructureCollectorTest {
         for (RepositoryEvidence item : evidence) {
             assertEquals(RepositoryContextLayer.RELATED_SOURCE_CODE, item.layer());
         }
+        RepositoryEvidence aggregate = evidence.stream()
+                .filter(item -> "MODULE_SUMMARY".equals(item.kind()))
+                .findFirst().orElseThrow();
+        assertEquals("NON_EXPANDABLE_STRUCTURE_PROJECTION",
+                aggregate.extractionMetadata().get("referenceSemantics"));
+        assertEquals(sourceId.toString(), aggregate.extractionMetadata().get("sourceId"));
+        assertEquals("abc123", aggregate.extractionMetadata().get("resolvedRevision"));
     }
 
     @Test
@@ -138,6 +146,11 @@ class RepositoryStructureCollectorTest {
             assertTrue(item.summary().contains("src/main/java/"));
             assertEquals("abc123",
                     item.extractionMetadata().get("resolvedRevision"));
+            assertEquals(sourceId.toString(), item.extractionMetadata().get("sourceId"));
+            assertEquals("CANONICAL_FILE",
+                    item.extractionMetadata().get("referenceSemantics"));
+            assertTrue(item.reference().startsWith("file:" + sourceId + ":"));
+            assertTrue(item.reference().endsWith("@abc123"));
             assertNull(item.content());
         }
     }
@@ -486,6 +499,30 @@ class RepositoryStructureCollectorTest {
         List<RepositoryEvidence> evidence = collector.collect(createRequest());
 
         assertTrue(evidence.isEmpty());
+    }
+
+    @Test
+    void failsExplicitlyWhenMultipleActiveSourcesExist() {
+        UUID secondSourceId = UUID.randomUUID();
+        Source first = Source.builder()
+                .id(sourceId)
+                .type(SourceType.GIT_REPOSITORY)
+                .active(true)
+                .build();
+        Source second = Source.builder()
+                .id(secondSourceId)
+                .type(SourceType.GIT_REPOSITORY)
+                .active(true)
+                .build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(first, second));
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> collector.collect(createRequest()));
+
+        assertTrue(exception.getMessage().contains(projectId.toString()));
+        assertTrue(exception.getMessage().contains(sourceId.toString()));
+        assertTrue(exception.getMessage().contains(secondSourceId.toString()));
     }
 
     @Test

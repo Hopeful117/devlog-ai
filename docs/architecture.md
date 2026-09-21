@@ -78,6 +78,95 @@ Documentation is considered a consumer of project knowledge rather than the prim
 
 The objective of DevLog AI is to transform development activity into structured knowledge that remains understandable and valuable over time.
 
+## Evidence Identity and Resolution
+
+DevLog uses canonical evidence reference semantics rather than one universal
+Evidence domain entity. Evidence families retain their authoritative models and
+may use category-appropriate reference and revision representations.
+
+A canonical evidence reference identifies one evidence item within a defined
+scope and is resolvable by Java Core. It does not grant authorization, imply
+trust, relevance, current authority or currentness. Identity remains independent
+of transport, ranking, composition and AI provider.
+
+Shared evidence resolution dispatches canonical references to specialized Git,
+document, domain and Analysis resolvers. The shared boundary preserves source,
+provenance and revision semantics but does not own retrieval, ranking,
+composition, projection, grounding policy or AI behavior.
+
+`AiReference` is a separate Core-created, typed and scoped provider reference.
+It resolves through the originating `AiTask` mapping snapshot back to canonical
+evidence or domain identity. It is not a public project identity. Existing
+string-based `EvidenceRef` contracts remain versioned legacy projections until
+explicitly migrated.
+
+MCP resource URIs are navigation projections over Core capabilities. They are
+not canonical evidence identities or authorization authority. Human and agent
+projections must preserve compatible source, provenance, trust and revision
+semantics for the same canonical evidence.
+
+### Evidence Reference Family Matrix
+
+| Collector / family | Current representation | Source/revision semantics | Resolution family | Human/MCP surface | Migration status |
+|---|---|---|---|---|---|
+| `CurrentAnalysisContextCollector` / Analysis | `analysis:{uuid}` | Analysis execution identity; no repository source intrinsic | Analysis domain | Analysis REST/UI | Domain identity established; shared resolution pending |
+| `DeterministicKnowledgeContextCollector` / Fact | `fact:{uuid}` | Producing Analysis, detection time and supporting refs are separate | Fact/Analysis | Analysis selected-evidence views | Domain identity established; shared resolution pending |
+| `DeterministicKnowledgeContextCollector` / Observation | `observation:{uuid}` | Producing Analysis, rule and supporting Fact refs are separate | Observation/Analysis | Analysis selected-evidence views | Domain identity established; shared resolution pending |
+| `GitHistoryContextCollector` / Git commit | `git:{sourceId}:{sha}` | Source plus immutable commit revision | Project history / Git | History REST and commit MCP resource | Source-aware current representation; shared resolver slice pending |
+| `CommitDiffEvidenceCollector` / Changed file | `diff:{sourceId}:{sha}:{path}` | Source plus commit/path; old `diff:{sha}:{path}` is legacy | Git diff / changed-file | Selected evidence and commit context; no direct resource | Current source-aware slice implemented; legacy compatibility retained |
+| `DocumentBodyCollector` / Repository document | `document:{sourceId}:{path}@{revision}` | Source, path and revision intrinsic to body | Pinned document | Story Context Analysis; general expansion incomplete | Already compliant for the current document slice |
+| `RepositoryStructureCollector` / Source, test and config file | `file:{sourceId}:{path}@{revision}` | Source, path and revision intrinsic to file snapshot | Repository content | Selected evidence; expansion incomplete | Current source-aware slice implemented |
+| `RepositoryStructureCollector` / Structure aggregate | `module:...`, `source:...`, `config:...`, `extensions:...` | Source and revision metadata; explicitly non-expandable projection | Repository structure | Selected evidence; no direct resource | Bounded projection; no canonical expansion implied |
+| `ProjectKnowledgeContextCollector` / Decision | `decision:{uuid}` | Project/domain lifecycle and currentness | Decision domain | REST/MCP/UI | Domain identity established; category-specific temporal semantics remain |
+| `ProjectKnowledgeContextCollector` / Insight | `insight:{uuid}` | Project/domain lifecycle and source Analysis | Insight domain | REST/MCP/UI | Domain identity established; category-specific temporal semantics remain |
+| `ProjectKnowledgeContextCollector` / Engineering Event | `event:{uuid}` | Project identity; source and commit bounds are related refs/metadata | Event domain | REST/MCP/UI | Domain identity established; category-specific temporal semantics remain |
+| `ProjectKnowledgeContextCollector` / Engineering Story | `story:{uuid}` | Project lifecycle; document body has separate revision | Story domain and pinned document | REST/MCP/UI | Domain identity established; document identity remains separate |
+| `ProjectKnowledgeContextCollector` / Artifact | `artifact:{uuid}` | Domain identity; repository path is provenance/related context | Artifact domain | REST/UI | Domain identity established; shared resolution pending |
+| `ProjectKnowledgeContextCollector` / Challenge or Milestone | `challenge:{uuid}`, `milestone:{uuid}` | Project/domain lifecycle | Challenge/Milestone domain | REST/UI | Domain identity established; shared resolution pending |
+
+The matrix intentionally does not prescribe replacement syntax. It records the
+current migration boundary and the resolver family that retains authority.
+
+### Historical Reference Compatibility
+
+The following forms remain readable as historical or legacy projections but are
+not emitted as new canonical repository identity by the current slices:
+
+```text
+diff:{sha}:{path}
+file:{path}
+```
+
+Historical analyses, persisted tasks and prior context snapshots must retain
+these strings verbatim. They are not rewritten to add a source or revision, and
+they must not be silently interpreted as source-unambiguous canonical identity.
+New producers use the source-aware forms where the evidence category requires
+them. A future resolver may classify a legacy reference as legacy, ambiguous or
+non-resolvable; it must not guess a source or revision.
+
+### Evidence Identity and Resolution Migration Direction
+
+Migration is additive and versioned:
+
+1. classify current reference families and make repository source ownership
+   explicit;
+2. introduce shared Core resolution with specialized family resolvers;
+3. migrate source-ambiguous repository projections without rewriting historical
+   references;
+4. migrate new AI contracts to typed `AiReference` contracts one intent at a
+   time;
+5. preserve legacy `EvidenceRef` and historical task compatibility until each
+   contract has an explicit replacement;
+6. add human evidence attachment using reference, state metadata and digest;
+7. converge MCP and human expansion on Core resolution without making MCP the
+   identity authority.
+
+Resolution must distinguish unknown, unsupported, ambiguous-source,
+source-unavailable, revision-unavailable, not-found, no-longer-resolvable,
+unauthorized and unsupported-expansion outcomes. It must not silently fall back
+to another source, current HEAD, current context, another task snapshot or
+another namespace.
+
 
 
 ## Project Snapshot
