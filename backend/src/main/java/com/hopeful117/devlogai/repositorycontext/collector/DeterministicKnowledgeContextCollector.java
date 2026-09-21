@@ -30,11 +30,15 @@ public class DeterministicKnowledgeContextCollector
         List<RepositoryEvidence> evidence = new ArrayList<>();
         for (AnalysisContext.FactSnapshot fact : request.analysisContext().facts()) {
             String location = fact.evidenceReferences().stream().findFirst().orElse(fact.source());
+            List<String> supportingReferences = fact.evidenceReferences().isEmpty()
+                    ? fact.source() == null ? List.of() : List.of(fact.source())
+                    : fact.evidenceReferences();
+            String provenanceLocation = fact.source() == null ? location : fact.source();
             evidence.add(evidenceFactory.create(metadata(), new EvidenceFactory.EvidenceInput(
                     layer(location), "FACT",
-                    location == null ? FACT_REFERENCE_PREFIX + fact.id() : location,
+                    FACT_REFERENCE_PREFIX + fact.id(),
                     fact.content(), fact.detectedAt(),
-                    List.of(FACT_REFERENCE_PREFIX + fact.id()), location, location,
+                    supportingReferences, provenanceLocation, provenanceLocation,
                     fact.id().toString()), request.budget().maximumSummaryCharacters()));
         }
         for (AnalysisContext.ObservationSnapshot observation

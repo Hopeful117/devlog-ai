@@ -96,6 +96,10 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             if (sources.isEmpty()) {
                 return List.of();
             }
+            if (sources.size() > 1) {
+                throw new AmbiguousRepositorySourceException(projectId,
+                        sources.stream().map(Source::getId).toList());
+            }
             Source source = sources.getFirst();
             SynchronizedWorkspace workspace = workspaceManager.synchronize(source, null);
 
@@ -124,11 +128,23 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             evidence.addAll(produceFileLevelEvidence(scan, source.getId().toString(),
                     workspace.resolvedRevision(), request));
 
-            return List.copyOf(evidence);
+            return evidence.stream()
+                    .map(item -> withReferenceSemantics(item, source.getId().toString(),
+                            workspace.resolvedRevision()))
+                    .toList();
+        } catch (AmbiguousRepositorySourceException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("Repository structure collection failed for project {}: {}",
                     projectId, e.getMessage());
             return List.of();
+        }
+    }
+
+    static final class AmbiguousRepositorySourceException extends IllegalStateException {
+        AmbiguousRepositorySourceException(UUID projectId, List<UUID> sourceIds) {
+            super("Repository structure collection requires one active source for project "
+                    + projectId + "; found " + sourceIds);
         }
     }
 
@@ -494,12 +510,12 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             String resolvedRevision,
             ContextRequest request
     ) {
-        RepositoryEvidence evidence = evidenceFactory.create(
+        return evidenceFactory.create(
                 metadata(),
                 new EvidenceFactory.EvidenceInput(
                         RepositoryContextLayer.RELATED_SOURCE_CODE,
                         kind.evidenceKind,
-                        kind.referencePrefix + path,
+                        kind.referencePrefix + sourceId + ":" + path + "@" + resolvedRevision,
                         path,
                         Instant.now(),
                         List.of(),
@@ -507,9 +523,23 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                         path,
                         "repository-structure:" + kind.identifierSegment + ":" + path),
                 request.budget().maximumSummaryCharacters());
-        Map<String, String> metadata = new LinkedHashMap<>(
-                evidence.extractionMetadata());
+    }
+
+    private RepositoryEvidence withReferenceSemantics(
+            RepositoryEvidence evidence,
+            String sourceId,
+            String resolvedRevision
+    ) {
+        Map<String, String> metadata = new LinkedHashMap<>(evidence.extractionMetadata());
+        metadata.put("sourceId", sourceId);
         metadata.put("resolvedRevision", resolvedRevision);
+        if ("SOURCE_FILE".equals(evidence.kind())
+                || "TEST_FILE".equals(evidence.kind())
+                || "CONFIG_FILE".equals(evidence.kind())) {
+            metadata.put("referenceSemantics", "CANONICAL_FILE");
+        } else {
+            metadata.put("referenceSemantics", "NON_EXPANDABLE_STRUCTURE_PROJECTION");
+        }
         return evidence.withExtractionMetadata(metadata);
     }
 

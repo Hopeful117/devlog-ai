@@ -13,6 +13,7 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import com.hopeful117.devlogai.repositorycontext.intelligence.ContextPlan;
+import com.hopeful117.devlogai.source.entity.Source;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,6 +44,7 @@ class CommitDiffEvidenceCollectorTest {
 
     private UUID projectId;
     private UUID analysisId;
+    private UUID sourceId;
     private Instant analysisStartedAt;
 
     @BeforeEach
@@ -53,6 +55,7 @@ class CommitDiffEvidenceCollectorTest {
 
         projectId = UUID.randomUUID();
         analysisId = UUID.randomUUID();
+        sourceId = UUID.randomUUID();
         analysisStartedAt = Instant.parse("2026-08-08T00:00:00Z");
     }
 
@@ -383,7 +386,8 @@ class CommitDiffEvidenceCollectorTest {
         // relatedReferences contains commit hashes that touched this file (from commitHashes)
         // For a single commit, there's only 1 hash
         assertEquals(1, item.relatedReferences().size());
-        assertTrue(item.relatedReferences().contains("diff:merge123:src/main/java/com/MergeConflict.java"));
+        assertTrue(item.relatedReferences().contains("diff:" + sourceId
+                + ":merge123:src/main/java/com/MergeConflict.java"));
     }
 
     @Test
@@ -405,7 +409,8 @@ class CommitDiffEvidenceCollectorTest {
         RepositoryEvidence item = evidence.getFirst();
         // Root commit still has its own hash in relatedReferences (from commitHashes)
         assertEquals(1, item.relatedReferences().size());
-        assertTrue(item.relatedReferences().contains("diff:root123:src/main/java/com/Initial.java"));
+        assertTrue(item.relatedReferences().contains("diff:" + sourceId
+                + ":root123:src/main/java/com/Initial.java"));
         assertTrue(item.summary().contains("Added"));
     }
 
@@ -575,9 +580,9 @@ class CommitDiffEvidenceCollectorTest {
 
         assertFalse(evidence.isEmpty());
         RepositoryEvidence item = evidence.getFirst();
-        // Reference format: diff:{commitHash}:{path}
+        // Reference format: diff:{sourceId}:{commitHash}:{path}
         String reference = item.reference();
-        assertTrue(reference.startsWith("diff:abc123def456:"));
+        assertTrue(reference.startsWith("diff:" + sourceId + ":abc123def456:"));
         assertTrue(reference.endsWith("src/main/java/com/Test.java"));
     }
 
@@ -652,14 +657,46 @@ class CommitDiffEvidenceCollectorTest {
         // Reference should use most recent commit hash (bbb222)
         assertTrue(item.reference().contains("bbb222"));
         // Related references should include both commit hashes with the file path
-        assertTrue(item.relatedReferences().contains("diff:aaa111:src/main/java/com/FileA.java"));
-        assertTrue(item.relatedReferences().contains("diff:bbb222:src/main/java/com/FileA.java"));
+        assertTrue(item.relatedReferences().contains("diff:" + sourceId
+                + ":aaa111:src/main/java/com/FileA.java"));
+        assertTrue(item.relatedReferences().contains("diff:" + sourceId
+                + ":bbb222:src/main/java/com/FileA.java"));
+    }
+
+    @Test
+    void keepsSamePathSeparateAcrossSources() {
+        UUID otherSourceId = UUID.randomUUID();
+        Instant commitTime = Instant.parse("2026-07-01T10:00:00Z");
+        ProjectCommit first = buildCommit("same123", commitTime, sourceId);
+        first.addChangedFile(buildChangedFile(FileChangeType.MODIFIED,
+                "src/main/java/com/App.java", null, false, 10, 5));
+        ProjectCommit second = buildCommit("same123", commitTime, otherSourceId);
+        second.addChangedFile(buildChangedFile(FileChangeType.MODIFIED,
+                "src/main/java/com/App.java", null, false, 20, 8));
+
+        when(projectCommitRepository
+                .findByProjectIdAndCommittedAtAfterOrderByCommittedAtDescCommitHashDesc(
+                        eq(projectId), any(Instant.class)))
+                .thenReturn(List.of(first, second));
+
+        List<RepositoryEvidence> evidence = collector.collect(createRequest());
+
+        assertEquals(2, evidence.size());
+        assertTrue(evidence.stream().anyMatch(item -> item.reference().startsWith(
+                "diff:" + sourceId + ":same123:")));
+        assertTrue(evidence.stream().anyMatch(item -> item.reference().startsWith(
+                "diff:" + otherSourceId + ":same123:")));
     }
 
     // --- Helper methods ---
 
     private ProjectCommit buildCommit(String hash, Instant committedAt) {
+        return buildCommit(hash, committedAt, sourceId);
+    }
+
+    private ProjectCommit buildCommit(String hash, Instant committedAt, UUID commitSourceId) {
         return ProjectCommit.builder()
+                .source(Source.builder().id(commitSourceId).build())
                 .commitHash(hash)
                 .committedAt(committedAt)
                 .subject("Test commit " + hash)

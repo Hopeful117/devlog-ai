@@ -78,6 +78,19 @@ class BudgetedDiverseEvidenceSelectorTest {
     }
 
     @Test
+    void rankingChangesDoNotChangeEvidenceIdentity() {
+        RepositoryEvidence original = evidence("fact:123", "FACT", 70);
+
+        RepositoryEvidence reranked = original.withRanking(
+                new EvidenceScore("test", Map.of(), Map.of(), 95, List.of("BOOSTED")),
+                List.of("BOOSTED"));
+
+        assertEquals(original.reference(), reranked.reference());
+        assertEquals(original.provenance(), reranked.provenance());
+        assertEquals(95, reranked.relevanceScore());
+    }
+
+    @Test
     void allowsStrongEvidenceBeyondTheOrdinaryKindAllowance() {
         List<RepositoryEvidence> ranked = List.of(
                 evidence("strong-1", "TEST_FILE", 95),
