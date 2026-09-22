@@ -1,0 +1,23 @@
+.navigation-state {
+  width: min(100% - 2rem, 44rem);
+  margin: 4rem auto;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.navigation-state p:not(.eyebrow) {
+  color: var(--text-secondary);
+}
+
+.primary-action {
+  display: inline-flex;
+  margin-top: 1rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: white;
+  text-decoration: none;
+  font-weight: 700;
+}

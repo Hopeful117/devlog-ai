@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { workspaceApplications } from '../workspace/application-registry';
 
 @Component({
   selector: 'app-layout',
@@ -7,4 +8,6 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
   templateUrl: './app-layout.html',
   styleUrl: './app-layout.scss',
 })
-export class AppLayout {}
+export class AppLayout {
+  readonly applications = workspaceApplications;
+}

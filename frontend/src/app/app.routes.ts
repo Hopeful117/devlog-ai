@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { WorkspaceNavigationPage } from './core/workspace/workspace-navigation-page';
 
 export const routes: Routes = [
   {
@@ -10,6 +11,10 @@ export const routes: Routes = [
     path: 'projects',
     loadComponent: () =>
       import('./features/projects/projects-page').then((module) => module.ProjectsPage),
+  },
+  {
+    path: 'navigation',
+    component: WorkspaceNavigationPage,
   },
   {
     path: 'projects/:id',

@@ -5,7 +5,13 @@
       <span><strong>Developer OS</strong><small>Project Workspace</small></span>
     </a>
     <nav aria-label="Primary navigation">
-      <a routerLink="/projects" routerLinkActive="active">Projects</a>
+      @for (application of applications; track application.id) {
+        @if (application.id === 'DEVLOG') {
+          <a routerLink="/projects" routerLinkActive="active">{{ application.label }}</a>
+        } @else {
+          <a [href]="application.destination">{{ application.label }}</a>
+        }
+      }
       <a class="nav-placeholder" aria-disabled="true" title="Coming soon">Notifications</a>
       <a class="nav-placeholder" aria-disabled="true" title="Coming soon">Settings</a>
     </nav>

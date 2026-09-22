@@ -1,0 +1,12 @@
+<section class="navigation-state" aria-labelledby="navigation-title">
+  @if (error(); as message) {
+    <p class="eyebrow">WORKSPACE NAVIGATION</p>
+    <h1 id="navigation-title">This resource cannot be opened here.</h1>
+    <p>{{ message }}</p>
+    <a class="primary-action" routerLink="/projects">Return to Developer OS</a>
+  } @else {
+    <p class="eyebrow">WORKSPACE NAVIGATION</p>
+    <h1 id="navigation-title">Opening resource...</h1>
+    <p>Resolving the known destination.</p>
+  }
+</section>
