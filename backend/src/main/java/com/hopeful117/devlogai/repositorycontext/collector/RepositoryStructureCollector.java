@@ -9,6 +9,8 @@ import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
 import com.hopeful117.devlogai.repositorycontext.ContextRequest;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
+import com.hopeful117.devlogai.source.exception.SourceSelectionException;
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.entity.SourceType;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
@@ -91,17 +93,39 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
     public List<RepositoryEvidence> collect(ContextRequest request) {
         UUID projectId = request.analysisContext().project().id();
         try {
-            List<Source> sources = sourceRepository
-                    .findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId);
-            if (sources.isEmpty()) {
-                return List.of();
+            RepositoryRevisionScope revisionScope = request.revisionScope();
+            Source source;
+            SynchronizedWorkspace workspace;
+            if (revisionScope != null) {
+                source = sourceRepository.findByIdAndProject_IdAndActiveTrue(
+                                revisionScope.sourceId(), projectId)
+                        .orElseThrow(() -> new SourceSelectionException(
+                                SourceSelectionException.Reason.SOURCE_UNAVAILABLE,
+                                projectId,
+                                "Explicit repository source is unavailable for project "
+                                        + projectId + ": " + revisionScope.sourceId()));
+                workspace = workspaceManager.synchronize(source, revisionScope.resolvedRevision());
+            } else {
+                List<Source> sources = sourceRepository
+                        .findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId);
+                if (sources.isEmpty()) {
+                    throw new SourceSelectionException(
+                            SourceSelectionException.Reason.SOURCE_UNAVAILABLE,
+                            projectId,
+                            "No active source found for project " + projectId);
+                }
+                if (sources.size() > 1) {
+                    throw new SourceSelectionException(
+                            SourceSelectionException.Reason.AMBIGUOUS_SOURCE,
+                            projectId,
+                            "Repository source selection is ambiguous for project "
+                                    + projectId + "; found " + sources.size()
+                                    + " active sources: "
+                                    + sources.stream().map(Source::getId).toList());
+                }
+                source = sources.getFirst();
+                workspace = workspaceManager.synchronize(source, null);
             }
-            if (sources.size() > 1) {
-                throw new AmbiguousRepositorySourceException(projectId,
-                        sources.stream().map(Source::getId).toList());
-            }
-            Source source = sources.getFirst();
-            SynchronizedWorkspace workspace = workspaceManager.synchronize(source, null);
 
             CollectionContext collectionContext = new CollectionContext(
                     request.analysisContext().analysis().id(),
@@ -132,19 +156,12 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                     .map(item -> withReferenceSemantics(item, source.getId().toString(),
                             workspace.resolvedRevision()))
                     .toList();
-        } catch (AmbiguousRepositorySourceException e) {
+        } catch (SourceSelectionException e) {
             throw e;
         } catch (Exception e) {
             log.warn("Repository structure collection failed for project {}: {}",
                     projectId, e.getMessage());
             return List.of();
-        }
-    }
-
-    static final class AmbiguousRepositorySourceException extends IllegalStateException {
-        AmbiguousRepositorySourceException(UUID projectId, List<UUID> sourceIds) {
-            super("Repository structure collection requires one active source for project "
-                    + projectId + "; found " + sourceIds);
         }
     }
 

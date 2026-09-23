@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from app.providers.base import GenerationPolicy, Prompt, PromptTraceability
 from app.prompts.structured_context import SHARED_STRUCTURED_CONTEXT_CONTRACT
 from app.schemas.ai_task import PromptRequest
-from app.schemas.story_context_analysis import StoryContextAnalysisResult
+from app.schemas.story_context_analysis import ProviderStoryContextAnalysisResult
 
 
 class PromptConstructionError(ValueError):
@@ -120,7 +120,7 @@ class StoryContextAnalysisPromptBuilder:
                 by_alias=True, mode="json", exclude_none=True
             ) if request.user_guidance else {}
         )
-        schema_json = self._canonical(request.expected_output_contract)
+        schema_json = self._canonical(ProviderStoryContextAnalysisResult.model_json_schema())
         grounding_json = self._canonical(request.grounding_contract)
 
         user_message = (
@@ -142,7 +142,8 @@ class StoryContextAnalysisPromptBuilder:
             "EXPECTED OUTPUT SCHEMA\n"
             f"{schema_json}\n\n"
             "OUTPUT REQUIREMENTS\n"
-            "Produce a StoryContextAnalysisResult with all required fields.\n"
+            "Produce a ProviderStoryContextAnalysisResult with all required fields.\n"
+            "confidence must be exactly one scalar value: HIGH, MEDIUM, or LOW; do not emit a confidence object.\n"
             "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
             "Classify each finding as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION in outputClassification.\n"
             "ArchitectureFinding, DecisionFinding, HistoricalContextItem, and ImpactedComponentFinding MUST include relationType (EXPLICIT, TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE, or INFERRED_HYPOTHESIS).\n"
@@ -168,7 +169,7 @@ class StoryContextAnalysisPromptBuilder:
             intent_version=request.intent.version,
             system_message=SYSTEM_MESSAGE,
             user_message=user_message,
-            expected_output_schema=StoryContextAnalysisResult.model_json_schema(),
+            expected_output_schema=ProviderStoryContextAnalysisResult.model_json_schema(),
             traceability=PromptTraceability(
                 request_id=str(request.request_id),
                 correlation_id=str(request.correlation_id),
@@ -210,7 +211,8 @@ class StoryContextAnalysisPromptBuilder:
             "The previous output was invalid. Fix the following error:\n"
             f"{error_message}\n\n"
             "The failure category is explicit. For SEMANTIC_SUPPORT_ERROR, downgrade the claim to NOT_ESTABLISHED when support is insufficient; do not invent evidence or add references outside the authoritative contract.\n"
-            "Produce a corrected StoryContextAnalysisResult that satisfies all constraints."
+            "Produce a corrected ProviderStoryContextAnalysisResult that satisfies all constraints. "
+            "confidence must remain a scalar HIGH, MEDIUM, or LOW value."
         )
         content = f"{SYSTEM_MESSAGE}\n\n{corrective_user_message}"
         content_digest = hashlib.sha256(content.encode()).hexdigest()

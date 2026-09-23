@@ -1,6 +1,8 @@
 package com.hopeful117.devlogai.knowledge.selection;
 
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.ai.reference.AiReference;
+import com.hopeful117.devlogai.fact.entity.FactType;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
@@ -17,6 +19,7 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceSymbols;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
+import com.hopeful117.devlogai.ai.reference.AiReferenceResolutionException;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -28,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -666,6 +670,86 @@ class SelectedKnowledgePromptProjectionServiceTest {
         assertTrue(hasArchitecture);
     }
 
+    @Test
+    void shouldProjectEveryV3ReachableSemanticItemType() {
+        UUID factId = UUID.randomUUID();
+        UUID observationId = UUID.randomUUID();
+        UUID insightId = UUID.randomUUID();
+        UUID architectureInsightId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID humanContextId = UUID.randomUUID();
+        AnalysisContext.ProjectSnapshot project = new AnalysisContext.ProjectSnapshot(
+                UUID.randomUUID(), "DevLog", "devlog-ai", "desc", ProjectStatus.ACTIVE);
+        AnalysisContext.AnalysisSnapshot analysis = new AnalysisContext.AnalysisSnapshot(
+                UUID.randomUUID(), com.hopeful117.devlogai.analysis.entity.AnalysisType.ARCHITECTURE_REVIEW,
+                "architecture-overview", "v3",
+                com.hopeful117.devlogai.analysis.entity.AnalysisStatus.IN_PROGRESS,
+                Instant.EPOCH, null, Instant.EPOCH);
+        SelectedKnowledge selectedKnowledge = new SelectedKnowledge(
+                project,
+                analysis,
+                profile(),
+                List.of(new AnalysisContext.ObservationSnapshot(
+                        observationId, ObservationType.CONTAINERIZED_PROJECT,
+                        "The project is containerized", "test", "v1", List.of(factId), Instant.EPOCH)),
+                List.of(new AnalysisContext.FactSnapshot(
+                        factId, FactType.DOCKERFILE_PRESENT, "Dockerfile detected", "test",
+                        List.of("file:Dockerfile"), Instant.EPOCH)),
+                DIAGNOSTICS,
+                List.of(new SelectedKnowledge.InsightSnapshot(
+                        insightId, UUID.randomUUID(), InsightType.ARCHITECTURAL,
+                        InsightSeverity.INFO, "Architecture", "Architecture content")),
+                List.of(new SelectedKnowledge.ExistingArchitectureKnowledgeSnapshot(
+                        architectureInsightId, UUID.randomUUID(), InsightType.ARCHITECTURAL,
+                        InsightSeverity.INFO, "INSIGHT", "Existing architecture",
+                        "Existing content", "Existing rationale", List.of(), Instant.EPOCH)),
+                List.of(new ProjectContextSnapshot.EngineeringEventSnapshot(
+                        eventId, "CATEGORY", "Event", "Event summary", UUID.randomUUID(),
+                        "base", "target", Instant.EPOCH, UUID.randomUUID())),
+                List.of(new ProjectContextSnapshot.HumanContextInputSnapshot(
+                        humanContextId, ProjectHumanContextInputType.GOAL, "Goal", "Goal content",
+                        "ACTIVE", Instant.EPOCH)),
+                List.of(),
+                List.of(),
+                repositoryContext(),
+                null,
+                METADATA,
+                "a".repeat(64));
+
+        Map<String, Object> projected = service.toTypedArchitectureOverviewMap(selectedKnowledge);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> context = (Map<String, Object>) projected.get("context");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sections = (List<Map<String, Object>>) context.get("semanticSections");
+        assertEquals(Set.of(
+                        "ANALYSIS", "PROJECT", "PROJECT_PROFILE", "FACT", "OBSERVATION", "INSIGHT",
+                "ENGINEERING_EVENT", "HUMAN_CONTEXT", "REPOSITORY_EVIDENCE"),
+                sections.stream()
+                        .flatMap(section -> ((List<Map<String, Object>>) section.get("items")).stream())
+                        .map(item -> (AiReference) item.get("reference"))
+                        .map(reference -> reference.type().name())
+                        .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    void shouldRejectUnknownSemanticItemType() {
+        SemanticSectionComposer unsupportedComposer = new SemanticSectionComposer() {
+            @Override
+            public List<SemanticSection.PromptSemanticSection> compose(SelectedKnowledge ignored) {
+                return List.of(new SemanticSection.PromptSemanticSection(
+                        "PROJECT_STATE", "Project State",
+                        List.of(new SemanticSection.PromptSemanticSectionItem(
+                                "UNKNOWN_TYPE", "unknown", "Unknown"))));
+            }
+        };
+        SelectedKnowledgePromptProjectionService strictService =
+                new SelectedKnowledgePromptProjectionService(new ObjectMapper(), unsupportedComposer);
+
+        assertThrows(AiReferenceResolutionException.class,
+                () -> strictService.toTypedArchitectureOverviewMap(selectedKnowledgeWithAnalysis()));
+    }
+
     private SelectedKnowledge selectedKnowledgeWithFacts(
             List<AnalysisContext.FactSnapshot> facts) {
         return new SelectedKnowledge(
@@ -686,5 +770,18 @@ class SelectedKnowledgePromptProjectionServiceTest {
                 METADATA,
                 "a".repeat(64)
         );
+    }
+
+    private SelectedKnowledge selectedKnowledgeWithAnalysis() {
+        return new SelectedKnowledge(
+                new AnalysisContext.ProjectSnapshot(UUID.randomUUID(), "DevLog", "devlog-ai",
+                        "desc", ProjectStatus.ACTIVE),
+                new AnalysisContext.AnalysisSnapshot(
+                        UUID.randomUUID(), com.hopeful117.devlogai.analysis.entity.AnalysisType.ARCHITECTURE_REVIEW,
+                        "architecture-overview", "v3",
+                        com.hopeful117.devlogai.analysis.entity.AnalysisStatus.IN_PROGRESS,
+                        Instant.EPOCH, null, Instant.EPOCH),
+                profile(), List.of(), List.of(), DIAGNOSTICS, List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), null, null, METADATA, "a".repeat(64));
     }
 }

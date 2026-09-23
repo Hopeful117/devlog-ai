@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.decision.repository;
 import com.hopeful117.devlogai.decision.entity.Decision;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 import java.util.Collection;
 import java.util.List;
@@ -10,6 +11,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface DecisionRepository extends JpaRepository<Decision, UUID> {
+    @EntityGraph(attributePaths = {"project", "proposal"})
+    Optional<Decision> findDetailedById(UUID id);
+
    List<Decision> findByProjectIdOrderByCreatedAtDesc(UUID uuid);
 
    List<Decision> findByProjectIdOrderByCreatedAtDescIdDesc(

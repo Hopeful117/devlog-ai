@@ -1,0 +1,275 @@
+{
+  "artifactSha256": "fb1f4d4ac857d276b405620a5347cb94fd356ca46d3aa8ae2e6346a4c7d5fc88",
+  "artifactVersion": "comparative-v4-raw-observation-4.0.0",
+  "immutable": true,
+  "observation": {
+    "answerContractVersion": "comparative-v4-common-answer-1.0.0",
+    "assignment": {
+      "assignmentId": "CASE-03:DEVLOG:r1",
+      "caseId": "CASE-03",
+      "condition": "DEVLOG",
+      "questionId": "CASE-03",
+      "questionVersion": "1.0.0",
+      "repetition": 1
+    },
+    "correctGroundedAnswer": "NOT_EVALUATED",
+    "deterministicProjection": {
+      "correctGroundedAnswer": "NOT_EVALUATED",
+      "executionStatus": "PROVIDER_TIMEOUT",
+      "groundingValid": "NOT_EVALUATED",
+      "primaryDiagnostic": "PROVIDER_TIMEOUT",
+      "providerFailure": {
+        "category": "TIMEOUT",
+        "exceptionType": "APITimeoutError",
+        "httpStatus": null,
+        "messageDigest": "98123ccc69040363d9434252c4fad917e2548c4123cc330f2d891bdc4eb30865",
+        "providerErrorCode": null,
+        "providerResponseReceived": false,
+        "requestPhase": "REQUEST",
+        "retryable": true,
+        "safeMessage": "Request timed out.",
+        "transportAttempted": true
+      },
+      "resourceAccounting": {
+        "ceilingCountedOperations": 0,
+        "executedToolOperations": 0,
+        "inputTokens": "NOT_MEASURED",
+        "invalidToolRequests": 0,
+        "largestSingleResultBytesDelivered": 0,
+        "largestSingleResultBytesProduced": 0,
+        "outputTokens": "NOT_MEASURED",
+        "providerLatencyMs": "NOT_MEASURED",
+        "providerResponsesReceived": 0,
+        "providerTransportAttempts": 1,
+        "providerTransportLatencyMs": 30102,
+        "responseBearingModelTurns": 0,
+        "resultBytesDelivered": 0,
+        "resultBytesProduced": 0,
+        "resultBytesRejected": 0,
+        "skippedToolOperations": 0,
+        "toolAttempts": 0,
+        "totalTokens": "NOT_MEASURED",
+        "usableProviderResponses": 0
+      },
+      "semanticCorrect": "NOT_EVALUATED",
+      "semanticEvaluated": false,
+      "stoppingReason": "PROVIDER_TIMEOUT",
+      "structuralValid": "NOT_EVALUATED"
+    },
+    "evaluation": {
+      "correctGroundedAnswer": "NOT_EVALUATED",
+      "grounding": {
+        "status": "NOT_EVALUATED"
+      },
+      "semantic": {
+        "semanticCorrect": "NOT_EVALUATED",
+        "semanticEvaluated": false
+      },
+      "structural": {
+        "status": "NOT_EVALUATED",
+        "valid": null
+      }
+    },
+    "executionConfigurationVersion": "comparative-v4-execution-config-2.0.0",
+    "executionStatus": "PROVIDER_TIMEOUT",
+    "experimentIdentity": {
+      "identityVersion": "comparative-v4-experiment-identity-2.0.0",
+      "inputs": {
+        "assignmentPlan": [
+          "CASE-01-COMPARATIVE:DEVLOG:r1",
+          "CASE-01-COMPARATIVE:DEVLOG:r2",
+          "CASE-01-COMPARATIVE:DEVLOG:r3",
+          "CASE-01-COMPARATIVE:AGENT_DIRECT_OPEN:r1",
+          "CASE-01-COMPARATIVE:AGENT_DIRECT_OPEN:r2",
+          "CASE-01-COMPARATIVE:AGENT_DIRECT_OPEN:r3",
+          "CASE-03:DEVLOG:r1",
+          "CASE-03:DEVLOG:r2",
+          "CASE-03:DEVLOG:r3",
+          "CASE-03:AGENT_DIRECT_OPEN:r1",
+          "CASE-03:AGENT_DIRECT_OPEN:r2",
+          "CASE-03:AGENT_DIRECT_OPEN:r3",
+          "CASE-04:DEVLOG:r1",
+          "CASE-04:DEVLOG:r2",
+          "CASE-04:DEVLOG:r3",
+          "CASE-04:AGENT_DIRECT_OPEN:r1",
+          "CASE-04:AGENT_DIRECT_OPEN:r2",
+          "CASE-04:AGENT_DIRECT_OPEN:r3"
+        ],
+        "benchmarkManifestSha256": "78a84ee8fd0e029f4c99427f67b2154d45dccc14c4feb281ad47821e96fe6a40",
+        "conditions": [
+          "DEVLOG",
+          "AGENT_DIRECT_OPEN"
+        ],
+        "executionBudgetPolicy": "NATURAL_COMPLETION_WITHOUT_EXPERIMENT_LIMITS",
+        "executionConfiguration": {
+          "finalOutputTokens": 32768,
+          "intermediateOutputTokens": 32768,
+          "nativeGroundingBridgeTimeoutSeconds": 60,
+          "nativeProviderConnectTimeoutSeconds": 5,
+          "nativeProviderPoolTimeoutSeconds": 5,
+          "nativeProviderTimeoutSeconds": 30,
+          "nativeRepositoryTimeoutSeconds": 15,
+          "providerMaxRetries": 0,
+          "safetyCeilings": {
+            "maxModelTurns": null,
+            "maxProviderCallsPerObservation": null,
+            "maxReadBytesPerOperation": null,
+            "maxToolOperations": null,
+            "maxWallClockSeconds": null
+          },
+          "sha256": "93ac73ac27e89ad329aa4da5210931c198f1227b0be3f5980e773f673f203534",
+          "toolSchemaVersion": "comparative-v4-typed-repository-tools-2.0.0",
+          "version": "comparative-v4-execution-config-2.0.0"
+        },
+        "groundingContract": "comparative-v4-deterministic-grounding-1.0.0",
+        "instrumentation": "comparative-v4-instrumentation-4.0.0",
+        "manifest": "comparative-baseline-v4-3.0.0",
+        "model": "gpt-4.1-mini",
+        "oracleSha256": "3c5ca08879ec19ccb442da5e25fabe7a005a8ab429ba3a6b21d29aa8e57f9303",
+        "projectionContract": "comparative-v4-deterministic-projection-4.0.0",
+        "protocol": "comparative-baseline-v4-3.0.0",
+        "provider": "openai",
+        "questionSetSha256": "18aafc4ee1d245c2682d6b1ac30a9667861b7e9cd16894f3fae66c36f6658c5f",
+        "questions": [
+          {
+            "question": "Does the available evidence establish a causal relationship between ADR-042 and Story-0039's persisted account identity and explicit PAPER provisioning?",
+            "questionId": "CASE-01-COMPARATIVE",
+            "questionVersion": "1.0.0"
+          },
+          {
+            "question": "If the PAPER settlement strategy changes, which production components and tests are likely affected, and why?",
+            "questionId": "CASE-03",
+            "questionVersion": "1.0.0"
+          },
+          {
+            "question": "Did ADR-043 cause the specific ExecutionConfiguration refactor delivered by Story 0042?",
+            "questionId": "CASE-04",
+            "questionVersion": "1.0.0"
+          }
+        ],
+        "rawSchema": "comparative-v4-raw-observation-4.0.0",
+        "recoveryPolicy": "NATURAL_MODEL_RECOVERY",
+        "repetitionCount": 3,
+        "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+        "resourceContract": "comparative-v4-resource-accounting-4.0.0",
+        "runtimeContract": {
+          "identityVersion": "comparative-v4-live-runtime-contract-5.1.0",
+          "inputs": {
+            "components": {
+              "ceilingEnforcement": "comparative-v4-tool-ceiling-order-3.0.0",
+              "conversationPropagation": "comparative-v4-conversation-propagation-1.0.0",
+              "executionStatus": "comparative-v4-execution-status-1.0.0",
+              "identityVersion": "comparative-v4-live-runtime-contract-5.1.0",
+              "naturalCompletion": "comparative-v4-natural-completion-1.0.0",
+              "providerAccounting": "comparative-v4-provider-transport-accounting-1.0.0",
+              "providerResponseNormalization": "comparative-v4-provider-response-normalization-5.0.0",
+              "recovery": "comparative-v4-natural-model-recovery-1.0.0",
+              "runawayGuard": "NONE_EXPERIMENT_DEFINED",
+              "toolLifecycle": "comparative-v4-tool-lifecycle-4.0.0",
+              "typedRepositoryToolSchema": "comparative-v4-typed-repository-tools-2.0.0"
+            },
+            "identityVersion": "comparative-v4-live-runtime-contract-5.1.0"
+          },
+          "sha256": "99f1c7dfe7e0e4f205f081150a1c8c943b924c53f15f9bd25bfad81e2c01f1ca"
+        },
+        "safety": {
+          "maxModelTurns": null,
+          "maxProviderCallsPerObservation": null,
+          "maxReadBytesPerOperation": null,
+          "maxToolOperations": null,
+          "maxWallClockSeconds": null
+        },
+        "semanticContract": "comparative-v4-semantic-diagnostic-1.0.0"
+      },
+      "sha256": "9b45c5d2a7c6d87a612eda7f4eea694d90af7c55e4106d7b8767adc8806cea13"
+    },
+    "groundingContractVersion": "comparative-v4-deterministic-grounding-1.0.0",
+    "groundingValid": "NOT_EVALUATED",
+    "observationId": "gpt-baseline-devlog-official:CASE-03:DEVLOG:r1",
+    "primaryDiagnostic": "PROVIDER_TIMEOUT",
+    "providerFailure": {
+      "category": "TIMEOUT",
+      "exceptionType": "APITimeoutError",
+      "httpStatus": null,
+      "messageDigest": "98123ccc69040363d9434252c4fad917e2548c4123cc330f2d891bdc4eb30865",
+      "providerErrorCode": null,
+      "providerResponseReceived": false,
+      "requestPhase": "REQUEST",
+      "retryable": true,
+      "safeMessage": "Request timed out.",
+      "transportAttempted": true
+    },
+    "rawOutput": {
+      "events": [
+        {
+          "message": "provider request timed out after 30.0 seconds",
+          "technicalEvent": "PROVIDER_TIMEOUT"
+        }
+      ],
+      "providerAttempts": [
+        {
+          "providerResponseDiagnostics": {},
+          "providerResponseReceived": false,
+          "responseBearingModelTurn": false,
+          "transportAttempted": true,
+          "transportLatencyMs": 30102,
+          "turn": 1,
+          "usableProviderResponse": false,
+          "usage": {}
+        }
+      ]
+    },
+    "rawOutputSha256": "bae93eb7fe3e3d1a5c83b6edf5b4a996184ab6c38ae7a8935fa532568525d1b4",
+    "rawSchemaVersion": "comparative-v4-raw-observation-4.0.0",
+    "resources": {
+      "assignmentLatencyMs": 30104,
+      "bytesDeliveredToModel": 0,
+      "bytesRejected": 0,
+      "ceilingCountedOperations": 0,
+      "cost": "NOT_AVAILABLE",
+      "cumulativeRepositoryBytesDelivered": 0,
+      "executedToolOperations": 0,
+      "finalAnswerProviderCalls": 0,
+      "inputTokens": "NOT_MEASURED",
+      "invalidToolCalls": 0,
+      "invalidToolRequests": 0,
+      "largestSingleResultBytesDelivered": 0,
+      "largestSingleResultBytesProduced": 0,
+      "modelTurns": 0,
+      "navigationProviderCalls": 0,
+      "outputTokens": "NOT_MEASURED",
+      "providerLatencyMs": "NOT_MEASURED",
+      "providerResponsesReceived": 0,
+      "providerTimeouts": 1,
+      "providerTransportAttempts": 1,
+      "providerTransportLatencyMs": 30102,
+      "repositoryReads": 0,
+      "repositorySearches": 0,
+      "resourceAccountingVersion": "comparative-v4-resource-accounting-4.0.0",
+      "responseBearingModelTurns": 0,
+      "resultBytesDelivered": 0,
+      "resultBytesProduced": 0,
+      "resultBytesRejected": 0,
+      "serializedRequestBytes": 69541,
+      "serializedResultBytes": 0,
+      "skippedToolOperations": 0,
+      "stoppingReason": "PROVIDER_TIMEOUT",
+      "technicalProviderRetries": 0,
+      "toolAttempts": 0,
+      "toolCalls": 0,
+      "toolExecutionFailures": 0,
+      "toolTimeouts": 0,
+      "totalProviderCalls": 0,
+      "totalTokens": "NOT_MEASURED",
+      "usableProviderResponses": 0,
+      "validToolCalls": 0
+    },
+    "runId": "gpt-baseline-devlog-official",
+    "semanticCorrect": "NOT_EVALUATED",
+    "semanticEvaluated": false,
+    "semanticEvaluationVersion": "comparative-v4-semantic-diagnostic-1.0.0",
+    "stoppingReason": "PROVIDER_TIMEOUT",
+    "structuralValid": "NOT_EVALUATED",
+    "v4ManifestVersion": "comparative-baseline-v4-3.0.0"
+  }
+}

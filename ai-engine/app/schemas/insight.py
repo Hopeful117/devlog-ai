@@ -81,8 +81,21 @@ class TypedInsightProposalOutput(InsightOutputModel):
     title: str = Field(min_length=1, max_length=255)
     summary: str = Field(min_length=1, max_length=5000)
     rationale: str = Field(min_length=1, max_length=5000)
-    delta_type: KnowledgeDeltaType = Field(alias="deltaType")
-    target_insight_ref: ProviderAiReference | None = Field(default=None, alias="targetInsightRef")
+    delta_type: KnowledgeDeltaType = Field(
+        alias="deltaType",
+        description=(
+            "Use NEW for genuinely new knowledge and ENRICHES only when materially "
+            "extending one authorized existing architecture Insight."
+        ),
+    )
+    target_insight_ref: ProviderAiReference | None = Field(
+        default=None,
+        alias="targetInsightRef",
+        description=(
+            "Required for ENRICHES and must be copied exactly from the authorized "
+            "existingArchitectureKnowledge target set; omitted for NEW."
+        ),
+    )
     confidence: float = Field(ge=0.0, le=1.0)
     supporting_fact_refs: list[ProviderAiReference] = Field(alias="supportingFactRefs")
     supporting_observation_refs: list[ProviderAiReference] = Field(alias="supportingObservationRefs")
@@ -108,7 +121,14 @@ class TypedAnalysisSynthesisOutput(InsightOutputModel):
     title: str = Field(min_length=1, max_length=500)
     sections: list[SynthesisSectionOutput] = Field(min_length=1, max_length=20)
     delta_conclusion: ArchitectureDeltaConclusion = Field(alias="deltaConclusion")
-    grounding_refs: list[ProviderAiReference] = Field(default_factory=list, alias="groundingRefs")
+    grounding_refs: list[ProviderAiReference] = Field(
+        default_factory=list,
+        alias="groundingRefs",
+        description=(
+            "Exact references from the authorized Fact, Observation, or repository-evidence "
+            "candidate union; shape validation does not authorize values."
+        ),
+    )
 
 
 class TypedInsightGenerationOutput(InsightOutputModel):

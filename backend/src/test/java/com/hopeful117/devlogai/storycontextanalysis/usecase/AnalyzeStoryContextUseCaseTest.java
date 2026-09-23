@@ -14,6 +14,7 @@ import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.context.AnalysisContextService;
 import com.hopeful117.devlogai.analysis.diagnostics.repository.AnalysisExecutionDiagnosticRepository;
+import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
@@ -44,6 +45,7 @@ import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
@@ -54,6 +56,7 @@ import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeC
 import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService.HistoricalKnowledgeCandidates;
 import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
+import com.hopeful117.devlogai.source.exception.SourceSelectionException;
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.entity.SourceType;
 import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
@@ -73,6 +76,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -145,6 +150,110 @@ class AnalyzeStoryContextUseCaseTest {
     }
 
     @Test
+    void revisionScopeUsesTheOnlyActiveSource() {
+        UUID projectId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(UUID.randomUUID(), project);
+        Source source = source(project, UUID.randomUUID());
+        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
+                source.getId(), java.nio.file.Path.of("/workspace/test"), "abc123def");
+
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+        when(workspaceManager.resolveCurrentRevision(source))
+                .thenReturn(new ResolvedSourceRevision(source.getId(), null, "abc123def"));
+        when(workspaceManager.synchronize(source, "abc123def")).thenReturn(workspace);
+
+        var resolved = invokeResolveRevisionScope(project, story, null);
+
+        assertEquals(source.getId(), resolved.sourceId());
+        assertEquals("abc123def", resolved.resolvedRevision());
+    }
+
+    @Test
+    void revisionScopeFailsWhenNoActiveSourceExists() {
+        UUID projectId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(UUID.randomUUID(), project);
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of());
+
+        SourceSelectionException failure = org.junit.jupiter.api.Assertions.assertThrows(
+                SourceSelectionException.class,
+                () -> invokeResolveRevisionScope(project, story, null));
+
+        assertEquals(SourceSelectionException.Reason.SOURCE_UNAVAILABLE, failure.reason());
+        verify(workspaceManager, never()).resolveCurrentRevision(any());
+    }
+
+    @Test
+    void revisionScopeRejectsMultipleSourcesRegardlessOfReturnedOrder() {
+        UUID projectId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(UUID.randomUUID(), project);
+        Source first = source(project, UUID.randomUUID());
+        Source second = source(project, UUID.randomUUID());
+
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(first, second));
+
+        SourceSelectionException failure = org.junit.jupiter.api.Assertions.assertThrows(
+                SourceSelectionException.class,
+                () -> invokeResolveRevisionScope(project, story, null));
+
+        assertEquals(SourceSelectionException.Reason.AMBIGUOUS_SOURCE, failure.reason());
+        verify(workspaceManager, never()).resolveCurrentRevision(any());
+        verify(workspaceManager, never()).synchronize(any(), any());
+    }
+
+    @Test
+    void revisionScopeRemainsAmbiguousWhenSourceOrderChanges() {
+        UUID projectId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(UUID.randomUUID(), project);
+        Source first = source(project, UUID.randomUUID());
+        Source second = source(project, UUID.randomUUID());
+
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(second, first));
+
+        SourceSelectionException failure = org.junit.jupiter.api.Assertions.assertThrows(
+                SourceSelectionException.class,
+                () -> invokeResolveRevisionScope(project, story, null));
+
+        assertEquals(SourceSelectionException.Reason.AMBIGUOUS_SOURCE, failure.reason());
+    }
+
+    private RepositoryRevisionScope invokeResolveRevisionScope(
+            Project project, EngineeringStory story, UUID baselineAnalysisId) {
+        try {
+            Method method = AnalyzeStoryContextUseCase.class.getDeclaredMethod(
+                    "resolveRevisionScope", Project.class, EngineeringStory.class, UUID.class);
+            method.setAccessible(true);
+            return (RepositoryRevisionScope) method.invoke(
+                    useCase, project, story, baselineAnalysisId);
+        } catch (InvocationTargetException exception) {
+            if (exception.getCause() instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new AssertionError(exception.getCause());
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError(exception);
+        }
+    }
+
+    private Source source(Project project, UUID id) {
+        return Source.builder()
+                .id(id)
+                .project(project)
+                .name("git-" + id)
+                .type(SourceType.GIT_REPOSITORY)
+                .repositoryUrl("https://github.com/test/" + id)
+                .active(true)
+                .build();
+    }
+
+    @Test
     void executeProjectsSelectedKnowledgeAndCanonicalGroundingIntoPrompt() {
         UUID projectId = UUID.randomUUID();
         UUID storyId = UUID.randomUUID();
@@ -180,6 +289,12 @@ class AnalyzeStoryContextUseCaseTest {
                 PROJECT_SLUG, INTENT_ID, List.of("src/main/java/Canonical.java"), storyId))
                 .thenReturn(engineeringContext);
         when(projectProfileService.getLatestByProject(projectId)).thenReturn(profile);
+        when(analysisRepository.save(any(Analysis.class)))
+                .thenAnswer(invocation -> {
+                    Analysis saved = invocation.getArgument(0);
+                    saved.setId(UUID.randomUUID());
+                    return saved;
+                });
         when(analysisContextService.build(analysisId)).thenReturn(baselineContext);
         when(historicalKnowledgeCandidateService.retrieve(
                 projectId, analysisId, story,
@@ -210,7 +325,7 @@ class AnalyzeStoryContextUseCaseTest {
         when(knowledgeSelectionService.select(any(), eq(intent), eq(null), any()))
                 .thenAnswer(invocation -> selectedKnowledge(invocation.getArgument(0), profile));
         when(aiTaskService.createForStoryContextAnalysisEntity(
-                eq(projectId), eq(AiTaskType.STORY_CONTEXT_ANALYSIS), eq(INTENT_ID), eq("v1"),
+                any(UUID.class), eq(AiTaskType.STORY_CONTEXT_ANALYSIS), eq(INTENT_ID), eq("v1"),
                 eq("story-context-analysis-prompt-v1"), any(), eq(CONTEXT_DIGEST),
                  any(), eq(null), any(AiReferenceRegistry.class)))
                 .thenReturn(task);
@@ -222,6 +337,8 @@ class AnalyzeStoryContextUseCaseTest {
         ArgumentCaptor<AnalysisContext> selectionContext = ArgumentCaptor.forClass(AnalysisContext.class);
         verify(knowledgeSelectionService).select(selectionContext.capture(), eq(intent), eq(null), any());
         assertEquals(INTENT_ID, selectionContext.getValue().analysis().intentId());
+        assertTrue(selectionContext.getValue().analysis().id() != null);
+        assertFalse(selectionContext.getValue().analysis().id().equals(analysisId));
         assertEquals(
                 List.of(baselineContext.facts().get(0).id(), historicalFact.id()),
                 selectionContext.getValue().facts().stream()
@@ -242,6 +359,12 @@ class AnalyzeStoryContextUseCaseTest {
         List<Map<String, Object>> projectedStories =
                 (List<Map<String, Object>>) request.selectedKnowledge().get("engineeringStories");
         assertEquals(storyId.toString(), projectedStories.get(0).get("id"));
+        ArgumentCaptor<UUID> executionAnalysisId = ArgumentCaptor.forClass(UUID.class);
+        verify(aiTaskService).createForStoryContextAnalysisEntity(
+                executionAnalysisId.capture(), eq(AiTaskType.STORY_CONTEXT_ANALYSIS), eq(INTENT_ID), eq("v1"),
+                eq("story-context-analysis-prompt-v1"), any(), eq(CONTEXT_DIGEST),
+                any(), eq(null), any(AiReferenceRegistry.class));
+        assertEquals(selectionContext.getValue().analysis().id(), executionAnalysisId.getValue());
         @SuppressWarnings("unchecked")
         Map<String, Object> projectedRepositoryContext =
                 (Map<String, Object>) request.selectedKnowledge().get("repositoryContext");

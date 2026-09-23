@@ -14,11 +14,7 @@ import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.context.AnalysisContextService;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
-import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
-import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
-import com.hopeful117.devlogai.project.entity.Project;
-import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
@@ -49,7 +45,6 @@ public class AiTaskServiceImpl implements AiTaskService {
     private final ObjectMapper objectMapper;
     private final IntentCatalog intentCatalog;
     private final SelectedKnowledgePromptProjectionService promptProjectionService;
-    private final ProjectRepository projectRepository;
 
     @Override
     public AiTaskResponse create(CreateAiTaskRequest request) {
@@ -131,7 +126,7 @@ public class AiTaskServiceImpl implements AiTaskService {
 
     @Override
     public AiTask createForStoryContextAnalysisEntity(
-            UUID projectId,
+            UUID analysisId,
             AiTaskType taskType,
             String intentId,
             String intentVersion,
@@ -141,14 +136,14 @@ public class AiTaskServiceImpl implements AiTaskService {
             Map<String, Object> groundingContract,
             Map<String, Object> userGuidance
     ) {
-        return createForStoryContextAnalysisEntity(projectId, taskType, intentId, intentVersion,
+        return createForStoryContextAnalysisEntity(analysisId, taskType, intentId, intentVersion,
                 promptTemplate, selectedKnowledgeSnapshot, contextDigest, groundingContract,
                 userGuidance, null);
     }
 
     @Override
     public AiTask createForStoryContextAnalysisEntity(
-            UUID projectId,
+            UUID analysisId,
             AiTaskType taskType,
             String intentId,
             String intentVersion,
@@ -159,20 +154,7 @@ public class AiTaskServiceImpl implements AiTaskService {
             Map<String, Object> userGuidance,
             AiReferenceRegistry referenceRegistry
     ) {
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new EntityNotFoundException("Project", projectId));
-
-        // Get or create an Analysis for the project with STORY_CONTEXT_ANALYSIS type
-        List<Analysis> existing = analysisRepository.findByProjectIdAndTypeOrderByCreatedAtDesc(projectId, AnalysisType.STORY_CONTEXT_ANALYSIS);
-        Analysis analysis = existing.isEmpty()
-                ? analysisRepository.save(Analysis.builder()
-                        .project(project)
-                        .type(AnalysisType.STORY_CONTEXT_ANALYSIS)
-                        .intentId("engineering-story-context-analysis")
-                        .intentVersion("v1")
-                        .status(AnalysisStatus.PENDING)
-                        .build())
-                : existing.get(0);
+        Analysis analysis = findAnalysis(analysisId);
 
         IntentDefinition intent = intentCatalog.resolve(intentId, intentVersion);
 

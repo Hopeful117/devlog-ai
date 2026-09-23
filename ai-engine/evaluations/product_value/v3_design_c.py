@@ -26,6 +26,7 @@ from app.schemas.story_context_analysis import (
 )
 
 from .v3_protocol import canonical, sha256_bytes
+from evaluations.repository_paths import TRADING_OS_REPOSITORY
 
 
 ROOT = Path(__file__).resolve().parents[3]

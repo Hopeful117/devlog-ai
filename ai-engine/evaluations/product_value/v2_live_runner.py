@@ -45,13 +45,14 @@ from .causal_mapping import (
 )
 from .loader import apply_frozen_oracle, load_benchmark
 from .repository_ground_truth import build_ground_truth_contexts, resolve_repository
+from evaluations.repository_paths import TRADING_OS_REPOSITORY
 
 
 MAPPING_SHA256 = "67474f09e41c07899c8c7117754b21e794f285380ffd50675e701a0a3c2c40c0"
 FIRST_GREEN_SHA256 = "011aed5f5c75264f2fea7272c745d8bc9fff45ee8c58b5c74ce8494190b345e1"
 ORIGINAL_RED_SHA256 = "bf148c3ed4b5e697478d7dc3325dd7c39a0e8b3ec604fec85e4c1545145f4128"
 PINNED_REVISION = "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
-PINNED_REPOSITORY_PATH = Path("/home/ludo/Bureau/workspace/trading-os")
+PINNED_REPOSITORY_PATH = TRADING_OS_REPOSITORY
 REPETITIONS = 3
 
 

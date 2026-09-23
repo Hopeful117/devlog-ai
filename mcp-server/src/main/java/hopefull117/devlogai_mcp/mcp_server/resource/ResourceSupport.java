@@ -118,8 +118,8 @@ public class ResourceSupport {
     }
 
     /**
-     * Selects the active Git source of the project using the same ordering
-     * rule as RepositoryStructureCollector (createdAt asc, id asc).
+     * Selects the only admissible active Git source for a project.
+     * Ordering is never used to resolve ambiguity.
      */
     public UUID requireActiveSourceId(UUID projectId, String projectSlug) {
         String sources = get(
@@ -127,26 +127,33 @@ public class ResourceSupport {
                 "Sources of project '%s' not found".formatted(projectSlug));
         JsonNode array = objectMapper.readTree(sources);
         if (!array.isArray()) {
-            throw notFound("No active repository source for project '%s'"
+            throw sourceUnavailable("No active repository source for project '%s'"
                     .formatted(projectSlug));
         }
-        JsonNode best = null;
+        UUID selected = null;
+        int activeCount = 0;
         for (JsonNode candidate : array) {
             if (!candidate.path("active").asBoolean(false)) continue;
-            if (best == null || compareSources(candidate, best) < 0) best = candidate;
+            activeCount++;
+            selected = UUID.fromString(candidate.path("id").asText());
         }
-        if (best == null) {
-            throw notFound("No active repository source for project '%s'"
+        if (activeCount == 0) {
+            throw sourceUnavailable("No active repository source for project '%s'"
                     .formatted(projectSlug));
         }
-        return UUID.fromString(best.path("id").asText());
+        if (activeCount > 1) {
+            throw ambiguousSource("Ambiguous active repository source for project '%s'"
+                    .formatted(projectSlug));
+        }
+        return selected;
     }
 
-    private int compareSources(JsonNode left, JsonNode right) {
-        int byCreatedAt = left.path("createdAt").asText("")
-                .compareTo(right.path("createdAt").asText(""));
-        if (byCreatedAt != 0) return byCreatedAt;
-        return left.path("id").asText("").compareTo(right.path("id").asText(""));
+    private static McpError sourceUnavailable(String message) {
+        return notFound("SOURCE_UNAVAILABLE: " + message);
+    }
+
+    private static McpError ambiguousSource(String message) {
+        return invalidParams("AMBIGUOUS_SOURCE: " + message);
     }
 
     public UUID requireUuid(String raw, String kind) {

@@ -53,10 +53,11 @@ from .v3_structured_output import (
     provider_result_to_internal,
     provider_schema,
 )
+from evaluations.repository_paths import TRADING_OS_REPOSITORY
 
 
 ROOT = Path(__file__).resolve().parents[3]
-TRADING_OS = Path("/home/ludo/Bureau/workspace/trading-os")
+TRADING_OS = TRADING_OS_REPOSITORY
 MANIFEST_PATH = ROOT / "ai-engine/evaluations/product_value/v3/benchmark-manifest.json"
 BENCHMARK_PATH = ROOT / "docs/stories/0130-devlog-product-value-parity-investigation/evaluation/benchmark-suite-v1.json"
 ORACLE_PATH = ROOT / "docs/stories/0131-devlog-product-value-evaluation-harness/evaluation/oracle-freeze-v1.json"

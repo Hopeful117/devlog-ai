@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 import logging
 import re
 from uuid import UUID
@@ -38,9 +39,19 @@ class InsightOutputValidationError(ValueError):
         message: str,
         *,
         relationship_context: RelationshipRetryContext | None = None,
+        failure_category: str | None = None,
+        diagnostics: dict[str, object] | None = None,
     ) -> None:
         super().__init__(message)
         self.relationship_context = relationship_context
+        self.failure_category = failure_category
+        self.diagnostics = diagnostics
+
+    @property
+    def retry_message(self) -> str:
+        if self.diagnostics is None:
+            return str(self)
+        return f"{self}: {json.dumps(self.diagnostics, sort_keys=True)}"
 
 
 logger = logging.getLogger(__name__)
@@ -93,6 +104,10 @@ class InsightGenerationService:
                 if isinstance(error, InsightOutputValidationError)
                 else None
             )
+            if relationship_context is None and submission.intent.version == "v3":
+                relationship_context = self._relationship_retry_context(
+                    submission.selected_knowledge
+                )
             corrective_prompt = self._prompt_builder.corrective_retry(
                 prompt, error, relationship_context
             )
@@ -335,7 +350,8 @@ class InsightGenerationService:
         evidence = self._typed_candidates(candidates.get("evidence"), AiReferenceType.REPOSITORY_EVIDENCE,
                                           AiReferenceScope.REPOSITORY)
         context_sections = context.get("context")
-        architecture_targets = self._typed_context_references(
+        visible_references = self._typed_context_references(context_sections)
+        architecture_targets = self._typed_architecture_references(
             context_sections.get("existingArchitectureKnowledge", [])
             if isinstance(context_sections, dict) else [],
             AiReferenceType.INSIGHT,
@@ -344,35 +360,92 @@ class InsightGenerationService:
         if require_synthesis != (output.synthesis is not None):
             raise InsightOutputValidationError("Architecture Overview v3 synthesis contract is invalid")
         if output.synthesis is not None:
-            self._require_typed_subset(output.synthesis.grounding_refs, facts | observations | evidence,
-                                       "groundingRefs")
+            self._require_typed_subset(
+                output.synthesis.grounding_refs,
+                facts | observations | evidence,
+                "groundingRefs",
+                visible=visible_references,
+                authorized_category="FACT|OBSERVATION|REPOSITORY_EVIDENCE",
+            )
         for proposal in output.proposals:
             if proposal.insight_type not in supported_insight_types:
                 raise InsightOutputValidationError(
                     f"insightType {proposal.insight_type.value} is not supported by Intent")
-            self._require_typed_subset(proposal.supporting_fact_refs, facts, "supportingFactRefs")
-            self._require_typed_subset(proposal.supporting_observation_refs, observations,
-                                       "supportingObservationRefs")
-            self._require_typed_subset(proposal.evidence_refs, evidence, "evidenceRefs")
+            self._require_typed_subset(
+                proposal.supporting_fact_refs, facts, "supportingFactRefs",
+                visible=visible_references, authorized_category="FACT",
+            )
+            self._require_typed_subset(
+                proposal.supporting_observation_refs, observations,
+                "supportingObservationRefs", visible=visible_references,
+                authorized_category="OBSERVATION",
+            )
+            self._require_typed_subset(
+                proposal.evidence_refs, evidence, "evidenceRefs",
+                visible=visible_references,
+                authorized_category="REPOSITORY_EVIDENCE",
+            )
             if proposal.delta_type.value == "ENRICHES" and proposal.target_insight_ref is None:
-                raise InsightOutputValidationError("ENRICHES requires targetInsightRef")
+                self._target_validation_error(
+                    "ENRICHES requires targetInsightRef", proposal, "REQUIRED_FOR_ENRICHES"
+                )
             if proposal.delta_type.value == "NEW" and proposal.target_insight_ref is not None:
-                raise InsightOutputValidationError("NEW must omit targetInsightRef")
+                self._target_validation_error(
+                    "NEW must omit targetInsightRef", proposal, "FORBIDDEN_FOR_NEW"
+                )
             if proposal.target_insight_ref is not None and (
                     proposal.target_insight_ref.type != AiReferenceType.INSIGHT
                     or proposal.target_insight_ref.scope != AiReferenceScope.PROJECT):
-                raise InsightOutputValidationError("targetInsightRef must identify a project Insight")
+                self._target_validation_error(
+                    "targetInsightRef must identify a project Insight", proposal, "WRONG_NAMESPACE_OR_SCOPE"
+                )
             if proposal.target_insight_ref is not None \
-                    and proposal.target_insight_ref not in architecture_targets:
-                raise InsightOutputValidationError(
-                    "targetInsightRef is not present in existingArchitectureKnowledge"
+                    and self._typed_reference_key(proposal.target_insight_ref) not in architecture_targets:
+                self._target_validation_error(
+                    "targetInsightRef is not present in existingArchitectureKnowledge",
+                    proposal,
+                    "NOT_IN_EXISTING_ARCHITECTURE_KNOWLEDGE",
                 )
 
+    def _target_validation_error(
+        self, message: str, proposal: object, reason: str
+    ) -> None:
+        target = proposal.target_insight_ref
+        raise InsightOutputValidationError(
+            message,
+            failure_category="TARGET_AUTHORIZATION",
+            diagnostics={
+                "field": "targetInsightRef",
+                "deltaType": proposal.delta_type.value,
+                "rejectedTarget": target.model_dump(by_alias=True, mode="json")
+                if target is not None else None,
+                "reason": reason,
+                "authorizedSource": "existingArchitectureKnowledge",
+            },
+        )
+
+    def _typed_context_references(self, value: object) -> set[tuple[AiReferenceType, str, AiReferenceScope]]:
+        references: set[tuple[AiReferenceType, str, AiReferenceScope]] = set()
+        if isinstance(value, dict):
+            if {"type", "ref", "scope"}.issubset(value):
+                try:
+                    reference = ProviderAiReference.model_validate(value)
+                except Exception:
+                    reference = None
+                if reference is not None:
+                    references.add(self._typed_reference_key(reference))
+            for nested in value.values():
+                references.update(self._typed_context_references(nested))
+        elif isinstance(value, list):
+            for nested in value:
+                references.update(self._typed_context_references(nested))
+        return references
+
     def _typed_candidates(self, value: object, expected_type: AiReferenceType,
-                          expected_scope: AiReferenceScope) -> set[ProviderAiReference]:
+                          expected_scope: AiReferenceScope) -> set[tuple[AiReferenceType, str, AiReferenceScope]]:
         if not isinstance(value, list):
             raise InsightOutputValidationError("Typed grounding candidates must be arrays")
-        result: set[ProviderAiReference] = set()
+        result: set[tuple[AiReferenceType, str, AiReferenceScope]] = set()
         for item in value:
             try:
                 reference = ProviderAiReference.model_validate(item)
@@ -380,14 +453,18 @@ class InsightGenerationService:
                 raise InsightOutputValidationError("Malformed typed grounding candidate") from error
             if reference.type != expected_type or reference.scope != expected_scope:
                 raise InsightOutputValidationError("Grounding candidate namespace or scope is invalid")
-            result.add(reference)
+            result.add(self._typed_reference_key(reference))
         return result
 
-    def _typed_context_references(self, value: object, expected_type: AiReferenceType,
-                                  expected_scope: AiReferenceScope) -> set[ProviderAiReference]:
+    def _typed_architecture_references(
+            self,
+            value: object,
+            expected_type: AiReferenceType,
+            expected_scope: AiReferenceScope,
+    ) -> set[tuple[AiReferenceType, str, AiReferenceScope]]:
         if not isinstance(value, list):
             raise InsightOutputValidationError("Typed architecture knowledge must be an array")
-        result: set[ProviderAiReference] = set()
+        result: set[tuple[AiReferenceType, str, AiReferenceScope]] = set()
         for item in value:
             if not isinstance(item, dict) or "reference" not in item:
                 raise InsightOutputValidationError("Architecture knowledge item lacks a typed reference")
@@ -397,14 +474,66 @@ class InsightGenerationService:
                 raise InsightOutputValidationError("Malformed architecture knowledge reference") from error
             if reference.type != expected_type or reference.scope != expected_scope:
                 raise InsightOutputValidationError("Architecture knowledge reference namespace or scope is invalid")
-            result.add(reference)
+            result.add(self._typed_reference_key(reference))
         return result
 
     def _require_typed_subset(self, referenced: list[ProviderAiReference],
-                              available: set[ProviderAiReference], field_name: str) -> None:
-        unknown = set(referenced) - available
-        if unknown:
-            raise InsightOutputValidationError(f"{field_name} contains unauthorized references")
+                              available: set[tuple[AiReferenceType, str, AiReferenceScope]],
+                              field_name: str, *,
+                              visible: set[tuple[AiReferenceType, str, AiReferenceScope]] | None = None,
+                              authorized_category: str | None = None) -> None:
+        rejected = [
+            self._reference_diagnostic(reference, available, visible or set(), authorized_category)
+            for reference in referenced
+            if self._typed_reference_key(reference) not in available
+        ]
+        if rejected:
+            diagnostics = {
+                "field": field_name,
+                "rejectedReferences": rejected,
+                "authorizedCategory": authorized_category,
+            }
+            raise InsightOutputValidationError(
+                f"{field_name} contains unauthorized references",
+                failure_category="GROUNDING_AUTHORIZATION",
+                diagnostics=diagnostics,
+            )
+
+    def _reference_diagnostic(
+            self,
+            reference: ProviderAiReference,
+            available: set[tuple[AiReferenceType, str, AiReferenceScope]],
+            visible: set[tuple[AiReferenceType, str, AiReferenceScope]],
+            authorized_category: str | None,
+    ) -> dict[str, object]:
+        key = self._typed_reference_key(reference)
+        all_known = available | visible
+        same_ref = [candidate for candidate in all_known if candidate[1] == reference.ref]
+        if key in visible and key not in available:
+            reason = "NOT_AUTHORIZED_FOR_GROUNDING"
+        elif any(candidate[0] == reference.type and candidate[2] != reference.scope
+                 for candidate in same_ref):
+            reason = "WRONG_SCOPE"
+        elif any(candidate[0] != reference.type and candidate[2] == reference.scope
+                 for candidate in same_ref):
+            reason = "WRONG_TYPE"
+        elif same_ref:
+            reason = "WRONG_NAMESPACE"
+        else:
+            reason = "UNKNOWN_REFERENCE"
+        return {
+            "type": reference.type.value,
+            "ref": reference.ref,
+            "scope": reference.scope.value,
+            "reason": reason,
+            "authorizedCategory": authorized_category,
+        }
+
+    @staticmethod
+    def _typed_reference_key(
+            reference: ProviderAiReference,
+    ) -> tuple[AiReferenceType, str, AiReferenceScope]:
+        return reference.type, reference.ref, reference.scope
 
     def _result_proposal(self, submission: AiTaskSubmissionRequest, proposal: object) -> AiProposalResult:
         if submission.intent.version == "v3":
@@ -467,15 +596,28 @@ class InsightGenerationService:
     def _relationship_retry_context(
         self, context: dict[str, object]
     ) -> RelationshipRetryContext | None:
+        typed = self._is_typed_context(context)
         relationships = self._uncovered_relationships(context)
         if not relationships:
             return None
         candidates = self._relationship_retry_candidates(context, relationships)
-        return RelationshipRetryContext(tuple(relationships), tuple(candidates))
+        return RelationshipRetryContext(
+            tuple(relationships), tuple(candidates),
+            target_field="targetInsightRef" if typed else "targetInsightId",
+        )
+
+    def _relationship_context(self, context: dict[str, object]) -> dict[str, object]:
+        nested = context.get("context")
+        return nested if self._is_typed_context(context) and isinstance(nested, dict) else context
+
+    def _is_typed_context(self, context: dict[str, object]) -> bool:
+        nested = context.get("context")
+        return isinstance(nested, dict) and isinstance(context.get("groundingCandidates"), dict)
 
     def _uncovered_relationships(
         self, context: dict[str, object]
     ) -> list[UncoveredRelationshipRetryItem]:
+        context = self._relationship_context(context)
         existing_relationships = self._existing_relationships(
             context.get("existingArchitectureKnowledge", [])
         )
@@ -521,6 +663,8 @@ class InsightGenerationService:
         context: dict[str, object],
         relationships: list[UncoveredRelationshipRetryItem],
     ) -> list[ArchitectureKnowledgeRetryCandidate]:
+        typed = self._is_typed_context(context)
+        context = self._relationship_context(context)
         existing = context.get("existingArchitectureKnowledge", [])
         if not isinstance(existing, list):
             return []
@@ -534,7 +678,11 @@ class InsightGenerationService:
         for item in existing:
             if not isinstance(item, dict):
                 continue
-            insight_id = item.get("insightId")
+            reference = item.get("reference") if typed else None
+            insight_id = (
+                reference.get("ref")
+                if isinstance(reference, dict) else item.get("insightId")
+            )
             title = item.get("title")
             content = item.get("content", item.get("summary"))
             if not all(isinstance(value, str) and value.strip()
@@ -551,7 +699,8 @@ class InsightGenerationService:
                 if isinstance(reference, str) and reference.strip()
             } if isinstance(references, list) else set()
             candidates.append((ArchitectureKnowledgeRetryCandidate(
-                normalized_id, str(title), str(content)
+                normalized_id, str(title), str(content),
+                target_reference=reference if isinstance(reference, dict) else None,
             ), candidate_references))
         matched = [
             candidate

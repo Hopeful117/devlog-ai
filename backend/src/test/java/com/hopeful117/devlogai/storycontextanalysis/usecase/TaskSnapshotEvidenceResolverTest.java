@@ -32,6 +32,26 @@ class TaskSnapshotEvidenceResolverTest {
     }
 
     @Test
+    void resolvesOnlyTheOriginatingTaskSnapshotContent() {
+        var task = task();
+        task.setSelectedKnowledgeSnapshot(Map.of(
+                "repositoryContext", Map.of("evidence", List.of(Map.of(
+                        "reference", REFERENCE,
+                        "content", Map.of(
+                                "status", "COMPLETE",
+                                "text", "Snapshot-only content",
+                                "revision", "rev-1"))))));
+
+        var assessment = assessment(new StoryContextAnalysisResult.EvidenceLocator(
+                StoryContextAnalysisResult.EvidenceLocator.LocatorKind.LINE_RANGE, 1, 1, null), null);
+
+        var bound = resolver.bind(assessment, task);
+
+        assertEquals("Snapshot-only content",
+                bound.evidenceAssertions().getFirst().resolvedContent());
+    }
+
+    @Test
     void resolvesSectionAndRejectsFabricatedExcerpt() {
         var locator = new StoryContextAnalysisResult.EvidenceLocator(
                 StoryContextAnalysisResult.EvidenceLocator.LocatorKind.SECTION, null, null, "Decision");

@@ -1,0 +1,116 @@
+{
+  "answer": {
+    "abstention": false,
+    "answerText": "No. The evidence establishes that ADR-042 constrained Story-0039's mode boundary, but not that it caused the persisted account identity or explicit PAPER provisioning. Those decisions are explicitly assigned to the separate Account Identity and Risk Facts ADR, ADR-043.",
+    "claims": [
+      {
+        "claimType": "FACT",
+        "references": [
+          "docs/architecture/adr/ADR-042.md:987-1000"
+        ],
+        "text": "ADR-042 explicitly requires a separate ADR for account identity and PAPER risk facts and states that these concerns are intentionally not hidden in ADR-042."
+      },
+      {
+        "claimType": "FACT",
+        "references": [
+          "docs/architecture/adr/ADR-042.md:1063-1077"
+        ],
+        "text": "ADR-042 identifies the first implementation Story as Account Identity and PAPER Risk Facts only after ADR-042 and the separate identity/risk ADR are accepted, but does not identify Story-0039 by name."
+      },
+      {
+        "claimType": "FACT",
+        "references": [
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md:34-56"
+        ],
+        "text": "Story-0039 attributes the independent account identities and canonical relation to ADR-043, while describing ADR-042 only as preserving the execution-mode boundary."
+      },
+      {
+        "claimType": "INTERPRETATION",
+        "references": [
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/repository-analysis.md:17-23",
+          "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/repository-analysis.md:32-53"
+        ],
+        "text": "Story-0039 was implemented under both ADR-042 and ADR-043, so ADR-042 provided an architectural constraint, but the available evidence does not establish it as the causal source of the identity and provisioning requirements."
+      },
+      {
+        "claimType": "FACT",
+        "references": [
+          "docs/architecture/adr/ADR-043.md:937-950"
+        ],
+        "text": "ADR-043 states that it provides the account identity and facts-source architecture needed to make ADR-042's mode distinction executable safely, without superseding ADR-042."
+      }
+    ],
+    "confidence": "HIGH",
+    "evidence": [
+      {
+        "excerpt": "A separate ADR is required before implementing the first PAPER risk/identity story... This is broader than position close and is intentionally not hidden in ADR-042.",
+        "locator": "LINE_RANGE startLine=987 endLine=1000",
+        "reference": "docs/architecture/adr/ADR-042.md",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "No Engineering Story is created by this ADR. Once ADR-042 and the separate Account Identity/Risk Facts ADR are accepted, the first implementation Story should remain: Establish PAPER Account Identity and Risk Facts.",
+        "locator": "LINE_RANGE startLine=1063 endLine=1077",
+        "reference": "docs/architecture/adr/ADR-042.md",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary...",
+        "locator": "LINE_RANGE startLine=34 endLine=56",
+        "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "ADR-043 provides the account identity and facts-source architecture required to make that distinction executable safely. It does not supersede ADR-042.",
+        "locator": "LINE_RANGE startLine=937 endLine=950",
+        "reference": "docs/architecture/adr/ADR-043.md",
+        "role": "SUPPORTING"
+      },
+      {
+        "excerpt": "ADR_042_CHANGED = NO; ADR_043_CHANGED = NO; NEW_ADR_REQUIRED = NO",
+        "locator": "LINE_RANGE startLine=40 endLine=48",
+        "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/final-review-report.md",
+        "role": "SUPPORTING"
+      }
+    ],
+    "questionId": "CASE-01-COMPARATIVE",
+    "questionVersion": "1.0.0",
+    "relationshipResult": "NOT_ESTABLISHED"
+  },
+  "capturedAt": 1789746229.7190304,
+  "condition": "DIRECT",
+  "elapsedMs": 81875,
+  "evaluation": {
+    "correctGroundedAnswer": "NOT_EVALUATED",
+    "grounding": {
+      "status": "NOT_EVALUATED"
+    },
+    "semantic": {
+      "semanticCorrect": "NOT_EVALUATED",
+      "semanticEvaluated": false
+    },
+    "structural": {
+      "error": "claim count is outside the common contract",
+      "status": "FAIL",
+      "valid": false
+    }
+  },
+  "executionStatus": "COMPLETED",
+  "model": "openai/gpt-5.6-luna",
+  "observationId": "luna-official:CASE-01-COMPARATIVE:DIRECT:r2",
+  "questionId": "CASE-01-COMPARATIVE",
+  "questionVersion": "1.0.0",
+  "rawFinalText": "{\"questionId\":\"CASE-01-COMPARATIVE\",\"questionVersion\":\"1.0.0\",\"answerText\":\"No. The evidence establishes that ADR-042 constrained Story-0039's mode boundary, but not that it caused the persisted account identity or explicit PAPER provisioning. Those decisions are explicitly assigned to the separate Account Identity and Risk Facts ADR, ADR-043.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"ADR-042 explicitly requires a separate ADR for account identity and PAPER risk facts and states that these concerns are intentionally not hidden in ADR-042.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-042.md:987-1000\"]},{\"text\":\"ADR-042 identifies the first implementation Story as Account Identity and PAPER Risk Facts only after ADR-042 and the separate identity/risk ADR are accepted, but does not identify Story-0039 by name.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-042.md:1063-1077\"]},{\"text\":\"Story-0039 attributes the independent account identities and canonical relation to ADR-043, while describing ADR-042 only as preserving the execution-mode boundary.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md:34-56\"]},{\"text\":\"Story-0039 was implemented under both ADR-042 and ADR-043, so ADR-042 provided an architectural constraint, but the available evidence does not establish it as the causal source of the identity and provisioning requirements.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/repository-analysis.md:17-23\",\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/repository-analysis.md:32-53\"]},{\"text\":\"ADR-043 states that it provides the account identity and facts-source architecture needed to make ADR-042's mode distinction executable safely, without superseding ADR-042.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-043.md:937-950\"]}],\"evidence\":[{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"LINE_RANGE startLine=987 endLine=1000\",\"excerpt\":\"A separate ADR is required before implementing the first PAPER risk/identity story... This is broader than position close and is intentionally not hidden in ADR-042.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"LINE_RANGE startLine=1063 endLine=1077\",\"excerpt\":\"No Engineering Story is created by this ADR. Once ADR-042 and the separate Account Identity/Risk Facts ADR are accepted, the first implementation Story should remain: Establish PAPER Account Identity and Risk Facts.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"locator\":\"LINE_RANGE startLine=34 endLine=56\",\"excerpt\":\"ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary...\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-043.md\",\"locator\":\"LINE_RANGE startLine=937 endLine=950\",\"excerpt\":\"ADR-043 provides the account identity and facts-source architecture required to make that distinction executable safely. It does not supersede ADR-042.\",\"role\":\"SUPPORTING\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/final-review-report.md\",\"locator\":\"LINE_RANGE startLine=40 endLine=48\",\"excerpt\":\"ADR_042_CHANGED = NO; ADR_043_CHANGED = NO; NEW_ADR_REQUIRED = NO\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+  "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-01-COMPARATIVE:DIRECT:r2.opencodelog.jsonl",
+  "repetition": 2,
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "returnCode": 0,
+  "runtime": "OpenCode 1.18.31 default agent",
+  "usage": {
+    "cacheRead": 187392,
+    "input": 42964,
+    "output": 2129,
+    "reasoning": 915,
+    "total": 233400
+  }
+}

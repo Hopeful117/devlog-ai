@@ -1,0 +1,52 @@
+{
+  "dataset": "GPT_BASELINE_DEVLOG_COLLECTION",
+  "model": "gpt-4.1-mini",
+  "condition": "DEVLOG",
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "assignmentCount": 9,
+  "sequential": true,
+  "openCodeInvoked": false,
+  "contextSource": "data/comparative-baseline/story0133-comparative-baseline-1.0.0/raw/*:DEVLOG:r*.json exactInput",
+  "contextIdentities": {
+    "CASE-01-COMPARATIVE": {
+      "contextDigest": "de3d7236b83f752c68347c9a3bf03ec2f97c15f8869ba170c9b83ecdad1dbf90",
+      "projectionRevision": "CASE-01:e76cd34467fcf9897a0ac0a0a54a9aad9693ccd2e60c7c17f98df851506a2f39",
+      "providerVisibleEvidenceItems": 4,
+      "providerVisibleEvidenceBytes": 32401
+    },
+    "CASE-03": {
+      "contextDigest": "de3d7236b83f752c68347c9a3bf03ec2f97c15f8869ba170c9b83ecdad1dbf90",
+      "projectionRevision": "CASE-03:36d04037f59952cefd9c5685a188477585d9f42e9d980d620fffae59870ec0e7",
+      "providerVisibleEvidenceItems": 3,
+      "providerVisibleEvidenceBytes": 31683
+    },
+    "CASE-04": {
+      "contextDigest": "de3d7236b83f752c68347c9a3bf03ec2f97c15f8869ba170c9b83ecdad1dbf90",
+      "projectionRevision": "CASE-04:58460a6ef22cc374fe65fb691976e45a6dfd04f64e7b0ebc5955f21071da1c97",
+      "providerVisibleEvidenceItems": 4,
+      "providerVisibleEvidenceBytes": 13504
+    }
+  },
+  "observationIds": [
+    "gpt-baseline-devlog-official:CASE-01-COMPARATIVE:DEVLOG:r1",
+    "gpt-baseline-devlog-official:CASE-03:DEVLOG:r1",
+    "gpt-baseline-devlog-official:CASE-04:DEVLOG:r1",
+    "gpt-baseline-devlog-official:CASE-01-COMPARATIVE:DEVLOG:r2",
+    "gpt-baseline-devlog-official:CASE-03:DEVLOG:r2",
+    "gpt-baseline-devlog-official:CASE-04:DEVLOG:r2",
+    "gpt-baseline-devlog-official:CASE-01-COMPARATIVE:DEVLOG:r3",
+    "gpt-baseline-devlog-official:CASE-03:DEVLOG:r3",
+    "gpt-baseline-devlog-official:CASE-04:DEVLOG:r3"
+  ],
+  "rawOutputSha256": [
+    "dba3386407babd1fb57d194f043d6bb49d72fcb6d9855411538efeec2a77b781",
+    "bae93eb7fe3e3d1a5c83b6edf5b4a996184ab6c38ae7a8935fa532568525d1b4",
+    "10424b07db6188b3dcc53239a060fc6df737fbb5ae7ac3c81e65daa26f5c18a6",
+    "bfe0973d72b3a342d825a59da5a59b8c9c1a27783fab24226f38b4484d82c503",
+    "7c2c77af12b8d23c5d744a816ee761c80e521a36a9518922197ad8d5736bfb93",
+    "bc6fe7a46b5e4ff7b9172722b40ed1b01a9a92d8fb7040716df20f186dc21c7d",
+    "bae93eb7fe3e3d1a5c83b6edf5b4a996184ab6c38ae7a8935fa532568525d1b4",
+    "33d802cfec0c34dc11a68986cbe43b569844305b88604a07b90accf7bc1cce3d",
+    "8d28af97a3b492970685eaf1ca5470201d264df27010f0da8d20f5054f9df505"
+  ]
+}

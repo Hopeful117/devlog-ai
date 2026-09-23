@@ -48,4 +48,10 @@ public interface DevlogResourceClient {
             @PathVariable("projectId") UUID projectId,
             @RequestParam("query") String query,
             @RequestParam(value = "limit", required = false) Integer limit);
+
+    @GetExchange("/evidence/resolve")
+    String resolveEvidence(
+            @RequestParam("reference") String reference,
+            @RequestParam("mode") String mode,
+            @RequestParam(value = "analysisId", required = false) UUID analysisId);
 }

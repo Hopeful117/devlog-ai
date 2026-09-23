@@ -14,6 +14,7 @@ import java.util.UUID;
 public interface ProjectCommitRepository extends JpaRepository<ProjectCommit, UUID> {
     boolean existsBySourceIdAndCommitHash(UUID sourceId, String commitHash);
 
+    @EntityGraph(attributePaths = {"source", "changedFiles", "parents"})
     Optional<ProjectCommit> findBySourceIdAndCommitHash(UUID sourceId, String commitHash);
 
     List<ProjectCommit> findByProjectIdOrderByCommittedAtAscCommitHashAsc(UUID projectId);

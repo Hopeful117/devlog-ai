@@ -15,14 +15,20 @@ class ScriptedProvider:
 
     def complete(self, request: ProviderRequest) -> ProviderResponse:
         self.requests.append(request)
+        if request.on_transport_attempt is not None:
+            request.on_transport_attempt()
         if not self.script:
             raise TransportFailure("script exhausted")
         item = self.script.pop(0)
         if isinstance(item, Exception):
             raise item
         if callable(item):
-            return item(request)
-        return item
+            response = item(request)
+        else:
+            response = item
+        if request.on_provider_response is not None:
+            request.on_provider_response(response.usage, {"kind": response.kind, "finishReason": response.finish_reason})
+        return response
 
 
 def final_answer(question_id: str, question_version: str, reference: str = "docs/example.md") -> ProviderResponse:

@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 from enum import Enum
 
@@ -313,6 +313,25 @@ class StoryContextAnalysisResult(StoryContextAnalysisContractModel):
     causal_assessment: CausalAssessment | None = Field(default=None, alias="causalAssessment")
 
     @field_serializer("confidence")
-    def serialize_confidence_for_core(self, value: Confidence) -> str:
+    def serialize_confidence_for_core(self, value: Confidence | str) -> str:
         """Keep the internal rationale out of the canonical Java callback wire shape."""
-        return value.level
+        return value if isinstance(value, str) else value.level
+
+
+ProviderConfidence = Literal["HIGH", "MEDIUM", "LOW"]
+
+
+class ProviderStoryContextAnalysisResult(StoryContextAnalysisResult):
+    """Strict provider wire result, separate from the richer internal model."""
+
+    confidence: ProviderConfidence
+
+
+def provider_result_to_internal(
+    result: ProviderStoryContextAnalysisResult,
+) -> StoryContextAnalysisResult:
+    """Adapt provider confidence without inventing rationale or semantics."""
+
+    payload = result.model_dump(mode="json", by_alias=True, exclude={"confidence"})
+    payload["confidence"] = {"level": result.confidence, "rationale": ""}
+    return StoryContextAnalysisResult.model_validate(payload)

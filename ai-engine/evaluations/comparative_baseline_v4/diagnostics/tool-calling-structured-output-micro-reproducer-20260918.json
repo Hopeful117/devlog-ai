@@ -1,0 +1,75 @@
+{
+  "classification": "MICRO_REPRODUCER",
+  "benchmark": false,
+  "officialCollection": false,
+  "newProviderCalls": 2,
+  "providerCallCeiling": 8,
+  "model": "gpt-4.1-mini",
+  "resolvedModel": "gpt-4.1-mini-2025-04-14",
+  "maxOutputTokens": 32768,
+  "providerMaxRetries": 0,
+  "promptSha256": "1322c36c95882640cc1f2663e432ea5402ffa08a3f00e89496a0aae442add096",
+  "promptBytes": 189,
+  "instructionsBytes": 102,
+  "serializedInputBytes": 219,
+  "strictResponseSchemaBytes": 2152,
+  "sixToolSchemaBytes": 2183,
+  "oneToolSchemaBytes": 428,
+  "toolNames": [
+    "read_file",
+    "search_repository",
+    "git_log",
+    "git_show",
+    "git_diff",
+    "inspect_commit"
+  ],
+  "providerDefaultsOmitted": [
+    "temperature",
+    "tool_choice",
+    "parallel_tool_calls"
+  ],
+  "results": [
+    {
+      "label": "one_v4_tool_strict_on",
+      "toolCount": 1,
+      "structuredOutputEnabled": true,
+      "strict": true,
+      "responseSchemaIdentity": "story0134_common_answer",
+      "requestShapeBytes": 3085,
+      "responseId": "resp_0deb4c1eff3ff746006aad3828791887d297253180a6f2fcc2",
+      "requestId": "req_f1f387afa4a94b3f8018d0209dfadef1",
+      "status": "incomplete",
+      "incompleteReason": "max_output_tokens",
+      "outputItemCount": 0,
+      "firstUsableToolCall": false,
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "reasoningTokens": 0
+      },
+      "latencyMs": 3038
+    },
+    {
+      "label": "six_v4_tools_strict_off",
+      "toolCount": 6,
+      "structuredOutputEnabled": false,
+      "strict": false,
+      "responseSchemaIdentity": "NOT_SENT",
+      "requestShapeBytes": 2590,
+      "responseId": "resp_061980db0acd27f8006aad3829b91487d28c59cd25f884562b",
+      "requestId": "req_fd04f6592571421d8d47224fa5f52d6c",
+      "status": "incomplete",
+      "incompleteReason": "max_output_tokens",
+      "outputItemCount": 0,
+      "firstUsableToolCall": false,
+      "usage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "totalTokens": 0,
+        "reasoningTokens": 0
+      },
+      "latencyMs": 1281
+    }
+  ]
+}

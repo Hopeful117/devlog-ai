@@ -37,6 +37,13 @@ def _failure_category(error: Exception) -> str:
     return "PROVIDER_ERROR"
 
 
+def _failure_message(error: Exception) -> str:
+    retry_message = getattr(error, "retry_message", None)
+    if isinstance(retry_message, str):
+        return retry_message[:5000]
+    return str(error)[:5000]
+
+
 def redact_sensitive_text(value: str | None) -> str | None:
     if value is None:
         return None
@@ -94,7 +101,7 @@ class InteractionTraceCollector:
         return os.getenv("AI_TRACE_LEVEL", "NORMAL").upper() == "DIAGNOSTIC"
 
     def retry(self, reason: Exception) -> None:
-        self._retry_reason = str(reason)[:5000]
+        self._retry_reason = _failure_message(reason)
 
     async def generate_and_validate(
         self,
@@ -126,7 +133,7 @@ class InteractionTraceCollector:
                 raise
             return parsed
         except Exception as error:
-            failure_message = str(error)[:5000]
+            failure_message = _failure_message(error)
             if failure_category is None:
                 if isinstance(error, ValidationError):
                     status = "PARSING_FAILED"
@@ -219,5 +226,5 @@ class InteractionTraceCollector:
             raw_model_response=redact_sensitive_text(generation.raw_output)
             if diagnostic and generation else None,
             parsed_model_response=_json_value(parsed) if diagnostic and parsed else None,
-            validation_diagnostics=redact_sensitive_text(failure_message) if diagnostic else None,
+            validation_diagnostics=redact_sensitive_text(failure_message),
         )

@@ -1,0 +1,2073 @@
+{
+  "dataset": "LUNA_COMPARATIVE_COLLECTION",
+  "model": "openai/gpt-5.6-luna",
+  "observations": [
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "The available evidence does not establish that ADR-042 caused Story-0039's persisted account identity and explicit PAPER provisioning. ADR-042 establishes PAPER authority and persistence boundaries, while Story-0039 attributes the independent account identities and canonical relation to ADR-043 and specifies explicit PAPER provisioning requirements.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-042.md"
+            ],
+            "text": "ADR-042 establishes that Trading Core is authoritative for PAPER position state and that PAPER state must be locally persisted and reloadable."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+            ],
+            "text": "Story-0039 explicitly attributes the independent Account and BrokerAccount identities and canonical relation to ADR-043, while describing ADR-042 as preserving the execution-mode boundary."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+            ],
+            "text": "Story-0039 requires persisted canonical account identity, explicit AccountRiskConfiguration, and versioned RiskProfile assignment for successful PAPER provisioning."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929"
+            ],
+            "text": "The implementation commit links account persistence and PAPER profile assignment, but implementation of both concerns does not by itself establish that ADR-042 caused the full Story-0039 scope."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "Trading OS SHALL maintain explicit, mode-specific position authority: LIVE_POSITION_AUTHORITY = BROKER; PAPER_POSITION_AUTHORITY = TRADING_CORE.",
+            "locator": "SECTION with heading 4. Decision",
+            "reference": "docs/architecture/adr/ADR-042.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The authoritative PAPER state is local persisted Trading Core state. A future implementation must not determine whether a PAPER position exists by calling Broker Service or by checking external broker credentials.",
+            "locator": "SECTION with heading 6.2 Local State",
+            "reference": "docs/architecture/adr/ADR-042.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary: BrokerAccount owns the execution mode, LIVE authority remains external-provider based, and PAPER financial state remains Trading Core owned.",
+            "locator": "SECTION with heading Context",
+            "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Establish an unambiguous, durable relationship between the financial Account and its execution/routing BrokerAccount, then make new PAPER provisioning a deterministic and fail-closed operation.",
+            "locator": "SECTION with heading Goal",
+            "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Add an explicit canonical reference from Account to BrokerAccount... Require a reference to an already existing, structurally valid, explicitly versioned RiskProfile for new PAPER provisioning. Persist AccountRiskConfiguration and its explicit profile assignment for successful PAPER provisioning.",
+            "locator": "SECTION with heading Scope",
+            "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The commit persists brokerAccountId on Account and then persists AccountRiskConfiguration and assigns the referenced RiskProfile during PAPER account creation.",
+            "locator": "COMMIT_HUNK with commit/path/header 6ea180ceab3c112807bc30818b1e7c19e38ae929/trading-core/src/main/java/com/hope/trading/trading_core/brokeraccount/application/BrokerAccountService.java/createPaperAccount",
+            "reference": "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-01-COMPARATIVE",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789745917.7541544,
+      "condition": "DEVLOG",
+      "elapsedMs": 27340,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "'str' object has no attribute 'get'",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-01-COMPARATIVE:DEVLOG:r1",
+      "questionId": "CASE-01-COMPARATIVE",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-01-COMPARATIVE\",\"questionVersion\":\"1.0.0\",\"answerText\":\"The available evidence does not establish that ADR-042 caused Story-0039's persisted account identity and explicit PAPER provisioning. ADR-042 establishes PAPER authority and persistence boundaries, while Story-0039 attributes the independent account identities and canonical relation to ADR-043 and specifies explicit PAPER provisioning requirements.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"ADR-042 establishes that Trading Core is authoritative for PAPER position state and that PAPER state must be locally persisted and reloadable.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-042.md\"]},{\"text\":\"Story-0039 explicitly attributes the independent Account and BrokerAccount identities and canonical relation to ADR-043, while describing ADR-042 as preserving the execution-mode boundary.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\"]},{\"text\":\"Story-0039 requires persisted canonical account identity, explicit AccountRiskConfiguration, and versioned RiskProfile assignment for successful PAPER provisioning.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\"]},{\"text\":\"The implementation commit links account persistence and PAPER profile assignment, but implementation of both concerns does not by itself establish that ADR-042 caused the full Story-0039 scope.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"commit:6ea180ceab3c112807bc30818b1e7c19e38ae929\"]}],\"evidence\":[{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"SECTION with heading 4. Decision\",\"excerpt\":\"Trading OS SHALL maintain explicit, mode-specific position authority: LIVE_POSITION_AUTHORITY = BROKER; PAPER_POSITION_AUTHORITY = TRADING_CORE.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"SECTION with heading 6.2 Local State\",\"excerpt\":\"The authoritative PAPER state is local persisted Trading Core state. A future implementation must not determine whether a PAPER position exists by calling Broker Service or by checking external broker credentials.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"locator\":\"SECTION with heading Context\",\"excerpt\":\"ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary: BrokerAccount owns the execution mode, LIVE authority remains external-provider based, and PAPER financial state remains Trading Core owned.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"locator\":\"SECTION with heading Goal\",\"excerpt\":\"Establish an unambiguous, durable relationship between the financial Account and its execution/routing BrokerAccount, then make new PAPER provisioning a deterministic and fail-closed operation.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"locator\":\"SECTION with heading Scope\",\"excerpt\":\"Add an explicit canonical reference from Account to BrokerAccount... Require a reference to an already existing, structurally valid, explicitly versioned RiskProfile for new PAPER provisioning. Persist AccountRiskConfiguration and its explicit profile assignment for successful PAPER provisioning.\",\"role\":\"DIRECT\"},{\"reference\":\"commit:6ea180ceab3c112807bc30818b1e7c19e38ae929\",\"locator\":\"COMMIT_HUNK with commit/path/header 6ea180ceab3c112807bc30818b1e7c19e38ae929/trading-core/src/main/java/com/hope/trading/trading_core/brokeraccount/application/BrokerAccountService.java/createPaperAccount\",\"excerpt\":\"The commit persists brokerAccountId on Account and then persists AccountRiskConfiguration and assigns the referenced RiskProfile during PAPER account creation.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-01-COMPARATIVE:DEVLOG:r1.opencodelog.jsonl",
+      "repetition": 1,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 0,
+        "input": 21621,
+        "output": 834,
+        "reasoning": 225,
+        "total": 22680
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "The evidence does not establish ADR-042 as the causal source of Story-0039's persisted account identity and explicit PAPER provisioning. ADR-042 explicitly excludes Account/BrokerAccount identity and PAPER risk configuration, and requires a separate decision. ADR-043 defines the corresponding identity and provisioning scope, while Story-0039 identifies ADR-043 as the authority for those decisions. The evidence supports architectural dependency and sequencing, but not causal attribution to ADR-042.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-042.md:LINE_RANGE:800-805"
+            ],
+            "text": "ADR-042 explicitly states that it does not decide or implement Account/BrokerAccount identity or PAPER Risk Facts source/configuration."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-042.md:LINE_RANGE:985-1000"
+            ],
+            "text": "ADR-042 requires a separate Account identity and PAPER Risk Facts decision before the first PAPER risk/identity story."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-043.md:LINE_RANGE:1061-1077"
+            ],
+            "text": "ADR-043 defines Future Story A as covering the canonical Account-to-BrokerAccount relation, migration, PAPER provisioning, and explicit risk configuration/profile readiness."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md:LINE_RANGE:34-56",
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md:LINE_RANGE:153-173"
+            ],
+            "text": "Story-0039 treats ADR-043 as the authority for independent identities and the canonical relation, while describing ADR-042 as preserving only the execution-mode boundary."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "docs/architecture/adr/ADR-042.md:LINE_RANGE:1063-1080",
+              "docs/architecture/adr/ADR-043.md:LINE_RANGE:1061-1092"
+            ],
+            "text": "ADR-042 provides sequencing and architectural context for the later identity/provisioning work, but the repository does not establish that it caused Story-0039's specific decisions."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "This ADR does NOT decide or implement: Account/BrokerAccount identity or migration; PAPER Risk Facts source/configuration.",
+            "locator": "LINE_RANGE:800-805",
+            "reference": "ADR-042 scope boundary",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "A separate ADR is required before implementing the first PAPER risk/identity story... This is broader than position close and is intentionally not hidden in ADR-042.",
+            "locator": "LINE_RANGE:987-1000",
+            "reference": "ADR-042 separate-decision requirement",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Future Story A - Account Identity and Provisioning ... canonical Account-to-BrokerAccount relation ... PAPER account provisioning; explicit risk configuration/profile readiness.",
+            "locator": "LINE_RANGE:1061-1077",
+            "reference": "ADR-043 Story Boundary Consequence",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary...",
+            "locator": "LINE_RANGE:34-56",
+            "reference": "Story-0039 context and authority",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "Respect ADR-042 and ADR-043 as architectural authority.",
+            "locator": "LINE_RANGE:153-173",
+            "reference": "Story-0039 constraints and relevant ADRs",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-01-COMPARATIVE",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789745945.0952237,
+      "condition": "DIRECT",
+      "elapsedMs": 66497,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "claim count is outside the common contract",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-01-COMPARATIVE:DIRECT:r1",
+      "questionId": "CASE-01-COMPARATIVE",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-01-COMPARATIVE\",\"questionVersion\":\"1.0.0\",\"answerText\":\"The evidence does not establish ADR-042 as the causal source of Story-0039's persisted account identity and explicit PAPER provisioning. ADR-042 explicitly excludes Account/BrokerAccount identity and PAPER risk configuration, and requires a separate decision. ADR-043 defines the corresponding identity and provisioning scope, while Story-0039 identifies ADR-043 as the authority for those decisions. The evidence supports architectural dependency and sequencing, but not causal attribution to ADR-042.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"ADR-042 explicitly states that it does not decide or implement Account/BrokerAccount identity or PAPER Risk Facts source/configuration.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-042.md:LINE_RANGE:800-805\"]},{\"text\":\"ADR-042 requires a separate Account identity and PAPER Risk Facts decision before the first PAPER risk/identity story.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-042.md:LINE_RANGE:985-1000\"]},{\"text\":\"ADR-043 defines Future Story A as covering the canonical Account-to-BrokerAccount relation, migration, PAPER provisioning, and explicit risk configuration/profile readiness.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-043.md:LINE_RANGE:1061-1077\"]},{\"text\":\"Story-0039 treats ADR-043 as the authority for independent identities and the canonical relation, while describing ADR-042 as preserving only the execution-mode boundary.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md:LINE_RANGE:34-56\",\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md:LINE_RANGE:153-173\"]},{\"text\":\"ADR-042 provides sequencing and architectural context for the later identity/provisioning work, but the repository does not establish that it caused Story-0039's specific decisions.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"docs/architecture/adr/ADR-042.md:LINE_RANGE:1063-1080\",\"docs/architecture/adr/ADR-043.md:LINE_RANGE:1061-1092\"]}],\"evidence\":[{\"reference\":\"ADR-042 scope boundary\",\"locator\":\"LINE_RANGE:800-805\",\"excerpt\":\"This ADR does NOT decide or implement: Account/BrokerAccount identity or migration; PAPER Risk Facts source/configuration.\",\"role\":\"DIRECT\"},{\"reference\":\"ADR-042 separate-decision requirement\",\"locator\":\"LINE_RANGE:987-1000\",\"excerpt\":\"A separate ADR is required before implementing the first PAPER risk/identity story... This is broader than position close and is intentionally not hidden in ADR-042.\",\"role\":\"DIRECT\"},{\"reference\":\"ADR-043 Story Boundary Consequence\",\"locator\":\"LINE_RANGE:1061-1077\",\"excerpt\":\"Future Story A - Account Identity and Provisioning ... canonical Account-to-BrokerAccount relation ... PAPER account provisioning; explicit risk configuration/profile readiness.\",\"role\":\"DIRECT\"},{\"reference\":\"Story-0039 context and authority\",\"locator\":\"LINE_RANGE:34-56\",\"excerpt\":\"ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary...\",\"role\":\"SUPPORTING\"},{\"reference\":\"Story-0039 constraints and relevant ADRs\",\"locator\":\"LINE_RANGE:153-173\",\"excerpt\":\"Respect ADR-042 and ADR-043 as architectural authority.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-01-COMPARATIVE:DIRECT:r1.opencodelog.jsonl",
+      "repetition": 1,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 73728,
+        "input": 30880,
+        "output": 1517,
+        "reasoning": 762,
+        "total": 106887
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "A change to the PAPER settlement strategy would likely affect Trading Core's PaperSettlementService, especially its balance updates, position creation or aggregation, exit settlement, PnL and equity calculations, fill selection, and PAPER-account validation. TradingCalculatorService is also likely affected if the strategy changes PnL semantics. The directly associated PaperSettlementExitTest would need updates or additional cases because it verifies long and short exit balances, equity, PnL, and trade closure. The historical change shows that production settlement logic and this test were changed together when full local PAPER exits were introduced.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java"
+            ],
+            "text": "PaperSettlementService is the production component that implements PAPER settlement and updates balances, positions, exits, PnL, equity, and account state."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+              "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+            ],
+            "text": "TradingCalculatorService is a likely affected dependency when settlement changes alter PnL calculation semantics."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+            ],
+            "text": "PaperSettlementExitTest directly verifies PAPER exit settlement for long and short trades, including cash balances, equity, PnL, and CLOSED trade status."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+              "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+            ],
+            "text": "PaperSettlementExitTest is likely to require updates or additional cases when the PAPER settlement strategy changes."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "PaperSettlementService validates PAPER execution, selects the latest fill, settles exits separately, updates balances and positions, calculates PnL, updates equity, and saves the account.",
+            "locator": "LINE_RANGE: startLine=1, endLine=190",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The test covers longExitSettlesCashEquityAndGrossPnlOnce and shortExitRestoresBorrowedFreeBaseWithoutInventingShorting, asserting balances, equity, PnL, and CLOSED status.",
+            "locator": "LINE_RANGE: startLine=1, endLine=100",
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The commit introduced a separate EXIT settlement path and added balance, PnL, trade-closing, and equity handling.",
+            "locator": "COMMIT_HUNK: commit=18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149, path=trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java, header=@@ -55,3 +68,7 @@",
+            "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "The same commit added PaperSettlementExitTest for long and short PAPER exits.",
+            "locator": "COMMIT_HUNK: commit=18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149, path=trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java, header=@@ -0,0 +1,100 @@",
+            "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-03",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "ESTABLISHED"
+      },
+      "capturedAt": 1789746011.5945966,
+      "condition": "DEVLOG",
+      "elapsedMs": 26438,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "'str' object has no attribute 'get'",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-03:DEVLOG:r1",
+      "questionId": "CASE-03",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-03\",\"questionVersion\":\"1.0.0\",\"answerText\":\"A change to the PAPER settlement strategy would likely affect Trading Core's PaperSettlementService, especially its balance updates, position creation or aggregation, exit settlement, PnL and equity calculations, fill selection, and PAPER-account validation. TradingCalculatorService is also likely affected if the strategy changes PnL semantics. The directly associated PaperSettlementExitTest would need updates or additional cases because it verifies long and short exit balances, equity, PnL, and trade closure. The historical change shows that production settlement logic and this test were changed together when full local PAPER exits were introduced.\",\"relationshipResult\":\"ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"PaperSettlementService is the production component that implements PAPER settlement and updates balances, positions, exits, PnL, equity, and account state.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java\"]},{\"text\":\"TradingCalculatorService is a likely affected dependency when settlement changes alter PnL calculation semantics.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java\",\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\"]},{\"text\":\"PaperSettlementExitTest directly verifies PAPER exit settlement for long and short trades, including cash balances, equity, PnL, and CLOSED trade status.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java\"]},{\"text\":\"PaperSettlementExitTest is likely to require updates or additional cases when the PAPER settlement strategy changes.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java\",\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\"]}],\"evidence\":[{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java\",\"locator\":\"LINE_RANGE: startLine=1, endLine=190\",\"excerpt\":\"PaperSettlementService validates PAPER execution, selects the latest fill, settles exits separately, updates balances and positions, calculates PnL, updates equity, and saves the account.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java\",\"locator\":\"LINE_RANGE: startLine=1, endLine=100\",\"excerpt\":\"The test covers longExitSettlesCashEquityAndGrossPnlOnce and shortExitRestoresBorrowedFreeBaseWithoutInventingShorting, asserting balances, equity, PnL, and CLOSED status.\",\"role\":\"DIRECT\"},{\"reference\":\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\",\"locator\":\"COMMIT_HUNK: commit=18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149, path=trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java, header=@@ -55,3 +68,7 @@\",\"excerpt\":\"The commit introduced a separate EXIT settlement path and added balance, PnL, trade-closing, and equity handling.\",\"role\":\"SUPPORTING\"},{\"reference\":\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\",\"locator\":\"COMMIT_HUNK: commit=18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149, path=trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java, header=@@ -0,0 +1,100 @@\",\"excerpt\":\"The same commit added PaperSettlementExitTest for long and short PAPER exits.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-03:DEVLOG:r1.opencodelog.jsonl",
+      "repetition": 1,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 0,
+        "input": 21705,
+        "output": 891,
+        "reasoning": 163,
+        "total": 22759
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "A PAPER settlement strategy change would primarily affect Trading Core's PaperSettlementService, because it owns PAPER balance mutations, position aggregation or closure, realized PnL, equity updates, and persistence. ExecutionFinalizationStep and ExecutionConfiguration would be affected if the settlement interface, ordering, or dependency wiring changes. SimulatedExecutionAdapter is affected if the strategy changes fill pricing, fees, partial fills, pending orders, or reconciliation assumptions. PaperExitService is affected for changes to full-close, target, quantity, or idempotency semantics. Account/Trade persistence and PAPER position projection code are affected if the resulting position representation or lifecycle changes. The main regression coverage is in PaperSettlementExitTest, PaperExecutionVerticalRegressionTest, PaperExitAcceptanceIntegrationTest, and PaperExecutionPersistenceIntegrationTest; pipeline-order and response-handling tests are also likely affected when settlement invocation or failure behavior changes.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77",
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-107"
+            ],
+            "text": "PaperSettlementService is the primary production component affected because it applies PAPER entry and exit settlement to balances, trades, equity, and realized PnL."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69"
+            ],
+            "text": "ExecutionFinalizationStep invokes PAPER settlement before final lifecycle persistence, so changes to settlement behavior or its contract can affect execution finalization and ordering guarantees."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:65-95",
+              "docs/architecture/adr/ADR-042.md:117-133"
+            ],
+            "text": "The simulator is coupled to settlement inputs because it determines PAPER fill prices and currently returns acknowledged synthetic fills while not modeling pending orders, partial fills, or fees."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71",
+              "docs/architecture/adr/ADR-042.md:426-447"
+            ],
+            "text": "PAPER close behavior is routed through PaperExitService into an EXIT execution intent, so a change to full-close, target resolution, quantity, or idempotency semantics would affect that service and its close tests."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-52",
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:72-81",
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:189-218",
+              "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:94-127",
+              "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:177-204",
+              "docs/architecture/stories/0038-persisted-paper-execution-regression/implementation-report.md:29-40"
+            ],
+            "text": "The regression suite likely needing updates includes isolated settlement tests, the end-to-end vertical execution test, persisted round-trip acceptance tests, and pipeline tests that mock or verify settlement invocation."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "settle(...) loads the PAPER account, applies entry or exit settlement, and saves the Account.",
+            "locator": "LINE_RANGE with startLine=44,endLine=77",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Exit settlement validates the target and quantity, updates balances, calculates PnL, closes the Trade, and updates equity.",
+            "locator": "LINE_RANGE with startLine=79,endLine=107",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-107",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Acknowledged PAPER executions call paperSettlementService.settle before lifecycle acknowledgement and repository saves.",
+            "locator": "LINE_RANGE with startLine=45,endLine=69",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The simulator selects ask for BUY and bid for SELL, validates limits, and returns an acknowledged synthetic order result.",
+            "locator": "LINE_RANGE with startLine=65,endLine=95",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:65-95",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The current PAPER adapter does not model pending orders, partial fills, or fees and uses simulated reconciliation behavior.",
+            "locator": "LINE_RANGE with startLine=117,endLine=133",
+            "reference": "docs/architecture/adr/ADR-042.md:117-133",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "PaperExitService verifies ownership and PAPER mode, resolves an open Trade, creates an EXIT intent, and executes it.",
+            "locator": "LINE_RANGE with startLine=39,endLine=71",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "PAPER full close is defined as an EXIT intent followed by simulated execution and local settlement, with full-close-only and no reversal constraints.",
+            "locator": "LINE_RANGE with startLine=426,endLine=447",
+            "reference": "docs/architecture/adr/ADR-042.md:426-447",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "Tests assert long and short exit cash, equity, PnL, balances, and CLOSED lifecycle behavior.",
+            "locator": "LINE_RANGE with startLine=31,endLine=52",
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-52",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The vertical regression verifies filled order data, settlement invocation exactly once, balances, equity, and open Trade state.",
+            "locator": "LINE_RANGE with startLine=189,endLine=218",
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:189-218",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The acceptance test proves entry, reload, PAPER close, persisted CLOSED state, realized PnL, balances, and empty open-position query.",
+            "locator": "LINE_RANGE with startLine=94,endLine=127",
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:94-127",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The acceptance test verifies settlement failure rolls back financial and Trade state.",
+            "locator": "LINE_RANGE with startLine=177,endLine=204",
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:177-204",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Persisted BUY coverage is explicit; SELL pricing, exact-once settlement, and pipeline ordering are covered by separate regression tests.",
+            "locator": "LINE_RANGE with startLine=29,endLine=40",
+            "reference": "docs/architecture/stories/0038-persisted-paper-execution-regression/implementation-report.md:29-40",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-03",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "ESTABLISHED"
+      },
+      "capturedAt": 1789746038.0330455,
+      "condition": "DIRECT",
+      "elapsedMs": 72605,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "claim count is outside the common contract",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-03:DIRECT:r1",
+      "questionId": "CASE-03",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-03\",\"questionVersion\":\"1.0.0\",\"answerText\":\"A PAPER settlement strategy change would primarily affect Trading Core's PaperSettlementService, because it owns PAPER balance mutations, position aggregation or closure, realized PnL, equity updates, and persistence. ExecutionFinalizationStep and ExecutionConfiguration would be affected if the settlement interface, ordering, or dependency wiring changes. SimulatedExecutionAdapter is affected if the strategy changes fill pricing, fees, partial fills, pending orders, or reconciliation assumptions. PaperExitService is affected for changes to full-close, target, quantity, or idempotency semantics. Account/Trade persistence and PAPER position projection code are affected if the resulting position representation or lifecycle changes. The main regression coverage is in PaperSettlementExitTest, PaperExecutionVerticalRegressionTest, PaperExitAcceptanceIntegrationTest, and PaperExecutionPersistenceIntegrationTest; pipeline-order and response-handling tests are also likely affected when settlement invocation or failure behavior changes.\",\"relationshipResult\":\"ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"PaperSettlementService is the primary production component affected because it applies PAPER entry and exit settlement to balances, trades, equity, and realized PnL.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77\",\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-107\"]},{\"text\":\"ExecutionFinalizationStep invokes PAPER settlement before final lifecycle persistence, so changes to settlement behavior or its contract can affect execution finalization and ordering guarantees.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69\"]},{\"text\":\"The simulator is coupled to settlement inputs because it determines PAPER fill prices and currently returns acknowledged synthetic fills while not modeling pending orders, partial fills, or fees.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:65-95\",\"docs/architecture/adr/ADR-042.md:117-133\"]},{\"text\":\"PAPER close behavior is routed through PaperExitService into an EXIT execution intent, so a change to full-close, target resolution, quantity, or idempotency semantics would affect that service and its close tests.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71\",\"docs/architecture/adr/ADR-042.md:426-447\"]},{\"text\":\"The regression suite likely needing updates includes isolated settlement tests, the end-to-end vertical execution test, persisted round-trip acceptance tests, and pipeline tests that mock or verify settlement invocation.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-52\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:72-81\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:189-218\",\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:94-127\",\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:177-204\",\"docs/architecture/stories/0038-persisted-paper-execution-regression/implementation-report.md:29-40\"]}],\"evidence\":[{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77\",\"locator\":\"LINE_RANGE with startLine=44,endLine=77\",\"excerpt\":\"settle(...) loads the PAPER account, applies entry or exit settlement, and saves the Account.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-107\",\"locator\":\"LINE_RANGE with startLine=79,endLine=107\",\"excerpt\":\"Exit settlement validates the target and quantity, updates balances, calculates PnL, closes the Trade, and updates equity.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69\",\"locator\":\"LINE_RANGE with startLine=45,endLine=69\",\"excerpt\":\"Acknowledged PAPER executions call paperSettlementService.settle before lifecycle acknowledgement and repository saves.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:65-95\",\"locator\":\"LINE_RANGE with startLine=65,endLine=95\",\"excerpt\":\"The simulator selects ask for BUY and bid for SELL, validates limits, and returns an acknowledged synthetic order result.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-042.md:117-133\",\"locator\":\"LINE_RANGE with startLine=117,endLine=133\",\"excerpt\":\"The current PAPER adapter does not model pending orders, partial fills, or fees and uses simulated reconciliation behavior.\",\"role\":\"SUPPORTING\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71\",\"locator\":\"LINE_RANGE with startLine=39,endLine=71\",\"excerpt\":\"PaperExitService verifies ownership and PAPER mode, resolves an open Trade, creates an EXIT intent, and executes it.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-042.md:426-447\",\"locator\":\"LINE_RANGE with startLine=426,endLine=447\",\"excerpt\":\"PAPER full close is defined as an EXIT intent followed by simulated execution and local settlement, with full-close-only and no reversal constraints.\",\"role\":\"SUPPORTING\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-52\",\"locator\":\"LINE_RANGE with startLine=31,endLine=52\",\"excerpt\":\"Tests assert long and short exit cash, equity, PnL, balances, and CLOSED lifecycle behavior.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:189-218\",\"locator\":\"LINE_RANGE with startLine=189,endLine=218\",\"excerpt\":\"The vertical regression verifies filled order data, settlement invocation exactly once, balances, equity, and open Trade state.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:94-127\",\"locator\":\"LINE_RANGE with startLine=94,endLine=127\",\"excerpt\":\"The acceptance test proves entry, reload, PAPER close, persisted CLOSED state, realized PnL, balances, and empty open-position query.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:177-204\",\"locator\":\"LINE_RANGE with startLine=177,endLine=204\",\"excerpt\":\"The acceptance test verifies settlement failure rolls back financial and Trade state.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0038-persisted-paper-execution-regression/implementation-report.md:29-40\",\"locator\":\"LINE_RANGE with startLine=29,endLine=40\",\"excerpt\":\"Persisted BUY coverage is explicit; SELL pricing, exact-once settlement, and pipeline ordering are covered by separate regression tests.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-03:DIRECT:r1.opencodelog.jsonl",
+      "repetition": 1,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 109568,
+        "input": 57259,
+        "output": 2533,
+        "reasoning": 678,
+        "total": 170038
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "No. The supplied evidence does not establish that ADR-043 caused the specific ExecutionConfiguration refactor delivered by Story 0042.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+            ],
+            "text": "Story 0042 delivered the ExecutionConfiguration change by adding TradingCalculatorService to PaperSettlementService."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-043.md"
+            ],
+            "text": "ADR-043 addresses account identity and facts-source architecture, while preserving ADR-029 execution lifecycle authority."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "docs/architecture/adr/ADR-043.md",
+              "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+            ],
+            "text": "The evidence does not explicitly link ADR-043 to the TradingCalculatorService dependency refactor."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "PaperSettlementService configuration changed to add TradingCalculatorService and pass it to the constructor.",
+            "locator": "COMMIT_HUNK with commit=18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149,path=trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java,header=@@ -56,2 +56,3 @@",
+            "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-029 remains authoritative for execution lifecycle, idempotency, attempts, orders, reconciliation, and execution audit.",
+            "locator": "SECTION with heading=27. Relationship to Other ADRs",
+            "reference": "docs/architecture/adr/ADR-043.md",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "The implementation may generalize ExecutionIntent or introduce an exit-specific authorization, but it must preserve common order/fill/audit concepts.",
+            "locator": "SECTION with heading=Architectural Constraints",
+            "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-04",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789746110.6420882,
+      "condition": "DEVLOG",
+      "elapsedMs": 20534,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "'str' object has no attribute 'get'",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-04:DEVLOG:r1",
+      "questionId": "CASE-04",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-04\",\"questionVersion\":\"1.0.0\",\"answerText\":\"No. The supplied evidence does not establish that ADR-043 caused the specific ExecutionConfiguration refactor delivered by Story 0042.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"Story 0042 delivered the ExecutionConfiguration change by adding TradingCalculatorService to PaperSettlementService.\",\"claimType\":\"FACT\",\"references\":[\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\"]},{\"text\":\"ADR-043 addresses account identity and facts-source architecture, while preserving ADR-029 execution lifecycle authority.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-043.md\"]},{\"text\":\"The evidence does not explicitly link ADR-043 to the TradingCalculatorService dependency refactor.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"docs/architecture/adr/ADR-043.md\",\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\"]}],\"evidence\":[{\"reference\":\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\",\"locator\":\"COMMIT_HUNK with commit=18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149,path=trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java,header=@@ -56,2 +56,3 @@\",\"excerpt\":\"PaperSettlementService configuration changed to add TradingCalculatorService and pass it to the constructor.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-043.md\",\"locator\":\"SECTION with heading=27. Relationship to Other ADRs\",\"excerpt\":\"ADR-029 remains authoritative for execution lifecycle, idempotency, attempts, orders, reconciliation, and execution audit.\",\"role\":\"SUPPORTING\"},{\"reference\":\"docs/architecture/stories/0042-paper-local-full-exit/story.md\",\"locator\":\"SECTION with heading=Architectural Constraints\",\"excerpt\":\"The implementation may generalize ExecutionIntent or introduce an exit-specific authorization, but it must preserve common order/fill/audit concepts.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-04:DEVLOG:r1.opencodelog.jsonl",
+      "repetition": 1,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 0,
+        "input": 17110,
+        "output": 494,
+        "reasoning": 132,
+        "total": 17736
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "No. ADR-043 did not cause the specific ExecutionConfiguration refactor; Story 0042 added TradingCalculatorService wiring to support exit settlement and realized PnL. ADR-043 was related context but explicitly excluded PAPER EXIT implementation.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "e1"
+            ],
+            "text": "The ExecutionConfiguration change injected TradingCalculatorService into PaperSettlementService."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "e2",
+              "e3"
+            ],
+            "text": "Story 0042 identifies explicit EXIT handling, local settlement, and realized PnL as the implementation drivers."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "e4"
+            ],
+            "text": "ADR-043 explicitly excludes PAPER EXIT implementation from its scope."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "e1",
+              "e2",
+              "e4"
+            ],
+            "text": "ADR-043 informed account identity and execution-mode constraints, but the evidence does not establish it as the cause of this specific configuration refactor."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "The Story 0042 commit changes PaperSettlementService wiring by adding TradingCalculatorService to its bean factory and constructor.",
+            "locator": "COMMIT_HUNK commit=da84a19 path=trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java header=@@ -53,8 +53,9 @@",
+            "reference": "e1",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Story 0042 implemented explicit ENTRY/EXIT purposes, PAPER local close dispatch, local exit settlement, and realized PnL using the existing calculator.",
+            "locator": "LINE_RANGE startLine=16 endLine=26",
+            "reference": "e2",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "PaperSettlementService branches on explicit purpose and the EXIT path computes gross PnL with TradingCalculatorService.",
+            "locator": "LINE_RANGE startLine=89 endLine=94",
+            "reference": "e3",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-043 states that PAPER position-query implementation, PAPER EXIT implementation, and PAPER realized-PnL settlement are not decided or implemented by the ADR.",
+            "locator": "LINE_RANGE startLine=992 endLine=1000",
+            "reference": "e4",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-04",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789746131.1763341,
+      "condition": "DIRECT",
+      "elapsedMs": 65982,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "'str' object has no attribute 'get'",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-04:DIRECT:r1",
+      "questionId": "CASE-04",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-04\",\"questionVersion\":\"1.0.0\",\"answerText\":\"No. ADR-043 did not cause the specific ExecutionConfiguration refactor; Story 0042 added TradingCalculatorService wiring to support exit settlement and realized PnL. ADR-043 was related context but explicitly excluded PAPER EXIT implementation.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"The ExecutionConfiguration change injected TradingCalculatorService into PaperSettlementService.\",\"claimType\":\"FACT\",\"references\":[\"e1\"]},{\"text\":\"Story 0042 identifies explicit EXIT handling, local settlement, and realized PnL as the implementation drivers.\",\"claimType\":\"FACT\",\"references\":[\"e2\",\"e3\"]},{\"text\":\"ADR-043 explicitly excludes PAPER EXIT implementation from its scope.\",\"claimType\":\"FACT\",\"references\":[\"e4\"]},{\"text\":\"ADR-043 informed account identity and execution-mode constraints, but the evidence does not establish it as the cause of this specific configuration refactor.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"e1\",\"e2\",\"e4\"]}],\"evidence\":[{\"reference\":\"e1\",\"locator\":\"COMMIT_HUNK commit=da84a19 path=trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java header=@@ -53,8 +53,9 @@\",\"excerpt\":\"The Story 0042 commit changes PaperSettlementService wiring by adding TradingCalculatorService to its bean factory and constructor.\",\"role\":\"DIRECT\"},{\"reference\":\"e2\",\"locator\":\"LINE_RANGE startLine=16 endLine=26\",\"excerpt\":\"Story 0042 implemented explicit ENTRY/EXIT purposes, PAPER local close dispatch, local exit settlement, and realized PnL using the existing calculator.\",\"role\":\"DIRECT\"},{\"reference\":\"e3\",\"locator\":\"LINE_RANGE startLine=89 endLine=94\",\"excerpt\":\"PaperSettlementService branches on explicit purpose and the EXIT path computes gross PnL with TradingCalculatorService.\",\"role\":\"DIRECT\"},{\"reference\":\"e4\",\"locator\":\"LINE_RANGE startLine=992 endLine=1000\",\"excerpt\":\"ADR-043 states that PAPER position-query implementation, PAPER EXIT implementation, and PAPER realized-PnL settlement are not decided or implemented by the ADR.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-04:DIRECT:r1.opencodelog.jsonl",
+      "repetition": 1,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 186368,
+        "input": 50294,
+        "output": 1712,
+        "reasoning": 732,
+        "total": 239106
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "The evidence does not establish that ADR-042 caused Story-0039's persisted account identity and explicit PAPER provisioning as a combined outcome. ADR-042 directly establishes persisted Trading Core authority for PAPER state, while Story-0039 attributes canonical account identity to ADR-043 and describes ADR-042 as preserving the execution-mode boundary.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-042.md"
+            ],
+            "text": "ADR-042 establishes that PAPER position state is authoritative local persisted Trading Core state and must survive reload."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+            ],
+            "text": "Story-0039 identifies ADR-043, not ADR-042, as defining the independent Account and BrokerAccount identities and their canonical relation."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+              "docs/architecture/adr/ADR-042.md"
+            ],
+            "text": "Story-0039 explicitly characterizes ADR-042 as preserving the execution-mode boundary, while its persisted identity and explicit PAPER provisioning requirements are broader than that boundary."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929"
+            ],
+            "text": "The implementation commit connects canonical account identity and explicit PAPER profile provisioning in code, but implementation sequence alone does not establish that ADR-042 causally produced both requirements."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "The authoritative PAPER state is local persisted Trading Core state. A future implementation must not determine whether a PAPER position exists by calling Broker Service or by checking external broker credentials. The state must be reloadable after a process restart.",
+            "locator": "SECTION with heading 6.2 Local State",
+            "reference": "docs/architecture/adr/ADR-042.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The canonical Account-to-BrokerAccount relation belongs to the account/domain model, independently of risk configuration.",
+            "locator": "SECTION with heading 5. Canonical Relationship Authority",
+            "reference": "docs/architecture/adr/ADR-043.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary: BrokerAccount owns the execution mode, LIVE authority remains external-provider based, and PAPER financial state remains Trading Core owned.",
+            "locator": "SECTION with heading Context",
+            "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Establish an unambiguous, durable relationship between the financial Account and its execution/routing BrokerAccount, then make new PAPER provisioning a deterministic and fail-closed operation.",
+            "locator": "SECTION with heading Goal",
+            "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The commit persists brokerAccountId on Account, creates AccountRiskConfiguration, and assigns the referenced profile during PAPER provisioning.",
+            "locator": "COMMIT_HUNK with commit=6ea180ceab3c112807bc30818b1e7c19e38ae929,path=trading-core/src/main/java/com/hope/trading/trading_core/brokeraccount/application/BrokerAccountService.java,header=createPaperAccount",
+            "reference": "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-01-COMPARATIVE",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789746197.1614048,
+      "condition": "DEVLOG",
+      "elapsedMs": 32557,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "'str' object has no attribute 'get'",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-01-COMPARATIVE:DEVLOG:r2",
+      "questionId": "CASE-01-COMPARATIVE",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-01-COMPARATIVE\",\"questionVersion\":\"1.0.0\",\"answerText\":\"The evidence does not establish that ADR-042 caused Story-0039's persisted account identity and explicit PAPER provisioning as a combined outcome. ADR-042 directly establishes persisted Trading Core authority for PAPER state, while Story-0039 attributes canonical account identity to ADR-043 and describes ADR-042 as preserving the execution-mode boundary.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"ADR-042 establishes that PAPER position state is authoritative local persisted Trading Core state and must survive reload.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-042.md\"]},{\"text\":\"Story-0039 identifies ADR-043, not ADR-042, as defining the independent Account and BrokerAccount identities and their canonical relation.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\"]},{\"text\":\"Story-0039 explicitly characterizes ADR-042 as preserving the execution-mode boundary, while its persisted identity and explicit PAPER provisioning requirements are broader than that boundary.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"docs/architecture/adr/ADR-042.md\"]},{\"text\":\"The implementation commit connects canonical account identity and explicit PAPER profile provisioning in code, but implementation sequence alone does not establish that ADR-042 causally produced both requirements.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"commit:6ea180ceab3c112807bc30818b1e7c19e38ae929\"]}],\"evidence\":[{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"SECTION with heading 6.2 Local State\",\"excerpt\":\"The authoritative PAPER state is local persisted Trading Core state. A future implementation must not determine whether a PAPER position exists by calling Broker Service or by checking external broker credentials. The state must be reloadable after a process restart.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-043.md\",\"locator\":\"SECTION with heading 5. Canonical Relationship Authority\",\"excerpt\":\"The canonical Account-to-BrokerAccount relation belongs to the account/domain model, independently of risk configuration.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"locator\":\"SECTION with heading Context\",\"excerpt\":\"ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary: BrokerAccount owns the execution mode, LIVE authority remains external-provider based, and PAPER financial state remains Trading Core owned.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"locator\":\"SECTION with heading Goal\",\"excerpt\":\"Establish an unambiguous, durable relationship between the financial Account and its execution/routing BrokerAccount, then make new PAPER provisioning a deterministic and fail-closed operation.\",\"role\":\"DIRECT\"},{\"reference\":\"commit:6ea180ceab3c112807bc30818b1e7c19e38ae929\",\"locator\":\"COMMIT_HUNK with commit=6ea180ceab3c112807bc30818b1e7c19e38ae929,path=trading-core/src/main/java/com/hope/trading/trading_core/brokeraccount/application/BrokerAccountService.java,header=createPaperAccount\",\"excerpt\":\"The commit persists brokerAccountId on Account, creates AccountRiskConfiguration, and assigns the referenced profile during PAPER provisioning.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-01-COMPARATIVE:DEVLOG:r2.opencodelog.jsonl",
+      "repetition": 2,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 0,
+        "input": 21621,
+        "output": 770,
+        "reasoning": 326,
+        "total": 22717
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "No. The evidence establishes that ADR-042 constrained Story-0039's mode boundary, but not that it caused the persisted account identity or explicit PAPER provisioning. Those decisions are explicitly assigned to the separate Account Identity and Risk Facts ADR, ADR-043.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-042.md:987-1000"
+            ],
+            "text": "ADR-042 explicitly requires a separate ADR for account identity and PAPER risk facts and states that these concerns are intentionally not hidden in ADR-042."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-042.md:1063-1077"
+            ],
+            "text": "ADR-042 identifies the first implementation Story as Account Identity and PAPER Risk Facts only after ADR-042 and the separate identity/risk ADR are accepted, but does not identify Story-0039 by name."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md:34-56"
+            ],
+            "text": "Story-0039 attributes the independent account identities and canonical relation to ADR-043, while describing ADR-042 only as preserving the execution-mode boundary."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/repository-analysis.md:17-23",
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/repository-analysis.md:32-53"
+            ],
+            "text": "Story-0039 was implemented under both ADR-042 and ADR-043, so ADR-042 provided an architectural constraint, but the available evidence does not establish it as the causal source of the identity and provisioning requirements."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-043.md:937-950"
+            ],
+            "text": "ADR-043 states that it provides the account identity and facts-source architecture needed to make ADR-042's mode distinction executable safely, without superseding ADR-042."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "A separate ADR is required before implementing the first PAPER risk/identity story... This is broader than position close and is intentionally not hidden in ADR-042.",
+            "locator": "LINE_RANGE startLine=987 endLine=1000",
+            "reference": "docs/architecture/adr/ADR-042.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "No Engineering Story is created by this ADR. Once ADR-042 and the separate Account Identity/Risk Facts ADR are accepted, the first implementation Story should remain: Establish PAPER Account Identity and Risk Facts.",
+            "locator": "LINE_RANGE startLine=1063 endLine=1077",
+            "reference": "docs/architecture/adr/ADR-042.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary...",
+            "locator": "LINE_RANGE startLine=34 endLine=56",
+            "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-043 provides the account identity and facts-source architecture required to make that distinction executable safely. It does not supersede ADR-042.",
+            "locator": "LINE_RANGE startLine=937 endLine=950",
+            "reference": "docs/architecture/adr/ADR-043.md",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "ADR_042_CHANGED = NO; ADR_043_CHANGED = NO; NEW_ADR_REQUIRED = NO",
+            "locator": "LINE_RANGE startLine=40 endLine=48",
+            "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/final-review-report.md",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-01-COMPARATIVE",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789746229.7190304,
+      "condition": "DIRECT",
+      "elapsedMs": 81875,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "claim count is outside the common contract",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-01-COMPARATIVE:DIRECT:r2",
+      "questionId": "CASE-01-COMPARATIVE",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-01-COMPARATIVE\",\"questionVersion\":\"1.0.0\",\"answerText\":\"No. The evidence establishes that ADR-042 constrained Story-0039's mode boundary, but not that it caused the persisted account identity or explicit PAPER provisioning. Those decisions are explicitly assigned to the separate Account Identity and Risk Facts ADR, ADR-043.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"ADR-042 explicitly requires a separate ADR for account identity and PAPER risk facts and states that these concerns are intentionally not hidden in ADR-042.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-042.md:987-1000\"]},{\"text\":\"ADR-042 identifies the first implementation Story as Account Identity and PAPER Risk Facts only after ADR-042 and the separate identity/risk ADR are accepted, but does not identify Story-0039 by name.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-042.md:1063-1077\"]},{\"text\":\"Story-0039 attributes the independent account identities and canonical relation to ADR-043, while describing ADR-042 only as preserving the execution-mode boundary.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md:34-56\"]},{\"text\":\"Story-0039 was implemented under both ADR-042 and ADR-043, so ADR-042 provided an architectural constraint, but the available evidence does not establish it as the causal source of the identity and provisioning requirements.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/repository-analysis.md:17-23\",\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/repository-analysis.md:32-53\"]},{\"text\":\"ADR-043 states that it provides the account identity and facts-source architecture needed to make ADR-042's mode distinction executable safely, without superseding ADR-042.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-043.md:937-950\"]}],\"evidence\":[{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"LINE_RANGE startLine=987 endLine=1000\",\"excerpt\":\"A separate ADR is required before implementing the first PAPER risk/identity story... This is broader than position close and is intentionally not hidden in ADR-042.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"LINE_RANGE startLine=1063 endLine=1077\",\"excerpt\":\"No Engineering Story is created by this ADR. Once ADR-042 and the separate Account Identity/Risk Facts ADR are accepted, the first implementation Story should remain: Establish PAPER Account Identity and Risk Facts.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"locator\":\"LINE_RANGE startLine=34 endLine=56\",\"excerpt\":\"ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary...\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-043.md\",\"locator\":\"LINE_RANGE startLine=937 endLine=950\",\"excerpt\":\"ADR-043 provides the account identity and facts-source architecture required to make that distinction executable safely. It does not supersede ADR-042.\",\"role\":\"SUPPORTING\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/final-review-report.md\",\"locator\":\"LINE_RANGE startLine=40 endLine=48\",\"excerpt\":\"ADR_042_CHANGED = NO; ADR_043_CHANGED = NO; NEW_ADR_REQUIRED = NO\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-01-COMPARATIVE:DIRECT:r2.opencodelog.jsonl",
+      "repetition": 2,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 187392,
+        "input": 42964,
+        "output": 2129,
+        "reasoning": 915,
+        "total": 233400
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "A change to the PAPER settlement strategy would primarily affect Trading Core's PaperSettlementService and its PaperSettlementExitTest. The service controls PAPER-mode account lookup and validation, fill selection, balance updates, position changes, equity and P&L settlement, and EXIT handling. The tests encode expected long-exit and short-exit cash, asset, equity, P&L, and trade-status outcomes, so they would need updating or expansion when those rules change. TradingCalculatorService may also be affected if the revised strategy changes P&L calculation.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java"
+            ],
+            "text": "PaperSettlementService is the production component that performs PAPER settlement and handles account validation, fill selection, balances, positions, equity, and exit settlement."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java"
+            ],
+            "text": "PaperSettlementExitTest directly verifies PAPER exit settlement for long and short trades, including balances, equity, P&L, and closed trade status."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+              "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+            ],
+            "text": "TradingCalculatorService is a likely affected dependency if the settlement strategy changes how exit P&L is calculated."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+            ],
+            "text": "The production settlement logic and exit tests were introduced or changed together for local full-exit behavior, indicating that strategy changes should update both implementation and behavioral tests."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "settle checks for ExecutionMode.PAPER, selects a fill, updates balances and positions for non-exits, and delegates exits to settleExit; exit settlement updates balances, calculates P&L, closes the trade, and updates equity.",
+            "locator": {
+              "heading": "class PaperSettlementService",
+              "type": "SECTION"
+            },
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Tests assert long-exit and short-exit USD/BTC balances, equity, P&L, and CLOSED trade status.",
+            "locator": {
+              "heading": "class PaperSettlementExitTest",
+              "type": "SECTION"
+            },
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The commit added separate EXIT settlement behavior and introduced TradingCalculatorService into PaperSettlementService.",
+            "locator": {
+              "commit": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+              "header": "@@ -55,3 +68,7 @@",
+              "path": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+              "type": "COMMIT_HUNK"
+            },
+            "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-03",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "ESTABLISHED"
+      },
+      "capturedAt": 1789746311.5965362,
+      "condition": "DEVLOG",
+      "elapsedMs": 28189,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "unsupported evidence locator",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-03:DEVLOG:r2",
+      "questionId": "CASE-03",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-03\",\"questionVersion\":\"1.0.0\",\"answerText\":\"A change to the PAPER settlement strategy would primarily affect Trading Core's PaperSettlementService and its PaperSettlementExitTest. The service controls PAPER-mode account lookup and validation, fill selection, balance updates, position changes, equity and P&L settlement, and EXIT handling. The tests encode expected long-exit and short-exit cash, asset, equity, P&L, and trade-status outcomes, so they would need updating or expansion when those rules change. TradingCalculatorService may also be affected if the revised strategy changes P&L calculation.\",\"relationshipResult\":\"ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"PaperSettlementService is the production component that performs PAPER settlement and handles account validation, fill selection, balances, positions, equity, and exit settlement.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java\"]},{\"text\":\"PaperSettlementExitTest directly verifies PAPER exit settlement for long and short trades, including balances, equity, P&L, and closed trade status.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java\"]},{\"text\":\"TradingCalculatorService is a likely affected dependency if the settlement strategy changes how exit P&L is calculated.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java\",\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\"]},{\"text\":\"The production settlement logic and exit tests were introduced or changed together for local full-exit behavior, indicating that strategy changes should update both implementation and behavioral tests.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\"]}],\"evidence\":[{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java\",\"locator\":{\"type\":\"SECTION\",\"heading\":\"class PaperSettlementService\"},\"excerpt\":\"settle checks for ExecutionMode.PAPER, selects a fill, updates balances and positions for non-exits, and delegates exits to settleExit; exit settlement updates balances, calculates P&L, closes the trade, and updates equity.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java\",\"locator\":{\"type\":\"SECTION\",\"heading\":\"class PaperSettlementExitTest\"},\"excerpt\":\"Tests assert long-exit and short-exit USD/BTC balances, equity, P&L, and CLOSED trade status.\",\"role\":\"DIRECT\"},{\"reference\":\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\",\"locator\":{\"type\":\"COMMIT_HUNK\",\"commit\":\"18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\",\"path\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java\",\"header\":\"@@ -55,3 +68,7 @@\"},\"excerpt\":\"The commit added separate EXIT settlement behavior and introduced TradingCalculatorService into PaperSettlementService.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-03:DEVLOG:r2.opencodelog.jsonl",
+      "repetition": 2,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 0,
+        "input": 21705,
+        "output": 739,
+        "reasoning": 217,
+        "total": 22661
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "A change to the PAPER settlement strategy would primarily affect Trading Core's PaperSettlementService, its ExecutionFinalizationStep caller, and ExecutionConfiguration bean wiring. If the change also alters simulated fill generation or exit orchestration, SimulatedExecutionAdapter, RoutingBrokerExecutionAdapter, and PaperExitService are affected indirectly. Tests covering settlement accounting, the end-to-end PAPER execution path, persistence, exits, rollback, idempotency, concurrency, and pipeline construction would need review.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77",
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-107"
+            ],
+            "text": "PaperSettlementService is the central PAPER settlement implementation: it validates PAPER mode, selects the fill, mutates balances and positions, calculates exit PnL, updates equity, and saves the Account transactionally."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69"
+            ],
+            "text": "ExecutionFinalizationStep invokes PAPER settlement after an acknowledged submission and before lifecycle/order persistence, so settlement contract or failure-semantics changes affect execution finalization."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java:55-66"
+            ],
+            "text": "ExecutionConfiguration constructs PaperSettlementService and injects it into ExecutionFinalizationStep, so replacing or splitting the strategy requires production bean wiring changes."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:46-95"
+            ],
+            "text": "SimulatedExecutionAdapter supplies the simulated fill price and limit-order acceptance behavior used by settlement; a strategy change involving pricing, fees, or fill semantics would affect this adapter and its tests."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71"
+            ],
+            "text": "PaperExitService creates PAPER EXIT intents and delegates execution to ExecuteTradeService, so changes to exit settlement rules, target validation, or the settlement boundary require corresponding exit-flow review."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-53",
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:84-97"
+            ],
+            "text": "PaperSettlementExitTest directly asserts long and short exit balance, equity, PnL, and closed-status outcomes, making it the primary unit-test target."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:72-81",
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:174-218"
+            ],
+            "text": "PaperExecutionVerticalRegressionTest covers routing to simulation, fill pricing, settlement invocation, persistence effects, and duplicate-execution protection for PAPER BUY and SELL flows."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionPersistenceIntegrationTest.java:115-164"
+            ],
+            "text": "PaperExecutionPersistenceIntegrationTest verifies Spring wiring, persisted execution state, simulated fill persistence, and final PAPER account balances and trades."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:94-147",
+              "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:149-205"
+            ],
+            "text": "PaperExitAcceptanceIntegrationTest covers complete entry-close accounting, reload behavior, idempotent replay, concurrent close protection, rollback on settlement failure, and isolation from the LIVE broker."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineTest.java:242-258",
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineResponseHandlingTest.java:154-163",
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineOrderRegressionTest.java:147-163",
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecuteTradeServiceGuardTest.java:291-317"
+            ],
+            "text": "Pipeline-focused tests construct or mock PaperSettlementService and ExecutionFinalizationStep, so they are likely affected if the settlement service interface, constructor, invocation timing, or PAPER gating changes."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "@Transactional settle(...) resolves the broker account, requires ExecutionMode.PAPER, applies entry or exit settlement, and saves the account.",
+            "locator": "LINE_RANGE with startLine=44,endLine=77",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "For an acknowledged result, PAPER accounts call paperSettlementService.settle(...) before lifecycle acknowledgement, order save, metrics, and final persistence.",
+            "locator": "LINE_RANGE with startLine=45,endLine=69",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The configuration creates PaperSettlementService and injects it into ExecutionFinalizationStep.",
+            "locator": "LINE_RANGE with startLine=55,endLine=66",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The simulator chooses BUY at ask or SELL at bid, checks LIMIT satisfaction, and returns an acknowledged simulated fill price.",
+            "locator": "LINE_RANGE with startLine=65,endLine=95",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "The PAPER exit service derives the opposite side, creates an exit intent, and delegates to execution.execute(...).",
+            "locator": "LINE_RANGE with startLine=60,endLine=71",
+            "reference": "trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "Unit tests assert long and short exit cash, base balance, equity, PnL, and CLOSED status.",
+            "locator": "LINE_RANGE with startLine=31,endLine=53",
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The vertical regression test verifies completed PAPER execution, simulated fill, settlement invocation, account mutation, and terminal replay protection.",
+            "locator": "LINE_RANGE with startLine=174,endLine=218",
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The persistence integration test verifies completed execution, no LIVE broker submission, persisted fill/order state, balances, equity, and open trade state.",
+            "locator": "LINE_RANGE with startLine=122,endLine=164",
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionPersistenceIntegrationTest.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Acceptance tests verify one settlement under concurrent close, rollback after settlement failure, and unchanged financial state on failure.",
+            "locator": "LINE_RANGE with startLine=149,endLine=205",
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The pipeline fixture mocks PaperSettlementService and passes it to ExecutionFinalizationStep.",
+            "locator": "LINE_RANGE with startLine=246,endLine=258",
+            "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineTest.java",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-03",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "ESTABLISHED"
+      },
+      "capturedAt": 1789746339.785741,
+      "condition": "DIRECT",
+      "elapsedMs": 93578,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "claim count is outside the common contract",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-03:DIRECT:r2",
+      "questionId": "CASE-03",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-03\",\"questionVersion\":\"1.0.0\",\"answerText\":\"A change to the PAPER settlement strategy would primarily affect Trading Core's PaperSettlementService, its ExecutionFinalizationStep caller, and ExecutionConfiguration bean wiring. If the change also alters simulated fill generation or exit orchestration, SimulatedExecutionAdapter, RoutingBrokerExecutionAdapter, and PaperExitService are affected indirectly. Tests covering settlement accounting, the end-to-end PAPER execution path, persistence, exits, rollback, idempotency, concurrency, and pipeline construction would need review.\",\"relationshipResult\":\"ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"PaperSettlementService is the central PAPER settlement implementation: it validates PAPER mode, selects the fill, mutates balances and positions, calculates exit PnL, updates equity, and saves the Account transactionally.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77\",\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-107\"]},{\"text\":\"ExecutionFinalizationStep invokes PAPER settlement after an acknowledged submission and before lifecycle/order persistence, so settlement contract or failure-semantics changes affect execution finalization.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69\"]},{\"text\":\"ExecutionConfiguration constructs PaperSettlementService and injects it into ExecutionFinalizationStep, so replacing or splitting the strategy requires production bean wiring changes.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java:55-66\"]},{\"text\":\"SimulatedExecutionAdapter supplies the simulated fill price and limit-order acceptance behavior used by settlement; a strategy change involving pricing, fees, or fill semantics would affect this adapter and its tests.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:46-95\"]},{\"text\":\"PaperExitService creates PAPER EXIT intents and delegates execution to ExecuteTradeService, so changes to exit settlement rules, target validation, or the settlement boundary require corresponding exit-flow review.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71\"]},{\"text\":\"PaperSettlementExitTest directly asserts long and short exit balance, equity, PnL, and closed-status outcomes, making it the primary unit-test target.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-53\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:84-97\"]},{\"text\":\"PaperExecutionVerticalRegressionTest covers routing to simulation, fill pricing, settlement invocation, persistence effects, and duplicate-execution protection for PAPER BUY and SELL flows.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:72-81\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:174-218\"]},{\"text\":\"PaperExecutionPersistenceIntegrationTest verifies Spring wiring, persisted execution state, simulated fill persistence, and final PAPER account balances and trades.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionPersistenceIntegrationTest.java:115-164\"]},{\"text\":\"PaperExitAcceptanceIntegrationTest covers complete entry-close accounting, reload behavior, idempotent replay, concurrent close protection, rollback on settlement failure, and isolation from the LIVE broker.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:94-147\",\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:149-205\"]},{\"text\":\"Pipeline-focused tests construct or mock PaperSettlementService and ExecutionFinalizationStep, so they are likely affected if the settlement service interface, constructor, invocation timing, or PAPER gating changes.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineTest.java:242-258\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineResponseHandlingTest.java:154-163\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineOrderRegressionTest.java:147-163\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecuteTradeServiceGuardTest.java:291-317\"]}],\"evidence\":[{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java\",\"locator\":\"LINE_RANGE with startLine=44,endLine=77\",\"excerpt\":\"@Transactional settle(...) resolves the broker account, requires ExecutionMode.PAPER, applies entry or exit settlement, and saves the account.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java\",\"locator\":\"LINE_RANGE with startLine=45,endLine=69\",\"excerpt\":\"For an acknowledged result, PAPER accounts call paperSettlementService.settle(...) before lifecycle acknowledgement, order save, metrics, and final persistence.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java\",\"locator\":\"LINE_RANGE with startLine=55,endLine=66\",\"excerpt\":\"The configuration creates PaperSettlementService and injects it into ExecutionFinalizationStep.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java\",\"locator\":\"LINE_RANGE with startLine=65,endLine=95\",\"excerpt\":\"The simulator chooses BUY at ask or SELL at bid, checks LIMIT satisfaction, and returns an acknowledged simulated fill price.\",\"role\":\"SUPPORTING\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java\",\"locator\":\"LINE_RANGE with startLine=60,endLine=71\",\"excerpt\":\"The PAPER exit service derives the opposite side, creates an exit intent, and delegates to execution.execute(...).\",\"role\":\"SUPPORTING\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java\",\"locator\":\"LINE_RANGE with startLine=31,endLine=53\",\"excerpt\":\"Unit tests assert long and short exit cash, base balance, equity, PnL, and CLOSED status.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java\",\"locator\":\"LINE_RANGE with startLine=174,endLine=218\",\"excerpt\":\"The vertical regression test verifies completed PAPER execution, simulated fill, settlement invocation, account mutation, and terminal replay protection.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionPersistenceIntegrationTest.java\",\"locator\":\"LINE_RANGE with startLine=122,endLine=164\",\"excerpt\":\"The persistence integration test verifies completed execution, no LIVE broker submission, persisted fill/order state, balances, equity, and open trade state.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java\",\"locator\":\"LINE_RANGE with startLine=149,endLine=205\",\"excerpt\":\"Acceptance tests verify one settlement under concurrent close, rollback after settlement failure, and unchanged financial state on failure.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineTest.java\",\"locator\":\"LINE_RANGE with startLine=246,endLine=258\",\"excerpt\":\"The pipeline fixture mocks PaperSettlementService and passes it to ExecutionFinalizationStep.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-03:DIRECT:r2.opencodelog.jsonl",
+      "repetition": 2,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 244224,
+        "input": 73845,
+        "output": 3078,
+        "reasoning": 747,
+        "total": 321894
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "The evidence does not establish that ADR-043 caused the specific ExecutionConfiguration refactor delivered by Story 0042. The refactor is directly evidenced as part of Story 0042's merge commit, while ADR-043's supplied text does not identify or require this ExecutionConfiguration change.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+            ],
+            "text": "Story 0042's merge commit changed ExecutionConfiguration to inject TradingCalculatorService into PaperSettlementService."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-043.md"
+            ],
+            "text": "The supplied ADR-043 excerpt discusses account identity, facts-source architecture, and compatibility with other ADRs, but does not specify the ExecutionConfiguration refactor."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+              "docs/architecture/adr/ADR-043.md",
+              "docs/architecture/stories/0042-paper-local-full-exit/story.md"
+            ],
+            "text": "The specific refactor is directly associated with Story 0042's implementation, but ADR-043 causation is not established by the supplied evidence."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "Story 0042 merge commit changes PaperSettlementService construction to add TradingCalculatorService.",
+            "locator": "COMMIT_HUNK with commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149/path:trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java/header:@@ -56,2 +56,3 @@",
+            "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-043 provides account identity and facts-source architecture and states compatibility with related ADRs; the excerpt does not mention ExecutionConfiguration.",
+            "locator": "SECTION with heading:Relationship to Other ADRs",
+            "reference": "docs/architecture/adr/ADR-043.md",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "The implementation may generalize ExecutionIntent or introduce exit-specific authorization while preserving common order/fill/audit concepts.",
+            "locator": "SECTION with heading:Architectural Constraints",
+            "reference": "docs/architecture/stories/0042-paper-local-full-exit/story.md",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-04",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789746433.3672845,
+      "condition": "DEVLOG",
+      "elapsedMs": 23557,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "'str' object has no attribute 'get'",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-04:DEVLOG:r2",
+      "questionId": "CASE-04",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-04\",\"questionVersion\":\"1.0.0\",\"answerText\":\"The evidence does not establish that ADR-043 caused the specific ExecutionConfiguration refactor delivered by Story 0042. The refactor is directly evidenced as part of Story 0042's merge commit, while ADR-043's supplied text does not identify or require this ExecutionConfiguration change.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"Story 0042's merge commit changed ExecutionConfiguration to inject TradingCalculatorService into PaperSettlementService.\",\"claimType\":\"FACT\",\"references\":[\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\"]},{\"text\":\"The supplied ADR-043 excerpt discusses account identity, facts-source architecture, and compatibility with other ADRs, but does not specify the ExecutionConfiguration refactor.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-043.md\"]},{\"text\":\"The specific refactor is directly associated with Story 0042's implementation, but ADR-043 causation is not established by the supplied evidence.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\",\"docs/architecture/adr/ADR-043.md\",\"docs/architecture/stories/0042-paper-local-full-exit/story.md\"]}],\"evidence\":[{\"reference\":\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\",\"locator\":\"COMMIT_HUNK with commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149/path:trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java/header:@@ -56,2 +56,3 @@\",\"excerpt\":\"Story 0042 merge commit changes PaperSettlementService construction to add TradingCalculatorService.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-043.md\",\"locator\":\"SECTION with heading:Relationship to Other ADRs\",\"excerpt\":\"ADR-043 provides account identity and facts-source architecture and states compatibility with related ADRs; the excerpt does not mention ExecutionConfiguration.\",\"role\":\"SUPPORTING\"},{\"reference\":\"docs/architecture/stories/0042-paper-local-full-exit/story.md\",\"locator\":\"SECTION with heading:Architectural Constraints\",\"excerpt\":\"The implementation may generalize ExecutionIntent or introduce exit-specific authorization while preserving common order/fill/audit concepts.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-04:DEVLOG:r2.opencodelog.jsonl",
+      "repetition": 2,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 12800,
+        "input": 4310,
+        "output": 560,
+        "reasoning": 161,
+        "total": 17831
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "No. ADR-043 did not cause the specific ExecutionConfiguration refactor; the refactor injected TradingCalculatorService into PaperSettlementService to support Story 0042's realized-PnL settlement.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "e1"
+            ],
+            "text": "ADR-043 explicitly excludes PAPER EXIT implementation and PAPER realized-PnL settlement from its scope."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "e2"
+            ],
+            "text": "Story 0042 required local exit settlement and realized PnL using the existing calculator."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "e3"
+            ],
+            "text": "The Story 0042 commit changed ExecutionConfiguration only by adding TradingCalculatorService to the PaperSettlementService bean wiring."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "e1",
+              "e2",
+              "e3"
+            ],
+            "text": "The specific refactor is attributable to Story 0042's settlement implementation, while ADR-043 was contextual architecture rather than the direct cause."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "This ADR does not decide or implement: PAPER position-query implementation; PAPER EXIT implementation; PAPER realized-PnL settlement.",
+            "locator": "LINE_RANGE startLine=992 endLine=999",
+            "reference": "e1",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Added local exit settlement and realized PnL using the existing calculator.",
+            "locator": "LINE_RANGE startLine=16 endLine=27",
+            "reference": "e2",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "PaperSettlementService bean wiring adds a TradingCalculatorService parameter and passes it to the constructor.",
+            "locator": "COMMIT_HUNK commit=da84a19 path=trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java header=@@ -53,8 +53,9 @@",
+            "reference": "e3",
+            "role": "DIRECT"
+          }
+        ],
+        "questionId": "CASE-04",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789746456.9249272,
+      "condition": "DIRECT",
+      "elapsedMs": 62925,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "'str' object has no attribute 'get'",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-04:DIRECT:r2",
+      "questionId": "CASE-04",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-04\",\"questionVersion\":\"1.0.0\",\"answerText\":\"No. ADR-043 did not cause the specific ExecutionConfiguration refactor; the refactor injected TradingCalculatorService into PaperSettlementService to support Story 0042's realized-PnL settlement.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"ADR-043 explicitly excludes PAPER EXIT implementation and PAPER realized-PnL settlement from its scope.\",\"claimType\":\"FACT\",\"references\":[\"e1\"]},{\"text\":\"Story 0042 required local exit settlement and realized PnL using the existing calculator.\",\"claimType\":\"FACT\",\"references\":[\"e2\"]},{\"text\":\"The Story 0042 commit changed ExecutionConfiguration only by adding TradingCalculatorService to the PaperSettlementService bean wiring.\",\"claimType\":\"FACT\",\"references\":[\"e3\"]},{\"text\":\"The specific refactor is attributable to Story 0042's settlement implementation, while ADR-043 was contextual architecture rather than the direct cause.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"e1\",\"e2\",\"e3\"]}],\"evidence\":[{\"reference\":\"e1\",\"locator\":\"LINE_RANGE startLine=992 endLine=999\",\"excerpt\":\"This ADR does not decide or implement: PAPER position-query implementation; PAPER EXIT implementation; PAPER realized-PnL settlement.\",\"role\":\"DIRECT\"},{\"reference\":\"e2\",\"locator\":\"LINE_RANGE startLine=16 endLine=27\",\"excerpt\":\"Added local exit settlement and realized PnL using the existing calculator.\",\"role\":\"DIRECT\"},{\"reference\":\"e3\",\"locator\":\"COMMIT_HUNK commit=da84a19 path=trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java header=@@ -53,8 +53,9 @@\",\"excerpt\":\"PaperSettlementService bean wiring adds a TradingCalculatorService parameter and passes it to the constructor.\",\"role\":\"DIRECT\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-04:DIRECT:r2.opencodelog.jsonl",
+      "repetition": 2,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 108032,
+        "input": 36536,
+        "output": 1589,
+        "reasoning": 660,
+        "total": 146817
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "The evidence does not establish that ADR-042 caused Story-0039's persisted account identity and explicit PAPER provisioning. ADR-042 establishes PAPER execution authority and persistence boundaries, while Story-0039 attributes canonical account identity to ADR-043 and defines the provisioning changes itself.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-042.md"
+            ],
+            "text": "ADR-042 establishes that Trading Core is authoritative for PAPER position state and that PAPER state must be locally persisted."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+            ],
+            "text": "Story-0039 identifies ADR-043 as defining the independent Account and BrokerAccount identities and the canonical persisted relation."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+            ],
+            "text": "Story-0039 describes ADR-042 as preserving the execution-mode boundary, not as establishing the account-identity relation."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+              "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929"
+            ],
+            "text": "The evidence shows implementation alignment with Story-0039, but does not establish a causal derivation of the persisted identity and explicit PAPER provisioning requirements from ADR-042."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "Trading OS SHALL maintain explicit, mode-specific position authority: LIVE_POSITION_AUTHORITY = BROKER; PAPER_POSITION_AUTHORITY = TRADING_CORE.",
+            "locator": "SECTION with heading 4. Decision",
+            "reference": "docs/architecture/adr/ADR-042.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The authoritative PAPER state is local persisted Trading Core state.",
+            "locator": "SECTION with heading 6.2 Local State",
+            "reference": "docs/architecture/adr/ADR-042.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary...",
+            "locator": "SECTION with heading Context",
+            "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Establish an unambiguous, durable relationship between the financial Account and its execution/routing BrokerAccount, then make new PAPER provisioning a deterministic and fail-closed operation.",
+            "locator": "SECTION with heading Goal",
+            "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The implementation persists brokerAccountId, AccountRiskConfiguration, and the explicit risk-profile assignment during PAPER account creation.",
+            "locator": "COMMIT_HUNK with commit=6ea180ceab3c112807bc30818b1e7c19e38ae929,path=trading-core/src/main/java/com/hope/trading/trading_core/brokeraccount/application/BrokerAccountService.java,header=createPaperAccount",
+            "reference": "commit:6ea180ceab3c112807bc30818b1e7c19e38ae929",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-01-COMPARATIVE",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789746519.8518517,
+      "condition": "DEVLOG",
+      "elapsedMs": 26496,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "'str' object has no attribute 'get'",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-01-COMPARATIVE:DEVLOG:r3",
+      "questionId": "CASE-01-COMPARATIVE",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-01-COMPARATIVE\",\"questionVersion\":\"1.0.0\",\"answerText\":\"The evidence does not establish that ADR-042 caused Story-0039's persisted account identity and explicit PAPER provisioning. ADR-042 establishes PAPER execution authority and persistence boundaries, while Story-0039 attributes canonical account identity to ADR-043 and defines the provisioning changes itself.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"ADR-042 establishes that Trading Core is authoritative for PAPER position state and that PAPER state must be locally persisted.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-042.md\"]},{\"text\":\"Story-0039 identifies ADR-043 as defining the independent Account and BrokerAccount identities and the canonical persisted relation.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\"]},{\"text\":\"Story-0039 describes ADR-042 as preserving the execution-mode boundary, not as establishing the account-identity relation.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\"]},{\"text\":\"The evidence shows implementation alignment with Story-0039, but does not establish a causal derivation of the persisted identity and explicit PAPER provisioning requirements from ADR-042.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"commit:6ea180ceab3c112807bc30818b1e7c19e38ae929\"]}],\"evidence\":[{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"SECTION with heading 4. Decision\",\"excerpt\":\"Trading OS SHALL maintain explicit, mode-specific position authority: LIVE_POSITION_AUTHORITY = BROKER; PAPER_POSITION_AUTHORITY = TRADING_CORE.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"SECTION with heading 6.2 Local State\",\"excerpt\":\"The authoritative PAPER state is local persisted Trading Core state.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"locator\":\"SECTION with heading Context\",\"excerpt\":\"ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary...\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"locator\":\"SECTION with heading Goal\",\"excerpt\":\"Establish an unambiguous, durable relationship between the financial Account and its execution/routing BrokerAccount, then make new PAPER provisioning a deterministic and fail-closed operation.\",\"role\":\"DIRECT\"},{\"reference\":\"commit:6ea180ceab3c112807bc30818b1e7c19e38ae929\",\"locator\":\"COMMIT_HUNK with commit=6ea180ceab3c112807bc30818b1e7c19e38ae929,path=trading-core/src/main/java/com/hope/trading/trading_core/brokeraccount/application/BrokerAccountService.java,header=createPaperAccount\",\"excerpt\":\"The implementation persists brokerAccountId, AccountRiskConfiguration, and the explicit risk-profile assignment during PAPER account creation.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-01-COMPARATIVE:DEVLOG:r3.opencodelog.jsonl",
+      "repetition": 3,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 12800,
+        "input": 8821,
+        "output": 707,
+        "reasoning": 238,
+        "total": 22566
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "The evidence does not establish ADR-042 as the cause of Story-0039's persisted account identity and explicit PAPER provisioning. ADR-042 explicitly delegates account identity and PAPER risk facts to a separate ADR; ADR-043 defines that architecture and identifies account identity and provisioning as the subsequent story scope. ADR-042 provides a preserved execution-mode boundary and constraint, not the direct decision source.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-042.md"
+            ],
+            "text": "ADR-042 states that Account Identity and PAPER Risk Facts require a separate ADR and are intentionally not decided within ADR-042."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-043.md"
+            ],
+            "text": "ADR-043 defines the account identity architecture and explicitly states that it provides the account identity architecture required to make ADR-042's position-authority distinction executable safely."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/adr/ADR-043.md"
+            ],
+            "text": "ADR-043 identifies canonical Account-to-BrokerAccount relation, PAPER provisioning, and explicit risk configuration/profile readiness as the conceptual scope of a future account identity and provisioning story."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+            ],
+            "text": "Story-0039 treats ADR-042 as an architectural constraint preserving execution-mode and financial-state boundaries, while relying on ADR-043 for independent identities and the canonical relation."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "docs/architecture/adr/ADR-042.md",
+              "docs/architecture/adr/ADR-043.md",
+              "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md"
+            ],
+            "text": "The available evidence supports influence and architectural compatibility from ADR-042, but not a direct causal authorship of Story-0039's persisted identity and explicit PAPER provisioning decisions."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "A separate ADR is required before implementing the first PAPER risk/identity story... This is broader than position close and is intentionally not hidden in ADR-042.",
+            "locator": "LINE_RANGE startLine=985 endLine=1000",
+            "reference": "docs/architecture/adr/ADR-042.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "No Engineering Story is created by this ADR... the first implementation Story should remain: Establish PAPER Account Identity and Risk Facts.",
+            "locator": "LINE_RANGE startLine=1063 endLine=1077",
+            "reference": "docs/architecture/adr/ADR-042.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-042 remains authoritative for position authority and close semantics. ADR-043 provides the account identity and facts-source architecture required to make that distinction executable safely.",
+            "locator": "LINE_RANGE startLine=937 endLine=950",
+            "reference": "docs/architecture/adr/ADR-043.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Future Story A - Account Identity and Provisioning... canonical Account-to-BrokerAccount relation... PAPER account provisioning... explicit risk configuration/profile readiness.",
+            "locator": "LINE_RANGE startLine=1061 endLine=1077",
+            "reference": "docs/architecture/adr/ADR-043.md",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary... The current repository has independent Account and BrokerAccount tables but no direct durable relation.",
+            "locator": "LINE_RANGE startLine=34 endLine=56",
+            "reference": "docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-01-COMPARATIVE",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789746546.3485801,
+      "condition": "DIRECT",
+      "elapsedMs": 55819,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "claim count is outside the common contract",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-01-COMPARATIVE:DIRECT:r3",
+      "questionId": "CASE-01-COMPARATIVE",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-01-COMPARATIVE\",\"questionVersion\":\"1.0.0\",\"answerText\":\"The evidence does not establish ADR-042 as the cause of Story-0039's persisted account identity and explicit PAPER provisioning. ADR-042 explicitly delegates account identity and PAPER risk facts to a separate ADR; ADR-043 defines that architecture and identifies account identity and provisioning as the subsequent story scope. ADR-042 provides a preserved execution-mode boundary and constraint, not the direct decision source.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"ADR-042 states that Account Identity and PAPER Risk Facts require a separate ADR and are intentionally not decided within ADR-042.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-042.md\"]},{\"text\":\"ADR-043 defines the account identity architecture and explicitly states that it provides the account identity architecture required to make ADR-042's position-authority distinction executable safely.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-043.md\"]},{\"text\":\"ADR-043 identifies canonical Account-to-BrokerAccount relation, PAPER provisioning, and explicit risk configuration/profile readiness as the conceptual scope of a future account identity and provisioning story.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/adr/ADR-043.md\"]},{\"text\":\"Story-0039 treats ADR-042 as an architectural constraint preserving execution-mode and financial-state boundaries, while relying on ADR-043 for independent identities and the canonical relation.\",\"claimType\":\"FACT\",\"references\":[\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\"]},{\"text\":\"The available evidence supports influence and architectural compatibility from ADR-042, but not a direct causal authorship of Story-0039's persisted identity and explicit PAPER provisioning decisions.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"docs/architecture/adr/ADR-042.md\",\"docs/architecture/adr/ADR-043.md\",\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\"]}],\"evidence\":[{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"LINE_RANGE startLine=985 endLine=1000\",\"excerpt\":\"A separate ADR is required before implementing the first PAPER risk/identity story... This is broader than position close and is intentionally not hidden in ADR-042.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-042.md\",\"locator\":\"LINE_RANGE startLine=1063 endLine=1077\",\"excerpt\":\"No Engineering Story is created by this ADR... the first implementation Story should remain: Establish PAPER Account Identity and Risk Facts.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-043.md\",\"locator\":\"LINE_RANGE startLine=937 endLine=950\",\"excerpt\":\"ADR-042 remains authoritative for position authority and close semantics. ADR-043 provides the account identity and facts-source architecture required to make that distinction executable safely.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-043.md\",\"locator\":\"LINE_RANGE startLine=1061 endLine=1077\",\"excerpt\":\"Future Story A - Account Identity and Provisioning... canonical Account-to-BrokerAccount relation... PAPER account provisioning... explicit risk configuration/profile readiness.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0039-persisted-account-identity-explicit-paper-provisioning/story.md\",\"locator\":\"LINE_RANGE startLine=34 endLine=56\",\"excerpt\":\"ADR-043 defines two independent identities... ADR-042 preserves the execution-mode boundary... The current repository has independent Account and BrokerAccount tables but no direct durable relation.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-01-COMPARATIVE:DIRECT:r3.opencodelog.jsonl",
+      "repetition": 3,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 75776,
+        "input": 35117,
+        "output": 1528,
+        "reasoning": 613,
+        "total": 113034
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "A change to the PAPER settlement strategy would most directly affect Trading Core's PaperSettlementService, including its account-balance updates, position aggregation, exit handling, PnL calculation, equity updates, fee treatment, and validation rules. Its injected TradingCalculatorService is also potentially affected if settlement changes alter PnL semantics. The PaperSettlementExitTest is directly affected because it asserts PAPER exit cash balances, equity, PnL, and trade status for long and short exits. Additional settlement tests would likely need updates or additions for any changed entry, exit, fee, fill, balance, position, or validation behavior.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "ev1"
+            ],
+            "text": "PaperSettlementService is the production component implementing PAPER settlement and depends on BrokerAccountRepository, AccountRepository, and TradingCalculatorService."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "ev1",
+              "ev3"
+            ],
+            "text": "PaperSettlementService changes balances, positions, exits, PnL, equity, fees, and trade status during PAPER settlement."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "ev1",
+              "ev3"
+            ],
+            "text": "TradingCalculatorService is likely affected if the changed settlement strategy modifies PnL calculation semantics."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "ev2",
+              "ev3"
+            ],
+            "text": "PaperSettlementExitTest directly verifies PAPER settlement outcomes for long and short exits, including balances, equity, PnL, and closed trade status."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "ev1",
+              "ev2",
+              "ev3"
+            ],
+            "text": "Tests covering changed settlement rules would likely require updates or additions for entry, exit, fee, fill, balance, position, and validation behavior."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "PaperSettlementService settles only PAPER broker accounts, applies entry or exit settlement, updates balances and positions, calculates PnL, updates equity, and saves the account.",
+            "locator": "LINE_RANGE:trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:startLine=1:endLine=220",
+            "reference": "ev1",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The test asserts long and short exit cash balances, equity, PnL, and CLOSED trade status.",
+            "locator": "LINE_RANGE:trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:startLine=1:endLine=100",
+            "reference": "ev2",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The PAPER settlement implementation added separate EXIT handling, including target-trade validation, exit balance updates, PnL calculation, fee deduction, equity updates, and trade closure; the same commit added PaperSettlementExitTest.",
+            "locator": "COMMIT_HUNK:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149:trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:@@ -55,3 +68,42 @@",
+            "reference": "ev3",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-03",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "ESTABLISHED"
+      },
+      "capturedAt": 1789746602.1699219,
+      "condition": "DEVLOG",
+      "elapsedMs": 26540,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "claim count is outside the common contract",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-03:DEVLOG:r3",
+      "questionId": "CASE-03",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-03\",\"questionVersion\":\"1.0.0\",\"answerText\":\"A change to the PAPER settlement strategy would most directly affect Trading Core's PaperSettlementService, including its account-balance updates, position aggregation, exit handling, PnL calculation, equity updates, fee treatment, and validation rules. Its injected TradingCalculatorService is also potentially affected if settlement changes alter PnL semantics. The PaperSettlementExitTest is directly affected because it asserts PAPER exit cash balances, equity, PnL, and trade status for long and short exits. Additional settlement tests would likely need updates or additions for any changed entry, exit, fee, fill, balance, position, or validation behavior.\",\"relationshipResult\":\"ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"PaperSettlementService is the production component implementing PAPER settlement and depends on BrokerAccountRepository, AccountRepository, and TradingCalculatorService.\",\"claimType\":\"FACT\",\"references\":[\"ev1\"]},{\"text\":\"PaperSettlementService changes balances, positions, exits, PnL, equity, fees, and trade status during PAPER settlement.\",\"claimType\":\"FACT\",\"references\":[\"ev1\",\"ev3\"]},{\"text\":\"TradingCalculatorService is likely affected if the changed settlement strategy modifies PnL calculation semantics.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"ev1\",\"ev3\"]},{\"text\":\"PaperSettlementExitTest directly verifies PAPER settlement outcomes for long and short exits, including balances, equity, PnL, and closed trade status.\",\"claimType\":\"FACT\",\"references\":[\"ev2\",\"ev3\"]},{\"text\":\"Tests covering changed settlement rules would likely require updates or additions for entry, exit, fee, fill, balance, position, and validation behavior.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"ev1\",\"ev2\",\"ev3\"]}],\"evidence\":[{\"reference\":\"ev1\",\"locator\":\"LINE_RANGE:trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:startLine=1:endLine=220\",\"excerpt\":\"PaperSettlementService settles only PAPER broker accounts, applies entry or exit settlement, updates balances and positions, calculates PnL, updates equity, and saves the account.\",\"role\":\"DIRECT\"},{\"reference\":\"ev2\",\"locator\":\"LINE_RANGE:trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:startLine=1:endLine=100\",\"excerpt\":\"The test asserts long and short exit cash balances, equity, PnL, and CLOSED trade status.\",\"role\":\"DIRECT\"},{\"reference\":\"ev3\",\"locator\":\"COMMIT_HUNK:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149:trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:@@ -55,3 +68,42 @@\",\"excerpt\":\"The PAPER settlement implementation added separate EXIT handling, including target-trade validation, exit balance updates, PnL calculation, fee deduction, equity updates, and trade closure; the same commit added PaperSettlementExitTest.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-03:DEVLOG:r3.opencodelog.jsonl",
+      "repetition": 3,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 0,
+        "input": 21705,
+        "output": 659,
+        "reasoning": 380,
+        "total": 22744
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "A PAPER settlement-strategy change is primarily a Trading Core change. The main production impact is PaperSettlementService, with possible changes to SimulatedExecutionAdapter and BrokerResponseProcessingStep if fill price, fee, or fill-generation semantics change. ExecutionFinalizationStep remains an integration boundary because it invokes PAPER settlement after acknowledgement. PaperExitService is affected when exit targeting, quantity, idempotency, or local close behavior changes. The key regression and acceptance tests cover accounting, the vertical execution path, idempotency/concurrency, and rollback behavior.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77",
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-118"
+            ],
+            "text": "PaperSettlementService is the primary production component affected because it owns the transactional PAPER mutation of account balances, trades, and equity, with separate entry and exit branches."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:57-95",
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/BrokerResponseProcessingStep.java:13-29"
+            ],
+            "text": "SimulatedExecutionAdapter and BrokerResponseProcessingStep are likely affected if the strategy changes executable prices, fees, or fill construction; the simulator selects bid/ask prices and the response step currently creates fills with zero fees."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69"
+            ],
+            "text": "ExecutionFinalizationStep is the production integration boundary for settlement: acknowledged PAPER executions invoke PaperSettlementService before lifecycle finalization and persistence."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71",
+              "docs/architecture/stories/0042-paper-local-full-exit/engineering-report.md:7-19"
+            ],
+            "text": "PaperExitService is likely affected when settlement semantics change for local exits because it validates PAPER mode, derives the opposite side and full trade quantity, creates the EXIT intent, and executes it through the common pipeline."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-53"
+            ],
+            "text": "PaperSettlementExitTest is directly affected by accounting-strategy changes because it asserts long and short exit balances, equity, gross PnL, and CLOSED trade state."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:72-81",
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:174-219"
+            ],
+            "text": "PaperExecutionVerticalRegressionTest is directly affected because it verifies PAPER routing, simulated fill prices, zero fees, settlement invocation exactly once, balances, equity, and the resulting OPEN trade."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:130-205"
+            ],
+            "text": "PaperExitAcceptanceIntegrationTest is affected by changes to settlement atomicity or lifecycle because it verifies idempotent replay, concurrent close protection, single settlement, and rollback of all financial state after settlement failure."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineOrderRegressionTest.java:27-31",
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineTest.java:242-258",
+              "trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineResponseHandlingTest.java:154-173"
+            ],
+            "text": "Execution pipeline tests that inject or mock PaperSettlementService may require updates if settlement invocation, ordering, or its contract changes, although tests focused only on pre-submission risk gates should remain behaviorally unchanged."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "@Transactional public void settle(...) ... if (intent.purpose() == ... EXIT) { settleExit(...) } else { updateBalances(...); updatePosition(...); recalculateEquity(...); } ... accountRepository.save(account);",
+            "locator": "LINE_RANGE with startLine=44 endLine=77",
+            "reference": "PaperSettlementService",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "if (isPaperAccount(...)) { paperSettlementService.settle(...); } lifecycle.acknowledged(...); orders.save(...);",
+            "locator": "LINE_RANGE with startLine=45 endLine=55",
+            "reference": "ExecutionFinalizationStep",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The adapter obtains a market price snapshot, selects ask for BUY and bid for SELL, validates it, and returns an acknowledged synthetic order with the fill price.",
+            "locator": "LINE_RANGE with startLine=57 endLine=95",
+            "reference": "SimulatedExecutionAdapter",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "Tests assert long and short exits update balances, equity, PnL, and trade status to CLOSED.",
+            "locator": "LINE_RANGE with startLine=31 endLine=53",
+            "reference": "PaperSettlementExitTest",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The vertical test asserts FILLED order data, zero fee, one settlement call, persisted balances/equity, OPEN trade state, and no duplicate settlement on replay.",
+            "locator": "LINE_RANGE with startLine=189 endLine=219",
+            "reference": "PaperExecutionVerticalRegressionTest",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Acceptance tests verify one settlement under concurrent close requests and complete rollback when settlement fails.",
+            "locator": "LINE_RANGE with startLine=149 endLine=205",
+            "reference": "PaperExitAcceptanceIntegrationTest",
+            "role": "DIRECT"
+          }
+        ],
+        "questionId": "CASE-03",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "ESTABLISHED"
+      },
+      "capturedAt": 1789746628.7107642,
+      "condition": "DIRECT",
+      "elapsedMs": 89166,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "claim count is outside the common contract",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-03:DIRECT:r3",
+      "questionId": "CASE-03",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-03\",\"questionVersion\":\"1.0.0\",\"answerText\":\"A PAPER settlement-strategy change is primarily a Trading Core change. The main production impact is PaperSettlementService, with possible changes to SimulatedExecutionAdapter and BrokerResponseProcessingStep if fill price, fee, or fill-generation semantics change. ExecutionFinalizationStep remains an integration boundary because it invokes PAPER settlement after acknowledgement. PaperExitService is affected when exit targeting, quantity, idempotency, or local close behavior changes. The key regression and acceptance tests cover accounting, the vertical execution path, idempotency/concurrency, and rollback behavior.\",\"relationshipResult\":\"ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"PaperSettlementService is the primary production component affected because it owns the transactional PAPER mutation of account balances, trades, and equity, with separate entry and exit branches.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77\",\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-118\"]},{\"text\":\"SimulatedExecutionAdapter and BrokerResponseProcessingStep are likely affected if the strategy changes executable prices, fees, or fill construction; the simulator selects bid/ask prices and the response step currently creates fills with zero fees.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:57-95\",\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/BrokerResponseProcessingStep.java:13-29\"]},{\"text\":\"ExecutionFinalizationStep is the production integration boundary for settlement: acknowledged PAPER executions invoke PaperSettlementService before lifecycle finalization and persistence.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69\"]},{\"text\":\"PaperExitService is likely affected when settlement semantics change for local exits because it validates PAPER mode, derives the opposite side and full trade quantity, creates the EXIT intent, and executes it through the common pipeline.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71\",\"docs/architecture/stories/0042-paper-local-full-exit/engineering-report.md:7-19\"]},{\"text\":\"PaperSettlementExitTest is directly affected by accounting-strategy changes because it asserts long and short exit balances, equity, gross PnL, and CLOSED trade state.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-53\"]},{\"text\":\"PaperExecutionVerticalRegressionTest is directly affected because it verifies PAPER routing, simulated fill prices, zero fees, settlement invocation exactly once, balances, equity, and the resulting OPEN trade.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:72-81\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:174-219\"]},{\"text\":\"PaperExitAcceptanceIntegrationTest is affected by changes to settlement atomicity or lifecycle because it verifies idempotent replay, concurrent close protection, single settlement, and rollback of all financial state after settlement failure.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:130-205\"]},{\"text\":\"Execution pipeline tests that inject or mock PaperSettlementService may require updates if settlement invocation, ordering, or its contract changes, although tests focused only on pre-submission risk gates should remain behaviorally unchanged.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineOrderRegressionTest.java:27-31\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineTest.java:242-258\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/ExecutionPipelineResponseHandlingTest.java:154-173\"]}],\"evidence\":[{\"reference\":\"PaperSettlementService\",\"locator\":\"LINE_RANGE with startLine=44 endLine=77\",\"excerpt\":\"@Transactional public void settle(...) ... if (intent.purpose() == ... EXIT) { settleExit(...) } else { updateBalances(...); updatePosition(...); recalculateEquity(...); } ... accountRepository.save(account);\",\"role\":\"DIRECT\"},{\"reference\":\"ExecutionFinalizationStep\",\"locator\":\"LINE_RANGE with startLine=45 endLine=55\",\"excerpt\":\"if (isPaperAccount(...)) { paperSettlementService.settle(...); } lifecycle.acknowledged(...); orders.save(...);\",\"role\":\"DIRECT\"},{\"reference\":\"SimulatedExecutionAdapter\",\"locator\":\"LINE_RANGE with startLine=57 endLine=95\",\"excerpt\":\"The adapter obtains a market price snapshot, selects ask for BUY and bid for SELL, validates it, and returns an acknowledged synthetic order with the fill price.\",\"role\":\"SUPPORTING\"},{\"reference\":\"PaperSettlementExitTest\",\"locator\":\"LINE_RANGE with startLine=31 endLine=53\",\"excerpt\":\"Tests assert long and short exits update balances, equity, PnL, and trade status to CLOSED.\",\"role\":\"DIRECT\"},{\"reference\":\"PaperExecutionVerticalRegressionTest\",\"locator\":\"LINE_RANGE with startLine=189 endLine=219\",\"excerpt\":\"The vertical test asserts FILLED order data, zero fee, one settlement call, persisted balances/equity, OPEN trade state, and no duplicate settlement on replay.\",\"role\":\"DIRECT\"},{\"reference\":\"PaperExitAcceptanceIntegrationTest\",\"locator\":\"LINE_RANGE with startLine=149 endLine=205\",\"excerpt\":\"Acceptance tests verify one settlement under concurrent close requests and complete rollback when settlement fails.\",\"role\":\"DIRECT\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-03:DIRECT:r3.opencodelog.jsonl",
+      "repetition": 3,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 214528,
+        "input": 46422,
+        "output": 2462,
+        "reasoning": 703,
+        "total": 264115
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "The evidence does not establish that ADR-043 caused the specific ExecutionConfiguration refactor delivered by Story 0042.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+            ],
+            "text": "Story 0042 delivered a change to ExecutionConfiguration that injected TradingCalculatorService into PaperSettlementService."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "docs/architecture/adr/ADR-043.md"
+            ],
+            "text": "ADR-043 describes account identity and facts-source architecture and states its relationship to other ADRs, but the supplied excerpt does not identify the ExecutionConfiguration refactor as a consequence of ADR-043."
+          }
+        ],
+        "confidence": "MEDIUM",
+        "evidence": [
+          {
+            "excerpt": "The Story 0042 merge changed PaperSettlementService wiring by adding TradingCalculatorService to the constructor.",
+            "locator": "COMMIT_HUNK with commit/18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149/trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java/- PaperSettlementService constructor/+ TradingCalculatorService injection",
+            "reference": "commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "ADR-043 provides account identity and facts-source architecture required to make the position-authority distinction executable safely; it does not specify the ExecutionConfiguration refactor.",
+            "locator": "SECTION with heading Relationship to Other ADRs",
+            "reference": "docs/architecture/adr/ADR-043.md",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-04",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789746717.8795848,
+      "condition": "DEVLOG",
+      "elapsedMs": 20860,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "'str' object has no attribute 'get'",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-04:DEVLOG:r3",
+      "questionId": "CASE-04",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-04\",\"questionVersion\":\"1.0.0\",\"answerText\":\"The evidence does not establish that ADR-043 caused the specific ExecutionConfiguration refactor delivered by Story 0042.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"Story 0042 delivered a change to ExecutionConfiguration that injected TradingCalculatorService into PaperSettlementService.\",\"claimType\":\"FACT\",\"references\":[\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\"]},{\"text\":\"ADR-043 describes account identity and facts-source architecture and states its relationship to other ADRs, but the supplied excerpt does not identify the ExecutionConfiguration refactor as a consequence of ADR-043.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"docs/architecture/adr/ADR-043.md\"]}],\"evidence\":[{\"reference\":\"commit:18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149\",\"locator\":\"COMMIT_HUNK with commit/18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149/trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java/- PaperSettlementService constructor/+ TradingCalculatorService injection\",\"excerpt\":\"The Story 0042 merge changed PaperSettlementService wiring by adding TradingCalculatorService to the constructor.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-043.md\",\"locator\":\"SECTION with heading Relationship to Other ADRs\",\"excerpt\":\"ADR-043 provides account identity and facts-source architecture required to make the position-authority distinction executable safely; it does not specify the ExecutionConfiguration refactor.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"MEDIUM\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-04:DEVLOG:r3.opencodelog.jsonl",
+      "repetition": 3,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 0,
+        "input": 17110,
+        "output": 386,
+        "reasoning": 165,
+        "total": 17661
+      }
+    },
+    {
+      "answer": {
+        "abstention": false,
+        "answerText": "No. ADR-043 provides identity and execution-mode constraints, but the specific ExecutionConfiguration refactor was caused by Story 0042's PAPER exit settlement and realized-PnL requirements.",
+        "claims": [
+          {
+            "claimType": "FACT",
+            "references": [
+              "E1",
+              "E2"
+            ],
+            "text": "Story 0042 required extending PAPER settlement to compute realized PnL and explicitly identified TradingCalculatorService as the PnL implementation evidence."
+          },
+          {
+            "claimType": "FACT",
+            "references": [
+              "E3"
+            ],
+            "text": "The Story 0042 commit changed ExecutionConfiguration only to inject TradingCalculatorService into PaperSettlementService."
+          },
+          {
+            "claimType": "INTERPRETATION",
+            "references": [
+              "E4",
+              "E5"
+            ],
+            "text": "ADR-043 defines distinct financial and routing identities and mode-specific authority, but does not prescribe TradingCalculatorService injection or this configuration change."
+          }
+        ],
+        "confidence": "HIGH",
+        "evidence": [
+          {
+            "excerpt": "Extend or split PaperSettlementService so an EXIT validates the target again, applies the documented LONG/SHORT cash effects, computes realized PnL from entry basis and fill price, sets exit fields and CLOSED status, and saves the Account atomically.",
+            "locator": "LINE_RANGE startLine=75 endLine=80",
+            "reference": "E1",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Gross deterministic PnL | TradingCalculatorService.calculatePnL() | Focused tests passed",
+            "locator": "LINE_RANGE startLine=7 endLine=14",
+            "reference": "E2",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "The Story 0042 commit adds a TradingCalculatorService parameter to the PaperSettlementService bean and passes it to the constructor.",
+            "locator": "COMMIT_HUNK da84a19/trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java/@@ -53,8 +53,9 @@",
+            "reference": "E3",
+            "role": "DIRECT"
+          },
+          {
+            "excerpt": "Account.accountId is Trading Core financial account identity; BrokerAccount.id is execution and broker-routing identity; LIVE position authority is external and PAPER position authority is Trading Core.",
+            "locator": "LINE_RANGE startLine=32 endLine=50",
+            "reference": "E4",
+            "role": "SUPPORTING"
+          },
+          {
+            "excerpt": "The architecture must define distinct financial and execution identities, canonical durable relationship, mode-correct Risk Facts acquisition, and fail-closed behavior.",
+            "locator": "LINE_RANGE startLine=70 endLine=82",
+            "reference": "E5",
+            "role": "SUPPORTING"
+          }
+        ],
+        "questionId": "CASE-04",
+        "questionVersion": "1.0.0",
+        "relationshipResult": "NOT_ESTABLISHED"
+      },
+      "capturedAt": 1789746738.7396777,
+      "condition": "DIRECT",
+      "elapsedMs": 82624,
+      "evaluation": {
+        "correctGroundedAnswer": "NOT_EVALUATED",
+        "grounding": {
+          "status": "NOT_EVALUATED"
+        },
+        "semantic": {
+          "semanticCorrect": "NOT_EVALUATED",
+          "semanticEvaluated": false
+        },
+        "structural": {
+          "error": "'str' object has no attribute 'get'",
+          "status": "FAIL",
+          "valid": false
+        }
+      },
+      "executionStatus": "COMPLETED",
+      "model": "openai/gpt-5.6-luna",
+      "observationId": "luna-official:CASE-04:DIRECT:r3",
+      "questionId": "CASE-04",
+      "questionVersion": "1.0.0",
+      "rawFinalText": "{\"questionId\":\"CASE-04\",\"questionVersion\":\"1.0.0\",\"answerText\":\"No. ADR-043 provides identity and execution-mode constraints, but the specific ExecutionConfiguration refactor was caused by Story 0042's PAPER exit settlement and realized-PnL requirements.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"Story 0042 required extending PAPER settlement to compute realized PnL and explicitly identified TradingCalculatorService as the PnL implementation evidence.\",\"claimType\":\"FACT\",\"references\":[\"E1\",\"E2\"]},{\"text\":\"The Story 0042 commit changed ExecutionConfiguration only to inject TradingCalculatorService into PaperSettlementService.\",\"claimType\":\"FACT\",\"references\":[\"E3\"]},{\"text\":\"ADR-043 defines distinct financial and routing identities and mode-specific authority, but does not prescribe TradingCalculatorService injection or this configuration change.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"E4\",\"E5\"]}],\"evidence\":[{\"reference\":\"E1\",\"locator\":\"LINE_RANGE startLine=75 endLine=80\",\"excerpt\":\"Extend or split PaperSettlementService so an EXIT validates the target again, applies the documented LONG/SHORT cash effects, computes realized PnL from entry basis and fill price, sets exit fields and CLOSED status, and saves the Account atomically.\",\"role\":\"DIRECT\"},{\"reference\":\"E2\",\"locator\":\"LINE_RANGE startLine=7 endLine=14\",\"excerpt\":\"Gross deterministic PnL | TradingCalculatorService.calculatePnL() | Focused tests passed\",\"role\":\"DIRECT\"},{\"reference\":\"E3\",\"locator\":\"COMMIT_HUNK da84a19/trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java/@@ -53,8 +53,9 @@\",\"excerpt\":\"The Story 0042 commit adds a TradingCalculatorService parameter to the PaperSettlementService bean and passes it to the constructor.\",\"role\":\"DIRECT\"},{\"reference\":\"E4\",\"locator\":\"LINE_RANGE startLine=32 endLine=50\",\"excerpt\":\"Account.accountId is Trading Core financial account identity; BrokerAccount.id is execution and broker-routing identity; LIVE position authority is external and PAPER position authority is Trading Core.\",\"role\":\"SUPPORTING\"},{\"reference\":\"E5\",\"locator\":\"LINE_RANGE startLine=70 endLine=82\",\"excerpt\":\"The architecture must define distinct financial and execution identities, canonical durable relationship, mode-correct Risk Facts acquisition, and fail-closed behavior.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+      "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-04:DIRECT:r3.opencodelog.jsonl",
+      "repetition": 3,
+      "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+      "returnCode": 0,
+      "runtime": "OpenCode 1.18.31 default agent",
+      "usage": {
+        "cacheRead": 122368,
+        "input": 51621,
+        "output": 1585,
+        "reasoning": 869,
+        "total": 176443
+      }
+    }
+  ],
+  "plannedSlots": 18,
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+}

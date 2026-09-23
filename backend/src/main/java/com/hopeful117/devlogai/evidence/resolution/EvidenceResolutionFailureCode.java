@@ -1,0 +1,13 @@
+package com.hopeful117.devlogai.evidence.resolution;
+
+public enum EvidenceResolutionFailureCode {
+    UNKNOWN_REFERENCE,
+    UNSUPPORTED_REFERENCE_TYPE,
+    AMBIGUOUS_SOURCE,
+    SOURCE_UNAVAILABLE,
+    REVISION_UNAVAILABLE,
+    EVIDENCE_NOT_FOUND,
+    EVIDENCE_NO_LONGER_RESOLVABLE,
+    UNAUTHORIZED,
+    UNSUPPORTED_EXPANSION
+}

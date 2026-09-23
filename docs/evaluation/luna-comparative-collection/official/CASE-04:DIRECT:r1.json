@@ -1,0 +1,105 @@
+{
+  "answer": {
+    "abstention": false,
+    "answerText": "No. ADR-043 did not cause the specific ExecutionConfiguration refactor; Story 0042 added TradingCalculatorService wiring to support exit settlement and realized PnL. ADR-043 was related context but explicitly excluded PAPER EXIT implementation.",
+    "claims": [
+      {
+        "claimType": "FACT",
+        "references": [
+          "e1"
+        ],
+        "text": "The ExecutionConfiguration change injected TradingCalculatorService into PaperSettlementService."
+      },
+      {
+        "claimType": "FACT",
+        "references": [
+          "e2",
+          "e3"
+        ],
+        "text": "Story 0042 identifies explicit EXIT handling, local settlement, and realized PnL as the implementation drivers."
+      },
+      {
+        "claimType": "FACT",
+        "references": [
+          "e4"
+        ],
+        "text": "ADR-043 explicitly excludes PAPER EXIT implementation from its scope."
+      },
+      {
+        "claimType": "INTERPRETATION",
+        "references": [
+          "e1",
+          "e2",
+          "e4"
+        ],
+        "text": "ADR-043 informed account identity and execution-mode constraints, but the evidence does not establish it as the cause of this specific configuration refactor."
+      }
+    ],
+    "confidence": "HIGH",
+    "evidence": [
+      {
+        "excerpt": "The Story 0042 commit changes PaperSettlementService wiring by adding TradingCalculatorService to its bean factory and constructor.",
+        "locator": "COMMIT_HUNK commit=da84a19 path=trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java header=@@ -53,8 +53,9 @@",
+        "reference": "e1",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "Story 0042 implemented explicit ENTRY/EXIT purposes, PAPER local close dispatch, local exit settlement, and realized PnL using the existing calculator.",
+        "locator": "LINE_RANGE startLine=16 endLine=26",
+        "reference": "e2",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "PaperSettlementService branches on explicit purpose and the EXIT path computes gross PnL with TradingCalculatorService.",
+        "locator": "LINE_RANGE startLine=89 endLine=94",
+        "reference": "e3",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "ADR-043 states that PAPER position-query implementation, PAPER EXIT implementation, and PAPER realized-PnL settlement are not decided or implemented by the ADR.",
+        "locator": "LINE_RANGE startLine=992 endLine=1000",
+        "reference": "e4",
+        "role": "SUPPORTING"
+      }
+    ],
+    "questionId": "CASE-04",
+    "questionVersion": "1.0.0",
+    "relationshipResult": "NOT_ESTABLISHED"
+  },
+  "capturedAt": 1789746131.1763341,
+  "condition": "DIRECT",
+  "elapsedMs": 65982,
+  "evaluation": {
+    "correctGroundedAnswer": "NOT_EVALUATED",
+    "grounding": {
+      "status": "NOT_EVALUATED"
+    },
+    "semantic": {
+      "semanticCorrect": "NOT_EVALUATED",
+      "semanticEvaluated": false
+    },
+    "structural": {
+      "error": "'str' object has no attribute 'get'",
+      "status": "FAIL",
+      "valid": false
+    }
+  },
+  "executionStatus": "COMPLETED",
+  "model": "openai/gpt-5.6-luna",
+  "observationId": "luna-official:CASE-04:DIRECT:r1",
+  "questionId": "CASE-04",
+  "questionVersion": "1.0.0",
+  "rawFinalText": "{\"questionId\":\"CASE-04\",\"questionVersion\":\"1.0.0\",\"answerText\":\"No. ADR-043 did not cause the specific ExecutionConfiguration refactor; Story 0042 added TradingCalculatorService wiring to support exit settlement and realized PnL. ADR-043 was related context but explicitly excluded PAPER EXIT implementation.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"The ExecutionConfiguration change injected TradingCalculatorService into PaperSettlementService.\",\"claimType\":\"FACT\",\"references\":[\"e1\"]},{\"text\":\"Story 0042 identifies explicit EXIT handling, local settlement, and realized PnL as the implementation drivers.\",\"claimType\":\"FACT\",\"references\":[\"e2\",\"e3\"]},{\"text\":\"ADR-043 explicitly excludes PAPER EXIT implementation from its scope.\",\"claimType\":\"FACT\",\"references\":[\"e4\"]},{\"text\":\"ADR-043 informed account identity and execution-mode constraints, but the evidence does not establish it as the cause of this specific configuration refactor.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"e1\",\"e2\",\"e4\"]}],\"evidence\":[{\"reference\":\"e1\",\"locator\":\"COMMIT_HUNK commit=da84a19 path=trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java header=@@ -53,8 +53,9 @@\",\"excerpt\":\"The Story 0042 commit changes PaperSettlementService wiring by adding TradingCalculatorService to its bean factory and constructor.\",\"role\":\"DIRECT\"},{\"reference\":\"e2\",\"locator\":\"LINE_RANGE startLine=16 endLine=26\",\"excerpt\":\"Story 0042 implemented explicit ENTRY/EXIT purposes, PAPER local close dispatch, local exit settlement, and realized PnL using the existing calculator.\",\"role\":\"DIRECT\"},{\"reference\":\"e3\",\"locator\":\"LINE_RANGE startLine=89 endLine=94\",\"excerpt\":\"PaperSettlementService branches on explicit purpose and the EXIT path computes gross PnL with TradingCalculatorService.\",\"role\":\"DIRECT\"},{\"reference\":\"e4\",\"locator\":\"LINE_RANGE startLine=992 endLine=1000\",\"excerpt\":\"ADR-043 states that PAPER position-query implementation, PAPER EXIT implementation, and PAPER realized-PnL settlement are not decided or implemented by the ADR.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+  "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-04:DIRECT:r1.opencodelog.jsonl",
+  "repetition": 1,
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "returnCode": 0,
+  "runtime": "OpenCode 1.18.31 default agent",
+  "usage": {
+    "cacheRead": 186368,
+    "input": 50294,
+    "output": 1712,
+    "reasoning": 732,
+    "total": 239106
+  }
+}
