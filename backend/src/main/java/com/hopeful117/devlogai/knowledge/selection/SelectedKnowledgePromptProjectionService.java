@@ -157,8 +157,20 @@ public class SelectedKnowledgePromptProjectionService {
                     AiReferenceScope.ANALYSIS_CONTEXT, identity);
             case "OBSERVATION" -> registry.referenceFor(AiReferenceType.OBSERVATION,
                     AiReferenceScope.ANALYSIS_CONTEXT, identity);
-            case "INSIGHT" -> registry.referenceFor(AiReferenceType.INSIGHT,
+            case "INSIGHT", "ARCHITECTURE_KNOWLEDGE" -> registry.referenceFor(AiReferenceType.INSIGHT,
                     AiReferenceScope.PROJECT, identity);
+            case "ANALYSIS" -> registry.referenceFor(AiReferenceType.ANALYSIS,
+                    AiReferenceScope.ANALYSIS_CONTEXT, identity);
+            case "PROJECT" -> registry.referenceFor(AiReferenceType.PROJECT,
+                    AiReferenceScope.PROJECT, identity);
+            case "PROJECT_PROFILE" -> registry.referenceFor(AiReferenceType.PROJECT_PROFILE,
+                    AiReferenceScope.ANALYSIS_CONTEXT, identity);
+            case "HUMAN_CONTEXT" -> registry.referenceFor(AiReferenceType.HUMAN_CONTEXT,
+                    AiReferenceScope.PROJECT, identity);
+            case "ENGINEERING_EVENT" -> registry.referenceFor(AiReferenceType.ENGINEERING_EVENT,
+                    AiReferenceScope.PROJECT, identity);
+            case "REPOSITORY_EVIDENCE" -> registry.referenceFor(AiReferenceType.REPOSITORY_EVIDENCE,
+                    AiReferenceScope.REPOSITORY, identity);
             default -> throw mappingFailure("Unsupported semantic section item type: " + type);
         };
     }

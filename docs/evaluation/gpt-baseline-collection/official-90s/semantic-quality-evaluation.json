@@ -1,0 +1,219 @@
+{
+  "evaluation": "GPT_BASELINE_OFFLINE_SEMANTIC_QUALITY",
+  "evaluationVersion": "1.0.0",
+  "offlineOnly": true,
+  "modelExecutionPerformed": false,
+  "repositoryExplorationPerformed": false,
+  "sourceObservationDirectory": "docs/evaluation/gpt-baseline-collection/official-90s/",
+  "oracle": {
+    "path": "docs/stories/0131-devlog-product-value-evaluation-harness/evaluation/oracle-freeze-v1.json",
+    "version": "1.0.0",
+    "sha256": "3c5ca08879ec19ccb442da5e25fabe7a005a8ab429ba3a6b21d29aa8e57f9303",
+    "status": "HUMAN_APPROVED"
+  },
+  "benchmark": {
+    "path": "ai-engine/evaluations/comparative_baseline/baseline-manifest.json",
+    "version": "story0133-comparative-baseline-1.0.0",
+    "sha256": "78a84ee8fd0e029f4c99427f67b2154d45dccc14c4feb281ad47821e96fe6a40"
+  },
+  "records": [
+    {
+      "observationId": "gpt-baseline-devlog-official:CASE-01-COMPARATIVE:DEVLOG:r1",
+      "questionId": "CASE-01-COMPARATIVE",
+      "condition": "DEVLOG_BASELINE_MODEL",
+      "repetition": 1,
+      "model": "gpt-4.1-mini",
+      "formatContract": {
+        "structuralValid": true,
+        "groundingContractValid": false,
+        "originalStructuralStatus": "YES",
+        "originalGroundingStatus": "FAIL"
+      },
+      "semanticQuality": {
+        "semanticConclusion": "CORRECT",
+        "causalReasoning": "CORRECT",
+        "overclaim": "NO",
+        "abstention": "NOT_APPLICABLE",
+        "reasoningSupport": "SUPPORTED",
+        "qualityCategory": "CORRECT_REASONED",
+        "rationale": "The answer matches the frozen CL-01 oracle and explains the relationship using the supplied ADR, Story, and implementation evidence."
+      }
+    },
+    {
+      "observationId": "gpt-baseline-devlog-official:CASE-01-COMPARATIVE:DEVLOG:r2",
+      "questionId": "CASE-01-COMPARATIVE",
+      "condition": "DEVLOG_BASELINE_MODEL",
+      "repetition": 2,
+      "model": "gpt-4.1-mini",
+      "formatContract": {
+        "structuralValid": true,
+        "groundingContractValid": false,
+        "originalStructuralStatus": "YES",
+        "originalGroundingStatus": "FAIL"
+      },
+      "semanticQuality": {
+        "semanticConclusion": "CORRECT",
+        "causalReasoning": "CORRECT",
+        "overclaim": "NO",
+        "abstention": "NOT_APPLICABLE",
+        "reasoningSupport": "SUPPORTED",
+        "qualityCategory": "CORRECT_REASONED",
+        "rationale": "The answer matches the frozen CL-01 oracle and explains the relationship using the supplied ADR, Story, and implementation evidence."
+      }
+    },
+    {
+      "observationId": "gpt-baseline-devlog-official:CASE-01-COMPARATIVE:DEVLOG:r3",
+      "questionId": "CASE-01-COMPARATIVE",
+      "condition": "DEVLOG_BASELINE_MODEL",
+      "repetition": 3,
+      "model": "gpt-4.1-mini",
+      "formatContract": {
+        "structuralValid": false,
+        "groundingContractValid": false,
+        "originalStructuralStatus": "NO",
+        "originalGroundingStatus": "NOT_EVALUATED"
+      },
+      "semanticQuality": {
+        "semanticConclusion": "CORRECT",
+        "causalReasoning": "CORRECT",
+        "overclaim": "NO",
+        "abstention": "NOT_APPLICABLE",
+        "reasoningSupport": "SUPPORTED",
+        "qualityCategory": "CORRECT_REASONED",
+        "rationale": "The answer matches the frozen CL-01 oracle and explains the relationship using the supplied ADR, Story, and implementation evidence."
+      }
+    },
+    {
+      "observationId": "gpt-baseline-devlog-official:CASE-03:DEVLOG:r1",
+      "questionId": "CASE-03",
+      "condition": "DEVLOG_BASELINE_MODEL",
+      "repetition": 1,
+      "model": "gpt-4.1-mini",
+      "formatContract": {
+        "structuralValid": false,
+        "groundingContractValid": false,
+        "originalStructuralStatus": "NO",
+        "originalGroundingStatus": "NOT_EVALUATED"
+      },
+      "semanticQuality": {
+        "semanticConclusion": "CORRECT",
+        "causalReasoning": "CORRECT",
+        "overclaim": "NO",
+        "abstention": "NOT_APPLICABLE",
+        "reasoningSupport": "SUPPORTED",
+        "qualityCategory": "CORRECT_REASONED",
+        "rationale": "The answer identifies PaperSettlementService and PaperSettlementExitTest and explains their direct impact under the frozen CASE-03 contract."
+      }
+    },
+    {
+      "observationId": "gpt-baseline-devlog-official:CASE-03:DEVLOG:r2",
+      "questionId": "CASE-03",
+      "condition": "DEVLOG_BASELINE_MODEL",
+      "repetition": 2,
+      "model": "gpt-4.1-mini",
+      "formatContract": {
+        "structuralValid": false,
+        "groundingContractValid": false,
+        "originalStructuralStatus": "NO",
+        "originalGroundingStatus": "NOT_EVALUATED"
+      },
+      "semanticQuality": {
+        "semanticConclusion": "CORRECT",
+        "causalReasoning": "CORRECT",
+        "overclaim": "NO",
+        "abstention": "NOT_APPLICABLE",
+        "reasoningSupport": "SUPPORTED",
+        "qualityCategory": "CORRECT_REASONED",
+        "rationale": "The answer identifies PaperSettlementService and PaperSettlementExitTest and explains their direct impact under the frozen CASE-03 contract."
+      }
+    },
+    {
+      "observationId": "gpt-baseline-devlog-official:CASE-03:DEVLOG:r3",
+      "questionId": "CASE-03",
+      "condition": "DEVLOG_BASELINE_MODEL",
+      "repetition": 3,
+      "model": "gpt-4.1-mini",
+      "formatContract": {
+        "structuralValid": true,
+        "groundingContractValid": false,
+        "originalStructuralStatus": "YES",
+        "originalGroundingStatus": "FAIL"
+      },
+      "semanticQuality": {
+        "semanticConclusion": "CORRECT",
+        "causalReasoning": "CORRECT",
+        "overclaim": "NO",
+        "abstention": "NOT_APPLICABLE",
+        "reasoningSupport": "SUPPORTED",
+        "qualityCategory": "CORRECT_REASONED",
+        "rationale": "The answer identifies PaperSettlementService and PaperSettlementExitTest and explains their direct impact under the frozen CASE-03 contract."
+      }
+    },
+    {
+      "observationId": "gpt-baseline-devlog-official:CASE-04:DEVLOG:r1",
+      "questionId": "CASE-04",
+      "condition": "DEVLOG_BASELINE_MODEL",
+      "repetition": 1,
+      "model": "gpt-4.1-mini",
+      "formatContract": {
+        "structuralValid": true,
+        "groundingContractValid": false,
+        "originalStructuralStatus": "YES",
+        "originalGroundingStatus": "FAIL"
+      },
+      "semanticQuality": {
+        "semanticConclusion": "CORRECT",
+        "causalReasoning": "CORRECT",
+        "overclaim": "NO",
+        "abstention": "CORRECT",
+        "reasoningSupport": "SUPPORTED",
+        "qualityCategory": "CORRECT_ABSTENTION",
+        "rationale": "The answer preserves the frozen negative-control conclusion that ADR-043 did not cause the specific Story-0042 configuration refactor."
+      }
+    },
+    {
+      "observationId": "gpt-baseline-devlog-official:CASE-04:DEVLOG:r2",
+      "questionId": "CASE-04",
+      "condition": "DEVLOG_BASELINE_MODEL",
+      "repetition": 2,
+      "model": "gpt-4.1-mini",
+      "formatContract": {
+        "structuralValid": true,
+        "groundingContractValid": false,
+        "originalStructuralStatus": "YES",
+        "originalGroundingStatus": "FAIL"
+      },
+      "semanticQuality": {
+        "semanticConclusion": "CORRECT",
+        "causalReasoning": "CORRECT",
+        "overclaim": "NO",
+        "abstention": "CORRECT",
+        "reasoningSupport": "SUPPORTED",
+        "qualityCategory": "CORRECT_ABSTENTION",
+        "rationale": "The answer preserves the frozen negative-control conclusion that ADR-043 did not cause the specific Story-0042 configuration refactor."
+      }
+    },
+    {
+      "observationId": "gpt-baseline-devlog-official:CASE-04:DEVLOG:r3",
+      "questionId": "CASE-04",
+      "condition": "DEVLOG_BASELINE_MODEL",
+      "repetition": 3,
+      "model": "gpt-4.1-mini",
+      "formatContract": {
+        "structuralValid": true,
+        "groundingContractValid": false,
+        "originalStructuralStatus": "YES",
+        "originalGroundingStatus": "FAIL"
+      },
+      "semanticQuality": {
+        "semanticConclusion": "CORRECT",
+        "causalReasoning": "CORRECT",
+        "overclaim": "NO",
+        "abstention": "CORRECT",
+        "reasoningSupport": "SUPPORTED",
+        "qualityCategory": "CORRECT_ABSTENTION",
+        "rationale": "The answer preserves the frozen negative-control conclusion that ADR-043 did not cause the specific Story-0042 configuration refactor."
+      }
+    }
+  ]
+}

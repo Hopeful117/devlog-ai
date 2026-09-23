@@ -37,6 +37,7 @@ class ServerInfoResourceTest {
         assertThat(result.path("prompts").isArray()).isTrue();
         assertThat(result.path("prompts")).isEmpty();
         assertThat(names(result.path("resources"))).containsExactly(
+                "evidence-resolution",
                 "project-commit-context",
                 "project-context",
                 "project-decision",
@@ -48,6 +49,7 @@ class ServerInfoResourceTest {
                 "server-info");
         assertThat(values(result.path("resources"), "uri"))
                 .contains("devlog://server/info")
+                .contains("devlog://evidence/{reference}")
                 .contains("devlog://projects/{projectSlug}/stories/{storyId}");
         assertThat(values(result.path("resources"), "description"))
                 .allSatisfy(description -> assertThat(description).isNotBlank());

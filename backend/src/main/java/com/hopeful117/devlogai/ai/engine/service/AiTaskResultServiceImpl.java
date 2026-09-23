@@ -567,6 +567,8 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         }
 
         analyzeStoryContextUseCase.handleCallback(task.getCorrelationId(), request);
+        finishAnalysis(task, AnalysisStatus.COMPLETED, request.completedAt());
+        evaluateAndCommunicate(task.getAnalysis().getId());
 
         return acknowledgement(task, false);
     }

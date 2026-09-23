@@ -59,7 +59,6 @@ COMPARATIVE_SCORING_PROJECTION_VERSION = "story0135-comparative-scoring-projecti
 ALLOWED_TOOL_OPERATIONS = (
     "read_file", "search_repository", "git_log", "git_show", "git_diff", "inspect_commit",
 )
-
 _SECRET_KEY = re.compile(
     r"(?i)^(authorization|api[_-]?key|password|secret|token|credential|cookie|access[_-]?token)$"
 )
@@ -69,6 +68,12 @@ _ORACLE_MARKERS = (
     "STRONGLY_SUPPORTED", "EXPLICITLY_DOCUMENTED", "NOT_ESTABLISHED",
     "DIRECT_REQUIRED", "SUPPORTING_ALLOWED", "CL-01", "CL-09",
 )
+PROVIDER_FAILURE_CATEGORIES = frozenset({
+    "TIMEOUT", "CONNECTION_ERROR", "HTTP_ERROR", "RATE_LIMIT",
+    "AUTHENTICATION_ERROR", "INVALID_REQUEST", "PROVIDER_SERVER_ERROR",
+    "RESPONSE_PARSE_ERROR", "PROVIDER_INCOMPLETE_RESPONSE", "RESPONSE_CONTRACT_ERROR", "TRANSPORT_ERROR",
+    "UNKNOWN_PROVIDER_FAILURE",
+})
 
 
 class RuntimeContractError(ValueError):
@@ -77,6 +82,72 @@ class RuntimeContractError(ValueError):
 
 class TransportFailure(RuntimeError):
     """A provider failure before a response-bearing output exists."""
+
+    def __init__(self, message: str = "provider transport failed", *, attribution: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.attribution = attribution
+
+
+def provider_failure_attribution(
+    error: BaseException,
+    *,
+    category: str | None = None,
+    request_phase: str = "REQUEST",
+    sdk_item_type: str | None = None,
+    value_representation: str | None = None,
+    diagnostic_metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return an allow-listed, secret-free provider failure diagnostic."""
+    exception_type = type(error).__name__
+    lower_type = exception_type.casefold()
+    status = getattr(error, "status_code", None)
+    if not isinstance(status, int):
+        status = None
+    if category is None:
+        if "timeout" in lower_type:
+            category = "TIMEOUT"
+        elif "connect" in lower_type or "connection" in lower_type:
+            category = "CONNECTION_ERROR"
+        elif status == 429:
+            category = "RATE_LIMIT"
+        elif status in {401, 403}:
+            category = "AUTHENTICATION_ERROR"
+        elif status == 400:
+            category = "INVALID_REQUEST"
+        elif isinstance(status, int) and status >= 500:
+            category = "PROVIDER_SERVER_ERROR"
+        elif isinstance(status, int):
+            category = "HTTP_ERROR"
+        else:
+            category = "UNKNOWN_PROVIDER_FAILURE"
+    retryable = category in {"TIMEOUT", "CONNECTION_ERROR", "RATE_LIMIT", "PROVIDER_SERVER_ERROR"} or status in {408, 409}
+    if category not in PROVIDER_FAILURE_CATEGORIES:
+        category = "UNKNOWN_PROVIDER_FAILURE"
+        retryable = False
+    raw_message = str(error).replace("\n", " ").strip()[:256]
+    safe_message = re.sub(r"(?i)(bearer\s+|sk-)[^\s,;]+", "[REDACTED]", raw_message)
+    safe_message = re.sub(r"(?i)(authorization|api[_-]?key|password|secret|token|cookie)\s*[:=]\s*[^\s,;]+", r"\1=[REDACTED]", safe_message)
+    code = getattr(error, "code", None)
+    if not isinstance(code, str) or len(code) > 128 or not re.fullmatch(r"[A-Za-z0-9_.-]+", code):
+        code = None
+    attribution = {
+        "category": category,
+        "exceptionType": exception_type,
+        "providerErrorCode": code,
+        "httpStatus": status,
+        "requestPhase": request_phase,
+        "retryable": retryable,
+        "messageDigest": hashlib.sha256(safe_message.encode("utf-8")).hexdigest(),
+        "safeMessage": safe_message,
+    }
+    if sdk_item_type is not None:
+        attribution["sdkItemType"] = sdk_item_type[:128]
+    if value_representation is not None:
+        attribution["valueRepresentation"] = value_representation[:64]
+    if diagnostic_metadata:
+        attribution.update(diagnostic_metadata)
+        assert_secret_free(attribution)
+    return attribution
 
 
 class SystemicInfrastructureFailure(RuntimeError):
@@ -284,6 +355,8 @@ class ProviderRequest:
     input_payload: dict[str, Any]
     tool_schema: dict[str, Any] | None
     max_output_tokens: int
+    on_transport_attempt: Callable[[], None] | None = None
+    on_provider_response: Callable[[dict[str, Any], dict[str, Any]], None] | None = None
 
 
 @dataclass(frozen=True)

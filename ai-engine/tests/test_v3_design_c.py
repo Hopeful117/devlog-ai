@@ -15,10 +15,11 @@ from evaluations.product_value.v3_design_c import (
     validate_causal_result,
 )
 from evaluations.product_value.v3_design_c_offline import render_smoke_inputs, size_fixtures
+from evaluations.repository_paths import TRADING_OS_REPOSITORY
 
 
 ROOT = Path(__file__).resolve().parents[2]
-TRADING_OS = Path("/home/ludo/Bureau/workspace/trading-os")
+TRADING_OS = TRADING_OS_REPOSITORY
 REVISION = "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
 
 

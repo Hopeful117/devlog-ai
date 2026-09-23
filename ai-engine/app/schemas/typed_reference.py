@@ -25,6 +25,13 @@ class AiReferenceScope(str, Enum):
 
 
 class ProviderAiReference(ContractModel):
-    type: AiReferenceType
-    ref: str = Field(min_length=1)
-    scope: AiReferenceScope
+    type: AiReferenceType = Field(
+        description="Typed namespace. Runtime authorization is checked against Core candidates."
+    )
+    ref: str = Field(
+        min_length=1,
+        description="Opaque Core-issued token; it must be copied exactly."
+    )
+    scope: AiReferenceScope = Field(
+        description="Typed identity scope. Runtime authorization requires an exact scope match."
+    )

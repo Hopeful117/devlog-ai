@@ -10,6 +10,7 @@ import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.context.AnalysisContextService;
+import com.hopeful117.devlogai.analysis.diagnostics.entity.AnalysisExecutionDiagnostic;
 import com.hopeful117.devlogai.analysis.diagnostics.repository.AnalysisExecutionDiagnosticRepository;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
@@ -37,6 +38,7 @@ import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeC
 import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.source.entity.Source;
+import com.hopeful117.devlogai.source.exception.SourceSelectionException;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
 import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
 import com.hopeful117.devlogai.collection.workspace.ResolvedSourceRevision;
@@ -96,6 +98,15 @@ public class AnalyzeStoryContextUseCase {
 
         var intentDef = intentCatalog.resolve(INTENT_ID, INTENT_VERSION);
 
+        Analysis executionAnalysis = analysisRepository.save(Analysis.builder()
+                .project(project)
+                .type(AnalysisType.STORY_CONTEXT_ANALYSIS)
+                .intentId(INTENT_ID)
+                .intentVersion(INTENT_VERSION)
+                .status(AnalysisStatus.IN_PROGRESS)
+                .startedAt(Instant.now())
+                .build());
+
         EngineeringContext engineeringContext = engineeringContextFacade.getEngineeringContext(
                 projectSlug,
                 INTENT_ID,
@@ -111,6 +122,7 @@ public class AnalyzeStoryContextUseCase {
         if (baselineAnalysisId != null) {
             // Use the baseline analysis for Facts/Observations but with SCA intent
             AnalysisContext baselineContext = analysisContextService.build(baselineAnalysisId);
+            projectBaselineDiagnostics(executionAnalysis, baselineAnalysisId);
             HistoricalKnowledgeCandidates historicalCandidates =
                     historicalKnowledgeCandidateService.retrieve(
                             project.getId(),
@@ -120,10 +132,11 @@ public class AnalyzeStoryContextUseCase {
                             engineeringContext
                     );
             analysisContext = adaptContextForSCA(
-                    baselineContext, story, historicalCandidates);
+                    baselineContext, executionAnalysis, story, historicalCandidates);
         } else {
             // No baseline analysis - create minimal context with empty knowledge
-            analysisContext = createMinimalSCAContext(project, engineeringContext, story, intentDef, guidance);
+            analysisContext = createMinimalSCAContext(
+                    project, executionAnalysis, engineeringContext, story, intentDef, guidance);
         }
 
         // Select validated knowledge using Story-aware KnowledgeSelectionService
@@ -146,7 +159,7 @@ public class AnalyzeStoryContextUseCase {
 
         // Create AiTask with selected knowledge and grounding contract
         AiTask aiTask = aiTaskService.createForStoryContextAnalysisEntity(
-                project.getId(),
+                executionAnalysis.getId(),
                 AiTaskType.STORY_CONTEXT_ANALYSIS,
                 INTENT_ID,
                 INTENT_VERSION,
@@ -197,6 +210,27 @@ public class AnalyzeStoryContextUseCase {
         aiEngineClient.submit(promptRequest);
 
         return aiTask.getId();
+    }
+
+    private void projectBaselineDiagnostics(Analysis executionAnalysis, UUID baselineAnalysisId) {
+        diagnosticRepository.findById(baselineAnalysisId).ifPresent(baseline ->
+                diagnosticRepository.save(AnalysisExecutionDiagnostic.builder()
+                        .analysis(executionAnalysis)
+                        .sourceCount(baseline.getSourceCount())
+                        .factCount(baseline.getFactCount())
+                        .observationCount(baseline.getObservationCount())
+                        .warningCount(baseline.getWarningCount())
+                        .errorCount(baseline.getErrorCount())
+                        .collectorCount(baseline.getCollectorCount())
+                        .successfulCollectors(baseline.getSuccessfulCollectors())
+                        .collectorsWithWarnings(baseline.getCollectorsWithWarnings())
+                        .failedCollectors(baseline.getFailedCollectors())
+                        .collectionComplete(baseline.isCollectionComplete())
+                        .truncated(baseline.isTruncated())
+                        .resolvedRevisions(baseline.getResolvedRevisions())
+                        .collectorVersions(baseline.getCollectorVersions())
+                        .collectedAt(baseline.getCollectedAt())
+                        .build()));
     }
 
     private Map<String, Object> buildGroundingContract(
@@ -255,19 +289,20 @@ public class AnalyzeStoryContextUseCase {
      */
     private AnalysisContext adaptContextForSCA(
             AnalysisContext baselineContext,
+            Analysis executionAnalysis,
             EngineeringStory story,
             HistoricalKnowledgeCandidates historicalCandidates
     ) {
         // Create SCA analysis snapshot with correct intent
         AnalysisContext.AnalysisSnapshot scaAnalysisSnapshot = new AnalysisContext.AnalysisSnapshot(
-                baselineContext.analysis().id(),
-                baselineContext.analysis().type(),
+                executionAnalysis.getId(),
+                executionAnalysis.getType(),
                 INTENT_ID,
                 INTENT_VERSION,
-                baselineContext.analysis().status(),
-                baselineContext.analysis().startedAt(),
-                baselineContext.analysis().completedAt(),
-                baselineContext.analysis().createdAt()
+                executionAnalysis.getStatus(),
+                executionAnalysis.getStartedAt(),
+                executionAnalysis.getCompletedAt(),
+                executionAnalysis.getCreatedAt()
         );
 
         // Include only the current story
@@ -325,6 +360,7 @@ public class AnalyzeStoryContextUseCase {
      */
     private AnalysisContext createMinimalSCAContext(
             Project project,
+            Analysis executionAnalysis,
             EngineeringContext engineeringContext,
             EngineeringStory story,
             IntentDefinition intentDef,
@@ -335,14 +371,14 @@ public class AnalyzeStoryContextUseCase {
         );
 
         var analysisSnapshot = new AnalysisContext.AnalysisSnapshot(
-                UUID.randomUUID(), // synthetic ID for context only
-                AnalysisType.STORY_CONTEXT_ANALYSIS,
+                executionAnalysis.getId(),
+                executionAnalysis.getType(),
                 INTENT_ID,
                 INTENT_VERSION,
-                AnalysisStatus.COMPLETED,
-                Instant.now(),
-                Instant.now(),
-                Instant.now()
+                executionAnalysis.getStatus(),
+                executionAnalysis.getStartedAt(),
+                executionAnalysis.getCompletedAt(),
+                executionAnalysis.getCreatedAt()
         );
 
         var currentStorySnapshot = new com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringStorySnapshot(
@@ -425,7 +461,17 @@ public class AnalyzeStoryContextUseCase {
         List<Source> sources = sourceRepository
                 .findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(project.getId());
         if (sources.isEmpty()) {
-            throw new IllegalStateException("No active source found for project " + project.getId());
+            throw new SourceSelectionException(
+                    SourceSelectionException.Reason.SOURCE_UNAVAILABLE,
+                    project.getId(),
+                    "No active source found for project " + project.getId());
+        }
+        if (sources.size() > 1) {
+            throw new SourceSelectionException(
+                    SourceSelectionException.Reason.AMBIGUOUS_SOURCE,
+                    project.getId(),
+                    "Repository source selection is ambiguous for project "
+                            + project.getId() + "; found " + sources.size() + " active sources");
         }
         Source source = sources.getFirst();
 

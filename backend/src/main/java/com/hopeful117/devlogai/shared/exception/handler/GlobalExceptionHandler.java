@@ -4,8 +4,11 @@ import com.hopeful117.devlogai.ai.engine.dto.AiTaskConflictResponse;
 import com.hopeful117.devlogai.ai.engine.exception.AiTaskResultConflictException;
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTypeException;
+import com.hopeful117.devlogai.evidence.resolution.EvidenceResolutionException;
+import com.hopeful117.devlogai.evidence.resolution.EvidenceResolutionFailureCode;
 import com.hopeful117.devlogai.project.exception.ProjectSlugAlreadyExistsException;
 import com.hopeful117.devlogai.projectfreshness.SourceRevisionUnavailableException;
+import com.hopeful117.devlogai.source.exception.SourceSelectionException;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.exception.InvalidParameterException;
@@ -39,6 +42,37 @@ public class GlobalExceptionHandler {
                 request.getRequestURI(), ex.getMessage());
         return response(HttpStatus.SERVICE_UNAVAILABLE,
                 ApiErrorCode.SOURCE_REVISION_UNAVAILABLE, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(SourceSelectionException.class)
+    public ResponseEntity<ApiErrorResponse> handleSourceSelection(
+            SourceSelectionException ex, HttpServletRequest request) {
+        ApiErrorCode code = ex.reason() == SourceSelectionException.Reason.AMBIGUOUS_SOURCE
+                ? ApiErrorCode.AMBIGUOUS_SOURCE
+                : ApiErrorCode.SOURCE_UNAVAILABLE;
+        HttpStatus status = ex.reason() == SourceSelectionException.Reason.AMBIGUOUS_SOURCE
+                ? HttpStatus.CONFLICT
+                : HttpStatus.SERVICE_UNAVAILABLE;
+        return response(status, code, ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(EvidenceResolutionException.class)
+    public ResponseEntity<ApiErrorResponse> handleEvidenceResolution(
+            EvidenceResolutionException exception,
+            HttpServletRequest request
+    ) {
+        EvidenceResolutionFailureCode code = exception.code();
+        HttpStatus status = switch (code) {
+            case AMBIGUOUS_SOURCE -> HttpStatus.CONFLICT;
+            case SOURCE_UNAVAILABLE, REVISION_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE;
+            case EVIDENCE_NOT_FOUND, EVIDENCE_NO_LONGER_RESOLVABLE, UNKNOWN_REFERENCE ->
+                    HttpStatus.NOT_FOUND;
+            case UNAUTHORIZED -> HttpStatus.FORBIDDEN;
+            case UNSUPPORTED_REFERENCE_TYPE, UNSUPPORTED_EXPANSION ->
+                    HttpStatus.UNPROCESSABLE_ENTITY;
+        };
+        return response(status, ApiErrorCode.EVIDENCE_RESOLUTION_FAILED,
+                code + ": " + exception.getMessage(), request);
     }
     @ExceptionHandler(AiTaskResultConflictException.class)
     public ResponseEntity<AiTaskConflictResponse> handleAiTaskResultConflict(

@@ -1,0 +1,16 @@
+{
+  "dataset": "LUNA_COMPARATIVE_COLLECTION",
+  "model": "openai/gpt-5.6-luna",
+  "runtime": "OpenCode 1.18.31 default agent",
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "plannedSlots": 18,
+  "completedAnswers": 18,
+  "executionFailures": 0,
+  "structurallyValid": 0,
+  "semanticEligible": 0,
+  "groundingEvaluable": 0,
+  "correctGroundedAnswers": 0,
+  "tokenMeasurable": 18,
+  "artifactDirectory": "docs/evaluation/luna-comparative-collection/official/",
+  "qualityNote": "All answers were structurally invalid under the existing common answer contract; no answer was repaired."
+}

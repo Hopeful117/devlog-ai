@@ -15,8 +15,10 @@ import com.hopeful117.devlogai.repositorycontext.ContextRequest;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
 import com.hopeful117.devlogai.repositorycontext.intelligence.ContextPlan;
 import com.hopeful117.devlogai.source.entity.Source;
+import com.hopeful117.devlogai.source.exception.SourceSelectionException;
 import com.hopeful117.devlogai.source.entity.SourceType;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +32,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -39,6 +42,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class RepositoryStructureCollectorTest {
@@ -496,9 +502,10 @@ class RepositoryStructureCollectorTest {
         when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
                 .thenReturn(List.of());
 
-        List<RepositoryEvidence> evidence = collector.collect(createRequest());
+        SourceSelectionException failure = assertThrows(SourceSelectionException.class,
+                () -> collector.collect(createRequest()));
 
-        assertTrue(evidence.isEmpty());
+        assertEquals(SourceSelectionException.Reason.SOURCE_UNAVAILABLE, failure.reason());
     }
 
     @Test
@@ -517,12 +524,38 @@ class RepositoryStructureCollectorTest {
         when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
                 .thenReturn(List.of(first, second));
 
-        IllegalStateException exception = assertThrows(IllegalStateException.class,
+        SourceSelectionException exception = assertThrows(SourceSelectionException.class,
                 () -> collector.collect(createRequest()));
 
+        assertEquals(SourceSelectionException.Reason.AMBIGUOUS_SOURCE, exception.reason());
         assertTrue(exception.getMessage().contains(projectId.toString()));
         assertTrue(exception.getMessage().contains(sourceId.toString()));
         assertTrue(exception.getMessage().contains(secondSourceId.toString()));
+    }
+
+    @Test
+    void usesExplicitRevisionScopeSourceWithoutConsultingActiveSourceOrdering() {
+        Source source = Source.builder()
+                .id(sourceId)
+                .type(SourceType.GIT_REPOSITORY)
+                .active(true)
+                .build();
+        RepositoryRevisionScope scope = new RepositoryRevisionScope(
+                projectId, sourceId, "pinned-revision", tempDir, "EXPLICIT_TEST");
+        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
+                sourceId, tempDir, "pinned-revision");
+        when(sourceRepository.findByIdAndProject_IdAndActiveTrue(sourceId, projectId))
+                .thenReturn(Optional.of(source));
+        when(workspaceManager.synchronize(source, "pinned-revision"))
+                .thenReturn(workspace);
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(
+                new RepositoryScan(List.of(), 0, 0, List.of()));
+
+        collector.collect(createRequest(scope));
+
+        verify(sourceRepository, never())
+                .findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId);
+        verify(workspaceManager).synchronize(eq(source), eq("pinned-revision"));
     }
 
     @Test
@@ -563,6 +596,10 @@ class RepositoryStructureCollectorTest {
     }
 
     private ContextRequest createRequest() {
+        return createRequest(null);
+    }
+
+    private ContextRequest createRequest(RepositoryRevisionScope revisionScope) {
         AnalysisContext analysisContext = new AnalysisContext(
                 new AnalysisContext.ProjectSnapshot(projectId, "TestProject",
                         "test-project", "A test project", ProjectStatus.ACTIVE),
@@ -586,7 +623,8 @@ class RepositoryStructureCollectorTest {
                 null,
                 List.of(),
                 mockContextPlan(),
-                new RepositoryContext.ContextBudget(10, 100, 5, 1000));
+                new RepositoryContext.ContextBudget(10, 100, 5, 1000),
+                revisionScope);
     }
 
     private ContextRequest createRequestWithObjective(String objective) {

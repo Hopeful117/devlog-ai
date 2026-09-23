@@ -36,12 +36,14 @@ class ArchitectureKnowledgeRetryCandidate:
     insight_id: str
     title: str
     content: str
+    target_reference: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
 class RelationshipRetryContext:
     relationships: tuple[UncoveredRelationshipRetryItem, ...]
     candidates: tuple[ArchitectureKnowledgeRetryCandidate, ...]
+    target_field: str = "targetInsightId"
 
 
 class InsightPromptBuilder:
@@ -287,6 +289,16 @@ Return only the grounded structured output required by the Intent contract."""
         schema_json = self._canonical(request.expected_output_contract)
         context_json = self._canonical(context)
         candidates_json = self._canonical(candidates)
+        target_candidates = [
+            {
+                "targetInsightRef": item["reference"],
+                "title": item.get("title", ""),
+                "content": item.get("content", item.get("summary", "")),
+            }
+            for item in context.get("existingArchitectureKnowledge", [])
+            if isinstance(item, dict) and isinstance(item.get("reference"), dict)
+        ]
+        target_candidates_json = self._canonical(target_candidates)
         guidance_json = self._canonical(
             request.user_guidance.model_dump(
                 by_alias=True, mode="json", exclude_none=True
@@ -294,12 +306,30 @@ Return only the grounded structured output required by the Intent contract."""
         )
         user_message = (
             f"{template[3]}\n\nBUSINESS INTENT\n{intent_json}\n\n"
-            "Use only the typed references in the Core-issued context and grounding candidates. "
-            "Treat ref values as opaque handles: copy them exactly and never construct, parse, "
-            "shorten, or replace them with UUIDs. Fact refs are valid only in supportingFactRefs; "
-            "Observation refs only in supportingObservationRefs; evidence refs only in evidenceRefs "
-            "or groundingRefs. Do not use contextual Insight refs as Fact or Observation evidence. "
+            "Use typed references in the Core-issued context for understanding, but use typed "
+            "references from GROUNDING CANDIDATES only in grounding fields. CONTEXT REFERENCES "
+            "are visible for understanding and are not automatically authorized for grounding. "
+            "Treat ref values as opaque handles: copy type, ref, and scope exactly and never "
+            "construct, parse, shorten, replace, or convert them. Fact refs are valid only in "
+            "supportingFactRefs; Observation refs only in supportingObservationRefs; repository "
+            "evidence refs only in evidenceRefs or groundingRefs. groundingRefs accepts only the "
+            "exact union of Fact, Observation, and repository evidence candidates. Contextual "
+            "Insight, Analysis, Project, and Project Profile refs are never valid groundingRefs. "
             "Return an empty array when no authorized reference supports a claim.\n\n"
+            "CONTEXT REFERENCES\n"
+            "Visible for project understanding only; visibility does not grant grounding authority.\n\n"
+            "ARCHITECTURE ENRICHMENT TARGETS\n"
+            "The following are the only targets permitted in targetInsightRef. Each target "
+            "contains its exact typed identity and trusted architecture content.\n"
+            f"{target_candidates_json}\n\n"
+            "Delta contract: choose NEW only for genuinely new knowledge and omit "
+            "targetInsightRef. Choose ENRICHES only when materially extending one supplied "
+            "architecture target; ENRICHES requires targetInsightRef copied exactly from the "
+            "target list, preserving type, ref, and scope. If no exact target applies, do not "
+            "fabricate one: use NEW only when the knowledge is genuinely new, otherwise emit "
+            "no proposal.\n\n"
+            "GROUNDING CANDIDATES\n"
+            "The only references permitted in grounding fields, subject to each field's namespace.\n\n"
             f"TYPED CONTEXT\n{context_json}\n\n"
             f"GROUNDING CANDIDATES\n{candidates_json}\n\n"
             f"USER GUIDANCE\n{guidance_json}\n\n"
@@ -332,9 +362,9 @@ Return only the grounded structured output required by the Intent contract."""
         relationship_context: RelationshipRetryContext | None = None,
     ) -> Prompt:
         correction = (
-            "\n\nCORRECTIVE RETRY\nThe previous response was invalid. Correct these errors "
+            "\n\nCORRECTIVE RETRY (attempt 2)\nThe previous response was invalid. Correct these errors "
             "and return the complete output again:\n"
-            + str(validation_error)
+            + getattr(validation_error, "retry_message", str(validation_error))
         )
         if relationship_context is not None:
             correction += self._relationship_retry_guidance(relationship_context)
@@ -364,11 +394,7 @@ Return only the grounded structured output required by the Intent contract."""
             for item in context.relationships
         ]
         candidates = [
-            {
-                "insightId": candidate.insight_id,
-                "title": candidate.title,
-                "content": candidate.content,
-            }
+            self._retry_candidate_payload(candidate, context.target_field)
             for candidate in context.candidates
         ]
         return (
@@ -388,9 +414,29 @@ Return only the grounded structured output required by the Intent contract."""
             "architecture knowledge with grounded specificity, structure, relationships, "
             "responsibilities, or constraints.\n"
             "Choose the classification from the evidence and comparison; do not assume one. "
-            "ENRICHES requires targetInsightId copied exactly from the candidate being "
-            "enriched. NEW must omit targetInsightId.\n"
+            + (
+                "ENRICHES requires targetInsightId copied exactly from the candidate being "
+                "enriched. NEW must omit targetInsightId."
+                if context.target_field == "targetInsightId"
+                else "targetInsightRef is required for ENRICHES and must be copied exactly "
+                "from the candidate being enriched. NEW must omit targetInsightRef."
+            )
+            + " If no exact candidate applies, use NEW only for genuinely new knowledge or "
+            "return no proposal.\n"
         )
+
+    def _retry_candidate_payload(
+        self, candidate: ArchitectureKnowledgeRetryCandidate, target_field: str
+    ) -> dict[str, object]:
+        payload: dict[str, object] = {
+            "title": candidate.title,
+            "content": candidate.content,
+        }
+        if target_field == "targetInsightRef":
+            payload[target_field] = candidate.target_reference
+        else:
+            payload["insightId"] = candidate.insight_id
+        return payload
 
     def _grounding_contract(
         self, selected_knowledge: dict[str, object]

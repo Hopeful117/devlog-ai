@@ -32,10 +32,11 @@ from .v3_design_c import (
 from .v3_design_c_offline import render_smoke_inputs
 from .v3_protocol import assert_safe_value, canonical, safe_metadata, sha256_text, write_immutable_artifact
 from .v3_structured_output import ProviderParseFailure, capture_then_parse_openai_response
+from evaluations.repository_paths import TRADING_OS_REPOSITORY
 
 
 ROOT = Path(__file__).resolve().parents[3]
-TRADING_OS = Path("/home/ludo/Bureau/workspace/trading-os")
+TRADING_OS = TRADING_OS_REPOSITORY
 MAPPING_HASH = "67474f09e41c07899c8c7117754b21e794f285380ffd50675e701a0a3c2c40c0"
 EXECUTION_CONFIGURATION = {
     "provider": "openai", "model": "gpt-4.1-mini", "maxOutputTokens": 2500,

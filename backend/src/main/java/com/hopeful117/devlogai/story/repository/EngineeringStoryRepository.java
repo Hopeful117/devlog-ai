@@ -15,6 +15,9 @@ import java.util.UUID;
 @Repository
 public interface EngineeringStoryRepository extends JpaRepository<EngineeringStory, UUID> {
 
+    @EntityGraph(attributePaths = "project")
+    java.util.Optional<EngineeringStory> findDetailedById(UUID id);
+
     List<EngineeringStory> findByProject_Id(UUID projectId);
 
     @EntityGraph(attributePaths = "project")

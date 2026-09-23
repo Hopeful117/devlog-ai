@@ -67,6 +67,67 @@ class ProjectHistorySearchServiceImplTest {
     }
 
     @Test
+    void shouldMatchCommitBodyThroughTheSharedHistoryQuery() {
+        when(commitRepository.findByProjectIdOrderByCommittedAtAscCommitHashAsc(PROJECT_ID))
+                .thenReturn(List.of(commit(sha("body"), 10, "unrelated subject",
+                        "body contains the marker", List.of())));
+
+        var result = service.findMatches(PROJECT_ID, null, "marker");
+
+        assertThat(result).singleElement().satisfies(match -> {
+            assertThat(match.commitSha()).isEqualTo(sha("body"));
+            assertThat(match.matches()).anySatisfy(value ->
+                    assertThat(value.matchedOn()).isEqualTo(ProjectHistoryMatchedOn.COMMIT_MESSAGE));
+        });
+    }
+
+    @Test
+    void shouldFilterSharedHistoryMatchesToAnExplicitSource() {
+        UUID otherSource = UUID.fromString("eeee1111-2222-3333-4444-555555555555");
+        ProjectCommit requested = commit(sha("requested"), 10, "markdown change", null, List.of());
+        ProjectCommit other = commit(sha("other"), 10, "markdown change", null, List.of());
+        other.getSource().setId(otherSource);
+        when(commitRepository.findByProjectIdOrderByCommittedAtAscCommitHashAsc(PROJECT_ID))
+                .thenReturn(List.of(other, requested));
+
+        var result = service.findMatches(PROJECT_ID, REPO_ID, "markdown");
+
+        assertThat(result).singleElement()
+                .extracting(ProjectHistoryQueryMatch::commitSha)
+                .isEqualTo(sha("requested"));
+    }
+
+    @Test
+    void shouldNotLeakACommitWhoseSourceBelongsToAnotherProject() {
+        UUID otherSource = UUID.fromString("eeee1111-2222-3333-4444-555555555555");
+        Project otherProject = Project.builder().id(UUID.randomUUID()).build();
+        ProjectCommit commit = commit(sha("foreign"), 10, "markdown change", null, List.of());
+        commit.getSource().setId(otherSource);
+        commit.getSource().setProject(otherProject);
+        when(commitRepository.findByProjectIdOrderByCommittedAtAscCommitHashAsc(PROJECT_ID))
+                .thenReturn(List.of(commit));
+
+        var result = service.findMatches(PROJECT_ID, otherSource, "markdown");
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void shouldSearchAllProjectSourcesWithSourceAwareTieOrdering() {
+        UUID otherSource = UUID.fromString("eeee1111-2222-3333-4444-555555555555");
+        ProjectCommit first = commit(sha("first"), 10, "markdown change", null, List.of());
+        ProjectCommit second = commit(sha("second"), 10, "markdown change", null, List.of());
+        second.getSource().setId(otherSource);
+        when(commitRepository.findByProjectIdOrderByCommittedAtAscCommitHashAsc(PROJECT_ID))
+                .thenReturn(List.of(second, first));
+
+        var result = service.findMatches(PROJECT_ID, null, "markdown");
+
+        assertThat(result).extracting(ProjectHistoryQueryMatch::sourceId)
+                .containsExactly(REPO_ID, otherSource);
+    }
+
+    @Test
     void shouldFindCommitsByChangedPathAndRankFilenameExactFirst() {
         Instant now = Instant.parse("2026-08-20T00:00:00Z");
         // recent weak message match on the same term, no path match
@@ -226,7 +287,7 @@ class ProjectHistorySearchServiceImplTest {
 
     private ProjectCommit commit(String sha, Instant committedAt, String subject,
                                  String fullMessage, List<ChangedFile> files) {
-        Source source = Source.builder().id(REPO_ID).build();
+        Source source = Source.builder().id(REPO_ID).project(project).build();
         ProjectCommit commit = ProjectCommit.builder()
                 .commitHash(sha)
                 .subject(subject)

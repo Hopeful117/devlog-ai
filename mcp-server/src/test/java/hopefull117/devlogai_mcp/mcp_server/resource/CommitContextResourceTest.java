@@ -103,4 +103,35 @@ class CommitContextResourceTest {
                 .isInstanceOf(McpError.class)
                 .hasMessageContaining("No active repository source");
     }
+
+    @Test
+    void shouldRejectAmbiguousActiveSourcesInsteadOfSelectingTheFirst() {
+        when(resourceClient.listProjectSources(PROJECT_ID)).thenReturn("""
+                [{"id":"%s","projectId":"%s","active":true,
+                  "createdAt":"2026-06-01T00:00:00Z"},
+                 {"id":"dddd2222-2222-3333-4444-555555555555","projectId":"%s",
+                  "active":true,"createdAt":"2026-05-01T00:00:00Z"}]"""
+                .formatted(SOURCE_ID, PROJECT_ID, PROJECT_ID));
+
+        assertThatThrownBy(() -> resource.getCommitContext(SLUG, SHA))
+                .isInstanceOf(McpError.class)
+                .hasMessageContaining("Ambiguous active repository source");
+
+        org.mockito.Mockito.verify(resourceClient, org.mockito.Mockito.never())
+                .getCommitContext(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void shouldRemainAmbiguousWhenActiveSourceResponseOrderChanges() {
+        when(resourceClient.listProjectSources(PROJECT_ID)).thenReturn("""
+                [{"id":"dddd2222-2222-3333-4444-555555555555","projectId":"%s",
+                  "active":true,"createdAt":"2026-05-01T00:00:00Z"},
+                 {"id":"%s","projectId":"%s","active":true,
+                  "createdAt":"2026-06-01T00:00:00Z"}]"""
+                .formatted(PROJECT_ID, SOURCE_ID, PROJECT_ID));
+
+        assertThatThrownBy(() -> resource.getCommitContext(SLUG, SHA))
+                .isInstanceOf(McpError.class)
+                .hasMessageContaining("Ambiguous active repository source");
+    }
 }

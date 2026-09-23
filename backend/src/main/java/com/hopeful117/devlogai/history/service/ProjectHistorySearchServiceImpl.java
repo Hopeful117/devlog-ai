@@ -33,7 +33,8 @@ import java.util.UUID;
  */
 @Service
 @RequiredArgsConstructor
-public class ProjectHistorySearchServiceImpl implements ProjectHistorySearchService {
+public class ProjectHistorySearchServiceImpl
+        implements ProjectHistorySearchService, ProjectHistoryQueryService {
 
     /** Term fully equals a changed file name (e.g. {@code RepositoryContextEngine.java}). */
     static final int STRENGTH_FILENAME_EXACT = 30;
@@ -54,12 +55,7 @@ public class ProjectHistorySearchServiceImpl implements ProjectHistorySearchServ
     @Override
     @Transactional(readOnly = true)
     public ProjectHistorySearchResult search(UUID projectId, String query, Integer limit) {
-        List<String> terms = tokenize(query);
-        if (terms.isEmpty()) {
-            throw new InvalidParameterException("query",
-                    "must contain at least one alphanumeric term of %d+ characters"
-                            .formatted(MIN_TERM_LENGTH));
-        }
+        validateQuery(query);
         int effectiveLimit = limit == null ? DEFAULT_LIMIT : limit;
         if (effectiveLimit < 1 || effectiveLimit > MAX_LIMIT) {
             throw new InvalidParameterException("limit",
@@ -69,17 +65,14 @@ public class ProjectHistorySearchServiceImpl implements ProjectHistorySearchServ
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new EntityNotFoundException("Project", projectId));
 
-        List<Candidate> candidates = new ArrayList<>();
-        for (ProjectCommit commit : commitRepository
-                .findByProjectIdOrderByCommittedAtAscCommitHashAsc(projectId)) {
-            Candidate candidate = match(commit, terms);
-            if (candidate != null) candidates.add(candidate);
-        }
-
-        candidates.sort(Comparator.comparingInt(Candidate::relevance).reversed()
-                .thenComparing(candidate -> candidate.commit().getCommittedAt(),
-                        Comparator.reverseOrder())
-                .thenComparing(candidate -> candidate.commit().getCommitHash()));
+        List<ProjectHistoryQueryMatch> candidates = findMatches(projectId, null, query);
+        // Preserve the existing public endpoint's tie ordering.
+        candidates = candidates.stream()
+                .sorted(Comparator.comparingInt(ProjectHistoryQueryMatch::relevance).reversed()
+                        .thenComparing(ProjectHistoryQueryMatch::committedAt,
+                                Comparator.reverseOrder())
+                        .thenComparing(ProjectHistoryQueryMatch::commitSha))
+                .toList();
 
         List<ProjectHistoryCommitMatch> results = candidates.stream()
                 .limit(effectiveLimit)
@@ -88,6 +81,40 @@ public class ProjectHistorySearchServiceImpl implements ProjectHistorySearchServ
 
         return new ProjectHistorySearchResult(query.strip(), candidates.size(),
                 candidates.size() > results.size(), results);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProjectHistoryQueryMatch> findMatches(
+            UUID projectId, UUID sourceId, String query) {
+        projectRepository.findById(projectId)
+                .orElseThrow(() -> new EntityNotFoundException("Project", projectId));
+        validateQuery(query);
+        List<String> terms = tokenize(query);
+
+        List<Candidate> candidates = new ArrayList<>();
+        for (ProjectCommit commit : commitRepository
+                .findByProjectIdOrderByCommittedAtAscCommitHashAsc(projectId)) {
+            if (!belongsToProject(commit, projectId)) continue;
+            if (sourceId != null && !sourceId.equals(commit.getSource().getId())) continue;
+            Candidate candidate = match(commit, terms);
+            if (candidate != null) candidates.add(candidate);
+        }
+
+        return candidates.stream()
+                .sorted(Comparator.comparingInt(Candidate::relevance).reversed()
+                        .thenComparing(candidate -> candidate.commit().getCommittedAt(),
+                                Comparator.reverseOrder())
+                        .thenComparing(candidate -> candidate.commit().getSource().getId())
+                        .thenComparing(candidate -> candidate.commit().getCommitHash()))
+                .map(this::toQueryMatch)
+                .toList();
+    }
+
+    private boolean belongsToProject(ProjectCommit commit, UUID projectId) {
+        return commit.getSource() != null
+                && commit.getSource().getProject() != null
+                && projectId.equals(commit.getSource().getProject().getId());
     }
 
     private record Candidate(ProjectCommit commit, int relevance,
@@ -196,20 +223,29 @@ public class ProjectHistorySearchServiceImpl implements ProjectHistorySearchServ
                 .toList();
     }
 
-    private ProjectHistoryCommitMatch toMatch(Candidate candidate, String slug) {
+    private static void validateQuery(String query) {
+        if (tokenize(query).isEmpty()) {
+            throw new InvalidParameterException("query",
+                    "must contain at least one alphanumeric term of %d+ characters"
+                            .formatted(MIN_TERM_LENGTH));
+        }
+    }
+
+    private ProjectHistoryQueryMatch toQueryMatch(Candidate candidate) {
         ProjectCommit commit = candidate.commit();
         List<ProjectHistoryMatch> matches = new ArrayList<>();
         candidate.matchesByField().forEach((field, values) -> values.forEach(
                 value -> matches.add(new ProjectHistoryMatch(field, value))));
+        return new ProjectHistoryQueryMatch(commit.getCommitHash(), commit.getSubject(),
+                commit.getAuthorName(), commit.getCommittedAt(), commit.getSource().getId(),
+                candidate.relevance(), matches);
+    }
+
+    private ProjectHistoryCommitMatch toMatch(ProjectHistoryQueryMatch candidate, String slug) {
         return new ProjectHistoryCommitMatch(
-                commit.getCommitHash(),
-                commit.getSubject(),
-                commit.getAuthorName(),
-                commit.getCommittedAt(),
-                commit.getSource().getId(),
-                candidate.relevance(),
-                matches,
-                resourceUri(slug, commit.getCommitHash()));
+                candidate.commitSha(), candidate.subject(), candidate.authorName(), candidate.committedAt(),
+                candidate.sourceId(), candidate.relevance(), candidate.matches(),
+                resourceUri(slug, candidate.commitSha()));
     }
 
     /** Fail-safe: a corrupted SHA yields no resource instead of failing the search. */

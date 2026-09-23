@@ -13,6 +13,9 @@ import java.util.Set;
 
 public interface FactRepository extends JpaRepository<Fact, UUID> {
 
+    @EntityGraph(attributePaths = "analysis")
+    java.util.Optional<Fact> findWithAnalysisById(UUID id);
+
     long countByAnalysisId(UUID analysisId);
 
     List<Fact> findByAnalysisIdOrderByDetectedAtDesc(UUID analysisId);

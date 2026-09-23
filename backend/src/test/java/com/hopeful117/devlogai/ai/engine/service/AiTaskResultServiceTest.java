@@ -13,6 +13,7 @@ import com.hopeful117.devlogai.analysis.communication.AnalysisCommunicationUseCa
 import com.hopeful117.devlogai.analysis.communication.CommunicationDecision;
 import com.hopeful117.devlogai.analysis.communication.CommunicationDecisionService;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
+import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.fact.entity.Fact;
 import com.hopeful117.devlogai.fact.repository.FactRepository;
@@ -562,12 +563,16 @@ class AiTaskResultServiceTest {
         when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
                 .thenReturn(Optional.of(task));
         when(proposalRepository.countByAiTaskId(task.getId())).thenReturn(0L);
+        when(communicationDecisionService.evaluate(task.getAnalysis().getId()))
+                .thenReturn(CommunicationDecision.SILENCE);
 
         AiTaskResultAcknowledgement result = service.handle(correlationId, request);
 
         assertTrue(result.acknowledged());
         assertFalse(result.duplicate());
         verify(analyzeStoryContextUseCase).handleCallback(correlationId, request);
+        assertEquals(AnalysisStatus.COMPLETED, task.getAnalysis().getStatus());
+        verify(communicationDecisionService).evaluate(task.getAnalysis().getId());
         verify(proposalRepository, never()).saveAll(any());
     }
 

@@ -7,22 +7,18 @@ internal result model. This module does not change production generation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Literal
+from typing import Any, Callable
 
 from pydantic import BaseModel
 
-from app.schemas.story_context_analysis import StoryContextAnalysisResult
+from app.schemas.story_context_analysis import (
+    ProviderConfidence,
+    ProviderStoryContextAnalysisResult,
+    StoryContextAnalysisResult,
+    provider_result_to_internal as _provider_result_to_internal,
+)
 
 from .v3_protocol import capture_raw_response
-
-
-ProviderConfidence = Literal["HIGH", "MEDIUM", "LOW"]
-
-
-class ProviderStoryContextAnalysisResult(StoryContextAnalysisResult):
-    """The canonical provider/Core wire shape for confidence."""
-
-    confidence: ProviderConfidence
 
 
 def provider_schema() -> dict[str, Any]:
@@ -32,13 +28,9 @@ def provider_schema() -> dict[str, Any]:
 def provider_result_to_internal(
     result: ProviderStoryContextAnalysisResult,
 ) -> StoryContextAnalysisResult:
-    """Map canonical confidence to the internal model without inventing rationale."""
+    """Preserve the historical evaluation import over the production adapter."""
 
-    payload = result.model_dump(
-        mode="json", by_alias=True, exclude={"confidence"},
-    )
-    payload["confidence"] = {"level": result.confidence, "rationale": ""}
-    return StoryContextAnalysisResult.model_validate(payload)
+    return _provider_result_to_internal(result)
 
 
 @dataclass(frozen=True)

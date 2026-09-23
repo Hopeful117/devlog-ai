@@ -1,0 +1,103 @@
+{
+  "answer": {
+    "abstention": false,
+    "answerText": "No. ADR-043 provides identity and execution-mode constraints, but the specific ExecutionConfiguration refactor was caused by Story 0042's PAPER exit settlement and realized-PnL requirements.",
+    "claims": [
+      {
+        "claimType": "FACT",
+        "references": [
+          "E1",
+          "E2"
+        ],
+        "text": "Story 0042 required extending PAPER settlement to compute realized PnL and explicitly identified TradingCalculatorService as the PnL implementation evidence."
+      },
+      {
+        "claimType": "FACT",
+        "references": [
+          "E3"
+        ],
+        "text": "The Story 0042 commit changed ExecutionConfiguration only to inject TradingCalculatorService into PaperSettlementService."
+      },
+      {
+        "claimType": "INTERPRETATION",
+        "references": [
+          "E4",
+          "E5"
+        ],
+        "text": "ADR-043 defines distinct financial and routing identities and mode-specific authority, but does not prescribe TradingCalculatorService injection or this configuration change."
+      }
+    ],
+    "confidence": "HIGH",
+    "evidence": [
+      {
+        "excerpt": "Extend or split PaperSettlementService so an EXIT validates the target again, applies the documented LONG/SHORT cash effects, computes realized PnL from entry basis and fill price, sets exit fields and CLOSED status, and saves the Account atomically.",
+        "locator": "LINE_RANGE startLine=75 endLine=80",
+        "reference": "E1",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "Gross deterministic PnL | TradingCalculatorService.calculatePnL() | Focused tests passed",
+        "locator": "LINE_RANGE startLine=7 endLine=14",
+        "reference": "E2",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "The Story 0042 commit adds a TradingCalculatorService parameter to the PaperSettlementService bean and passes it to the constructor.",
+        "locator": "COMMIT_HUNK da84a19/trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java/@@ -53,8 +53,9 @@",
+        "reference": "E3",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "Account.accountId is Trading Core financial account identity; BrokerAccount.id is execution and broker-routing identity; LIVE position authority is external and PAPER position authority is Trading Core.",
+        "locator": "LINE_RANGE startLine=32 endLine=50",
+        "reference": "E4",
+        "role": "SUPPORTING"
+      },
+      {
+        "excerpt": "The architecture must define distinct financial and execution identities, canonical durable relationship, mode-correct Risk Facts acquisition, and fail-closed behavior.",
+        "locator": "LINE_RANGE startLine=70 endLine=82",
+        "reference": "E5",
+        "role": "SUPPORTING"
+      }
+    ],
+    "questionId": "CASE-04",
+    "questionVersion": "1.0.0",
+    "relationshipResult": "NOT_ESTABLISHED"
+  },
+  "capturedAt": 1789746738.7396777,
+  "condition": "DIRECT",
+  "elapsedMs": 82624,
+  "evaluation": {
+    "correctGroundedAnswer": "NOT_EVALUATED",
+    "grounding": {
+      "status": "NOT_EVALUATED"
+    },
+    "semantic": {
+      "semanticCorrect": "NOT_EVALUATED",
+      "semanticEvaluated": false
+    },
+    "structural": {
+      "error": "'str' object has no attribute 'get'",
+      "status": "FAIL",
+      "valid": false
+    }
+  },
+  "executionStatus": "COMPLETED",
+  "model": "openai/gpt-5.6-luna",
+  "observationId": "luna-official:CASE-04:DIRECT:r3",
+  "questionId": "CASE-04",
+  "questionVersion": "1.0.0",
+  "rawFinalText": "{\"questionId\":\"CASE-04\",\"questionVersion\":\"1.0.0\",\"answerText\":\"No. ADR-043 provides identity and execution-mode constraints, but the specific ExecutionConfiguration refactor was caused by Story 0042's PAPER exit settlement and realized-PnL requirements.\",\"relationshipResult\":\"NOT_ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"Story 0042 required extending PAPER settlement to compute realized PnL and explicitly identified TradingCalculatorService as the PnL implementation evidence.\",\"claimType\":\"FACT\",\"references\":[\"E1\",\"E2\"]},{\"text\":\"The Story 0042 commit changed ExecutionConfiguration only to inject TradingCalculatorService into PaperSettlementService.\",\"claimType\":\"FACT\",\"references\":[\"E3\"]},{\"text\":\"ADR-043 defines distinct financial and routing identities and mode-specific authority, but does not prescribe TradingCalculatorService injection or this configuration change.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"E4\",\"E5\"]}],\"evidence\":[{\"reference\":\"E1\",\"locator\":\"LINE_RANGE startLine=75 endLine=80\",\"excerpt\":\"Extend or split PaperSettlementService so an EXIT validates the target again, applies the documented LONG/SHORT cash effects, computes realized PnL from entry basis and fill price, sets exit fields and CLOSED status, and saves the Account atomically.\",\"role\":\"DIRECT\"},{\"reference\":\"E2\",\"locator\":\"LINE_RANGE startLine=7 endLine=14\",\"excerpt\":\"Gross deterministic PnL | TradingCalculatorService.calculatePnL() | Focused tests passed\",\"role\":\"DIRECT\"},{\"reference\":\"E3\",\"locator\":\"COMMIT_HUNK da84a19/trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/configuration/ExecutionConfiguration.java/@@ -53,8 +53,9 @@\",\"excerpt\":\"The Story 0042 commit adds a TradingCalculatorService parameter to the PaperSettlementService bean and passes it to the constructor.\",\"role\":\"DIRECT\"},{\"reference\":\"E4\",\"locator\":\"LINE_RANGE startLine=32 endLine=50\",\"excerpt\":\"Account.accountId is Trading Core financial account identity; BrokerAccount.id is execution and broker-routing identity; LIVE position authority is external and PAPER position authority is Trading Core.\",\"role\":\"SUPPORTING\"},{\"reference\":\"E5\",\"locator\":\"LINE_RANGE startLine=70 endLine=82\",\"excerpt\":\"The architecture must define distinct financial and execution identities, canonical durable relationship, mode-correct Risk Facts acquisition, and fail-closed behavior.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+  "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-04:DIRECT:r3.opencodelog.jsonl",
+  "repetition": 3,
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "returnCode": 0,
+  "runtime": "OpenCode 1.18.31 default agent",
+  "usage": {
+    "cacheRead": 122368,
+    "input": 51621,
+    "output": 1585,
+    "reasoning": 869,
+    "total": 176443
+  }
+}

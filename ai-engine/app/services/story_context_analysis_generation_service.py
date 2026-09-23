@@ -23,6 +23,8 @@ from app.schemas.story_context_analysis import (
     RelationType,
     maximum_defensible_classification,
     CausalAssessment,
+    ProviderStoryContextAnalysisResult,
+    provider_result_to_internal,
 )
 from app.services.interaction_trace import InteractionTraceCollector
 
@@ -143,11 +145,14 @@ class StoryContextAnalysisGenerationService:
         grounding_contract: dict[str, object],
         traces: InteractionTraceCollector,
     ) -> StoryContextAnalysisResult:
-        return await traces.generate_and_validate(
+        provider_output = await traces.generate_and_validate(
             prompt,
-            StoryContextAnalysisResult,
-            lambda output: self._validate_output(output, context, grounding_contract),
+            ProviderStoryContextAnalysisResult,
+            lambda output: self._validate_output(
+                provider_result_to_internal(output), context, grounding_contract
+            ),
         )
+        return provider_result_to_internal(provider_output)
 
     def _validate_output(
         self,

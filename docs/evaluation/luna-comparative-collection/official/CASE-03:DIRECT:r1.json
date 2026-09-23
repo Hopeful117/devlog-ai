@@ -1,0 +1,165 @@
+{
+  "answer": {
+    "abstention": false,
+    "answerText": "A PAPER settlement strategy change would primarily affect Trading Core's PaperSettlementService, because it owns PAPER balance mutations, position aggregation or closure, realized PnL, equity updates, and persistence. ExecutionFinalizationStep and ExecutionConfiguration would be affected if the settlement interface, ordering, or dependency wiring changes. SimulatedExecutionAdapter is affected if the strategy changes fill pricing, fees, partial fills, pending orders, or reconciliation assumptions. PaperExitService is affected for changes to full-close, target, quantity, or idempotency semantics. Account/Trade persistence and PAPER position projection code are affected if the resulting position representation or lifecycle changes. The main regression coverage is in PaperSettlementExitTest, PaperExecutionVerticalRegressionTest, PaperExitAcceptanceIntegrationTest, and PaperExecutionPersistenceIntegrationTest; pipeline-order and response-handling tests are also likely affected when settlement invocation or failure behavior changes.",
+    "claims": [
+      {
+        "claimType": "FACT",
+        "references": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77",
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-107"
+        ],
+        "text": "PaperSettlementService is the primary production component affected because it applies PAPER entry and exit settlement to balances, trades, equity, and realized PnL."
+      },
+      {
+        "claimType": "FACT",
+        "references": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69"
+        ],
+        "text": "ExecutionFinalizationStep invokes PAPER settlement before final lifecycle persistence, so changes to settlement behavior or its contract can affect execution finalization and ordering guarantees."
+      },
+      {
+        "claimType": "FACT",
+        "references": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:65-95",
+          "docs/architecture/adr/ADR-042.md:117-133"
+        ],
+        "text": "The simulator is coupled to settlement inputs because it determines PAPER fill prices and currently returns acknowledged synthetic fills while not modeling pending orders, partial fills, or fees."
+      },
+      {
+        "claimType": "FACT",
+        "references": [
+          "trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71",
+          "docs/architecture/adr/ADR-042.md:426-447"
+        ],
+        "text": "PAPER close behavior is routed through PaperExitService into an EXIT execution intent, so a change to full-close, target resolution, quantity, or idempotency semantics would affect that service and its close tests."
+      },
+      {
+        "claimType": "INTERPRETATION",
+        "references": [
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-52",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:72-81",
+          "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:189-218",
+          "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:94-127",
+          "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:177-204",
+          "docs/architecture/stories/0038-persisted-paper-execution-regression/implementation-report.md:29-40"
+        ],
+        "text": "The regression suite likely needing updates includes isolated settlement tests, the end-to-end vertical execution test, persisted round-trip acceptance tests, and pipeline tests that mock or verify settlement invocation."
+      }
+    ],
+    "confidence": "HIGH",
+    "evidence": [
+      {
+        "excerpt": "settle(...) loads the PAPER account, applies entry or exit settlement, and saves the Account.",
+        "locator": "LINE_RANGE with startLine=44,endLine=77",
+        "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "Exit settlement validates the target and quantity, updates balances, calculates PnL, closes the Trade, and updates equity.",
+        "locator": "LINE_RANGE with startLine=79,endLine=107",
+        "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-107",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "Acknowledged PAPER executions call paperSettlementService.settle before lifecycle acknowledgement and repository saves.",
+        "locator": "LINE_RANGE with startLine=45,endLine=69",
+        "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "The simulator selects ask for BUY and bid for SELL, validates limits, and returns an acknowledged synthetic order result.",
+        "locator": "LINE_RANGE with startLine=65,endLine=95",
+        "reference": "trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:65-95",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "The current PAPER adapter does not model pending orders, partial fills, or fees and uses simulated reconciliation behavior.",
+        "locator": "LINE_RANGE with startLine=117,endLine=133",
+        "reference": "docs/architecture/adr/ADR-042.md:117-133",
+        "role": "SUPPORTING"
+      },
+      {
+        "excerpt": "PaperExitService verifies ownership and PAPER mode, resolves an open Trade, creates an EXIT intent, and executes it.",
+        "locator": "LINE_RANGE with startLine=39,endLine=71",
+        "reference": "trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "PAPER full close is defined as an EXIT intent followed by simulated execution and local settlement, with full-close-only and no reversal constraints.",
+        "locator": "LINE_RANGE with startLine=426,endLine=447",
+        "reference": "docs/architecture/adr/ADR-042.md:426-447",
+        "role": "SUPPORTING"
+      },
+      {
+        "excerpt": "Tests assert long and short exit cash, equity, PnL, balances, and CLOSED lifecycle behavior.",
+        "locator": "LINE_RANGE with startLine=31,endLine=52",
+        "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-52",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "The vertical regression verifies filled order data, settlement invocation exactly once, balances, equity, and open Trade state.",
+        "locator": "LINE_RANGE with startLine=189,endLine=218",
+        "reference": "trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:189-218",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "The acceptance test proves entry, reload, PAPER close, persisted CLOSED state, realized PnL, balances, and empty open-position query.",
+        "locator": "LINE_RANGE with startLine=94,endLine=127",
+        "reference": "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:94-127",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "The acceptance test verifies settlement failure rolls back financial and Trade state.",
+        "locator": "LINE_RANGE with startLine=177,endLine=204",
+        "reference": "trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:177-204",
+        "role": "DIRECT"
+      },
+      {
+        "excerpt": "Persisted BUY coverage is explicit; SELL pricing, exact-once settlement, and pipeline ordering are covered by separate regression tests.",
+        "locator": "LINE_RANGE with startLine=29,endLine=40",
+        "reference": "docs/architecture/stories/0038-persisted-paper-execution-regression/implementation-report.md:29-40",
+        "role": "SUPPORTING"
+      }
+    ],
+    "questionId": "CASE-03",
+    "questionVersion": "1.0.0",
+    "relationshipResult": "ESTABLISHED"
+  },
+  "capturedAt": 1789746038.0330455,
+  "condition": "DIRECT",
+  "elapsedMs": 72605,
+  "evaluation": {
+    "correctGroundedAnswer": "NOT_EVALUATED",
+    "grounding": {
+      "status": "NOT_EVALUATED"
+    },
+    "semantic": {
+      "semanticCorrect": "NOT_EVALUATED",
+      "semanticEvaluated": false
+    },
+    "structural": {
+      "error": "claim count is outside the common contract",
+      "status": "FAIL",
+      "valid": false
+    }
+  },
+  "executionStatus": "COMPLETED",
+  "model": "openai/gpt-5.6-luna",
+  "observationId": "luna-official:CASE-03:DIRECT:r1",
+  "questionId": "CASE-03",
+  "questionVersion": "1.0.0",
+  "rawFinalText": "{\"questionId\":\"CASE-03\",\"questionVersion\":\"1.0.0\",\"answerText\":\"A PAPER settlement strategy change would primarily affect Trading Core's PaperSettlementService, because it owns PAPER balance mutations, position aggregation or closure, realized PnL, equity updates, and persistence. ExecutionFinalizationStep and ExecutionConfiguration would be affected if the settlement interface, ordering, or dependency wiring changes. SimulatedExecutionAdapter is affected if the strategy changes fill pricing, fees, partial fills, pending orders, or reconciliation assumptions. PaperExitService is affected for changes to full-close, target, quantity, or idempotency semantics. Account/Trade persistence and PAPER position projection code are affected if the resulting position representation or lifecycle changes. The main regression coverage is in PaperSettlementExitTest, PaperExecutionVerticalRegressionTest, PaperExitAcceptanceIntegrationTest, and PaperExecutionPersistenceIntegrationTest; pipeline-order and response-handling tests are also likely affected when settlement invocation or failure behavior changes.\",\"relationshipResult\":\"ESTABLISHED\",\"abstention\":false,\"claims\":[{\"text\":\"PaperSettlementService is the primary production component affected because it applies PAPER entry and exit settlement to balances, trades, equity, and realized PnL.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77\",\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-107\"]},{\"text\":\"ExecutionFinalizationStep invokes PAPER settlement before final lifecycle persistence, so changes to settlement behavior or its contract can affect execution finalization and ordering guarantees.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69\"]},{\"text\":\"The simulator is coupled to settlement inputs because it determines PAPER fill prices and currently returns acknowledged synthetic fills while not modeling pending orders, partial fills, or fees.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:65-95\",\"docs/architecture/adr/ADR-042.md:117-133\"]},{\"text\":\"PAPER close behavior is routed through PaperExitService into an EXIT execution intent, so a change to full-close, target resolution, quantity, or idempotency semantics would affect that service and its close tests.\",\"claimType\":\"FACT\",\"references\":[\"trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71\",\"docs/architecture/adr/ADR-042.md:426-447\"]},{\"text\":\"The regression suite likely needing updates includes isolated settlement tests, the end-to-end vertical execution test, persisted round-trip acceptance tests, and pipeline tests that mock or verify settlement invocation.\",\"claimType\":\"INTERPRETATION\",\"references\":[\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-52\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:72-81\",\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:189-218\",\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:94-127\",\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:177-204\",\"docs/architecture/stories/0038-persisted-paper-execution-regression/implementation-report.md:29-40\"]}],\"evidence\":[{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:44-77\",\"locator\":\"LINE_RANGE with startLine=44,endLine=77\",\"excerpt\":\"settle(...) loads the PAPER account, applies entry or exit settlement, and saves the Account.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/service/PaperSettlementService.java:79-107\",\"locator\":\"LINE_RANGE with startLine=79,endLine=107\",\"excerpt\":\"Exit settlement validates the target and quantity, updates balances, calculates PnL, closes the Trade, and updates equity.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/application/pipeline/ExecutionFinalizationStep.java:45-69\",\"locator\":\"LINE_RANGE with startLine=45,endLine=69\",\"excerpt\":\"Acknowledged PAPER executions call paperSettlementService.settle before lifecycle acknowledgement and repository saves.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/execution/infrastructure/adapter/SimulatedExecutionAdapter.java:65-95\",\"locator\":\"LINE_RANGE with startLine=65,endLine=95\",\"excerpt\":\"The simulator selects ask for BUY and bid for SELL, validates limits, and returns an acknowledged synthetic order result.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-042.md:117-133\",\"locator\":\"LINE_RANGE with startLine=117,endLine=133\",\"excerpt\":\"The current PAPER adapter does not model pending orders, partial fills, or fees and uses simulated reconciliation behavior.\",\"role\":\"SUPPORTING\"},{\"reference\":\"trading-core/src/main/java/com/hope/trading/trading_core/positionclose/application/service/PaperExitService.java:39-71\",\"locator\":\"LINE_RANGE with startLine=39,endLine=71\",\"excerpt\":\"PaperExitService verifies ownership and PAPER mode, resolves an open Trade, creates an EXIT intent, and executes it.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/adr/ADR-042.md:426-447\",\"locator\":\"LINE_RANGE with startLine=426,endLine=447\",\"excerpt\":\"PAPER full close is defined as an EXIT intent followed by simulated execution and local settlement, with full-close-only and no reversal constraints.\",\"role\":\"SUPPORTING\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperSettlementExitTest.java:31-52\",\"locator\":\"LINE_RANGE with startLine=31,endLine=52\",\"excerpt\":\"Tests assert long and short exit cash, equity, PnL, balances, and CLOSED lifecycle behavior.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/execution/PaperExecutionVerticalRegressionTest.java:189-218\",\"locator\":\"LINE_RANGE with startLine=189,endLine=218\",\"excerpt\":\"The vertical regression verifies filled order data, settlement invocation exactly once, balances, equity, and open Trade state.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:94-127\",\"locator\":\"LINE_RANGE with startLine=94,endLine=127\",\"excerpt\":\"The acceptance test proves entry, reload, PAPER close, persisted CLOSED state, realized PnL, balances, and empty open-position query.\",\"role\":\"DIRECT\"},{\"reference\":\"trading-core/src/test/java/com/hope/trading/trading_core/positionclose/PaperExitAcceptanceIntegrationTest.java:177-204\",\"locator\":\"LINE_RANGE with startLine=177,endLine=204\",\"excerpt\":\"The acceptance test verifies settlement failure rolls back financial and Trade state.\",\"role\":\"DIRECT\"},{\"reference\":\"docs/architecture/stories/0038-persisted-paper-execution-regression/implementation-report.md:29-40\",\"locator\":\"LINE_RANGE with startLine=29,endLine=40\",\"excerpt\":\"Persisted BUY coverage is explicit; SELL pricing, exact-once settlement, and pipeline ordering are covered by separate regression tests.\",\"role\":\"SUPPORTING\"}],\"confidence\":\"HIGH\"}",
+  "rawLog": "docs/evaluation/luna-comparative-collection/official/CASE-03:DIRECT:r1.opencodelog.jsonl",
+  "repetition": 1,
+  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "returnCode": 0,
+  "runtime": "OpenCode 1.18.31 default agent",
+  "usage": {
+    "cacheRead": 109568,
+    "input": 57259,
+    "output": 2533,
+    "reasoning": 678,
+    "total": 170038
+  }
+}
