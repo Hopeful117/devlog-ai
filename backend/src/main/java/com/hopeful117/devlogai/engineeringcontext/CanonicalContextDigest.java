@@ -9,13 +9,13 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-/** ADR-069 canonical, versioned serialization for the Core context identity. */
-final class CanonicalContextDigest {
+/** ADR-069 canonical JSON and SHA-256 identity helper for Core-owned contracts. */
+public final class CanonicalContextDigest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private CanonicalContextDigest() { }
 
-    static String calculate(Object value) {
+    public static String calculate(Object value) {
         try {
             String json = canonicalJson(value);
             byte[] bytes = MessageDigest.getInstance("SHA-256")
@@ -28,7 +28,7 @@ final class CanonicalContextDigest {
         }
     }
 
-    private static String canonicalJson(Object value) {
+    public static String canonicalJson(Object value) {
         if (value == null) return "null";
         if (value instanceof Map<?, ?> map) {
             return map.entrySet().stream()
