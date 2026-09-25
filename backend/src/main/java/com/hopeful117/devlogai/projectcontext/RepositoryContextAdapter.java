@@ -591,7 +591,9 @@ public class RepositoryContextAdapter {
 
         Map<String, ProjectCommit> commitBySha = new HashMap<>();
         for (ProjectCommit commit : allCommits) {
-            commitBySha.put(commit.getCommitHash().toLowerCase(), commit);
+            if (commit == null || commit.getCommitHash() == null || commit.getParents() == null) return Set.of();
+            String hash = commit.getCommitHash().toLowerCase();
+            if (commitBySha.putIfAbsent(hash, commit) != null) return Set.of();
         }
 
         String baseLower = baseCommitSha.toLowerCase();
@@ -601,9 +603,10 @@ public class RepositoryContextAdapter {
         if (!commitBySha.containsKey(baseLower)) return Set.of();
 
         Set<String> ancestorsOfTarget = findAllAncestors(targetLower, commitBySha);
-        if (!ancestorsOfTarget.contains(baseLower)) return Set.of();
+        if (ancestorsOfTarget == null || !ancestorsOfTarget.contains(baseLower)) return Set.of();
 
         Set<String> ancestorsOfBase = findAllAncestors(baseLower, commitBySha);
+        if (ancestorsOfBase == null) return Set.of();
 
         Set<String> window = new HashSet<>(ancestorsOfTarget);
         window.removeAll(ancestorsOfBase);
@@ -622,10 +625,12 @@ public class RepositoryContextAdapter {
         while (!queue.isEmpty()) {
             String currentSha = queue.poll();
             ProjectCommit current = commitBySha.get(currentSha);
-            if (current == null) continue;
+            if (current == null || current.getParents() == null) return null;
 
             for (CommitParent parent : current.getParents()) {
+                if (parent == null || parent.getParentHash() == null || parent.getParentHash().isBlank()) return null;
                 String parentSha = parent.getParentHash().toLowerCase();
+                if (!commitBySha.containsKey(parentSha)) return null;
                 if (visited.add(parentSha)) {
                     queue.add(parentSha);
                 }
