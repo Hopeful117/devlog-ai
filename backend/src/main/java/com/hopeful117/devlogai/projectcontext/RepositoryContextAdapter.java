@@ -463,12 +463,8 @@ public class RepositoryContextAdapter {
         String baseCommit = story.baseCommit();
         String targetCommit = story.targetCommit();
 
-        if (baseCommit == null && targetCommit == null) {
-            return filterToNonTechnical(context);
-        }
-
         if (baseCommit == null || targetCommit == null) {
-            return filterBaseOnly(context, projectId, baseCommit, targetCommit);
+            return filterToNonTechnical(context);
         }
 
         Set<String> window = findCommitsInWindow(projectId, baseCommit, targetCommit);

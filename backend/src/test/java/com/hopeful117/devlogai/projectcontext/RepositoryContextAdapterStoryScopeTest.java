@@ -29,6 +29,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class RepositoryContextAdapterStoryScopeTest {
@@ -85,13 +86,12 @@ class RepositoryContextAdapterStoryScopeTest {
         var snapshot = snapshotWithStory(storyId, null, SHA_B);
         var context = contextWithEvidence(commitEvidence(SOURCE_ID, SHA_B));
 
-        when(freshnessService.summary(PROJECT_ID)).thenReturn(
-                new com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary(
-                        "v1", PROJECT_ID, List.of(), 0, false));
+
 
         var result = adapter.filterByStoryScope(context, PROJECT_ID, snapshot, storyId);
 
         assertThat(result.evidence()).isEmpty();
+        verifyNoInteractions(commitRepository, freshnessService);
     }
 
     @Test
@@ -100,13 +100,12 @@ class RepositoryContextAdapterStoryScopeTest {
         var snapshot = snapshotWithStory(storyId, SHA_A, null);
         var context = contextWithEvidence(commitEvidence(SOURCE_ID, SHA_B));
 
-        when(freshnessService.summary(PROJECT_ID)).thenReturn(
-                new com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary(
-                        "v1", PROJECT_ID, List.of(), 0, false));
+
 
         var result = adapter.filterByStoryScope(context, PROJECT_ID, snapshot, storyId);
 
         assertThat(result.evidence()).isEmpty();
+        verifyNoInteractions(commitRepository, freshnessService);
     }
 
     @Test
@@ -129,48 +128,15 @@ class RepositoryContextAdapterStoryScopeTest {
     }
 
     @Test
-    void baseOnlyWithSnapshot_filtersToDeterministicWindow() {
+    void baseOnlyWithSnapshot_excludesAllTechnicalEvidenceWithoutFallback() {
         var storyId = UUID.randomUUID();
         var snapshot = snapshotWithStory(storyId, SHA_A, null);
-        var evidenceA = commitEvidence(SOURCE_ID, SHA_A);
-        var evidenceB = commitEvidence(SOURCE_ID, SHA_B);
-        var evidenceC = commitEvidence(SOURCE_ID, SHA_C);
-        var evidenceD = commitEvidence(SOURCE_ID, SHA_D);
-        var context = contextWithEvidence(evidenceA, evidenceB, evidenceC, evidenceD);
-
-        var linearCommits = linearChain(PROJECT_ID, SHA_A, SHA_B, SHA_C, SHA_D);
-        when(commitRepository.findByProjectIdOrderByCommittedAtAscCommitHashAsc(PROJECT_ID))
-                .thenReturn(linearCommits);
-
-        var baseline = new ProjectFreshnessResponse.Baseline(
-                UUID.randomUUID(), Instant.now(), SHA_C);
-        var source = new ProjectFreshnessResponse.Source(
-                UUID.randomUUID(), "repo", "main", null, SHA_C, null);
-        var freshnessRow = new ProjectFreshnessResponse(
-                "v1", UUID.randomUUID(), PROJECT_ID, source,
-                Instant.now(), ProjectFreshnessStatus.CURRENT,
-                ProjectRefreshGuidance.REFRESH_NOT_NEEDED,
-                baseline,
-                new ProjectFreshnessResponse.ReviewCounts(0, 0, 0, 0));
-        when(freshnessService.summary(PROJECT_ID)).thenReturn(
-                new com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary(
-                        "v1", PROJECT_ID, List.of(freshnessRow), 0, false));
+        var context = contextWithEvidence(commitEvidence(SOURCE_ID, SHA_B));
 
         var result = adapter.filterByStoryScope(context, PROJECT_ID, snapshot, storyId);
 
-        assertThat(result.evidence())
-                .as("base A excluded per lower-bound semantics")
-                .noneMatch(e -> e.reference().contains(SHA_A));
-        assertThat(result.evidence())
-                .as("intermediate commit B included")
-                .anyMatch(e -> e.reference().contains(SHA_B));
-        assertThat(result.evidence())
-                .as("snapshot revision C included")
-                .anyMatch(e -> e.reference().contains(SHA_C));
-        assertThat(result.evidence())
-                .as("post-snapshot commit D excluded")
-                .noneMatch(e -> e.reference().contains(SHA_D));
-        assertThat(result.evidence()).hasSize(2);
+        assertThat(result.evidence()).isEmpty();
+        verifyNoInteractions(commitRepository, freshnessService);
     }
 
     @Test

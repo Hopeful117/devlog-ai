@@ -37,7 +37,8 @@ class RepositoryRelationshipProjectorTest {
         assertEquals("file:" + projectId + ":" + sourceId
                         + ":abc123:backend/src/main/App.java",
                 relationship.target().canonicalIdentity());
-        assertTrue(relationship.evidenceReferences().contains("diff:abc123:backend\\src\\main\\App.java"));
+        assertTrue(relationship.evidenceReferences().contains("diff:" + sourceId
+                + ":abc123:backend/src/main/App.java"));
     }
 
     @Test
@@ -47,6 +48,36 @@ class RepositoryRelationshipProjectorTest {
                 .binary(false).insertions(0).deletions(1).build());
 
         assertTrue(projector.project(commit).isEmpty());
+    }
+
+    @Test
+    void rejectsNullParentInStrictWindow() {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        String base = "a".repeat(40);
+        String target = "b".repeat(40);
+        ProjectCommit baseCommit = commit(projectId, sourceId, base);
+        ProjectCommit targetCommit = commit(projectId, sourceId, target);
+        targetCommit.getParents().add(null);
+
+        assertTrue(projector.projectForEntity("STORY", UUID.randomUUID(), projectId, sourceId,
+                base, target, java.util.List.of(baseCommit, targetCommit)).isEmpty());
+    }
+
+    @Test
+    void rejectsMalformedParentInMergeWindow() {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        String base = "a".repeat(40);
+        String target = "b".repeat(40);
+        ProjectCommit baseCommit = commit(projectId, sourceId, base);
+        ProjectCommit targetCommit = commit(projectId, sourceId, target);
+        targetCommit.setMergeCommit(true);
+        targetCommit.addParent(0, base);
+        targetCommit.addParent(1, "not-a-git-object-id");
+
+        assertTrue(projector.projectForEntity("STORY", UUID.randomUUID(), projectId, sourceId,
+                base, target, java.util.List.of(baseCommit, targetCommit)).isEmpty());
     }
 
     private ProjectCommit commit(UUID projectId, UUID sourceId, String hash) {
