@@ -106,7 +106,7 @@ public class CommitDiffEvidenceCollector implements RepositoryContextCollector {
             String sourceId = group.mostRecentCommit.getSource().getId().toString();
             String reference = "diff:" + sourceId + ":"
                     + group.mostRecentCommit.getCommitHash()
-                    + ":" + group.path;
+                    + ":" + normalizePath(group.path);
             String summary = formatSummary(
                     group.dominantChangeType,
                     group.path,
@@ -125,15 +125,19 @@ public class CommitDiffEvidenceCollector implements RepositoryContextCollector {
                     summary,
                     group.mostRecentCommit.getCommittedAt(),
                     group.commitHashes.stream().map(h -> "diff:" + sourceId + ":"
-                            + h + ":" + group.path).toList(),
+                            + h + ":" + normalizePath(group.path)).toList(),
                     sourceId,
-                    group.path,
-                    "commit-diff:" + group.path),
+                    normalizePath(group.path),
+                    "commit-diff:" + normalizePath(group.path)),
                     request.budget().maximumSummaryCharacters()
             ));
         }
 
         return evidence.stream().limit(maxItems).toList();
+    }
+
+    private String normalizePath(String path) {
+        return path == null ? null : path.replace('\\', '/');
     }
 
     private void addFileGroup(Map<FileGroupKey, FileGroup> groups,

@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.evidence.resolution;
 
 public enum EvidenceResolutionFamily {
     GIT_COMMIT,
+    DIFF,
     DOCUMENT,
     FACT,
     DECISION,

@@ -48,7 +48,7 @@ public record EngineeringRelationship(
     }
 
     public sealed interface Endpoint
-            permits KnowledgeEndpoint, RepositoryCommitEndpoint, RepositoryFileEndpoint {
+            permits KnowledgeEndpoint, RepositoryCommitEndpoint, RepositoryFileEndpoint, RepositoryEntityEndpoint {
         String kind();
 
         String canonicalIdentity();
@@ -69,6 +69,12 @@ public record EngineeringRelationship(
         public String canonicalIdentity() {
             return entityType.name() + ":" + entityId;
         }
+    }
+
+    public record RepositoryEntityEndpoint(String entityKind, UUID entityId) implements Endpoint {
+        public RepositoryEntityEndpoint { Objects.requireNonNull(entityKind); Objects.requireNonNull(entityId); }
+        public String kind() { return entityKind; }
+        public String canonicalIdentity() { return entityKind.toLowerCase() + ":" + entityId; }
     }
 
     public record RepositoryCommitEndpoint(UUID projectId, UUID sourceId, String commitHash)

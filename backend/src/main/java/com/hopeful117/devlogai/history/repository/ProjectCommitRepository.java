@@ -14,10 +14,19 @@ import java.util.UUID;
 public interface ProjectCommitRepository extends JpaRepository<ProjectCommit, UUID> {
     boolean existsBySourceIdAndCommitHash(UUID sourceId, String commitHash);
 
-    @EntityGraph(attributePaths = {"source", "changedFiles", "parents"})
+    @EntityGraph(attributePaths = {"source", "parents"})
     Optional<ProjectCommit> findBySourceIdAndCommitHash(UUID sourceId, String commitHash);
 
+    @EntityGraph(attributePaths = {"source", "changedFiles"})
+    Optional<ProjectCommit> findWithChangedFilesBySourceIdAndCommitHash(UUID sourceId, String commitHash);
+
     List<ProjectCommit> findByProjectIdOrderByCommittedAtAscCommitHashAsc(UUID projectId);
+
+    @EntityGraph(attributePaths = {"project", "source", "parents"})
+    List<ProjectCommit> findWithParentsByProjectIdOrderByCommittedAtAscCommitHashAsc(UUID projectId);
+
+    @EntityGraph(attributePaths = {"project", "source", "changedFiles"})
+    List<ProjectCommit> findWithChangedFilesByProjectIdOrderByCommittedAtAscCommitHashAsc(UUID projectId);
 
     @EntityGraph(attributePaths = {"parents", "source"})
     List<ProjectCommit> findByProjectIdOrderByCommittedAtDescCommitHashDesc(

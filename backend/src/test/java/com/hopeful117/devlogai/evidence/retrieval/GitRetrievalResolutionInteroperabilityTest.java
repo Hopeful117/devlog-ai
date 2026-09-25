@@ -178,6 +178,8 @@ class GitRetrievalResolutionInteroperabilityTest {
         for (ProjectCommit commit : commits) {
             when(resolutionCommitRepository.findBySourceIdAndCommitHash(
                     commit.getSource().getId(), commit.getCommitHash())).thenReturn(Optional.of(commit));
+            when(resolutionCommitRepository.findWithChangedFilesBySourceIdAndCommitHash(
+                    commit.getSource().getId(), commit.getCommitHash())).thenReturn(Optional.of(commit));
         }
     }
 

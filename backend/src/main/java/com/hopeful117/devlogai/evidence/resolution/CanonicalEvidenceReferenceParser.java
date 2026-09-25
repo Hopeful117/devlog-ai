@@ -16,6 +16,9 @@ public final class CanonicalEvidenceReferenceParser {
         if (reference.startsWith("git:")) {
             return parseGit(reference);
         }
+        if (reference.startsWith("diff:")) {
+            return parseDiff(reference);
+        }
         if (reference.startsWith("document:")) {
             return parseDocument(reference);
         }
@@ -103,6 +106,18 @@ public final class CanonicalEvidenceReferenceParser {
                 sourceId(parts[1], reference), parts[2], parts[2]);
     }
 
+    private ParsedEvidenceReference parseDiff(String reference) {
+        String[] parts = reference.split(":", 4);
+        if (parts.length != 4 || parts[1].isBlank() || !SHA.matcher(parts[2]).matches()
+                || parts[3].isBlank() || parts[3].startsWith("/")
+                || parts[3].contains("\\") || parts[3].contains("..")) {
+            throw failure(EvidenceResolutionFailureCode.UNKNOWN_REFERENCE, reference,
+                    "Canonical diff reference must be diff:{sourceId}:{sha}:{normalizedPath}");
+        }
+        return new ParsedEvidenceReference(reference, EvidenceResolutionFamily.DIFF,
+                sourceId(parts[1], reference), parts[2], parts[3]);
+    }
+
     private ParsedEvidenceReference parseDocument(String reference) {
         String[] prefixAndBody = reference.split(":", 2);
         String[] sourceAndPath = prefixAndBody.length == 2
@@ -132,8 +147,7 @@ public final class CanonicalEvidenceReferenceParser {
     }
 
     private boolean hasKnownUnsupportedFamily(String reference) {
-        return reference.startsWith("diff:")
-                || reference.startsWith("file:")
+        return reference.startsWith("file:")
                 || reference.startsWith("observation:")
                 || reference.startsWith("insight:");
     }

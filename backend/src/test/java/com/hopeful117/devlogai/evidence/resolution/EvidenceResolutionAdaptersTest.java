@@ -48,6 +48,8 @@ class EvidenceResolutionAdaptersTest {
         when(sourceRepository.findById(SOURCE_ID)).thenReturn(Optional.of(source));
         when(commitRepository.findBySourceIdAndCommitHash(SOURCE_ID, COMMIT))
                 .thenReturn(Optional.of(commit));
+        when(commitRepository.findWithChangedFilesBySourceIdAndCommitHash(SOURCE_ID, COMMIT))
+                .thenReturn(Optional.of(commit));
 
         var result = new EvidenceResolutionFacade(
                 new CanonicalEvidenceReferenceParser(),
