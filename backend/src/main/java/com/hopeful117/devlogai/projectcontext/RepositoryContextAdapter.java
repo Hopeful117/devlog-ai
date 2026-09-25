@@ -67,6 +67,8 @@ public class RepositoryContextAdapter {
             Pattern.compile("^git:[0-9a-fA-F\\-]+:([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$");
     private static final Pattern DIFF_REFERENCE =
             Pattern.compile("^diff:([0-9a-fA-F]{40}|[0-9a-fA-F]{64}):");
+    private static final Pattern GIT_OBJECT_ID =
+            Pattern.compile("^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$");
 
     private final ProjectContextProvider projectContextProvider;
     private final RepositoryContextService repositoryContextService;
@@ -584,10 +586,12 @@ public class RepositoryContextAdapter {
     ) {
         List<ProjectCommit> allCommits =
                 commitRepository.findByProjectIdOrderByCommittedAtAscCommitHashAsc(projectId);
+        if (allCommits == null) return Set.of();
 
         Map<String, ProjectCommit> commitBySha = new HashMap<>();
         for (ProjectCommit commit : allCommits) {
             if (commit == null || commit.getCommitHash() == null || commit.getParents() == null) return Set.of();
+            if (!isValidGitObjectId(commit.getCommitHash())) return Set.of();
             String hash = commit.getCommitHash().toLowerCase();
             if (commitBySha.putIfAbsent(hash, commit) != null) return Set.of();
         }
@@ -625,6 +629,7 @@ public class RepositoryContextAdapter {
 
             for (CommitParent parent : current.getParents()) {
                 if (parent == null || parent.getParentHash() == null || parent.getParentHash().isBlank()) return null;
+                if (!isValidGitObjectId(parent.getParentHash())) return null;
                 String parentSha = parent.getParentHash().toLowerCase();
                 if (!commitBySha.containsKey(parentSha)) return null;
                 if (visited.add(parentSha)) {
@@ -634,6 +639,10 @@ public class RepositoryContextAdapter {
         }
 
         return visited;
+    }
+
+    private boolean isValidGitObjectId(String value) {
+        return value != null && GIT_OBJECT_ID.matcher(value).matches();
     }
 
     private RepositoryContext withFilteredEvidence(

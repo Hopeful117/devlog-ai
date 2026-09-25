@@ -157,6 +157,37 @@ class RepositoryContextAdapterStoryScopeTest {
     }
 
     @Test
+    void malformedNonBlankParent_excludesAllTechnicalEvidence() {
+        var storyId = UUID.randomUUID();
+        var snapshot = snapshotWithStory(storyId, SHA_A, SHA_C);
+        var context = contextWithEvidence(commitEvidence(SOURCE_ID, SHA_C));
+
+        var commitA = commitEntity(PROJECT_ID, SHA_A);
+        var commitB = commitEntity(PROJECT_ID, SHA_B);
+        var commitC = commitEntity(PROJECT_ID, SHA_C);
+        commitC.addParent(0, "not-a-git-object-id");
+        when(commitRepository.findByProjectIdOrderByCommittedAtAscCommitHashAsc(PROJECT_ID))
+                .thenReturn(List.of(commitA, commitB, commitC));
+
+        var result = adapter.filterByStoryScope(context, PROJECT_ID, snapshot, storyId);
+
+        assertThat(result.evidence()).isEmpty();
+    }
+
+    @Test
+    void nullCommitHistory_excludesAllTechnicalEvidence() {
+        var storyId = UUID.randomUUID();
+        var snapshot = snapshotWithStory(storyId, SHA_A, SHA_C);
+        var context = contextWithEvidence(commitEvidence(SOURCE_ID, SHA_C));
+        when(commitRepository.findByProjectIdOrderByCommittedAtAscCommitHashAsc(PROJECT_ID))
+                .thenReturn(null);
+
+        var result = adapter.filterByStoryScope(context, PROJECT_ID, snapshot, storyId);
+
+        assertThat(result.evidence()).isEmpty();
+    }
+
+    @Test
     void evidenceMentioningEndpointButOutsideWindow_excluded() {
         var storyId = UUID.randomUUID();
         var snapshot = snapshotWithStory(storyId, SHA_A, SHA_C);
