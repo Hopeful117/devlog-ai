@@ -598,7 +598,8 @@ class AiTaskResultServiceTest {
                 () -> service.handle(correlationId, request)
         );
         assertTrue(ex.getMessage().contains("analysisResult"));
-        verifyNoInteractions(analyzeStoryContextUseCase);
+        verify(analyzeStoryContextUseCase).validateCoreIssuedIdentities(task, request.promptExecution());
+        verify(analyzeStoryContextUseCase, never()).handleCallback(any(), any());
     }
 
     @Test
@@ -621,7 +622,39 @@ class AiTaskResultServiceTest {
         assertTrue(result.acknowledged());
         assertTrue(result.duplicate());
         assertEquals(AiTaskStatus.COMPLETED, result.taskStatus());
-        verifyNoInteractions(analyzeStoryContextUseCase);
+        verify(analyzeStoryContextUseCase).validateCoreIssuedIdentities(task, request.promptExecution());
+        verify(analyzeStoryContextUseCase, never()).handleCallback(any(), any());
+    }
+
+    @Test
+    void shouldRejectDuplicateStoryContextAnalysisCallbackWithMismatchedCoreIdentity() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.COMPLETED);
+        task.setIntentId("engineering-story-context-analysis");
+        task.setIntentVersion("v1");
+
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.now(), List.of(), null,
+                new PromptExecutionMetadata(
+                        "story-context-prompt-v1", "mock", "model",
+                        "a".repeat(64), "mismatched-context-digest"),
+                null, null);
+        doThrow(new IllegalStateException("Context digest mismatch in callback"))
+                .when(analyzeStoryContextUseCase)
+                .validateCoreIssuedIdentities(task, request.promptExecution());
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> service.handle(correlationId, request));
+
+        assertEquals("Context digest mismatch in callback", error.getMessage());
+        verify(analyzeStoryContextUseCase)
+                .validateCoreIssuedIdentities(task, request.promptExecution());
+        verify(proposalRepository, never()).countByAiTaskId(any());
     }
 
     @Test

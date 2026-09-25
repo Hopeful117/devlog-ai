@@ -99,7 +99,7 @@ class StoryContextAnalysisPromptBuilder:
         required_sections = {
             "project", "analysis", "projectProfile", "selectedFacts",
             "selectedObservations", "diagnostics", "selectedInsights",
-            "selectionMetadata", "selectionDigest", "repositoryContext", "engineeringStories",
+            "selectionMetadata", "repositoryContext", "engineeringStories",
         }
         missing = sorted(required_sections - request.selected_knowledge.keys())
         if missing:
@@ -107,11 +107,21 @@ class StoryContextAnalysisPromptBuilder:
                 f"SelectedKnowledge is missing required sections: {', '.join(missing)}"
             )
 
-        selection_digest = request.selected_knowledge.get("selectionDigest")
-        if not isinstance(selection_digest, str) or len(selection_digest) != 64 or any(
+        selection_digest = request.selection_digest
+        if selection_digest is not None and (len(selection_digest) != 64 or any(
             c not in "0123456789abcdef" for c in selection_digest
+        )):
+            raise PromptConstructionError("Prompt selectionDigest is invalid")
+        context_digest = request.context_digest
+        if not isinstance(context_digest, str) or len(context_digest) != 64 or any(
+            c not in "0123456789abcdef" for c in context_digest
         ):
-            raise PromptConstructionError("SelectedKnowledge selectionDigest is invalid")
+            raise PromptConstructionError("Prompt contextDigest is invalid")
+        projection_digest = request.projection_digest
+        if not isinstance(projection_digest, str) or len(projection_digest) != 64 or any(
+            c not in "0123456789abcdef" for c in projection_digest
+        ):
+            raise PromptConstructionError("Prompt projectionDigest is invalid")
 
         knowledge_json = self._canonical(request.selected_knowledge)
         intent_json = self._canonical(request.intent.model_dump(by_alias=True, mode="json"))
@@ -160,8 +170,6 @@ class StoryContextAnalysisPromptBuilder:
 
         content = f"{SYSTEM_MESSAGE}\n\n{user_message}"
         content_digest = hashlib.sha256(content.encode()).hexdigest()
-        context_digest = selection_digest
-
         return Prompt(
             prompt_id=str(uuid.uuid5(uuid.NAMESPACE_URL, content_digest)),
             prompt_version=request.intent.prompt_template,
@@ -181,6 +189,8 @@ class StoryContextAnalysisPromptBuilder:
                 analysis_context_id=None,
                 profile_id=None,
                 profile_version=None,
+                selection_digest=selection_digest,
+                projection_digest=projection_digest,
             ),
             generation_policy=GenerationPolicy(10, 5000, True),
             content_digest=content_digest,

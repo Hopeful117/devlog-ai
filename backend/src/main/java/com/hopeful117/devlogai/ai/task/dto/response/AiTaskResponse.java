@@ -21,6 +21,7 @@ public record AiTaskResponse(
         String modelIdentifier,
         String promptContentDigest,
         String contextDigest,
+        String projectionDigest,
         Map<String, Object> selectedKnowledgeSnapshot,
         String selectionVersion,
         String selectionDigest,
@@ -41,7 +42,7 @@ public record AiTaskResponse(
                           String failureMessage, Instant createdAt, Instant submittedAt,
                           Instant startedAt, Instant completedAt) {
         this(id, analysisId, correlationId, taskType, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, status,
+                null, null, null, null, null, null, null, null, null, null, status,
                 contextSnapshot, externalJobId, attemptCount, failureCode, failureMessage,
                 createdAt, submittedAt, startedAt, completedAt);
     }

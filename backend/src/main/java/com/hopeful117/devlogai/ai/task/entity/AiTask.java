@@ -88,6 +88,9 @@ public class AiTask {
     @Column(name = "selection_digest", length = 64)
     private String selectionDigest;
 
+    @Column(name = "projection_digest", length = 64)
+    private String projectionDigest;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default

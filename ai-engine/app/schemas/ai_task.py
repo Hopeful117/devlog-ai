@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.ai_task import AiTaskType
 from app.models.intent import InsightType
@@ -65,6 +65,19 @@ class PromptRequest(ContractModel):
     expected_output_contract: dict[str, Any] = Field(alias="expectedOutputContract")
     grounding_contract: dict[str, Any] = Field(default_factory=dict, alias="groundingContract")
     metadata: dict[str, Any]
+    context_digest: str | None = Field(default=None, alias="contextDigest")
+    selection_digest: str | None = Field(default=None, alias="selectionDigest")
+    projection_digest: str | None = Field(default=None, alias="projectionDigest")
+
+    @model_validator(mode="after")
+    def validate_capability_identities(self):
+        if self.task_type == AiTaskType.STORY_CONTEXT_ANALYSIS:
+            if self.projection_digest is None or len(self.projection_digest) != 64 \
+                    or any(c not in "0123456789abcdef" for c in self.projection_digest):
+                raise ValueError(
+                    "projectionDigest is required for STORY_CONTEXT_ANALYSIS"
+                )
+        return self
 
 
 AiTaskSubmissionRequest = PromptRequest
