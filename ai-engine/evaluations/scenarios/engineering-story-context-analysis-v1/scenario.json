@@ -225,6 +225,8 @@
         "docker-compose.yml"
       ]
     },
+    "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "projectionDigest": "ba300430292aa8c60de851af5bdaa2b56a88729393d64a397d9e7d4987f1b8e7",
     "expectedOutputContract": {
       "type": "object",
       "structured": true,

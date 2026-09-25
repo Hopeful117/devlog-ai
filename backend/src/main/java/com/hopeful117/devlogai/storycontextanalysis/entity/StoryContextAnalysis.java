@@ -36,18 +36,18 @@ public class StoryContextAnalysis {
     private AiTask aiTask;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "analysis_snapshot", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "analysis_snapshot", nullable = false, updatable = false, columnDefinition = "jsonb")
     private Map<String, Object> analysisSnapshot;
 
-    @Column(name = "context_digest", length = 64, nullable = false)
+    @Column(name = "context_digest", length = 64, nullable = false, updatable = false)
     private String contextDigest;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "prompt_execution_metadata", columnDefinition = "jsonb")
+    @Column(name = "prompt_execution_metadata", updatable = false, columnDefinition = "jsonb")
     private Map<String, Object> promptExecutionMetadata;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "context_freshness", columnDefinition = "jsonb")
+    @Column(name = "context_freshness", updatable = false, columnDefinition = "jsonb")
     private Map<String, Object> contextFreshness;
 
     @CreatedDate
