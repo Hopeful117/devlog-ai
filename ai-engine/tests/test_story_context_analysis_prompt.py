@@ -1,4 +1,6 @@
-from app.prompts.story_context_analysis import StoryContextAnalysisPromptBuilder
+import pytest
+
+from app.prompts.story_context_analysis import PromptConstructionError, StoryContextAnalysisPromptBuilder
 from evaluations.loader import load_scenario
 
 
@@ -22,6 +24,15 @@ def test_story_context_prompt_uses_only_java_authored_grounding_contract() -> No
     assert (
         'GROUNDING CONTRACT (AUTHORITATIVE)\n{}\n\nSELECTED KNOWLEDGE'
     ) in empty_contract_prompt.user_message
+
+
+def test_story_context_prompt_builder_requires_projection_digest() -> None:
+    request = load_scenario(SCENARIO_ID).prompt_request.model_copy(
+        update={"projection_digest": None}
+    )
+
+    with pytest.raises(PromptConstructionError, match="projectionDigest is invalid"):
+        StoryContextAnalysisPromptBuilder().build(request)
 
 
 def test_story_context_prompt_requires_evidence_ledger_and_safe_retry() -> None:

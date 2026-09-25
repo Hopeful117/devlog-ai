@@ -26,6 +26,7 @@ import com.hopeful117.devlogai.contracts.engineeringcontext.EvidenceRef;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
 import com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier;
 import com.hopeful117.devlogai.engineeringcontext.EngineeringContextFacade;
+import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
 import com.hopeful117.devlogai.fact.entity.FactType;
 import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightType;
@@ -81,6 +82,7 @@ import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -96,6 +98,7 @@ class AnalyzeStoryContextUseCaseTest {
     private static final String PROJECT_SLUG = "devlog-ai";
     private static final String INTENT_ID = "engineering-story-context-analysis";
     private static final String CONTEXT_DIGEST = "a".repeat(64);
+    private static final String PROJECTION_DIGEST = "b".repeat(64);
     private static final String CANONICAL_REFERENCE = "src/main/java/Canonical.java";
     private static final String DOCUMENT_REFERENCE =
             "document:00000000-0000-0000-0000-000000000001:docs/stories/0119/story.md@abc123def";
@@ -254,26 +257,19 @@ class AnalyzeStoryContextUseCaseTest {
     }
 
     @Test
-    void executeProjectsSelectedKnowledgeAndCanonicalGroundingIntoPrompt() {
+    void executeUsesCanonicalFacadeWithoutBroadeningGrounding() {
         UUID projectId = UUID.randomUUID();
         UUID storyId = UUID.randomUUID();
         UUID analysisId = UUID.randomUUID();
         Project project = project(projectId);
         EngineeringStory story = story(storyId, project);
         ProjectProfileResponse profile = profile(projectId, analysisId);
-        AnalysisContext baselineContext = baselineContext(projectId, analysisId, profile);
-        AnalysisContext.FactSnapshot historicalFact = new AnalysisContext.FactSnapshot(
-                UUID.randomUUID(), FactType.DOCUMENTATION_CHANGE,
-                "Historical Story context", CANONICAL_REFERENCE,
-                List.of(CANONICAL_REFERENCE), Instant.parse("2026-09-01T10:00:00Z"));
-        AnalysisContext.ObservationSnapshot historicalObservation =
-                new AnalysisContext.ObservationSnapshot(
-                        UUID.randomUUID(), ObservationType.ARCHITECTURE_DOCUMENTATION_PRESENT,
-                        "Historical architecture context", "historical-rule", "v1",
-                        List.of(historicalFact.id()), Instant.parse("2026-09-01T11:00:00Z"));
-        HistoricalKnowledgeCandidates historicalCandidates = new HistoricalKnowledgeCandidates(
-                List.of(historicalFact), List.of(historicalObservation));
         EngineeringContext engineeringContext = engineeringContext();
+        CanonicalEngineeringContext canonicalContext = new CanonicalEngineeringContext(
+                engineeringContext, null, CONTEXT_DIGEST, "engineering-context-v2", null,
+                Map.of("status", "STALE", "repositoryRevision", "repository-revision"),
+                Map.of("evidenceCount", 1), Map.of(DOCUMENT_REFERENCE, "TECHNICAL_EVIDENCE"),
+                List.of(new EvidenceRef(DOCUMENT_REFERENCE, "document://story-0119")));
         IntentDefinition intent = intent();
         AiTask task = AiTask.builder()
                 .id(UUID.randomUUID())
@@ -285,48 +281,18 @@ class AnalyzeStoryContextUseCaseTest {
         when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
         when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
         when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent);
-        when(engineeringContextFacade.getEngineeringContext(
+        when(engineeringContextFacade.getCanonicalEngineeringContext(
                 PROJECT_SLUG, INTENT_ID, List.of("src/main/java/Canonical.java"), storyId))
-                .thenReturn(engineeringContext);
-        when(projectProfileService.getLatestByProject(projectId)).thenReturn(profile);
+                .thenReturn(canonicalContext);
         when(analysisRepository.save(any(Analysis.class)))
                 .thenAnswer(invocation -> {
                     Analysis saved = invocation.getArgument(0);
                     saved.setId(UUID.randomUUID());
                     return saved;
                 });
-        when(analysisContextService.build(analysisId)).thenReturn(baselineContext);
-        when(historicalKnowledgeCandidateService.retrieve(
-                projectId, analysisId, story,
-                List.of("src/main/java/Canonical.java"), engineeringContext))
-                .thenReturn(historicalCandidates);
-
-        // Mock source repository and workspace manager for revision scope resolution
-        Source source = Source.builder()
-                .id(UUID.randomUUID())
-                .project(project)
-                .name("git")
-                .type(SourceType.GIT_REPOSITORY)
-                .repositoryUrl("https://github.com/test/repo")
-                .active(true)
-                .build();
-        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
-                .thenReturn(List.of(source));
-        when(workspaceManager.resolveCurrentRevision(source))
-                .thenReturn(new ResolvedSourceRevision(source.getId(), null, "abc123def"));
-        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
-                source.getId(),
-                java.nio.file.Path.of("/workspace/test"),
-                "abc123def"
-        );
-        when(workspaceManager.synchronize(eq(source), eq("abc123def")))
-                .thenReturn(workspace);
-
-        when(knowledgeSelectionService.select(any(), eq(intent), eq(null), any()))
-                .thenAnswer(invocation -> selectedKnowledge(invocation.getArgument(0), profile));
         when(aiTaskService.createForStoryContextAnalysisEntity(
                 any(UUID.class), eq(AiTaskType.STORY_CONTEXT_ANALYSIS), eq(INTENT_ID), eq("v1"),
-                eq("story-context-analysis-prompt-v1"), any(), eq(CONTEXT_DIGEST),
+                eq("story-context-analysis-prompt-v1"), any(), any(String.class),
                  any(), eq(null), any(AiReferenceRegistry.class)))
                 .thenReturn(task);
 
@@ -334,27 +300,25 @@ class AnalyzeStoryContextUseCaseTest {
                 PROJECT_SLUG, storyId, List.of("src/main/java/Canonical.java"), null);
 
         assertEquals(task.getId(), result);
-        ArgumentCaptor<AnalysisContext> selectionContext = ArgumentCaptor.forClass(AnalysisContext.class);
-        verify(knowledgeSelectionService).select(selectionContext.capture(), eq(intent), eq(null), any());
-        assertEquals(INTENT_ID, selectionContext.getValue().analysis().intentId());
-        assertTrue(selectionContext.getValue().analysis().id() != null);
-        assertFalse(selectionContext.getValue().analysis().id().equals(analysisId));
-        assertEquals(
-                List.of(baselineContext.facts().get(0).id(), historicalFact.id()),
-                selectionContext.getValue().facts().stream()
-                        .map(AnalysisContext.FactSnapshot::id).toList());
-        assertEquals(
-                List.of(baselineContext.observations().get(0).id(), historicalObservation.id()),
-                selectionContext.getValue().observations().stream()
-                        .map(AnalysisContext.ObservationSnapshot::id).toList());
-        assertEquals(storyId, selectionContext.getValue().engineeringStories().get(0).id());
+        verify(engineeringContextFacade).getCanonicalEngineeringContext(
+                PROJECT_SLUG, INTENT_ID, List.of("src/main/java/Canonical.java"), storyId);
+        verify(engineeringContextFacade, never()).getEngineeringContext(any(), any(), any(), any());
+        verify(knowledgeSelectionService, never()).select(any(), any(), any(), any());
 
         ArgumentCaptor<PromptRequest> promptCaptor = ArgumentCaptor.forClass(PromptRequest.class);
         verify(aiEngineClient).submit(promptCaptor.capture());
         PromptRequest request = promptCaptor.getValue();
-        assertEquals(2, ((List<?>) request.selectedKnowledge().get("selectedFacts")).size());
-        assertEquals(2, ((List<?>) request.selectedKnowledge().get("selectedObservations")).size());
-        assertFalse(((List<?>) request.selectedKnowledge().get("selectedInsights")).isEmpty());
+        assertEquals("engineering-context-v2",
+                ((Map<?, ?>) request.selectedKnowledge().get("canonicalContext")).get("contextVersion"));
+        assertTrue(request.selectedKnowledge().keySet().containsAll(List.of(
+                "project", "analysis", "projectProfile", "selectedFacts",
+                "selectedObservations", "diagnostics", "selectedInsights",
+                "selectionMetadata", "repositoryContext", "engineeringStories")));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> projectedEvidence = request.selectedKnowledge().get("repositoryContext") instanceof Map<?, ?> repository
+                && repository.get("evidence") instanceof List<?> evidence
+                ? (List<Map<String, Object>>) evidence : List.of();
+        assertTrue(projectedEvidence.isEmpty());
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> projectedStories =
                 (List<Map<String, Object>>) request.selectedKnowledge().get("engineeringStories");
@@ -362,33 +326,53 @@ class AnalyzeStoryContextUseCaseTest {
         ArgumentCaptor<UUID> executionAnalysisId = ArgumentCaptor.forClass(UUID.class);
         verify(aiTaskService).createForStoryContextAnalysisEntity(
                 executionAnalysisId.capture(), eq(AiTaskType.STORY_CONTEXT_ANALYSIS), eq(INTENT_ID), eq("v1"),
-                eq("story-context-analysis-prompt-v1"), any(), eq(CONTEXT_DIGEST),
+                eq("story-context-analysis-prompt-v1"), any(), any(String.class),
                 any(), eq(null), any(AiReferenceRegistry.class));
-        assertEquals(selectionContext.getValue().analysis().id(), executionAnalysisId.getValue());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> projectedRepositoryContext =
-                (Map<String, Object>) request.selectedKnowledge().get("repositoryContext");
-        @SuppressWarnings("unchecked")
-        List<String> projectedEvidenceReferences =
-                ((List<Map<String, Object>>) projectedRepositoryContext.get("evidence")).stream()
-                        .map(evidence -> (String) evidence.get("reference"))
-                        .toList();
         @SuppressWarnings("unchecked")
         List<String> allowedEvidenceReferences = (List<String>) request.groundingContract()
                 .get("allowedEvidenceReferences");
         assertEquals(List.of(DOCUMENT_REFERENCE), allowedEvidenceReferences);
-        assertTrue(projectedEvidenceReferences.containsAll(allowedEvidenceReferences));
         assertFalse(allowedEvidenceReferences.contains(CANONICAL_REFERENCE));
         assertFalse(((List<?>) request.groundingContract().get("allowedEvidenceReferences"))
                 .contains(PROVENANCE_IDENTIFIER));
         assertFalse(((List<?>) request.groundingContract().get("allowedEvidenceReferences"))
                 .contains(RELATED_REFERENCE));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> typedGrounding =
+                (List<Map<String, Object>>) request.groundingContract().get("allowedGroundingReferences");
+        assertEquals("REPOSITORY_EVIDENCE", typedGrounding.get(0).get("type"));
+        assertEquals(DOCUMENT_REFERENCE, typedGrounding.get(0).get("ref"));
+        assertEquals(DOCUMENT_REFERENCE, typedGrounding.get(0).get("coreReference"));
+        assertEquals(DOCUMENT_REFERENCE, typedGrounding.get(0).get("taskReference"));
+        assertTrue(((Map<?, ?>) typedGrounding.get(0).get("scope")).containsKey("project"));
+        assertTrue(((Map<?, ?>) typedGrounding.get(0).get("scope")).containsKey("revision"));
+        assertEquals(64, request.contextDigest().length());
+        assertNotNull(request.projectionDigest());
+        assertEquals(request.projectionDigest(), task.getProjectionDigest());
+        assertEquals(null, task.getSelectionDigest());
+        assertEquals(null, task.getSelectionVersion());
+        assertEquals(request.contextDigest(), task.getContextDigest());
+        assertEquals(request.projectionDigest(), task.getContextSnapshot().get("projectionDigest"));
+        assertTrue(task.getContextSnapshot().containsKey("groundingContract"));
 
         @SuppressWarnings("unchecked")
         Map<String, Object> freshness = (Map<String, Object>) task.getContextSnapshot()
                 .get("contextFreshness");
         assertEquals("STALE", freshness.get("status"));
         assertEquals("repository-revision", freshness.get("repositoryRevision"));
+        assertEquals(CONTEXT_DIGEST, task.getContextSnapshot().get("contextDigest"));
+        assertEquals(null, task.getContextSnapshot().get("selectionDigest"));
+        assertEquals(task.getProjectionDigest(), task.getContextSnapshot().get("projectionDigest"));
+        assertEquals("devlog-ai", ((Map<?, ?>) task.getContextSnapshot().get("scope")).get("projectSlug"));
+        assertTrue(task.getContextSnapshot().containsKey("requestEcho"));
+        assertTrue(task.getContextSnapshot().containsKey("revisions"));
+        assertTrue(task.getContextSnapshot().containsKey("policy"));
+        assertTrue(task.getContextSnapshot().containsKey("budgets"));
+        assertTrue(task.getContextSnapshot().containsKey("accounting"));
+        assertTrue(task.getContextSnapshot().containsKey("truncation"));
+        assertTrue(task.getContextSnapshot().containsKey("warnings"));
+        assertTrue(task.getContextSnapshot().containsKey("referenceMapping"));
+        assertTrue(task.getContextSnapshot().containsKey("projection"));
         verify(aiTaskService).submit(eq(task.getId()), any());
     }
 
@@ -694,7 +678,7 @@ class AnalyzeStoryContextUseCaseTest {
     private EngineeringContext engineeringContext() {
         EngineeringEvidence evidence = new EngineeringEvidence(
                 "SOURCE_FILE", "CODE", "Canonical evidence", "REPOSITORY",
-                "src/main/java/Canonical.java", PROVENANCE_IDENTIFIER, CANONICAL_REFERENCE,
+                "src/main/java/Canonical.java", PROVENANCE_IDENTIFIER, DOCUMENT_REFERENCE,
                 100, "Story relevance", Instant.parse("2026-09-08T10:00:00Z"),
                 List.of(RELATED_REFERENCE), Map.of(), null, null,
                 "devlog://evidence/canonical", TrustTier.TECHNICAL_EVIDENCE);
@@ -732,6 +716,13 @@ class AnalyzeStoryContextUseCaseTest {
         Map<String, Object> groundingContract = new LinkedHashMap<>();
         groundingContract.put("allowedEvidenceReferences", List.of(allowedReference));
         groundingContract.put("causalAnswerRequired", causalAnswerRequired);
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("storyId", storyId.toString());
+        snapshot.put("groundingContract", groundingContract);
+        snapshot.put("contextFreshness", freshness);
+        snapshot.put("contextDigest", CONTEXT_DIGEST);
+        snapshot.put("selectionDigest", null);
+        snapshot.put("projectionDigest", PROJECTION_DIGEST);
         return AiTask.builder()
                 .id(UUID.randomUUID())
                 .correlationId(correlationId)
@@ -740,11 +731,8 @@ class AnalyzeStoryContextUseCaseTest {
                 .intentVersion("v1")
                 .status(AiTaskStatus.SUBMITTED)
                 .contextDigest(CONTEXT_DIGEST)
-                .contextSnapshot(Map.of(
-                        "storyId", storyId.toString(),
-                        "groundingContract", groundingContract,
-                        "contextFreshness", freshness
-                ))
+                .projectionDigest(PROJECTION_DIGEST)
+                .contextSnapshot(snapshot)
                 .build();
     }
 
@@ -755,7 +743,7 @@ class AnalyzeStoryContextUseCaseTest {
     ) {
         PromptExecutionMetadata execution = new PromptExecutionMetadata(
                 "story-context-analysis-prompt-v1", "mock", "deterministic-v1",
-                "b".repeat(64), CONTEXT_DIGEST);
+                "c".repeat(64), CONTEXT_DIGEST, null, PROJECTION_DIGEST);
         return new AiTaskResultRequest(
                 correlationId, "job-42", AiTaskResultStatus.COMPLETED, completedAt,
                 List.of(), null, execution, null, result);

@@ -12,7 +12,7 @@ from app.schemas.typed_reference import ProviderAiReference
 
 
 class ResultContractModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
 class AiProposalResult(ResultContractModel):
@@ -53,6 +53,8 @@ class PromptExecutionMetadata(ResultContractModel):
     model_identifier: str = Field(alias="modelIdentifier", min_length=1, max_length=255)
     prompt_content_digest: str = Field(alias="promptContentDigest", pattern=r"^[0-9a-f]{64}$")
     context_digest: str = Field(alias="contextDigest", pattern=r"^[0-9a-f]{64}$")
+    selection_digest: str | None = Field(default=None, alias="selectionDigest", pattern=r"^[0-9a-f]{64}$")
+    projection_digest: str | None = Field(default=None, alias="projectionDigest", pattern=r"^[0-9a-f]{64}$")
 
 
 class AiTaskResultRequest(ResultContractModel):

@@ -21,6 +21,7 @@ import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -112,6 +113,35 @@ class AiTaskServiceTest {
         assertNull(task.getCompletedAt());
         verify(analysisContextService).build(analysisId);
         verify(aiTaskRepository).save(task);
+    }
+
+    @Test
+    void shouldLeaveLegacySelectionIdentityAbsentForStoryContextAnalysis() {
+        UUID analysisId = UUID.randomUUID();
+        Analysis analysis = new Analysis();
+        analysis.setId(analysisId);
+        IntentDefinition intent = new IntentDefinition(
+                "engineering-story-context-analysis", "v1", "Story context",
+                List.of(InsightType.PROJECT_PRESENTATION), List.of(), Map.of(), "prompt");
+        Map<String, Object> intentSnapshot = Map.of("id", intent.id(), "version", intent.version());
+        Map<String, Object> selectedKnowledge = Map.of(
+                "engineeringStories", List.of(Map.of("id", UUID.randomUUID().toString())));
+        AiTask savedTask = new AiTask();
+
+        when(analysisRepository.findById(analysisId)).thenReturn(Optional.of(analysis));
+        when(intentCatalog.resolve(intent.id(), intent.version())).thenReturn(intent);
+        when(objectMapper.convertValue(intent, Map.class)).thenReturn(intentSnapshot);
+        when(aiTaskRepository.save(any(AiTask.class))).thenReturn(savedTask);
+
+        AiTask result = aiTaskService.createForStoryContextAnalysisEntity(
+                analysisId, AiTaskType.STORY_CONTEXT_ANALYSIS, intent.id(), intent.version(),
+                intent.promptTemplate(), selectedKnowledge, "context-digest", Map.of(), Map.of());
+
+        assertSame(savedTask, result);
+        ArgumentCaptor<AiTask> taskCaptor = ArgumentCaptor.forClass(AiTask.class);
+        verify(aiTaskRepository).save(taskCaptor.capture());
+        assertNull(taskCaptor.getValue().getSelectionVersion());
+        assertNull(taskCaptor.getValue().getSelectionDigest());
     }
 
     @Test

@@ -37,6 +37,8 @@ class PromptTraceability:
     analysis_context_id: str | None
     profile_id: str | None
     profile_version: str | None
+    selection_digest: str | None = None
+    projection_digest: str | None = None
 
 
 @dataclass(frozen=True)

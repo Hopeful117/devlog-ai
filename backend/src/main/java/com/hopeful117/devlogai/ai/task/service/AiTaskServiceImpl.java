@@ -112,7 +112,9 @@ public class AiTaskServiceImpl implements AiTaskService {
         task.setContextSnapshot(contextSnapshot);
         task.setSelectedKnowledgeSnapshot(selectedKnowledgeSnapshot);
         task.setSelectionVersion(null);
-        task.setSelectionDigest(contextDigest);
+        task.setSelectionDigest(null);
+        task.setContextDigest(contextDigest);
+        task.setProjectionDigest(selectedKnowledgeSnapshot == null ? null : (String) selectedKnowledgeSnapshot.get("projectionDigest"));
         task.setAttemptCount(0);
         task.setExternalJobId(null);
         task.setFailureCode(null);
@@ -196,10 +198,11 @@ public class AiTaskServiceImpl implements AiTaskService {
         task.setSelectedKnowledgeSnapshot(selectedKnowledgeSnapshot);
         task.setAiReferenceMappingSnapshot(referenceRegistry == null ? null
                 : AiReferenceMappingSnapshot.from(referenceRegistry).asMap());
-        // Use v5 for SCA intent (Story-aware selection)
-        task.setSelectionVersion("engineering-story-context-analysis".equals(intentId)
-                ? "knowledge-selection-v5" : "knowledge-selection-v1");
-        task.setSelectionDigest(contextDigest);
+        // SCA uses the canonical context projection, not legacy semantic selection.
+        task.setSelectionVersion(null);
+        task.setSelectionDigest(null);
+        task.setContextDigest(contextDigest);
+        task.setProjectionDigest(selectedKnowledgeSnapshot == null ? null : (String) selectedKnowledgeSnapshot.get("projectionDigest"));
         task.setAttemptCount(0);
         task.setExternalJobId(null);
         task.setFailureCode(null);

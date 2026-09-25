@@ -131,6 +131,8 @@ class StoryContextAnalysisGenerationService:
                     model_identifier=self._provider.model_identifier,
                     prompt_content_digest=prompt.content_digest,
                     context_digest=prompt.traceability.context_digest,
+                    selection_digest=prompt.traceability.selection_digest,
+                    projection_digest=prompt.traceability.projection_digest,
                 ),
                 synthesis=None,
                 analysis_result=output,
@@ -162,7 +164,19 @@ class StoryContextAnalysisGenerationService:
     ) -> None:
         # Use Java-authored grounding contract (authoritative per Story 0112 D14)
         allowed_refs = set()
-        allowed_list = grounding_contract.get("allowedEvidenceReferences", [])
+        typed_list = grounding_contract.get("allowedGroundingReferences", [])
+        if isinstance(typed_list, list):
+            for entry in typed_list:
+                if not isinstance(entry, dict) or entry.get("type") != "REPOSITORY_EVIDENCE":
+                    raise StoryContextAnalysisGroundingError("Invalid typed repository grounding reference")
+                scope = entry.get("scope")
+                if not isinstance(scope, dict) or not scope.get("project") or not scope.get("revision"):
+                    raise StoryContextAnalysisGroundingError("Repository grounding scope is incomplete")
+                if entry.get("ref") != entry.get("coreReference") or entry.get("ref") != entry.get("taskReference"):
+                    raise StoryContextAnalysisGroundingError("Repository grounding mapping is inconsistent")
+                if isinstance(entry.get("ref"), str):
+                    allowed_refs.add(entry["ref"])
+        allowed_list = grounding_contract.get("allowedEvidenceReferences", []) if not typed_list else []
         if isinstance(allowed_list, list):
             for ref in allowed_list:
                 if isinstance(ref, str):
@@ -393,4 +407,6 @@ class StoryContextAnalysisGenerationService:
             model_identifier=self._provider.model_identifier,
             prompt_content_digest=prompt.content_digest,
             context_digest=prompt.traceability.context_digest,
+            selection_digest=prompt.traceability.selection_digest,
+            projection_digest=prompt.traceability.projection_digest,
         )

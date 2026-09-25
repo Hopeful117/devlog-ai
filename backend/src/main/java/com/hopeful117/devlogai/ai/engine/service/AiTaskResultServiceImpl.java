@@ -214,7 +214,15 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         task.setProvider(metadata.provider());
         task.setModelIdentifier(metadata.modelIdentifier());
         task.setPromptContentDigest(metadata.promptContentDigest());
-        task.setContextDigest(metadata.contextDigest());
+        if (isStoryContextAnalysisIntent(task)) {
+            // SCA identities are issued and persisted by Core before SUBMITTED. Python
+            // may only echo them; it must never establish or replace task identity.
+            analyzeStoryContextUseCase.validateCoreIssuedIdentities(task, metadata);
+        } else {
+            // Explicit legacy compatibility: generic callbacks historically supplied
+            // contextDigest in their execution metadata and may continue to do so.
+            task.setContextDigest(metadata.contextDigest());
+        }
         log.info("Persisting Prompt metadata taskId={} promptVersion={} promptDigest={} provider={} model={}",
                 task.getId(), metadata.promptVersion(), metadata.promptContentDigest(),
                 metadata.provider(), metadata.modelIdentifier());
@@ -527,6 +535,10 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
     }
 
     private AiTaskResultAcknowledgement handleStoryContextAnalysis(AiTask task, AiTaskResultRequest request) {
+        // Core-issued SCA identities remain authoritative even for retries after
+        // terminal completion. Validate the callback before treating it as an
+        // idempotent duplicate so a mismatched callback cannot be acknowledged.
+        analyzeStoryContextUseCase.validateCoreIssuedIdentities(task, request.promptExecution());
         if (task.getStatus().isTerminal()) {
             log.info("Duplicate callback for completed story context analysis task correlationId={}", task.getCorrelationId());
             return acknowledgement(task, true);
@@ -548,9 +560,6 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         }
 
         if (request.status() == AiTaskResultStatus.FAILED) {
-            if (request.promptExecution() != null) {
-                applyPromptExecution(task, request.promptExecution());
-            }
             failTask(task, request);
             aiTaskRepository.save(task);
             finishAnalysis(task, AnalysisStatus.FAILED, request.completedAt());
