@@ -35,12 +35,14 @@ public class RepositoryRelationshipProjector {
             String baseCommit, String targetCommit, List<ProjectCommit> commits) {
         if (entityKind == null || entityKind.isBlank() || entityId == null || projectId == null || sourceId == null
                 || baseCommit == null || targetCommit == null || baseCommit.isBlank() || targetCommit.isBlank()
+                || !validGitObjectId(baseCommit) || !validGitObjectId(targetCommit)
                 || baseCommit.equalsIgnoreCase(targetCommit) || commits == null) return List.of();
         Map<String, ProjectCommit> byHash = new HashMap<>();
         for (ProjectCommit c : commits) {
             if (c == null || c.getCommitHash() == null || c.getProject() == null || c.getSource() == null
-                    || c.getParents() == null || !projectId.equals(c.getProject().getId())
-                    || !sourceId.equals(c.getSource().getId())) continue;
+                    || c.getParents() == null) continue;
+            if (!projectId.equals(c.getProject().getId()) || !sourceId.equals(c.getSource().getId())) continue;
+            if (!validGitObjectId(c.getCommitHash())) return List.of();
             String hash = c.getCommitHash().toLowerCase(Locale.ROOT);
             if (byHash.putIfAbsent(hash, c) != null) return List.of();
         }
@@ -77,7 +79,7 @@ public class RepositoryRelationshipProjector {
     }
 
     private boolean validGitObjectId(String hash) {
-        return hash != null && GIT_OBJECT_ID.matcher(hash.trim()).matches();
+        return hash != null && GIT_OBJECT_ID.matcher(hash).matches();
     }
 
     private List<EngineeringRelationship> projectFile(ProjectCommit commit, ChangedFile file) {

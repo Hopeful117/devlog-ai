@@ -80,6 +80,38 @@ class RepositoryRelationshipProjectorTest {
                 base, target, java.util.List.of(baseCommit, targetCommit)).isEmpty());
     }
 
+    @Test
+    void rejectsMalformedProjectionBounds() {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        String base = "a".repeat(40);
+        String target = "b".repeat(40);
+        ProjectCommit baseCommit = commit(projectId, sourceId, base);
+        ProjectCommit targetCommit = commit(projectId, sourceId, target);
+        targetCommit.addParent(0, base);
+        var commits = java.util.List.of(baseCommit, targetCommit);
+
+        assertTrue(projector.projectForEntity("STORY", UUID.randomUUID(), projectId, sourceId,
+                "malformed", target, commits).isEmpty());
+        assertTrue(projector.projectForEntity("STORY", UUID.randomUUID(), projectId, sourceId,
+                base, "malformed", commits).isEmpty());
+    }
+
+    @Test
+    void rejectsMalformedPersistedCommitHash() {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        String base = "a".repeat(40);
+        String target = "b".repeat(40);
+        ProjectCommit baseCommit = commit(projectId, sourceId, base);
+        ProjectCommit targetCommit = commit(projectId, sourceId, target);
+        targetCommit.addParent(0, base);
+        ProjectCommit malformedCommit = commit(projectId, sourceId, "not-a-git-object-id");
+
+        assertTrue(projector.projectForEntity("STORY", UUID.randomUUID(), projectId, sourceId,
+                base, target, java.util.List.of(baseCommit, targetCommit, malformedCommit)).isEmpty());
+    }
+
     private ProjectCommit commit(UUID projectId, UUID sourceId, String hash) {
         Project project = Project.builder().id(projectId).name("Project").slug("project")
                 .status(ProjectStatus.ACTIVE).build();
