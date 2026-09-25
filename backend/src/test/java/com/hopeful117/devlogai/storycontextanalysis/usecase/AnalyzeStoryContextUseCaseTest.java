@@ -11,9 +11,6 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.reference.AiReferenceRegistry;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
-import com.hopeful117.devlogai.analysis.context.AnalysisContext;
-import com.hopeful117.devlogai.analysis.context.AnalysisContextService;
-import com.hopeful117.devlogai.analysis.diagnostics.repository.AnalysisExecutionDiagnosticRepository;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
@@ -27,42 +24,16 @@ import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysis
 import com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier;
 import com.hopeful117.devlogai.engineeringcontext.EngineeringContextFacade;
 import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
-import com.hopeful117.devlogai.fact.entity.FactType;
-import com.hopeful117.devlogai.insight.entity.InsightSeverity;
-import com.hopeful117.devlogai.insight.entity.InsightType;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
-import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
-import com.hopeful117.devlogai.knowledge.selection.SemanticSectionComposer;
-import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
-import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
-import com.hopeful117.devlogai.observation.entity.ObservationType;
-import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
-import com.hopeful117.devlogai.profile.service.ProjectProfileService;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
-import com.hopeful117.devlogai.repositorycontext.ContextProfile;
-import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
-import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
-import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
-import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
-import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
-import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.entity.StoryStatus;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import com.hopeful117.devlogai.storycontextanalysis.entity.StoryContextAnalysis;
-import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService;
-import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService.HistoricalKnowledgeCandidates;
 import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
-import com.hopeful117.devlogai.source.repository.SourceRepository;
-import com.hopeful117.devlogai.source.exception.SourceSelectionException;
-import com.hopeful117.devlogai.source.entity.Source;
-import com.hopeful117.devlogai.source.entity.SourceType;
-import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
-import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
-import com.hopeful117.devlogai.collection.workspace.ResolvedSourceRevision;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -77,7 +48,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -85,6 +55,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -113,23 +84,13 @@ class AnalyzeStoryContextUseCaseTest {
     @Mock private AIEngineClient aiEngineClient;
     @Mock private AiTaskRepository aiTaskRepository;
     @Mock private StoryContextAnalysisRepository storyContextAnalysisRepository;
-    @Mock private KnowledgeSelectionService knowledgeSelectionService;
-    private SelectedKnowledgePromptProjectionService promptProjectionService;
-    @Mock private ProjectProfileService projectProfileService;
-    @Mock private AnalysisContextService analysisContextService;
     @Mock private AnalysisRepository analysisRepository;
-    @Mock private AnalysisExecutionDiagnosticRepository diagnosticRepository;
-    @Mock private HistoricalKnowledgeCandidateService historicalKnowledgeCandidateService;
-    @Mock private SourceRepository sourceRepository;
-    @Mock private WorkspaceManager workspaceManager;
 
     private AnalyzeStoryContextUseCase useCase;
 
     @BeforeEach
     void setUp() {
         ObjectMapper objectMapper = new ObjectMapper();
-        promptProjectionService = new SelectedKnowledgePromptProjectionService(
-                objectMapper, new SemanticSectionComposer());
         useCase = new AnalyzeStoryContextUseCase(
                 projectRepository,
                 storyRepository,
@@ -140,130 +101,17 @@ class AnalyzeStoryContextUseCaseTest {
                 aiTaskRepository,
                 storyContextAnalysisRepository,
                 objectMapper,
-                knowledgeSelectionService,
-                promptProjectionService,
-                projectProfileService,
-                analysisContextService,
-                analysisRepository,
-                diagnosticRepository,
-                historicalKnowledgeCandidateService,
-                sourceRepository,
-                workspaceManager
+                analysisRepository
         );
     }
 
     @Test
-    void revisionScopeUsesTheOnlyActiveSource() {
-        UUID projectId = UUID.randomUUID();
-        Project project = project(projectId);
-        EngineeringStory story = story(UUID.randomUUID(), project);
-        Source source = source(project, UUID.randomUUID());
-        SynchronizedWorkspace workspace = new SynchronizedWorkspace(
-                source.getId(), java.nio.file.Path.of("/workspace/test"), "abc123def");
-
-        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
-                .thenReturn(List.of(source));
-        when(workspaceManager.resolveCurrentRevision(source))
-                .thenReturn(new ResolvedSourceRevision(source.getId(), null, "abc123def"));
-        when(workspaceManager.synchronize(source, "abc123def")).thenReturn(workspace);
-
-        var resolved = invokeResolveRevisionScope(project, story, null);
-
-        assertEquals(source.getId(), resolved.sourceId());
-        assertEquals("abc123def", resolved.resolvedRevision());
-    }
-
-    @Test
-    void revisionScopeFailsWhenNoActiveSourceExists() {
-        UUID projectId = UUID.randomUUID();
-        Project project = project(projectId);
-        EngineeringStory story = story(UUID.randomUUID(), project);
-        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
-                .thenReturn(List.of());
-
-        SourceSelectionException failure = org.junit.jupiter.api.Assertions.assertThrows(
-                SourceSelectionException.class,
-                () -> invokeResolveRevisionScope(project, story, null));
-
-        assertEquals(SourceSelectionException.Reason.SOURCE_UNAVAILABLE, failure.reason());
-        verify(workspaceManager, never()).resolveCurrentRevision(any());
-    }
-
-    @Test
-    void revisionScopeRejectsMultipleSourcesRegardlessOfReturnedOrder() {
-        UUID projectId = UUID.randomUUID();
-        Project project = project(projectId);
-        EngineeringStory story = story(UUID.randomUUID(), project);
-        Source first = source(project, UUID.randomUUID());
-        Source second = source(project, UUID.randomUUID());
-
-        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
-                .thenReturn(List.of(first, second));
-
-        SourceSelectionException failure = org.junit.jupiter.api.Assertions.assertThrows(
-                SourceSelectionException.class,
-                () -> invokeResolveRevisionScope(project, story, null));
-
-        assertEquals(SourceSelectionException.Reason.AMBIGUOUS_SOURCE, failure.reason());
-        verify(workspaceManager, never()).resolveCurrentRevision(any());
-        verify(workspaceManager, never()).synchronize(any(), any());
-    }
-
-    @Test
-    void revisionScopeRemainsAmbiguousWhenSourceOrderChanges() {
-        UUID projectId = UUID.randomUUID();
-        Project project = project(projectId);
-        EngineeringStory story = story(UUID.randomUUID(), project);
-        Source first = source(project, UUID.randomUUID());
-        Source second = source(project, UUID.randomUUID());
-
-        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
-                .thenReturn(List.of(second, first));
-
-        SourceSelectionException failure = org.junit.jupiter.api.Assertions.assertThrows(
-                SourceSelectionException.class,
-                () -> invokeResolveRevisionScope(project, story, null));
-
-        assertEquals(SourceSelectionException.Reason.AMBIGUOUS_SOURCE, failure.reason());
-    }
-
-    private RepositoryRevisionScope invokeResolveRevisionScope(
-            Project project, EngineeringStory story, UUID baselineAnalysisId) {
-        try {
-            Method method = AnalyzeStoryContextUseCase.class.getDeclaredMethod(
-                    "resolveRevisionScope", Project.class, EngineeringStory.class, UUID.class);
-            method.setAccessible(true);
-            return (RepositoryRevisionScope) method.invoke(
-                    useCase, project, story, baselineAnalysisId);
-        } catch (InvocationTargetException exception) {
-            if (exception.getCause() instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            throw new AssertionError(exception.getCause());
-        } catch (ReflectiveOperationException exception) {
-            throw new AssertionError(exception);
-        }
-    }
-
-    private Source source(Project project, UUID id) {
-        return Source.builder()
-                .id(id)
-                .project(project)
-                .name("git-" + id)
-                .type(SourceType.GIT_REPOSITORY)
-                .repositoryUrl("https://github.com/test/" + id)
-                .active(true)
-                .build();
-    }
-
-    @Test
-    void executeUsesCanonicalFacadeWithoutBroadeningGrounding() {
+    void executeUsesCanonicalFacadeWithoutBroadeningGrounding() throws Exception {
         UUID projectId = UUID.randomUUID();
         UUID storyId = UUID.randomUUID();
         UUID analysisId = UUID.randomUUID();
         Project project = project(projectId);
         EngineeringStory story = story(storyId, project);
-        ProjectProfileResponse profile = profile(projectId, analysisId);
         EngineeringContext engineeringContext = engineeringContext();
         CanonicalEngineeringContext canonicalContext = new CanonicalEngineeringContext(
                 engineeringContext, null, CONTEXT_DIGEST, "engineering-context-v2", null,
@@ -303,8 +151,6 @@ class AnalyzeStoryContextUseCaseTest {
         verify(engineeringContextFacade).getCanonicalEngineeringContext(
                 PROJECT_SLUG, INTENT_ID, List.of("src/main/java/Canonical.java"), storyId);
         verify(engineeringContextFacade, never()).getEngineeringContext(any(), any(), any(), any());
-        verify(knowledgeSelectionService, never()).select(any(), any(), any(), any());
-
         ArgumentCaptor<PromptRequest> promptCaptor = ArgumentCaptor.forClass(PromptRequest.class);
         verify(aiEngineClient).submit(promptCaptor.capture());
         PromptRequest request = promptCaptor.getValue();
@@ -348,6 +194,23 @@ class AnalyzeStoryContextUseCaseTest {
         assertTrue(((Map<?, ?>) typedGrounding.get(0).get("scope")).containsKey("revision"));
         assertEquals(64, request.contextDigest().length());
         assertNotNull(request.projectionDigest());
+        assertEquals(request.projectionDigest(), request.metadata().get("projectionDigest"));
+        assertEquals(StoryContextAgentProjection.PROJECTION_VERSION,
+                request.metadata().get("contractVersion"));
+        assertEquals(StoryContextAgentProjection.PROJECTION_VERSION,
+                request.metadata().get("projectionVersion"));
+        assertEquals(StoryContextAgentProjection.PROJECTION_VERSION,
+                task.getContextSnapshot().get("projectionVersion"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> persistedProjection =
+                (Map<String, Object>) task.getContextSnapshot().get("projection");
+        assertEquals(StoryContextAgentProjection.PROJECTION_VERSION, persistedProjection.get("version"));
+        assertEquals(request.selectedKnowledge(), persistedProjection.get("selectedKnowledge"));
+        assertEquals(request.groundingContract(), persistedProjection.get("groundingContract"));
+        assertEquals(request.groundingContract(), task.getContextSnapshot().get("groundingContract"));
+        assertEquals(request.projectionDigest(),
+                projectionDigest((Map<String, Object>) persistedProjection.get("selectedKnowledge"),
+                        (Map<String, Object>) persistedProjection.get("groundingContract")));
         assertEquals(request.projectionDigest(), task.getProjectionDigest());
         assertEquals(null, task.getSelectionDigest());
         assertEquals(null, task.getSelectionVersion());
@@ -373,7 +236,103 @@ class AnalyzeStoryContextUseCaseTest {
         assertTrue(task.getContextSnapshot().containsKey("warnings"));
         assertTrue(task.getContextSnapshot().containsKey("referenceMapping"));
         assertTrue(task.getContextSnapshot().containsKey("projection"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> policy = (Map<String, Object>) task.getContextSnapshot().get("policy");
+        assertEquals(StoryContextAgentProjection.PROJECTION_VERSION, policy.get("contractVersion"));
+        assertEquals(request.projectionDigest(), policy.get("projectionDigest"));
         verify(aiTaskService).submit(eq(task.getId()), any());
+    }
+
+    @Test
+    void projectionDigestChangesForGroundingAndSelectedKnowledgeAndIgnoresMapOrder() throws Exception {
+        Map<String, Object> selected = new LinkedHashMap<>();
+        Map<String, Object> selectedKnowledge = new LinkedHashMap<>();
+        selectedKnowledge.put("answer", "one");
+        selectedKnowledge.put("context", "stable");
+        selected.put("selectedKnowledge", selectedKnowledge);
+        Map<String, Object> grounding = new LinkedHashMap<>();
+        grounding.put("allowedEvidenceReferences", List.of(DOCUMENT_REFERENCE));
+
+        String baseline = projectionDigest(selected, grounding);
+        Map<String, Object> changedGrounding = new LinkedHashMap<>(grounding);
+        changedGrounding.put("causalAnswerRequired", true);
+        assertNotEquals(baseline, projectionDigest(selected, changedGrounding));
+
+        Map<String, Object> changedSelected = new LinkedHashMap<>(selected);
+        changedSelected.put("selectedKnowledge", new LinkedHashMap<>(Map.of("answer", "two")));
+        assertNotEquals(baseline, projectionDigest(changedSelected, grounding));
+
+        Map<String, Object> reorderedSelected = new LinkedHashMap<>();
+        Map<String, Object> reorderedKnowledge = new LinkedHashMap<>();
+        reorderedKnowledge.put("context", "stable");
+        reorderedKnowledge.put("answer", "one");
+        reorderedSelected.put("selectedKnowledge", reorderedKnowledge);
+        Map<String, Object> reorderedGrounding = new LinkedHashMap<>();
+        reorderedGrounding.put("allowedEvidenceReferences", List.of(DOCUMENT_REFERENCE));
+        assertEquals(baseline, projectionDigest(reorderedSelected, reorderedGrounding));
+    }
+
+    private String projectionDigest(Map<String, Object> selected, Map<String, Object> grounding)
+            throws Exception {
+        Method method = AnalyzeStoryContextUseCase.class.getDeclaredMethod(
+                "digestProjection", Map.class, Map.class);
+        method.setAccessible(true);
+        return (String) method.invoke(useCase, selected, grounding);
+    }
+
+    @Test
+    void executeFailsClosedWhenCanonicalContextIsUnavailable() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        IntentDefinition intent = intent();
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent);
+        when(analysisRepository.save(any(Analysis.class))).thenAnswer(invocation -> {
+            Analysis saved = invocation.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            return saved;
+        });
+        when(engineeringContextFacade.getCanonicalEngineeringContext(
+                PROJECT_SLUG, INTENT_ID, List.of(), storyId)).thenReturn(null);
+
+        assertThrows(IllegalStateException.class,
+                () -> useCase.execute(PROJECT_SLUG, storyId, List.of(), null));
+        verify(engineeringContextFacade, never()).getEngineeringContext(any(), any(), any(), any());
+        verify(aiTaskService, never()).createForStoryContextAnalysisEntity(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void executeFailsClosedWhenCanonicalFacadeReturnsNoContext() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(analysisRepository.save(any(Analysis.class))).thenAnswer(invocation -> {
+            Analysis saved = invocation.getArgument(0);
+            saved.setId(UUID.randomUUID());
+            return saved;
+        });
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class,
+                () -> useCase.execute(PROJECT_SLUG, storyId, List.of(), null));
+
+        assertEquals("Canonical EngineeringContext is required for Story Context Analysis", error.getMessage());
+
+        verify(engineeringContextFacade).getCanonicalEngineeringContext(
+                PROJECT_SLUG, INTENT_ID, List.of(), storyId);
+        verify(engineeringContextFacade, never()).getEngineeringContext(any(), any(), any(), any());
+        verify(aiTaskService, never()).createForStoryContextAnalysisEntity(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -566,35 +525,6 @@ class AnalyzeStoryContextUseCaseTest {
                 .build();
     }
 
-    private ProjectProfileResponse profile(UUID projectId, UUID analysisId) {
-        return new ProjectProfileResponse(
-                UUID.randomUUID(), projectId, analysisId, "v1", "v1", Instant.now(),
-                null, Map.of(), null, List.of(), "profile", List.of(), 1);
-    }
-
-    private AnalysisContext baselineContext(
-            UUID projectId, UUID analysisId, ProjectProfileResponse profile) {
-        Instant now = Instant.parse("2026-09-08T10:00:00Z");
-        AnalysisContext.FactSnapshot fact = new AnalysisContext.FactSnapshot(
-                UUID.randomUUID(), FactType.DOCKER_SERVICE_DEPENDS_ON, "backend -> ai-engine",
-                "docker-compose.yml", List.of(CANONICAL_REFERENCE), now);
-        AnalysisContext.ObservationSnapshot observation = new AnalysisContext.ObservationSnapshot(
-                UUID.randomUUID(), ObservationType.HTTP_SERVICE_COMMUNICATION,
-                "Backend communicates with the AI Engine", "rule", "v1",
-                List.of(fact.id()), now);
-        return new AnalysisContext(
-                new AnalysisContext.ProjectSnapshot(
-                        projectId, "DevLog AI", PROJECT_SLUG, null, ProjectStatus.ACTIVE),
-                new AnalysisContext.AnalysisSnapshot(
-                        analysisId, AnalysisType.ARCHITECTURE_REVIEW, "project-profile", "v1",
-                        AnalysisStatus.COMPLETED, now, now, now),
-                profile,
-                List.of(fact),
-                List.of(observation),
-                List.of(), List.of(), List.of(), List.of(), List.of(), List.of()
-        );
-    }
-
     @Test
     void causalClaimRejectsAffirmativeClassificationWithNonCausalContext() {
         assertThrows(
@@ -626,53 +556,6 @@ class AnalyzeStoryContextUseCaseTest {
 
         assertTrue(error.getMessage().contains("causalClaims must not be empty"));
         verify(storyContextAnalysisRepository, never()).save(any());
-    }
-
-    private SelectedKnowledge selectedKnowledge(
-            AnalysisContext context, ProjectProfileResponse profile) {
-        SelectedKnowledge.InsightSnapshot insight = new SelectedKnowledge.InsightSnapshot(
-                UUID.randomUUID(), context.analysis().id(), InsightType.ARCHITECTURAL,
-                InsightSeverity.INFO, "Core authority", "Java owns grounding authority");
-        return new SelectedKnowledge(
-                context.project(), context.analysis(), profile,
-                context.observations(), context.facts(),
-                new SelectedKnowledge.DiagnosticSnapshot(true, false, 0, 0),
-                List.of(insight), repositoryContext(),
-                new SelectedKnowledge.SelectionMetadata(
-                        "knowledge-selection-v5",
-                        List.of("ENGINEERING_STORY_RELEVANCE"),
-                        3, 0,
-                        new SelectedKnowledge.KnowledgeBudget(40, 25, 10, 5, 60),
-                        "COMPLETE"),
-                CONTEXT_DIGEST
-        );
-    }
-
-    private RepositoryContext repositoryContext() {
-        RepositoryEvidence evidence = new RepositoryEvidence(
-                RepositoryContextLayer.PROJECT_DOCUMENTATION,
-                "STORY_DOCUMENT",
-                DOCUMENT_REFERENCE,
-                "Story 0119",
-                Instant.parse("2026-09-08T10:00:00Z"),
-                EvidenceScore.unscored(),
-                List.of(),
-                new RepositoryEvidence.EvidenceProvenance(
-                        "REPOSITORY_DOCUMENT", "source-id",
-                        "docs/stories/0119/story.md", DOCUMENT_REFERENCE),
-                Map.of("resolvedRevision", "abc123def"),
-                10,
-                List.of(),
-                new RepositoryEvidenceContent(
-                        RepositoryEvidenceContent.Status.COMPLETE,
-                        "# Story 0119", null, "document-body-budget-v1", "v1",
-                        "abc123def"));
-        return new RepositoryContext(
-                "repository-context-engine-v1", ContextProfile.PROJECT_STATE, List.of(),
-                "context-plan-v1", List.of(), List.of(evidence),
-                Map.of(RepositoryContextLayer.PROJECT_DOCUMENTATION, 1),
-                new RepositoryContext.ContextBudget(60, 500, 20, 6000),
-                10, 1, 0, false, List.of(), List.of(), "repository-digest");
     }
 
     private EngineeringContext engineeringContext() {

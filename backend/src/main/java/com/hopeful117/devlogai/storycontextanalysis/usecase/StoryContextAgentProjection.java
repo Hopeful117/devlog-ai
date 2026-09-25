@@ -11,7 +11,7 @@ import java.util.Map;
 
 /** Core-owned compatibility projection; it performs no retrieval or selection. */
 public final class StoryContextAgentProjection {
-    private static final String VERSION = "story-context-projection-v1";
+    public static final String PROJECTION_VERSION = "sca-prompt-projection-v2";
 
     private StoryContextAgentProjection() {
     }
@@ -54,7 +54,7 @@ public final class StoryContextAgentProjection {
 
     private static Map<String, Object> selectionMetadata(CanonicalEngineeringContext canonical) {
         Map<String, Object> metadata = new LinkedHashMap<>();
-        metadata.put("projectionVersion", VERSION);
+        metadata.put("projectionVersion", PROJECTION_VERSION);
         metadata.put("contextVersion", canonical.contextVersion());
         metadata.put("contextDigest", canonical.contextDigest());
         metadata.put("freshness", canonical.freshness());

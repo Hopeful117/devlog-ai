@@ -8,15 +8,10 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
-import com.hopeful117.devlogai.analysis.context.AnalysisContext;
-import com.hopeful117.devlogai.analysis.context.AnalysisContextService;
-import com.hopeful117.devlogai.analysis.diagnostics.entity.AnalysisExecutionDiagnostic;
-import com.hopeful117.devlogai.analysis.diagnostics.repository.AnalysisExecutionDiagnosticRepository;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
-import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EvidenceRef;
 import com.hopeful117.devlogai.engineeringcontext.EngineeringContextFacade;
@@ -24,27 +19,14 @@ import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
-import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
-import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
-import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
-import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
-import com.hopeful117.devlogai.profile.service.ProjectProfileService;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import com.hopeful117.devlogai.storycontextanalysis.entity.StoryContextAnalysis;
-import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService;
-import com.hopeful117.devlogai.storycontextanalysis.history.HistoricalKnowledgeCandidateService.HistoricalKnowledgeCandidates;
 import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
-import com.hopeful117.devlogai.source.entity.Source;
-import com.hopeful117.devlogai.source.exception.SourceSelectionException;
-import com.hopeful117.devlogai.source.repository.SourceRepository;
-import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
-import com.hopeful117.devlogai.collection.workspace.ResolvedSourceRevision;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
-import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -72,15 +54,7 @@ public class AnalyzeStoryContextUseCase {
     private final AiTaskRepository aiTaskRepository;
     private final StoryContextAnalysisRepository storyContextAnalysisRepository;
     private final ObjectMapper objectMapper;
-    private final KnowledgeSelectionService knowledgeSelectionService;
-    private final SelectedKnowledgePromptProjectionService promptProjectionService;
-    private final ProjectProfileService projectProfileService;
-    private final AnalysisContextService analysisContextService;
     private final AnalysisRepository analysisRepository;
-    private final AnalysisExecutionDiagnosticRepository diagnosticRepository;
-    private final HistoricalKnowledgeCandidateService historicalKnowledgeCandidateService;
-    private final SourceRepository sourceRepository;
-    private final WorkspaceManager workspaceManager;
     private static final TaskSnapshotEvidenceResolver evidenceResolver = new TaskSnapshotEvidenceResolver();
 
     public UUID execute(
@@ -114,14 +88,8 @@ public class AnalyzeStoryContextUseCase {
                 files != null ? files : List.of(),
                 storyId
         );
-        // Compatibility with older facade test doubles/implementations during the additive migration.
         if (canonicalContext == null) {
-            EngineeringContext legacy = engineeringContextFacade.getEngineeringContext(
-                    projectSlug, INTENT_ID, files != null ? files : List.of(), storyId);
-            canonicalContext = new CanonicalEngineeringContext(legacy,
-                    legacy.metadata().contextDigest(), "engineering-context-v1", storyId,
-                    legacy.evidence().stream().map(e -> e.reference())
-                            .filter(Objects::nonNull).toList());
+            throw new IllegalStateException("Canonical EngineeringContext is required for Story Context Analysis");
         }
 
         UserGuidance userGuidance = mapGuidance(guidance);
@@ -150,7 +118,7 @@ public class AnalyzeStoryContextUseCase {
                 guidance,
                 new com.hopeful117.devlogai.ai.reference.AiReferenceRegistry(List.of())
         );
-        String projectionDigest = digestProjection(selectedKnowledgeSnapshot);
+        String projectionDigest = digestProjection(selectedKnowledgeSnapshot, groundingContract);
         aiTask.setContextDigest(contextDigest);
         aiTask.setSelectionDigest(null);
         aiTask.setProjectionDigest(projectionDigest);
@@ -172,7 +140,8 @@ public class AnalyzeStoryContextUseCase {
         promptMetadata.put("contextDigest", contextDigest);
         if (aiTask.getSelectionDigest() != null) promptMetadata.put("selectionDigest", aiTask.getSelectionDigest());
         promptMetadata.put("projectionDigest", projectionDigest);
-        promptMetadata.put("contractVersion", "story-context-projection-v1");
+        promptMetadata.put("contractVersion", StoryContextAgentProjection.PROJECTION_VERSION);
+        promptMetadata.put("projectionVersion", StoryContextAgentProjection.PROJECTION_VERSION);
         PromptRequest promptRequest = new PromptRequest(
                 UUID.randomUUID(),
                 aiTask.getCorrelationId(),
@@ -202,14 +171,15 @@ public class AnalyzeStoryContextUseCase {
         snapshot.put("projectionDigest", projectionDigest);
         snapshot.put("selectionDigest", null); // SCA has no compatibility selection
         snapshot.put("contextVersion", canonical.contextVersion());
-        snapshot.put("projectionVersion", "story-context-projection-v1");
+        snapshot.put("projectionVersion", StoryContextAgentProjection.PROJECTION_VERSION);
         snapshot.put("scope", Map.of("projectSlug", projectSlug, "storyId", storyId.toString(),
                 "files", files == null ? List.of() : List.copyOf(files)));
         snapshot.put("requestEcho", valueMap(canonical.requestEcho()));
         snapshot.put("freshness", canonical.freshness());
         snapshot.put("contextFreshness", canonical.freshness()); // legacy compatibility alias
         snapshot.put("revisions", revisions(canonical));
-        snapshot.put("policy", Map.of("contractVersion", "story-context-projection-v1",
+        snapshot.put("policy", Map.of("contractVersion", StoryContextAgentProjection.PROJECTION_VERSION,
+                "projectionDigest", projectionDigest,
                 "selection", "CORE_CANONICAL_ONLY", "retrieval", "NONE",
                 "allowListVersion", "typed-grounding-v1"));
         snapshot.put("budgets", budgets(canonical));
@@ -223,7 +193,7 @@ public class AnalyzeStoryContextUseCase {
         snapshot.put("allowListVersion", "typed-grounding-v1");
         snapshot.put("groundingContract", groundingContract);
         snapshot.put("canonicalContext", valueMap(canonical));
-        snapshot.put("projection", projection); // exact payload whose digest is persisted above
+        snapshot.put("projection", projectionEnvelope(projection, groundingContract));
         snapshot.put("guidance", guidance == null ? Map.of() : new LinkedHashMap<>(guidance));
         return snapshot;
     }
@@ -259,66 +229,6 @@ public class AnalyzeStoryContextUseCase {
         return value == null ? Map.of() : objectMapper.convertValue(value, Map.class);
     }
 
-    private void projectBaselineDiagnostics(Analysis executionAnalysis, UUID baselineAnalysisId) {
-        diagnosticRepository.findById(baselineAnalysisId).ifPresent(baseline ->
-                diagnosticRepository.save(AnalysisExecutionDiagnostic.builder()
-                        .analysis(executionAnalysis)
-                        .sourceCount(baseline.getSourceCount())
-                        .factCount(baseline.getFactCount())
-                        .observationCount(baseline.getObservationCount())
-                        .warningCount(baseline.getWarningCount())
-                        .errorCount(baseline.getErrorCount())
-                        .collectorCount(baseline.getCollectorCount())
-                        .successfulCollectors(baseline.getSuccessfulCollectors())
-                        .collectorsWithWarnings(baseline.getCollectorsWithWarnings())
-                        .failedCollectors(baseline.getFailedCollectors())
-                        .collectionComplete(baseline.isCollectionComplete())
-                        .truncated(baseline.isTruncated())
-                        .resolvedRevisions(baseline.getResolvedRevisions())
-                        .collectorVersions(baseline.getCollectorVersions())
-                        .collectedAt(baseline.getCollectedAt())
-                        .build()));
-    }
-
-    private Map<String, Object> buildGroundingContract(
-            RepositoryContext context,
-            Map<String, Object> guidance
-    ) {
-        Set<String> allowedRefs = new LinkedHashSet<>();
-        for (var evidence : context.evidence()) {
-            // Use canonical reference for grounding (RepositoryEvidence.reference)
-            if (evidence.reference() != null) {
-                allowedRefs.add(evidence.reference());
-            }
-        }
-        Map<String, Object> contract = new LinkedHashMap<>();
-        contract.put("allowedEvidenceReferences", new ArrayList<>(allowedRefs));
-        boolean causalAnswerRequired = guidance != null
-                && Boolean.TRUE.equals(guidance.get("causalAnswerRequired"));
-        contract.put("causalAnswerRequired", causalAnswerRequired);
-        if (causalAnswerRequired && guidance != null && guidance.get("causalRelationship") instanceof Map<?, ?> relationship) {
-            Object source = relationship.get("source");
-            Object target = relationship.get("target");
-            if (source instanceof String sourceValue && !sourceValue.isBlank()
-                    && target instanceof String targetValue && !targetValue.isBlank()) {
-                String relationAsked = guidance.get("relationAsked") instanceof String value && !value.isBlank()
-                        ? value : "CAUSAL";
-                contract.put("causalContractVersion", "V2");
-                contract.put("causalQuestion", Map.of(
-                        "source", sourceValue,
-                        "target", targetValue,
-                        "relationAsked", relationAsked,
-                        "answerRequired", true));
-                // Keep the old shape in the snapshot for historical diagnostics only.
-                contract.put("causalRelationship", Map.of("source", sourceValue, "target", targetValue));
-            }
-        }
-        if (causalAnswerRequired && !contract.containsKey("causalQuestion")) {
-            throw new IllegalArgumentException("causalAnswerRequired requires a valid causalRelationship");
-        }
-        return contract;
-    }
-
     private Map<String, Object> buildGroundingContract(
             CanonicalEngineeringContext canonical, String projectSlug, Map<String, Object> guidance) {
         Map<String, Object> contract = new LinkedHashMap<>();
@@ -352,10 +262,22 @@ public class AnalyzeStoryContextUseCase {
         return contract;
     }
 
-    private String digestProjection(Map<String, Object> projection) {
+    private String digestProjection(Map<String, Object> selectedKnowledge,
+                                   Map<String, Object> groundingContract) {
         Map<String, Object> envelope = new LinkedHashMap<>();
-        envelope.put("version", "sca-projection-digest-v1"); envelope.put("projection", projection);
+        envelope.put("version", StoryContextAgentProjection.PROJECTION_VERSION);
+        envelope.put("selectedKnowledge", selectedKnowledge);
+        envelope.put("groundingContract", groundingContract == null ? Map.of() : groundingContract);
         return sha256(canonicalJson(envelope));
+    }
+
+    private Map<String, Object> projectionEnvelope(Map<String, Object> selectedKnowledge,
+                                                           Map<String, Object> groundingContract) {
+        Map<String, Object> envelope = new LinkedHashMap<>();
+        envelope.put("version", StoryContextAgentProjection.PROJECTION_VERSION);
+        envelope.put("selectedKnowledge", selectedKnowledge);
+        envelope.put("groundingContract", groundingContract == null ? Map.of() : groundingContract);
+        return envelope;
     }
 
     private String sha256(String value) {
@@ -388,155 +310,6 @@ public class AnalyzeStoryContextUseCase {
         catch (Exception e) { throw new IllegalStateException(e); }
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> captureFreshnessSnapshot(EngineeringContext context) {
-        if (context.metadata() == null || context.metadata().freshness() == null) {
-            return null;
-        }
-        return objectMapper.convertValue(context.metadata().freshness(), Map.class);
-    }
-
-    /**
-     * Adapts the baseline AnalysisContext for SCA by:
-     * - Keeping Facts/Observations from baseline
-     * - Setting SCA intent in analysis snapshot
-     * - Including only the current Story
-     * - Preserving other context (Insights, Events, Relations, Human Inputs)
-     */
-    private AnalysisContext adaptContextForSCA(
-            AnalysisContext baselineContext,
-            Analysis executionAnalysis,
-            EngineeringStory story,
-            HistoricalKnowledgeCandidates historicalCandidates
-    ) {
-        // Create SCA analysis snapshot with correct intent
-        AnalysisContext.AnalysisSnapshot scaAnalysisSnapshot = new AnalysisContext.AnalysisSnapshot(
-                executionAnalysis.getId(),
-                executionAnalysis.getType(),
-                INTENT_ID,
-                INTENT_VERSION,
-                executionAnalysis.getStatus(),
-                executionAnalysis.getStartedAt(),
-                executionAnalysis.getCompletedAt(),
-                executionAnalysis.getCreatedAt()
-        );
-
-        // Include only the current story
-        var currentStorySnapshot = new com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringStorySnapshot(
-                story.getId(),
-                story.getProject().getId(),
-                story.getStoryNumber(),
-                story.getTitle(),
-                story.getStatus().name(),
-                story.getStoryPath(),
-                story.getBaseCommit(),
-                story.getTargetCommit(),
-                story.getCreatedAt(),
-                story.getCompletedAt()
-        );
-
-        return new AnalysisContext(
-                baselineContext.project(),
-                scaAnalysisSnapshot,
-                baselineContext.projectProfile(),
-                mergeById(baselineContext.facts(), historicalCandidates.facts(),
-                        AnalysisContext.FactSnapshot::id),
-                mergeById(baselineContext.observations(), historicalCandidates.observations(),
-                        AnalysisContext.ObservationSnapshot::id),
-                baselineContext.recentKnowledgeEvents(),
-                baselineContext.relatedAnalyses(),
-                baselineContext.architectureArtifacts(),
-                baselineContext.relatedDecisions(),
-                baselineContext.recentMilestones(),
-                baselineContext.validatedProposals(),
-                baselineContext.evolutionContext(),
-                baselineContext.validatedEngineeringEvents(),
-                baselineContext.openChallenges(),
-                baselineContext.knowledgeRelations(),
-                List.of(currentStorySnapshot),
-                baselineContext.humanContextInputs(),
-                baselineContext.engineeringRelationships()
-        );
-    }
-
-    private <T> List<T> mergeById(
-            List<T> baseline,
-            List<T> historical,
-            java.util.function.Function<T, UUID> id
-    ) {
-        LinkedHashMap<UUID, T> merged = new LinkedHashMap<>();
-        baseline.forEach(value -> merged.putIfAbsent(id.apply(value), value));
-        historical.forEach(value -> merged.putIfAbsent(id.apply(value), value));
-        return List.copyOf(merged.values());
-    }
-
-    /**
-     * Creates a minimal SCA context when no baseline analysis exists.
-     * KnowledgeSelectionService will return empty selections but with valid structure.
-     */
-    private AnalysisContext createMinimalSCAContext(
-            Project project,
-            Analysis executionAnalysis,
-            EngineeringContext engineeringContext,
-            EngineeringStory story,
-            IntentDefinition intentDef,
-            Map<String, Object> guidance
-    ) {
-        var projectSnapshot = new AnalysisContext.ProjectSnapshot(
-                project.getId(), project.getName(), project.getSlug(), null, project.getStatus()
-        );
-
-        var analysisSnapshot = new AnalysisContext.AnalysisSnapshot(
-                executionAnalysis.getId(),
-                executionAnalysis.getType(),
-                INTENT_ID,
-                INTENT_VERSION,
-                executionAnalysis.getStatus(),
-                executionAnalysis.getStartedAt(),
-                executionAnalysis.getCompletedAt(),
-                executionAnalysis.getCreatedAt()
-        );
-
-        var currentStorySnapshot = new com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot.EngineeringStorySnapshot(
-                story.getId(),
-                story.getProject().getId(),
-                story.getStoryNumber(),
-                story.getTitle(),
-                story.getStatus().name(),
-                story.getStoryPath(),
-                story.getBaseCommit(),
-                story.getTargetCommit(),
-                story.getCreatedAt(),
-                story.getCompletedAt()
-        );
-
-        // Get project profile for context
-        ProjectProfileResponse profile = projectProfileService.getLatestByProject(project.getId());
-
-        UserGuidance userGuidance = mapGuidance(guidance);
-
-        return new AnalysisContext(
-                projectSnapshot,
-                analysisSnapshot,
-                profile,
-                List.of(), // facts
-                List.of(), // observations
-                List.of(), // recentKnowledgeEvents
-                List.of(), // relatedAnalyses
-                List.of(), // architectureArtifacts
-                List.of(), // relatedDecisions
-                List.of(), // recentMilestones
-                List.of(), // validatedProposals
-                null, // evolutionContext
-                List.of(), // validatedEngineeringEvents
-                List.of(), // openChallenges
-                List.of(), // knowledgeRelations
-                List.of(currentStorySnapshot),
-                 List.of(), // humanContextInputs
-                 List.of() // engineeringRelationships
-        );
-    }
-
     private UserGuidance mapGuidance(Map<String, Object> guidance) {
         if (guidance == null || guidance.isEmpty()) {
             return null;
@@ -556,91 +329,6 @@ public class AnalyzeStoryContextUseCase {
                 outputContext,
                 INTENT_ID,
                 priorities
-        );
-    }
-
-    /**
-     * Resolves a single immutable RepositoryRevisionScope per SCA execution
-     * (ADR-063 §42.2, §42.4).
-     *
-     * Resolution order:
-     * 1. EngineeringStory.targetCommit (if non-null)
-     * 2. Analysis.targetRevision (from baseline Analysis)
-     * 3. Source.currentRevision (latest known)
-     * 4. HEAD (fallback via WorkspaceManager)
-     */
-    private RepositoryRevisionScope resolveRevisionScope(
-            Project project,
-            EngineeringStory story,
-            UUID baselineAnalysisId
-    ) {
-        List<Source> sources = sourceRepository
-                .findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(project.getId());
-        if (sources.isEmpty()) {
-            throw new SourceSelectionException(
-                    SourceSelectionException.Reason.SOURCE_UNAVAILABLE,
-                    project.getId(),
-                    "No active source found for project " + project.getId());
-        }
-        if (sources.size() > 1) {
-            throw new SourceSelectionException(
-                    SourceSelectionException.Reason.AMBIGUOUS_SOURCE,
-                    project.getId(),
-                    "Repository source selection is ambiguous for project "
-                            + project.getId() + "; found " + sources.size() + " active sources");
-        }
-        Source source = sources.getFirst();
-
-        String targetRevision = null;
-        String revisionSource = null;
-
-        // 1. Story.targetCommit
-        if (story.getTargetCommit() != null && !story.getTargetCommit().isBlank()) {
-            targetRevision = story.getTargetCommit();
-            revisionSource = RepositoryRevisionScope.SOURCE_STORY_TARGET;
-        }
-
-        // 2. Analysis.targetRevision
-        if (targetRevision == null && baselineAnalysisId != null) {
-            Optional<Analysis> analysisOpt = analysisRepository.findById(baselineAnalysisId);
-            if (analysisOpt.isPresent()) {
-                Analysis analysis = analysisOpt.get();
-                if (analysis.getTargetRevision() != null && !analysis.getTargetRevision().isBlank()) {
-                    targetRevision = analysis.getTargetRevision();
-                    revisionSource = RepositoryRevisionScope.SOURCE_ANALYSIS_TARGET;
-                }
-            }
-        }
-
-        // 3. Source.currentRevision / 4. HEAD
-        if (targetRevision == null) {
-            try {
-                ResolvedSourceRevision resolved = workspaceManager.resolveCurrentRevision(source);
-                targetRevision = resolved.resolvedRevision();
-                revisionSource = RepositoryRevisionScope.SOURCE_CURRENT_REVISION;
-            } catch (Exception e) {
-                log.warn("Failed to resolve current revision for source {}: {}",
-                        source.getId(), e.getMessage());
-                // Fallback: synchronize to HEAD
-                try {
-                    var workspace = workspaceManager.synchronize(source, null);
-                    targetRevision = workspace.resolvedRevision();
-                    revisionSource = RepositoryRevisionScope.SOURCE_HEAD;
-                } catch (Exception ex) {
-                    throw new IllegalStateException(
-                            "Unable to resolve repository revision for source " + source.getId(), ex);
-                }
-            }
-        }
-
-        // Validate revision exists by synchronizing workspace
-        var workspace = workspaceManager.synchronize(source, targetRevision);
-        return new RepositoryRevisionScope(
-                project.getId(),
-                source.getId(),
-                workspace.resolvedRevision(),
-                workspace.path(),
-                revisionSource
         );
     }
 
