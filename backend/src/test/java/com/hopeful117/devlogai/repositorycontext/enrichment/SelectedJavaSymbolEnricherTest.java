@@ -267,6 +267,7 @@ class SelectedJavaSymbolEnricherTest {
 
         RepositorySymbolPolicy symbolBound = new RepositorySymbolPolicy();
         symbolBound.setMaxTotalSymbols(1);
+        symbolBound.setMaxParseDurationPerFile(java.time.Duration.ofSeconds(2));
         var symbolResult = enricher(symbolBound, sources, manager).enrich(
                 request(projectId, 5_000), selection(List.of(
                         evidence(sourceId, "SOURCE_FILE", "First.java", 300),
