@@ -14,10 +14,36 @@ Requires-Dist: httpx<1.0,>=0.28; extra == "dev"
 
 # DevLog AI Engine
 
+Insight and Engineering Event generation are intent-driven. Every accepted submission contains a
+provider-independent `PromptRequest` with a versioned catalog Intent and an immutable `AnalysisContext`; arbitrary user
+prompts are not accepted. The prompt builder only supports registered template
+versions and validates generated Insight categories against the Intent before
+returning proposals for human validation.
+
+Submissions may include structured User Guidance (`focus`, `audience`,
+`levelOfDetail`, `writingStyle`, `outputContext`, and ordered `priorities`). It is
+validated as a closed schema and inserted into the prompt at the lowest priority:
+Intent and AnalysisContext constraints always win.
+
+The Prompt Builder converts this contract into an immutable, provider-agnostic
+`Prompt` containing separate system and user messages, the expected output
+schema, a generation policy, traceability metadata, and a deterministic SHA-256
+content digest. Providers only adapt that Prompt to their external API. Prompt
+versions, digests, provider names, and model identifiers are returned to the
+Core for persistence; complete rendered prompts are never written to standard
+logs.
+
+Prompt Version and Prompt Digest have distinct roles. The human-readable,
+semantic version governs the template contract; the SHA-256 digest identifies
+the normalized system message, user message, and expected schema actually sent
+to the provider. Historical AI Tasks persist both values.
+
 FastAPI service responsible for the AI-processing boundary of DevLog AI.
 
 The service implements health reporting, ADR-019 task acceptance, the ADR-020
-callback contract, and the ADR-022 structured `INSIGHT_GENERATION` workflow.
+callback contract, the ADR-022 structured `INSIGHT_GENERATION` workflow, and the dedicated
+`EVENT_PROPOSAL_GENERATION` workflow. Event prompts require Core's bounded first-parent evolution
+context and allow zero output when the selected evidence is insufficient.
 It interprets only the immutable `AnalysisContext` supplied by the Java Core.
 
 ## Local development
@@ -32,6 +58,13 @@ pytest
 
 - `GET /health`
 - `POST /api/v1/ai/tasks`
+- `POST /api/v1/deliverables/generate`
+
+The Deliverable endpoint implements ADR-034. Its closed request schema accepts only validated
+Insight snapshots plus communication parameters. It does not accept repository data, Facts,
+Observations, AnalysisContext, or pending proposals. The versioned
+`deliverable-generation-prompt-v1` template returns a single structured title/content result and
+records provider/model and prompt digest metadata for Core persistence.
 
 ## LLM configuration
 
