@@ -41,13 +41,19 @@ public final class GitCommitEvidenceResolver implements EvidenceFamilyResolver {
                 .findBySourceIdAndCommitHash(reference.sourceId(), reference.revision())
                 .orElseThrow(() -> failure(EvidenceResolutionFailureCode.EVIDENCE_NOT_FOUND,
                         reference, "Git commit is not present for the requested source"));
+        ProjectCommit files = commitRepository.findWithChangedFilesBySourceIdAndCommitHash(
+                reference.sourceId(), reference.revision()).orElse(null);
+        if (files == null || files.getChangedFiles() == null || commit.getParents() == null) {
+            throw failure(EvidenceResolutionFailureCode.EVIDENCE_NOT_FOUND, reference,
+                    "Git commit history is incomplete");
+        }
 
         var payload = new GitCommitResolutionPayload(
                 commit.getCommitHash(), commit.getSubject(), commit.getFullMessage(),
                 commit.getAuthorName(), commit.getAuthorEmail(), commit.getAuthoredAt(),
                 commit.getCommittedAt(), commit.isRootCommit(), commit.isMergeCommit(),
                 commit.getParents().stream().map(parent -> parent.getParentHash()).toList(),
-                commit.getChangedFiles().stream().map(this::changedFile).toList());
+                files.getChangedFiles().stream().map(this::changedFile).toList());
         var metadata = new EvidenceResolutionMetadata(
                 reference.canonicalReference(), reference.family(), reference.sourceId(),
                 "project-commit", reference.revision(), request.mode(), true);

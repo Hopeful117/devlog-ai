@@ -67,6 +67,8 @@ public class RepositoryContextAdapter {
             Pattern.compile("^git:[0-9a-fA-F\\-]+:([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$");
     private static final Pattern DIFF_REFERENCE =
             Pattern.compile("^diff:([0-9a-fA-F]{40}|[0-9a-fA-F]{64}):");
+    private static final Pattern GIT_OBJECT_ID =
+            Pattern.compile("^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$");
 
     private final ProjectContextProvider projectContextProvider;
     private final RepositoryContextService repositoryContextService;
@@ -463,12 +465,8 @@ public class RepositoryContextAdapter {
         String baseCommit = story.baseCommit();
         String targetCommit = story.targetCommit();
 
-        if (baseCommit == null && targetCommit == null) {
-            return filterToNonTechnical(context);
-        }
-
         if (baseCommit == null || targetCommit == null) {
-            return filterBaseOnly(context, projectId, baseCommit, targetCommit);
+            return filterToNonTechnical(context);
         }
 
         Set<String> window = findCommitsInWindow(projectId, baseCommit, targetCommit);
@@ -588,10 +586,14 @@ public class RepositoryContextAdapter {
     ) {
         List<ProjectCommit> allCommits =
                 commitRepository.findByProjectIdOrderByCommittedAtAscCommitHashAsc(projectId);
+        if (allCommits == null) return Set.of();
 
         Map<String, ProjectCommit> commitBySha = new HashMap<>();
         for (ProjectCommit commit : allCommits) {
-            commitBySha.put(commit.getCommitHash().toLowerCase(), commit);
+            if (commit == null || commit.getCommitHash() == null || commit.getParents() == null) return Set.of();
+            if (!isValidGitObjectId(commit.getCommitHash())) return Set.of();
+            String hash = commit.getCommitHash().toLowerCase();
+            if (commitBySha.putIfAbsent(hash, commit) != null) return Set.of();
         }
 
         String baseLower = baseCommitSha.toLowerCase();
@@ -601,9 +603,10 @@ public class RepositoryContextAdapter {
         if (!commitBySha.containsKey(baseLower)) return Set.of();
 
         Set<String> ancestorsOfTarget = findAllAncestors(targetLower, commitBySha);
-        if (!ancestorsOfTarget.contains(baseLower)) return Set.of();
+        if (ancestorsOfTarget == null || !ancestorsOfTarget.contains(baseLower)) return Set.of();
 
         Set<String> ancestorsOfBase = findAllAncestors(baseLower, commitBySha);
+        if (ancestorsOfBase == null) return Set.of();
 
         Set<String> window = new HashSet<>(ancestorsOfTarget);
         window.removeAll(ancestorsOfBase);
@@ -622,10 +625,13 @@ public class RepositoryContextAdapter {
         while (!queue.isEmpty()) {
             String currentSha = queue.poll();
             ProjectCommit current = commitBySha.get(currentSha);
-            if (current == null) continue;
+            if (current == null || current.getParents() == null) return null;
 
             for (CommitParent parent : current.getParents()) {
+                if (parent == null || parent.getParentHash() == null || parent.getParentHash().isBlank()) return null;
+                if (!isValidGitObjectId(parent.getParentHash())) return null;
                 String parentSha = parent.getParentHash().toLowerCase();
+                if (!commitBySha.containsKey(parentSha)) return null;
                 if (visited.add(parentSha)) {
                     queue.add(parentSha);
                 }
@@ -633,6 +639,10 @@ public class RepositoryContextAdapter {
         }
 
         return visited;
+    }
+
+    private boolean isValidGitObjectId(String value) {
+        return value != null && GIT_OBJECT_ID.matcher(value).matches();
     }
 
     private RepositoryContext withFilteredEvidence(

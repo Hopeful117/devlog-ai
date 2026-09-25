@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.history.repository.ProjectCommitRepository;
+import com.hopeful117.devlogai.history.entity.ProjectCommit;
 import com.hopeful117.devlogai.artifact.entity.Artifact;
 import com.hopeful117.devlogai.artifact.entity.ArtifactType;
 import com.hopeful117.devlogai.artifact.repository.ArtifactRepository;
@@ -26,6 +27,7 @@ import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.engineeringevent.EngineeringEvent;
 import com.hopeful117.devlogai.engineeringevent.EngineeringEventRepository;
+import com.hopeful117.devlogai.validation.entity.ValidationDecision;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
@@ -39,6 +41,11 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -131,8 +138,11 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
 
         List<ProjectContextSnapshot.EngineeringEventSnapshot> engineeringEvents =
                 engineeringEventRepository.findRecentByProjectIdOrderByOccurredAtDescTargetCommitDescIdAsc(
-                                projectId, PageRequest.of(0, MAX_VALIDATED_ENGINEERING_EVENTS))
-                        .stream().map(this::toEngineeringEvent).toList();
+                        projectId, PageRequest.of(0, MAX_VALIDATED_ENGINEERING_EVENTS))
+                        .stream()
+                        .filter(event -> event.getValidation() != null
+                                && event.getValidation().getDecision() == ValidationDecision.ACCEPTED)
+                        .map(this::toEngineeringEvent).toList();
 
         List<ProjectContextSnapshot.ChallengeSnapshot> openChallenges =
                 challengeRepository.findByProjectIdOrderByCreatedAtDesc(projectId)
@@ -166,13 +176,14 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                         .map(this::toHumanContextInputSnapshot)
                         .toList();
 
-        List<EngineeringRelationship> engineeringRelationships = projectCommitRepository == null
-                ? List.of()
-                : projectCommitRepository
-                        .findRecentWithChangedFiles(
-                                projectId, PageRequest.of(0, MAX_REPOSITORY_RELATIONSHIPS))
-                        .stream()
-                        .flatMap(commit -> new RepositoryRelationshipProjector().project(commit).stream())
+        List<ProjectCommit> repositoryHistory = loadRepositoryHistory(projectId);
+        RepositoryRelationshipProjector projector = new RepositoryRelationshipProjector();
+        List<EngineeringRelationship> engineeringRelationships = engineeringStories.stream()
+                .flatMap(story -> storyRelationships(story, repositoryHistory, projector).stream())
+                .toList();
+        engineeringRelationships = java.util.stream.Stream.concat(
+                        engineeringEvents.stream().flatMap(event -> eventRelationships(projectId, event, repositoryHistory, projector).stream()),
+                        engineeringRelationships.stream())
                         .sorted(java.util.Comparator.comparing(EngineeringRelationship::id))
                         .limit(MAX_REPOSITORY_RELATIONSHIPS)
                         .toList();
@@ -193,6 +204,49 @@ public class ProjectContextProviderImpl implements ProjectContextProvider {
                 humanContextInputs,
                 engineeringRelationships
         );
+    }
+
+    private List<ProjectCommit> loadRepositoryHistory(UUID projectId) {
+        if (projectCommitRepository == null) return List.of();
+        List<ProjectCommit> withParents = Objects.requireNonNullElse(projectCommitRepository
+                .findWithParentsByProjectIdOrderByCommittedAtAscCommitHashAsc(projectId), List.of());
+        List<ProjectCommit> withFiles = Objects.requireNonNullElse(projectCommitRepository
+                .findWithChangedFilesByProjectIdOrderByCommittedAtAscCommitHashAsc(projectId), List.of());
+        Map<UUID, ProjectCommit> filesById = withFiles.stream().filter(Objects::nonNull)
+                .filter(commit -> commit.getId() != null)
+                .collect(Collectors.toMap(ProjectCommit::getId, Function.identity(), (first, ignored) -> first));
+        withParents.forEach(commit -> {
+            ProjectCommit fileLoaded = filesById.get(commit.getId());
+            commit.setChangedFiles(fileLoaded == null || fileLoaded.getChangedFiles() == null
+                    ? List.of() : fileLoaded.getChangedFiles());
+        });
+        return withParents;
+    }
+
+    private List<EngineeringRelationship> storyRelationships(
+            ProjectContextSnapshot.EngineeringStorySnapshot story, List<ProjectCommit> history,
+            RepositoryRelationshipProjector projector) {
+        UUID sourceId = uniqueSourceFor(story.projectId(), story.baseCommit(), story.targetCommit(), history);
+        return sourceId == null ? List.of() : projector.projectForEntity("STORY", story.id(), story.projectId(),
+                sourceId, story.baseCommit(), story.targetCommit(), history);
+    }
+
+    private List<EngineeringRelationship> eventRelationships(
+            UUID projectId, ProjectContextSnapshot.EngineeringEventSnapshot event, List<ProjectCommit> history,
+            RepositoryRelationshipProjector projector) {
+        if (event.sourceId() == null) return List.of();
+        return projector.projectForEntity("ENGINEERING_EVENT", event.id(), projectId,
+                event.sourceId(), event.baseCommit(), event.targetCommit(), history);
+    }
+
+    private UUID uniqueSourceFor(UUID projectId, String base, String target, List<ProjectCommit> history) {
+        if (projectId == null || base == null || target == null) return null;
+        Set<UUID> sources = new HashSet<>();
+        history.stream().filter(c -> c != null && c.getProject() != null && projectId.equals(c.getProject().getId())
+                        && c.getSource() != null && (base.equalsIgnoreCase(c.getCommitHash())
+                        || target.equalsIgnoreCase(c.getCommitHash())))
+                .forEach(c -> sources.add(c.getSource().getId()));
+        return sources.size() == 1 ? sources.iterator().next() : null;
     }
 
     private ProjectProfileResponse latestProfileOrNull(UUID projectId) {
