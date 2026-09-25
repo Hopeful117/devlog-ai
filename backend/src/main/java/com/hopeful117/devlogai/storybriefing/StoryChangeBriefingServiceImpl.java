@@ -7,6 +7,7 @@ import com.hopeful117.devlogai.engineeringcontext.CanonicalContextDigest;
 import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
 import com.hopeful117.devlogai.engineeringcontext.EngineeringContextFacade;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EvidenceRef;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -33,7 +34,8 @@ public class StoryChangeBriefingServiceImpl implements StoryChangeBriefingServic
                 List.of(), storyId);
         List<StoryChangeBriefing.Change> candidateChanges = canonical.repositoryContext() == null
                 ? List.of() : canonical.repositoryContext().evidence().stream()
-                .filter(this::isChangeEvidence).map(this::change).toList();
+                .filter(evidence -> isChangeEvidence(evidence, canonical.authorizedReferences()))
+                .map(this::change).toList();
         List<String> warnings = warnings(canonical, candidateChanges);
         List<StoryChangeBriefing.Change> changes = validGitWindow(canonical)
                 ? candidateChanges : List.of();
@@ -77,11 +79,67 @@ public class StoryChangeBriefingServiceImpl implements StoryChangeBriefingServic
         snapshot.put("provenance", canonical.provenanceByReference());
         snapshot.put("trust", canonical.trustByReference());
         snapshot.put("typedReferenceMapping", canonical.authorizedReferences());
+        snapshot.put("relationsByReference", canonical.relationsByReference() == null
+                ? Map.of() : canonical.relationsByReference());
+        snapshot.put("effectiveVersions", effectiveVersions(canonical));
+        snapshot.put("sourceRevisions", sourceRevisions(canonical));
+        // Keep the exact Core projection in the immutable record snapshot. The
+        // projection is the audit contract; reconstituting it from selected
+        // fields would make the snapshot lossy.
+        snapshot.put("projection", canonical.projection() == null ? Map.of() : canonical.projection());
         snapshot.put("projectionPolicy", Map.of("contractVersion", VERSION,
                 "serializer", "ADR-069-canonical-json-v1", "schema", "story-change-briefing-v1"));
         snapshot.put("changeCount", changes.size());
         snapshot.put("warnings", warnings);
         return snapshot;
+    }
+
+    private Map<String, Object> effectiveVersions(CanonicalEngineeringContext canonical) {
+        Map<String, String> collectors = new java.util.TreeMap<>();
+        if (canonical.repositoryContext() != null && canonical.repositoryContext().evidence() != null) {
+            canonical.repositoryContext().evidence().forEach(evidence -> {
+                if (evidence == null || evidence.extractionMetadata() == null) return;
+                String id = evidence.extractionMetadata().get("collectorId");
+                String version = evidence.extractionMetadata().get("collectorVersion");
+                if (id != null && version != null) collectors.putIfAbsent(id, version);
+            });
+        }
+        Map<String, Object> versions = new LinkedHashMap<>();
+        versions.put("collectorVersions", collectors);
+        String composition = canonical.repositoryContext() == null
+                ? canonical.contextVersion() : canonical.repositoryContext().contextVersion();
+        String scopePolicy = canonical.repositoryContext() == null
+                ? null : canonical.repositoryContext().contextPlanVersion();
+        versions.put("compositionVersion", composition == null ? "UNAVAILABLE" : composition);
+        versions.put("scopePolicyVersion", scopePolicy == null ? "UNAVAILABLE" : scopePolicy);
+        return versions;
+    }
+
+    private Map<String, List<String>> sourceRevisions(CanonicalEngineeringContext canonical) {
+        Map<String, Set<String>> revisions = new java.util.TreeMap<>();
+        if (canonical.repositoryContext() == null || canonical.repositoryContext().evidence() == null) {
+            return Map.of();
+        }
+        canonical.repositoryContext().evidence().forEach(evidence -> {
+            if (evidence == null) return;
+            String source = evidence.provenance() == null ? null : evidence.provenance().repositoryLocation();
+            if (source == null && evidence.extractionMetadata() != null) {
+                source = evidence.extractionMetadata().get("sourceId");
+            }
+            if (source == null || source.isBlank()) return;
+            Set<String> values = revisions.computeIfAbsent(source, ignored -> new java.util.TreeSet<>());
+            if (evidence.extractionMetadata() != null) addRevision(values,
+                    evidence.extractionMetadata().get("resolvedRevision"));
+            if (evidence.content() != null) addRevision(values, evidence.content().revision());
+            if (evidence.symbols() != null) addRevision(values, evidence.symbols().revision());
+        });
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        revisions.forEach((source, values) -> result.put(source, List.copyOf(values)));
+        return result;
+    }
+
+    private void addRevision(Set<String> target, String revision) {
+        if (revision != null && !revision.isBlank()) target.add(revision);
     }
 
     private Map<String, Object> changeWindow(CanonicalEngineeringContext canonical) {
@@ -124,8 +182,11 @@ public class StoryChangeBriefingServiceImpl implements StoryChangeBriefingServic
         return value.matches("[0-9a-fA-F]{40}");
     }
 
-    private boolean isChangeEvidence(RepositoryEvidence evidence) {
+    private boolean isChangeEvidence(RepositoryEvidence evidence, List<EvidenceRef> authorizedReferences) {
         return evidence != null && evidence.reference() != null
+                && authorizedReferences != null
+                && authorizedReferences.stream().filter(java.util.Objects::nonNull)
+                .map(EvidenceRef::reference).anyMatch(evidence.reference()::equals)
                 && (evidence.reference().startsWith("git:") || evidence.reference().startsWith("diff:"));
     }
 
