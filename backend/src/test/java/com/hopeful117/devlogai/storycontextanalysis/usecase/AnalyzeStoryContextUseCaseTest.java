@@ -526,6 +526,30 @@ class AnalyzeStoryContextUseCaseTest {
     }
 
     @Test
+    void restGuidanceUsesSharedFieldsWhenBuildingPythonPromptContract() throws Exception {
+        Method mapper = AnalyzeStoryContextUseCase.class.getDeclaredMethod("mapGuidance", Map.class);
+        mapper.setAccessible(true);
+
+        var guidance = Map.<String, Object>of(
+                "focus", "repository relationships",
+                "audience", "maintainers",
+                "levelOfDetail", "deep",
+                "writingStyle", "concise",
+                "outputContext", "implementation review",
+                "priorities", List.of("trust", "digests"));
+
+        var mapped = (com.hopeful117.devlogai.intent.model.UserGuidance)
+                mapper.invoke(useCase, guidance);
+
+        assertEquals("repository relationships", mapped.focus());
+        assertEquals("maintainers", mapped.audience());
+        assertEquals("deep", mapped.levelOfDetail());
+        assertEquals("concise", mapped.writingStyle());
+        assertEquals("implementation review", mapped.outputContext());
+        assertEquals(List.of("trust", "digests"), mapped.priorities());
+    }
+
+    @Test
     void causalClaimRejectsAffirmativeClassificationWithNonCausalContext() {
         assertThrows(
                 IllegalArgumentException.class,

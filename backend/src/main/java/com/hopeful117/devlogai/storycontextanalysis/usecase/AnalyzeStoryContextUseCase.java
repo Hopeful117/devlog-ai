@@ -314,22 +314,10 @@ public class AnalyzeStoryContextUseCase {
         if (guidance == null || guidance.isEmpty()) {
             return null;
         }
-        String focus = (String) guidance.get("focus");
-        @SuppressWarnings("unchecked")
-        List<String> priorities = (List<String>) guidance.getOrDefault("priorities", List.of());
-        @SuppressWarnings("unchecked")
-        List<String> questions = (List<String>) guidance.getOrDefault("questions", List.of());
-        String outputContext = (String) guidance.get("outputContext");
-        String perspective = (String) guidance.get("perspective");
-
-        return new UserGuidance(
-                focus,
-                "kiko",
-                perspective,
-                outputContext,
-                INTENT_ID,
-                priorities
-        );
+        // Keep the REST payload aligned with the shared guidance contract. In
+        // particular, do not shift fields into unrelated prompt fields: this
+        // object is serialized into PromptRequest and rendered by Python.
+        return UserGuidance.from(guidance);
     }
 
     @Transactional
