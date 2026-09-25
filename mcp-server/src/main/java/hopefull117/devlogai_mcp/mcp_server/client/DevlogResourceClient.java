@@ -32,6 +32,11 @@ public interface DevlogResourceClient {
             @PathVariable("projectId") UUID projectId,
             @PathVariable("storyId") UUID storyId);
 
+    @GetExchange("/projects/{projectSlug}/stories/{storyId}/change-briefing")
+    String getStoryChangeBriefing(
+            @PathVariable("projectSlug") String projectSlug,
+            @PathVariable("storyId") UUID storyId);
+
     @GetExchange("/sources/project/{projectId}")
     String listProjectSources(@PathVariable("projectId") UUID projectId);
 
