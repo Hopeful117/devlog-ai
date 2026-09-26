@@ -50,6 +50,11 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'stories/:storyId',
+        loadComponent: () =>
+          import('./features/stories/story-detail-page').then((module) => module.StoryDetailPage),
+      },
+      {
         path: 'activity',
         data: { workspaceSection: 'activity' },
         loadComponent: () =>

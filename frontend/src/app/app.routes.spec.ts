@@ -24,6 +24,14 @@ async function loadStandaloneRouteComponent(
 }
 
 describe('app.routes', () => {
+  it('routes /projects/:id/stories/:storyId to the read-only StoryDetailPage', async () => {
+    const projectRoute = routes.find((route) => route.path === 'projects/:id');
+    const storyRoute = projectRoute?.children?.find((route) => route.path === 'stories/:storyId');
+    const loaded = await storyRoute?.loadComponent?.();
+    const component = loaded as { readonly name?: string };
+    expect(component.name?.endsWith('StoryDetailPage')).toBe(true);
+  });
+
   it('routes /decisions/:id to the DecisionDetailPage', async () => {
     const component = await loadStandaloneRouteComponent('decisions/:id');
     expect(component?.name.endsWith('DecisionDetailPage')).toBe(true);
