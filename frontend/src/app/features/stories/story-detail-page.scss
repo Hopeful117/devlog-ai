@@ -1,0 +1,15 @@
+.story-detail {
+  max-width: 960px;
+}
+.story-detail h2 {
+  margin-top: 2rem;
+}
+.story-detail pre {
+  max-height: 28rem;
+  overflow: auto;
+  padding: 1rem;
+}
+.warning {
+  border-left: 0.25rem solid #d97706;
+  padding-left: 0.75rem;
+}
