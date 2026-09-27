@@ -10,6 +10,8 @@ import com.hopeful117.devlogai.knowledge.relation.entity.EntityType;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.projectcontext.EngineeringRelationship;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -107,6 +109,37 @@ class AiReferenceRegistryTest {
                 EntityType.INSIGHT, insightId);
 
         assertThat(registry.referenceFor(endpoint)).contains(insight.reference());
+    }
+
+    @Test
+    void v1FactoryDoesNotExposeLegacyRepositoryScope() {
+        SelectedKnowledge knowledge = mock(SelectedKnowledge.class);
+        when(knowledge.project()).thenReturn(new AnalysisContext.ProjectSnapshot(
+                UUID.randomUUID(), "project", "project", null, null));
+        when(knowledge.analysis()).thenReturn(new AnalysisContext.AnalysisSnapshot(
+                UUID.randomUUID(), null, "intent", "v1", null, null, null, null));
+        when(knowledge.projectProfile()).thenReturn(null);
+        when(knowledge.selectedFacts()).thenReturn(List.of());
+        when(knowledge.selectedObservations()).thenReturn(List.of());
+        when(knowledge.selectedInsights()).thenReturn(List.of());
+        when(knowledge.existingArchitectureKnowledge()).thenReturn(List.of());
+        when(knowledge.selectedEngineeringEvents()).thenReturn(List.of());
+        when(knowledge.selectedHumanContextInputs()).thenReturn(List.of());
+        RepositoryEvidence evidence = mock(RepositoryEvidence.class);
+        when(evidence.reference()).thenReturn("file:src/Main.java");
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+        when(repositoryContext.evidence()).thenReturn(List.of(evidence));
+        when(knowledge.repositoryContext()).thenReturn(repositoryContext);
+
+        AiReferenceRegistry registry = AiReferenceRegistryFactory.create(knowledge);
+
+        assertThat(registry.referenceFor(AiReferenceType.REPOSITORY_EVIDENCE,
+                AiReferenceScope.REPOSITORY, "file:src/Main.java")).isEmpty();
+        assertThat(registry.referenceFor(AiReferenceType.REPOSITORY_EVIDENCE,
+                AiReferenceScope.PROJECT_REVISION, "file:src/Main.java")).isPresent();
+        assertThat(AiReferenceRegistryFactory.createLegacy(knowledge)
+                .referenceFor(AiReferenceType.REPOSITORY_EVIDENCE, AiReferenceScope.REPOSITORY,
+                        "file:src/Main.java")).isPresent();
     }
 
     @Test

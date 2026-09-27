@@ -65,9 +65,9 @@ public class AnalyzeStoryContextUseCase {
     ) {
         Project project = projectRepository.findBySlug(projectSlug)
                 .orElseThrow(() -> new EntityNotFoundException("Project", projectSlug));
-        EngineeringStory story = storyRepository.findById(storyId)
+        EngineeringStory story = storyId == null ? null : storyRepository.findById(storyId)
                 .orElseThrow(() -> new EntityNotFoundException("EngineeringStory", storyId));
-        if (!story.getProject().getId().equals(project.getId())) {
+        if (story != null && !story.getProject().getId().equals(project.getId())) {
             throw new IllegalArgumentException("Story does not belong to project");
         }
 
@@ -93,8 +93,9 @@ public class AnalyzeStoryContextUseCase {
         }
 
         UserGuidance userGuidance = mapGuidance(guidance);
-        Map<String, Object> selectedKnowledgeSnapshot = StoryContextAgentProjection.project(
-                canonicalContext, story, objectMapper);
+        Map<String, Object> storyAgentProjection = StoryContextAgentProjectionV1.build(
+                canonicalContext, projectSlug, storyId, INTENT_ID, files, story, objectMapper);
+        String projectionDigest = (String) storyAgentProjection.get("projectionDigest");
 
         // The Core canonical construction owns the digest; this use case only propagates it.
         String contextDigest = canonicalContext.contextDigest();
@@ -112,20 +113,20 @@ public class AnalyzeStoryContextUseCase {
                 INTENT_ID,
                 INTENT_VERSION,
                 intentDef.promptTemplate(),
-                selectedKnowledgeSnapshot,
+                storyAgentProjection,
                 contextDigest,
                 groundingContract,
                 guidance,
-                new com.hopeful117.devlogai.ai.reference.AiReferenceRegistry(List.of())
+                AiReferenceRegistryFactory.createForStoryContext(canonicalContext.authorizedReferences())
         );
-        String projectionDigest = digestProjection(selectedKnowledgeSnapshot, groundingContract);
+
         aiTask.setContextDigest(contextDigest);
         aiTask.setSelectionDigest(null);
         aiTask.setProjectionDigest(projectionDigest);
         // Freeze the complete execution contract before SUBMITTED. Callback data is
         // an echo only and must never be able to complete or repair this snapshot.
         Map<String, Object> taskContextSnapshot = buildExecutionSnapshot(
-                aiTask, canonicalContext, selectedKnowledgeSnapshot, projectionDigest,
+                aiTask, canonicalContext, storyAgentProjection, projectionDigest,
                 projectSlug, storyId, files, guidance, groundingContract);
         aiTask.setContextSnapshot(taskContextSnapshot);
         aiTaskRepository.save(aiTask);
@@ -136,12 +137,16 @@ public class AnalyzeStoryContextUseCase {
         // Build PromptRequest with selected knowledge and grounding contract
         Map<String, Object> promptMetadata = new LinkedHashMap<>();
         promptMetadata.put("projectSlug", projectSlug);
-        promptMetadata.put("storyId", storyId.toString());
+        promptMetadata.put("storyId", storyId == null ? null : storyId.toString());
         promptMetadata.put("contextDigest", contextDigest);
         if (aiTask.getSelectionDigest() != null) promptMetadata.put("selectionDigest", aiTask.getSelectionDigest());
         promptMetadata.put("projectionDigest", projectionDigest);
-        promptMetadata.put("contractVersion", StoryContextAgentProjection.PROJECTION_VERSION);
-        promptMetadata.put("projectionVersion", StoryContextAgentProjection.PROJECTION_VERSION);
+        promptMetadata.put("contractVersion", StoryContextAgentProjectionV1.CONTRACT_VERSION);
+        promptMetadata.put("projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION);
+        promptMetadata.put("scope", taskContextSnapshot.get("scope"));
+        promptMetadata.put("freshness", storyAgentProjection.get("freshness"));
+        promptMetadata.put("groundingDigest", sha256(canonicalJson(groundingContract)));
+        promptMetadata.put("storyAgentContractVersion", StoryContextAgentProjectionV1.CONTRACT_VERSION);
         PromptRequest promptRequest = new PromptRequest(
                 UUID.randomUUID(),
                 aiTask.getCorrelationId(),
@@ -150,7 +155,7 @@ public class AnalyzeStoryContextUseCase {
                 AiTaskType.STORY_CONTEXT_ANALYSIS,
                 intentDef,
                 userGuidance,
-                selectedKnowledgeSnapshot,
+                storyAgentProjection,
                 intentDef.outputSchema(),
                 groundingContract,
                 promptMetadata
@@ -169,16 +174,19 @@ public class AnalyzeStoryContextUseCase {
                 task.getContextSnapshot() == null ? Map.of() : task.getContextSnapshot());
         snapshot.put("contextDigest", canonical.contextDigest());
         snapshot.put("projectionDigest", projectionDigest);
-        snapshot.put("selectionDigest", null); // SCA has no compatibility selection
         snapshot.put("contextVersion", canonical.contextVersion());
-        snapshot.put("projectionVersion", StoryContextAgentProjection.PROJECTION_VERSION);
-        snapshot.put("scope", Map.of("projectSlug", projectSlug, "storyId", storyId.toString(),
-                "files", files == null ? List.of() : List.copyOf(files)));
-        snapshot.put("requestEcho", valueMap(canonical.requestEcho()));
-        snapshot.put("freshness", canonical.freshness());
-        snapshot.put("contextFreshness", canonical.freshness()); // legacy compatibility alias
+        snapshot.put("projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION);
+        Map<String,Object> scope = new LinkedHashMap<>();
+        scope.put("projectSlug", projectSlug); scope.put("storyId", storyId == null ? null : storyId.toString());
+        scope.put("intent", INTENT_ID); scope.put("files", files == null ? List.of() : List.copyOf(files));
+        snapshot.put("scope", scope);
+        Map<String, Object> requestEcho = valueMap(canonical.requestEcho());
+        snapshot.put("requestEcho", requestEcho);
+        Object normalizedFreshness = projection.get("freshness");
+        snapshot.put("freshness", normalizedFreshness);
+        snapshot.put("contextFreshness", normalizedFreshness); // legacy compatibility alias
         snapshot.put("revisions", revisions(canonical));
-        snapshot.put("policy", Map.of("contractVersion", StoryContextAgentProjection.PROJECTION_VERSION,
+        snapshot.put("policy", Map.of("contractVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION,
                 "projectionDigest", projectionDigest,
                 "selection", "CORE_CANONICAL_ONLY", "retrieval", "NONE",
                 "allowListVersion", "typed-grounding-v1"));
@@ -192,6 +200,7 @@ public class AnalyzeStoryContextUseCase {
                 : task.getAiReferenceMappingSnapshot());
         snapshot.put("allowListVersion", "typed-grounding-v1");
         snapshot.put("groundingContract", groundingContract);
+        snapshot.put("groundingDigest", sha256(canonicalJson(groundingContract)));
         snapshot.put("canonicalContext", valueMap(canonical));
         snapshot.put("projection", projectionEnvelope(projection, groundingContract));
         snapshot.put("guidance", guidance == null ? Map.of() : new LinkedHashMap<>(guidance));
@@ -221,7 +230,7 @@ public class AnalyzeStoryContextUseCase {
     }
 
     private List<String> warnings(CanonicalEngineeringContext canonical) {
-        return canonical.repositoryContext() == null ? List.of() : canonical.repositoryContext().warnings();
+        return canonical.repositoryContext() == null ? List.of() : canonical.repositoryContext().warnings().stream().sorted().toList();
     }
 
     @SuppressWarnings("unchecked")
@@ -233,19 +242,20 @@ public class AnalyzeStoryContextUseCase {
             CanonicalEngineeringContext canonical, String projectSlug, Map<String, Object> guidance) {
         Map<String, Object> contract = new LinkedHashMap<>();
         List<EvidenceRef> typed = canonical.authorizedReferences();
-        String revision = canonical.repositoryContext() == null ? "UNSPECIFIED" : canonical.repositoryContext().evidence().stream()
-                .map(e -> e.content() == null ? null : e.content().revision())
-                .filter(v -> v != null && !v.isBlank()).findFirst().orElse("UNSPECIFIED");
+        String revision = StoryContextAgentProjectionV1.canonicalRevision(canonical);
         contract.put("allowedGroundingReferences", typed.stream().map(ref -> {
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("type", "REPOSITORY_EVIDENCE"); entry.put("ref", ref.reference());
             entry.put("coreReference", ref.reference()); entry.put("taskReference", ref.reference());
-            entry.put("scope", Map.of("project", projectSlug, "revision", revision));
+            entry.put("scope", "PROJECT_REVISION");
+            entry.put("project", projectSlug);
+            entry.put("revision", revision);
+            entry.put("provenance", canonical.provenanceByReference().get(ref.reference()));
+            entry.put("resource", ref.resource());
+            entry.put("trust", canonical.trustByReference().getOrDefault(ref.reference(), "UNKNOWN"));
             return entry;
         }).toList());
-        // Legacy shape is retained only for old Python consumers and is not authoritative.
-        contract.put("allowedEvidenceReferences", typed.stream().map(EvidenceRef::reference)
-                .collect(java.util.stream.Collectors.toUnmodifiableList()));
+        contract.put("groundingContractVersion", "story-context-grounding/v1");
         boolean required = guidance != null && Boolean.TRUE.equals(guidance.get("causalAnswerRequired"));
         contract.put("causalAnswerRequired", required);
         if (required && guidance != null && guidance.get("causalRelationship") instanceof Map<?, ?> relationship) {
@@ -265,19 +275,16 @@ public class AnalyzeStoryContextUseCase {
     private String digestProjection(Map<String, Object> selectedKnowledge,
                                    Map<String, Object> groundingContract) {
         Map<String, Object> envelope = new LinkedHashMap<>();
-        envelope.put("version", StoryContextAgentProjection.PROJECTION_VERSION);
+        envelope.put("version", StoryContextAgentProjectionV1.PROJECTION_VERSION);
         envelope.put("selectedKnowledge", selectedKnowledge);
         envelope.put("groundingContract", groundingContract == null ? Map.of() : groundingContract);
         return sha256(canonicalJson(envelope));
     }
 
-    private Map<String, Object> projectionEnvelope(Map<String, Object> selectedKnowledge,
+    private Map<String, Object> projectionEnvelope(Map<String, Object> storyAgentProjection,
                                                            Map<String, Object> groundingContract) {
-        Map<String, Object> envelope = new LinkedHashMap<>();
-        envelope.put("version", StoryContextAgentProjection.PROJECTION_VERSION);
-        envelope.put("selectedKnowledge", selectedKnowledge);
-        envelope.put("groundingContract", groundingContract == null ? Map.of() : groundingContract);
-        return envelope;
+        // Store the exact immutable V1 payload exposed to AI.
+        return storyAgentProjection;
     }
 
     private String sha256(String value) {
@@ -352,9 +359,7 @@ public class AnalyzeStoryContextUseCase {
         // Authoritative Java validation of AI output
         analysisResult = validateStoryContextAnalysisResult(analysisResult, task);
 
-        UUID storyId = UUID.fromString(
-                task.getContextSnapshot().get("storyId").toString()
-        );
+        UUID storyId = callbackStoryId(task);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> contextFreshness = task.getContextSnapshot() != null
@@ -362,7 +367,7 @@ public class AnalyzeStoryContextUseCase {
                 : null;
 
         StoryContextAnalysis analysis = StoryContextAnalysis.builder()
-                .story(storyRepository.findById(storyId).orElseThrow())
+                .story(storyId == null ? null : storyRepository.findById(storyId).orElseThrow())
                 .aiTask(task)
                 .analysisSnapshot(objectMapper.convertValue(analysisResult, Map.class))
                 .contextDigest(task.getContextDigest())
@@ -392,6 +397,10 @@ public class AnalyzeStoryContextUseCase {
         String expectedContext = task.getContextDigest();
         String expectedProjection = task.getProjectionDigest();
         String expectedSelection = task.getSelectionDigest();
+        String expectedProjectionVersion = String.valueOf(snapshot.get("projectionVersion"));
+        Object expectedScope = snapshot.get("scope");
+        Object expectedFreshness = snapshot.get("freshness");
+        Object expectedGrounding = snapshot.get("groundingDigest");
         if (expectedProjection == null || !expectedProjection.matches("[0-9a-f]{64}")) {
             throw new IllegalStateException("Story Context Analysis task is missing a valid projection digest");
         }
@@ -408,6 +417,20 @@ public class AnalyzeStoryContextUseCase {
         if (!Objects.equals(expectedSelection, metadata.selectionDigest())) {
             throw new IllegalStateException("Selection digest mismatch in callback");
         }
+        if (!Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, metadata.projectionVersion())
+                || !Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, expectedProjectionVersion)) {
+            throw new IllegalStateException("Projection version mismatch in callback");
+        }
+        if (!(metadata.scope() instanceof Map<?, ?>) || !Objects.equals(expectedScope, metadata.scope())) {
+            throw new IllegalStateException("Scope mismatch in callback");
+        }
+        if (!(metadata.freshness() instanceof Map<?, ?>) || !Objects.equals(expectedFreshness, metadata.freshness())) {
+            throw new IllegalStateException("Freshness mismatch in callback");
+        }
+        if (!(expectedGrounding instanceof String grounding) || !grounding.matches("[0-9a-f]{64}")
+                || !Objects.equals(grounding, metadata.groundingDigest())) {
+            throw new IllegalStateException("Grounding identity mismatch in callback");
+        }
         boolean hasIdentitySnapshot = snapshot.containsKey("contextDigest")
                 || snapshot.containsKey("projectionDigest") || snapshot.containsKey("selectionDigest");
         if (hasIdentitySnapshot && (!Objects.equals(expectedContext, snapshot.get("contextDigest"))
@@ -415,6 +438,17 @@ public class AnalyzeStoryContextUseCase {
                 || !Objects.equals(expectedSelection, snapshot.get("selectionDigest")))) {
             throw new IllegalStateException("AI task snapshot identity is incomplete or inconsistent");
         }
+        validateSnapshotScope(task);
+        if (!Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, snapshot.get("projectionVersion")))
+            throw new IllegalStateException("AI task snapshot projection version is missing or inconsistent");
+        if (!(snapshot.get("freshness") instanceof Map<?, ?>) || !(snapshot.get("groundingContract") instanceof Map<?, ?>))
+            throw new IllegalStateException("AI task snapshot freshness and grounding identity are required");
+        Object projection = snapshot.get("projection");
+        if (!(projection instanceof Map<?, ?> p)
+                || !Objects.equals(expectedContext, p.get("contextDigest"))
+                || !Objects.equals(expectedProjection, p.get("projectionDigest"))
+                || !Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, p.get("projectionVersion")))
+            throw new IllegalStateException("AI task snapshot projection identity is incomplete or inconsistent");
     }
 
     /**
@@ -429,7 +463,7 @@ public class AnalyzeStoryContextUseCase {
                 ? (Map<String, Object>) task.getContextSnapshot().get("groundingContract")
                 : Map.of();
 
-        Set<String> allowedRefSet = allowedGroundingReferences(groundingContract);
+        Set<String> allowedRefSet = allowedGroundingReferences(groundingContract, task);
 
         // Validate context digest consistency
         String expectedDigest = task.getContextDigest();
@@ -480,7 +514,11 @@ public class AnalyzeStoryContextUseCase {
     }
 
     @SuppressWarnings("unchecked")
-    private static Set<String> allowedGroundingReferences(Map<String, Object> groundingContract) {
+    private static Set<String> allowedGroundingReferences(Map<String, Object> groundingContract, AiTask task) {
+        if (groundingContract.containsKey("allowedEvidenceReferences")
+                || "legacy-grounding/v0".equals(groundingContract.get("groundingContractVersion"))) {
+            throw new IllegalStateException("legacy grounding is forbidden in Story Context V1");
+        }
         Object typed = groundingContract.get("allowedGroundingReferences");
         if (typed instanceof List<?> entries) {
             Set<String> refs = new LinkedHashSet<>();
@@ -490,25 +528,84 @@ public class AnalyzeStoryContextUseCase {
                 }
                 Object type = map.get("type");
                 Object ref = map.get("ref");
-                Object scope = map.get("scope");
                 if (!"REPOSITORY_EVIDENCE".equals(type) || !(ref instanceof String value)
-                        || value.isBlank() || !(scope instanceof Map<?, ?> scopeMap)
-                        || !(scopeMap.get("project") instanceof String project) || project.isBlank()
-                        || !(scopeMap.get("revision") instanceof String revision) || revision.isBlank()
+                        || value.isBlank() || !"PROJECT_REVISION".equals(map.get("scope"))
+                        || !(map.get("project") instanceof String project) || project.isBlank()
+                        || !(map.get("revision") instanceof String revision) || revision.isBlank()
+                        || !(map.get("provenance") instanceof Map<?, ?>)
+                        || !(map.get("trust") instanceof String trust) || trust.isBlank()
                         || !Objects.equals(ref, map.get("coreReference"))
                         || !Objects.equals(ref, map.get("taskReference"))) {
                     throw new IllegalStateException("Invalid typed grounding reference");
                 }
+                Object snapshotScope = taskSnapshotScope(task);
+                if (!(snapshotScope instanceof Map<?, ?> requested)
+                        || !Objects.equals(project, requested.get("projectSlug"))) {
+                    throw new IllegalStateException("Grounding project does not match requested scope");
+                }
+                if (!Objects.equals(revision, snapshotRevision(task))) throw new IllegalStateException("Grounding revision does not match PROJECT_REVISION snapshot");
+                Map<String, Object> evidence = snapshotEvidence(task, value);
+                if (evidence == null || !Objects.equals(map.get("provenance"), evidence.get("provenance"))) throw new IllegalStateException("Grounding provenance does not match snapshot evidence");
                 refs.add(value);
             }
             return refs;
         }
-        Object legacy = groundingContract.getOrDefault("allowedEvidenceReferences", List.of());
-        if (!(legacy instanceof List<?> values)) {
-            throw new IllegalStateException("Grounding allow-list is missing");
+        if (!"story-context-grounding/v1".equals(groundingContract.get("groundingContractVersion"))) {
+            throw new IllegalStateException("V1 grounding requires the typed allow-list contract");
         }
-        return values.stream().filter(String.class::isInstance).map(String.class::cast)
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        throw new IllegalStateException("V1 grounding typed allow-list is missing or invalid");
+    }
+
+    private static void validateSnapshotScope(AiTask task) {
+        Object raw = taskSnapshotScope(task);
+        if (!(raw instanceof Map<?, ?> scope)) throw new IllegalStateException("AI task snapshot scope is missing");
+        Set<String> keys = Set.of("projectSlug", "storyId", "intent", "files");
+        if (!scope.keySet().stream().allMatch(keys::contains)
+                || scope.get("projectSlug") == null || scope.get("files") == null)
+            throw new IllegalStateException("AI task snapshot scope is incomplete or inconsistent");
+        if ((scope.containsKey("intent") && !Objects.equals(task.getIntentId(), scope.get("intent")))
+                || !Objects.equals(task.getContextSnapshot().get("storyId"), scope.get("storyId"))) {
+            throw new IllegalStateException("AI task scope does not match its intent or story");
+        }
+        Object projection = task.getSelectedKnowledgeSnapshot();
+        if (projection instanceof Map<?, ?> p && p.get("request") instanceof Map<?, ?> request && !Objects.equals(scope, request)) throw new IllegalStateException("AI task snapshot scope does not match request scope");
+    }
+
+    private static UUID callbackStoryId(AiTask task) {
+        Map<String, Object> snapshot = task.getContextSnapshot();
+        Object rawStoryId = null;
+        if (snapshot != null && snapshot.get("scope") instanceof Map<?, ?> scope) {
+            rawStoryId = scope.get("storyId");
+        }
+        if (rawStoryId == null && snapshot != null) rawStoryId = snapshot.get("storyId");
+        return rawStoryId == null ? null : UUID.fromString(rawStoryId.toString());
+    }
+
+    private static String snapshotRevision(AiTask task) {
+        Object raw = task.getSelectedKnowledgeSnapshot();
+        if (!(raw instanceof Map<?, ?> snapshot)) throw new IllegalStateException("Selected snapshot is missing");
+        Object freshness = snapshot.get("freshness");
+        if (freshness instanceof Map<?, ?> f && f.get("sourceRevision") instanceof Map<?, ?> source && source.get("revision") instanceof String revision && !revision.isBlank()) return revision;
+        throw new IllegalStateException("PROJECT_REVISION snapshot revision is missing");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> snapshotEvidence(AiTask task, String reference) {
+        Object raw = task.getSelectedKnowledgeSnapshot();
+        if (!(raw instanceof Map<?, ?> snapshot)) return null;
+        Object context = snapshot.get("context");
+        Object entries = context instanceof Map<?, ?> c ? c.get("repositoryEvidence") : null;
+        if (!(entries instanceof List<?>)) {
+            context = snapshot.get("repositoryContext");
+            entries = context instanceof Map<?, ?> c ? c.get("evidence") : null;
+        }
+        if (!(entries instanceof List<?> list)) return null;
+        for (Object entry : list) if (entry instanceof Map<?, ?> e && Objects.equals(reference, e.get("reference"))) return (Map<String, Object>) e;
+        return null;
+    }
+
+    private static Object taskSnapshotScope(AiTask task) {
+        return task.getContextSnapshot() == null ? null : task.getContextSnapshot().get("scope");
     }
 
     @SuppressWarnings("unchecked")

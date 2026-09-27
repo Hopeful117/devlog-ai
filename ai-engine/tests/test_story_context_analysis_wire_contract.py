@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from openai.lib._parsing import type_to_response_format_param
 from pydantic import ValidationError
@@ -118,8 +120,36 @@ async def test_production_generation_uses_provider_model_before_adapting(monkeyp
         generation_module.StoryContextAnalysisGenerationService
     )
     service._provider = object()
-    output = await service._generate_and_validate(object(), {}, {}, FakeTraces(None, None))
+    output = await service._generate_and_validate(object(), {}, {"groundingContractVersion": "story-context-grounding/v1", "allowedGroundingReferences": []}, FakeTraces(None, None))
 
     assert captured["response_model"] is ProviderStoryContextAnalysisResult
     assert output.confidence.level == "HIGH"
     assert output.confidence.rationale == ""
+
+
+def test_story_context_prompt_preserves_null_story_id_but_omits_optional_nulls():
+    request = load_scenario("engineering-story-context-analysis-v1").prompt_request
+    prompt = StoryContextAnalysisPromptBuilder().build(request)
+    rendered = prompt.user_message.split("SELECTED KNOWLEDGE\n", 1)[1].split("\n\nUSER GUIDANCE", 1)[0]
+    payload = json.loads(rendered)
+
+    assert payload["request"]["storyId"] is None
+    assert payload["requestEcho"]["storyId"] is None
+    assert payload["scope"]["storyId"] is None
+    assert "compatibility" not in payload
+
+
+def test_prompt_construction_failure_keeps_core_identity_metadata():
+    request = load_scenario("engineering-story-context-analysis-v1").prompt_request
+    service = generation_module.StoryContextAnalysisGenerationService.__new__(
+        generation_module.StoryContextAnalysisGenerationService
+    )
+    metadata = service._failure_execution_metadata(request)
+
+    assert metadata.context_digest == request.context_digest
+    assert metadata.projection_digest == request.projection_digest
+    assert metadata.projection_version == request.metadata.get("projectionVersion")
+    assert metadata.scope == request.metadata.get("scope")
+    assert metadata.freshness == request.metadata.get("freshness")
+    assert metadata.grounding_digest == request.metadata.get("groundingDigest")
+    assert metadata.provider == "unavailable"

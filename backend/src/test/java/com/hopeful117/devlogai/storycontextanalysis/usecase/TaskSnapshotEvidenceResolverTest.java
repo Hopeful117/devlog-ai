@@ -32,9 +32,32 @@ class TaskSnapshotEvidenceResolverTest {
     }
 
     @Test
+    void resolvesCanonicalProjectionRepositoryEvidenceForCallbackGrounding() {
+        AiTask task = task();
+        Map<String, Object> evidence = Map.of(
+                "reference", REFERENCE,
+                "content", Map.of("status", "COMPLETE", "text", "Canonical projection content", "revision", "rev-1"));
+        task.setSelectedKnowledgeSnapshot(Map.of(
+                "context", Map.of("repositoryEvidence", List.of(evidence)),
+                "groundingContract", Map.of("allowedGroundingReferences", List.of(Map.of(
+                        "type", "REPOSITORY_EVIDENCE", "ref", REFERENCE, "scope", "PROJECT_REVISION",
+                        "project", "devlog-ai", "revision", "rev-1")))));
+
+        var bound = resolver.bind(assessment(new StoryContextAnalysisResult.EvidenceLocator(
+                StoryContextAnalysisResult.EvidenceLocator.LocatorKind.LINE_RANGE, 1, 1, null), null), task);
+
+        assertEquals("Canonical projection content", bound.evidenceAssertions().getFirst().resolvedContent());
+    }
+
+    @Test
     void resolvesOnlyTheOriginatingTaskSnapshotContent() {
         var task = task();
         task.setSelectedKnowledgeSnapshot(Map.of(
+                "scope", Map.of("projectSlug", "devlog-ai", "revision", "rev-1"),
+                "groundingContract", Map.of("allowedGroundingReferences", List.of(Map.of(
+                        "type", "REPOSITORY_EVIDENCE", "ref", REFERENCE, "scope", "PROJECT_REVISION",
+                        "project", "devlog-ai", "revision", "rev-1")),
+                        "allowedEvidenceReferences", List.of(REFERENCE)),
                 "repositoryContext", Map.of("evidence", List.of(Map.of(
                         "reference", REFERENCE,
                         "content", Map.of(
@@ -90,6 +113,19 @@ class TaskSnapshotEvidenceResolverTest {
         assertThrows(IllegalStateException.class, () -> resolver.bind(assessment, reduced));
     }
 
+    @Test
+    void rejectsRepositoryWideReferenceForStoryAgentV1() {
+        var assessment = assessment(new StoryContextAnalysisResult.EvidenceLocator(
+                StoryContextAnalysisResult.EvidenceLocator.LocatorKind.LINE_RANGE, 1, 1, null), null);
+        AiTask legacyScoped = task();
+        legacyScoped.setAiReferenceMappingSnapshot(AiReferenceMappingSnapshot.from(
+                new AiReferenceRegistry(List.of(new AiReferenceBinding(
+                        new AiReference(AiReferenceType.REPOSITORY_EVIDENCE, REFERENCE, AiReferenceScope.REPOSITORY),
+                        "REPOSITORY_EVIDENCE", REFERENCE, Set.of("EVIDENCE_REFERENCE"))))).asMap());
+
+        assertThrows(IllegalStateException.class, () -> resolver.bind(assessment, legacyScoped));
+    }
+
     private StoryContextAnalysisResult.CausalAssessment assessment(
             StoryContextAnalysisResult.EvidenceLocator locator, String excerpt) {
         var assertion = new StoryContextAnalysisResult.EvidenceAssertion(
@@ -107,7 +143,7 @@ class TaskSnapshotEvidenceResolverTest {
     private AiTask task() {
         AiReferenceRegistry registry = new AiReferenceRegistry(List.of(
                 new AiReferenceBinding(
-                        new AiReference(AiReferenceType.REPOSITORY_EVIDENCE, REFERENCE, AiReferenceScope.REPOSITORY),
+                        new AiReference(AiReferenceType.REPOSITORY_EVIDENCE, REFERENCE, AiReferenceScope.PROJECT_REVISION),
                         "REPOSITORY_EVIDENCE", REFERENCE, Set.of("EVIDENCE_REFERENCE"))));
         Map<String, Object> evidence = Map.of(
                 "reference", REFERENCE,
@@ -115,10 +151,25 @@ class TaskSnapshotEvidenceResolverTest {
                         "status", "COMPLETE",
                         "text", "Introduction\nDecision\nThis is the authoritative relationship.\nConclusion",
                         "revision", "rev-1"));
+        return taskWithEvidence(List.of(evidence));
+    }
+
+    private AiTask taskWithEvidence(List<Map<String, Object>> evidence) {
+        AiReferenceRegistry registry = new AiReferenceRegistry(List.of(new AiReferenceBinding(new AiReference(AiReferenceType.REPOSITORY_EVIDENCE, REFERENCE, AiReferenceScope.PROJECT_REVISION), "REPOSITORY_EVIDENCE", REFERENCE, Set.of("EVIDENCE_REFERENCE"))));
+        Map<String, Object> typedReference = Map.of(
+                "type", "REPOSITORY_EVIDENCE", "ref", REFERENCE,
+                "coreReference", REFERENCE, "taskReference", REFERENCE,
+                "scope", "PROJECT_REVISION", "project", "devlog-ai", "revision", "rev-1");
+        Map<String, Object> contract = Map.of(
+                "allowedGroundingReferences", List.of(typedReference),
+                "allowedEvidenceReferences", List.of(REFERENCE));
         Map<String, Object> snapshot = Map.of(
-                "repositoryContext", Map.of("evidence", List.of(evidence)));
+                "scope", Map.of("projectSlug", "devlog-ai", "revision", "rev-1"),
+                "groundingContract", contract,
+                "repositoryContext", Map.of("evidence", evidence));
         return AiTask.builder()
                 .selectedKnowledgeSnapshot(snapshot)
+                .contextSnapshot(snapshot)
                 .aiReferenceMappingSnapshot(AiReferenceMappingSnapshot.from(registry).asMap())
                 .build();
     }

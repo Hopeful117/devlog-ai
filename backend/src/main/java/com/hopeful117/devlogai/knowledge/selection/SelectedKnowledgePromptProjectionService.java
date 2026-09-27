@@ -53,7 +53,7 @@ public class SelectedKnowledgePromptProjectionService {
     /** Projects only the v3 provider contract; Core-only binding metadata stays internal. */
     public Map<String, Object> toTypedArchitectureOverviewMap(SelectedKnowledge selectedKnowledge) {
         Map<String, Object> legacy = toMap(selectedKnowledge);
-        AiReferenceRegistry registry = AiReferenceRegistryFactory.create(selectedKnowledge);
+        AiReferenceRegistry registry = AiReferenceRegistryFactory.createLegacy(selectedKnowledge);
         Map<String, Object> context = new LinkedHashMap<>(legacy);
         context.put("selectedFacts", typedItems(legacy.get("selectedFacts"), registry,
                 AiReferenceType.FACT, AiReferenceScope.ANALYSIS_CONTEXT));

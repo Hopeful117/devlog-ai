@@ -16,6 +16,7 @@ import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
+import com.hopeful117.devlogai.contracts.engineeringcontext.ContextRequestEcho;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextFreshness;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextMetadata;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidence;
@@ -24,6 +25,14 @@ import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysis
 import com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier;
 import com.hopeful117.devlogai.engineeringcontext.EngineeringContextFacade;
 import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
+import com.hopeful117.devlogai.engineeringcontext.CanonicalContextDigest;
+import com.hopeful117.devlogai.repositorycontext.ContextProfile;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
+import com.hopeful117.devlogai.repositorycontext.RepositoryContextDiagnostics;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
+import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.project.entity.Project;
@@ -46,6 +55,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 import java.lang.reflect.Method;
@@ -75,6 +85,11 @@ class AnalyzeStoryContextUseCaseTest {
             "document:00000000-0000-0000-0000-000000000001:docs/stories/0119/story.md@abc123def";
     private static final String PROVENANCE_IDENTIFIER = "fact:historical-provenance";
     private static final String RELATED_REFERENCE = "src/main/java/Related.java";
+    private static final String PROJECT_REVISION = "repository-revision";
+    private static final Map<String, Object> CALLBACK_FRESHNESS = Map.of(
+            "sourceRevision", Map.of("kind", "PROJECT_REVISION", "project", PROJECT_SLUG,
+                    "revision", PROJECT_REVISION),
+            "state", "STALE");
 
     @Mock private ProjectRepository projectRepository;
     @Mock private EngineeringStoryRepository storyRepository;
@@ -114,9 +129,12 @@ class AnalyzeStoryContextUseCaseTest {
         EngineeringStory story = story(storyId, project);
         EngineeringContext engineeringContext = engineeringContext();
         CanonicalEngineeringContext canonicalContext = new CanonicalEngineeringContext(
-                engineeringContext, null, CONTEXT_DIGEST, "engineering-context-v2", null,
+                engineeringContext, repositoryContext(), CONTEXT_DIGEST, "engineering-context-v2",
+                new ContextRequestEcho(PROJECT_SLUG, INTENT_ID,
+                        List.of(CANONICAL_REFERENCE), storyId),
                 Map.of("status", "STALE", "repositoryRevision", "repository-revision"),
-                Map.of("evidenceCount", 1), Map.of(DOCUMENT_REFERENCE, "TECHNICAL_EVIDENCE"),
+                Map.of("candidateCount", 1, "selectedCount", 1, "discardedCount", 0,
+                        "usedTokens", 100, "budget", 10_000), Map.of(DOCUMENT_REFERENCE, "TECHNICAL_EVIDENCE"),
                 List.of(new EvidenceRef(DOCUMENT_REFERENCE, "document://story-0119")));
         IntentDefinition intent = intent();
         AiTask task = AiTask.builder()
@@ -155,34 +173,17 @@ class AnalyzeStoryContextUseCaseTest {
         verify(aiEngineClient).submit(promptCaptor.capture());
         PromptRequest request = promptCaptor.getValue();
         assertEquals("engineering-context-v2",
-                ((Map<?, ?>) request.selectedKnowledge().get("canonicalContext")).get("contextVersion"));
+                ((Map<?, ?>) request.selectedKnowledge().get("policy")).get("compositionVersion"));
         assertTrue(request.selectedKnowledge().keySet().containsAll(List.of(
-                "project", "analysis", "projectProfile", "selectedFacts",
-                "selectedObservations", "diagnostics", "selectedInsights",
-                "selectionMetadata", "repositoryContext", "engineeringStories")));
+                "contractVersion", "projectionVersion", "contextDigest", "request", "freshness",
+                "context", "groundingCandidates", "accounting", "policy")));
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> projectedEvidence = request.selectedKnowledge().get("repositoryContext") instanceof Map<?, ?> repository
-                && repository.get("evidence") instanceof List<?> evidence
-                ? (List<Map<String, Object>>) evidence : List.of();
-        assertTrue(projectedEvidence.isEmpty());
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> projectedStories =
-                (List<Map<String, Object>>) request.selectedKnowledge().get("engineeringStories");
-        assertEquals(storyId.toString(), projectedStories.get(0).get("id"));
         ArgumentCaptor<UUID> executionAnalysisId = ArgumentCaptor.forClass(UUID.class);
         verify(aiTaskService).createForStoryContextAnalysisEntity(
                 executionAnalysisId.capture(), eq(AiTaskType.STORY_CONTEXT_ANALYSIS), eq(INTENT_ID), eq("v1"),
                 eq("story-context-analysis-prompt-v1"), any(), any(String.class),
                 any(), eq(null), any(AiReferenceRegistry.class));
-        @SuppressWarnings("unchecked")
-        List<String> allowedEvidenceReferences = (List<String>) request.groundingContract()
-                .get("allowedEvidenceReferences");
-        assertEquals(List.of(DOCUMENT_REFERENCE), allowedEvidenceReferences);
-        assertFalse(allowedEvidenceReferences.contains(CANONICAL_REFERENCE));
-        assertFalse(((List<?>) request.groundingContract().get("allowedEvidenceReferences"))
-                .contains(PROVENANCE_IDENTIFIER));
-        assertFalse(((List<?>) request.groundingContract().get("allowedEvidenceReferences"))
-                .contains(RELATED_REFERENCE));
+        assertFalse(request.groundingContract().containsKey("allowedEvidenceReferences"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> typedGrounding =
                 (List<Map<String, Object>>) request.groundingContract().get("allowedGroundingReferences");
@@ -190,27 +191,47 @@ class AnalyzeStoryContextUseCaseTest {
         assertEquals(DOCUMENT_REFERENCE, typedGrounding.get(0).get("ref"));
         assertEquals(DOCUMENT_REFERENCE, typedGrounding.get(0).get("coreReference"));
         assertEquals(DOCUMENT_REFERENCE, typedGrounding.get(0).get("taskReference"));
-        assertTrue(((Map<?, ?>) typedGrounding.get(0).get("scope")).containsKey("project"));
-        assertTrue(((Map<?, ?>) typedGrounding.get(0).get("scope")).containsKey("revision"));
+        assertEquals("PROJECT_REVISION", typedGrounding.get(0).get("scope"));
+        assertEquals(PROJECT_SLUG, typedGrounding.get(0).get("project"));
+        assertEquals("repository-revision", typedGrounding.get(0).get("revision"));
         assertEquals(64, request.contextDigest().length());
         assertNotNull(request.projectionDigest());
         assertEquals(request.projectionDigest(), request.metadata().get("projectionDigest"));
-        assertEquals(StoryContextAgentProjection.PROJECTION_VERSION,
+        assertEquals(StoryContextAgentProjectionV1.CONTRACT_VERSION,
                 request.metadata().get("contractVersion"));
-        assertEquals(StoryContextAgentProjection.PROJECTION_VERSION,
+        assertEquals(StoryContextAgentProjectionV1.PROJECTION_VERSION,
                 request.metadata().get("projectionVersion"));
-        assertEquals(StoryContextAgentProjection.PROJECTION_VERSION,
-                task.getContextSnapshot().get("projectionVersion"));
         @SuppressWarnings("unchecked")
         Map<String, Object> persistedProjection =
                 (Map<String, Object>) task.getContextSnapshot().get("projection");
-        assertEquals(StoryContextAgentProjection.PROJECTION_VERSION, persistedProjection.get("version"));
-        assertEquals(request.selectedKnowledge(), persistedProjection.get("selectedKnowledge"));
-        assertEquals(request.groundingContract(), persistedProjection.get("groundingContract"));
+        assertEquals(StoryContextAgentProjectionV1.PROJECTION_VERSION, persistedProjection.get("projectionVersion"));
+        assertEquals(request.selectedKnowledge(), persistedProjection);
+        assertEquals(StoryContextAgentProjectionV1.CONTRACT_VERSION, persistedProjection.get("contractVersion"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectionGrounding = (Map<String, Object>) persistedProjection.get("groundingCandidates");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> projectionReferences =
+                (List<Map<String, Object>>) projectionGrounding.get("repositoryEvidence");
+        assertFalse(projectionReferences.isEmpty());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> snapshotEvidence =
+                (List<Map<String, Object>>) ((Map<String, Object>) persistedProjection.get("context"))
+                        .get("repositoryEvidence");
+        assertEquals(1, snapshotEvidence.size());
+        assertEquals(DOCUMENT_REFERENCE, snapshotEvidence.get(0).get("reference"));
+        assertEquals(Map.of("sourceType", "REPOSITORY", "repositoryLocation", "devlog://evidence/canonical",
+                        "originatingFile", "docs/stories/0119/story.md", "identifier", PROVENANCE_IDENTIFIER),
+                snapshotEvidence.get(0).get("provenance"));
+        assertEquals(PROJECT_REVISION,
+                ((Map<String, Object>) snapshotEvidence.get(0).get("content")).get("revision"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> projectionReference =
+                (Map<String, Object>) projectionReferences.get(0).get("reference");
+        assertEquals(Set.of("type", "ref", "scope"), projectionReference.keySet());
+        assertEquals(request.selectedKnowledge().get("requestEcho"), persistedProjection.get("requestEcho"));
+        assertEquals(request.selectedKnowledge().get("requestEcho"), task.getContextSnapshot().get("requestEcho"));
         assertEquals(request.groundingContract(), task.getContextSnapshot().get("groundingContract"));
-        assertEquals(request.projectionDigest(),
-                projectionDigest((Map<String, Object>) persistedProjection.get("selectedKnowledge"),
-                        (Map<String, Object>) persistedProjection.get("groundingContract")));
+        assertEquals(request.projectionDigest(), projectionDigest(persistedProjection));
         assertEquals(request.projectionDigest(), task.getProjectionDigest());
         assertEquals(null, task.getSelectionDigest());
         assertEquals(null, task.getSelectionVersion());
@@ -221,10 +242,10 @@ class AnalyzeStoryContextUseCaseTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> freshness = (Map<String, Object>) task.getContextSnapshot()
                 .get("contextFreshness");
-        assertEquals("STALE", freshness.get("status"));
-        assertEquals("repository-revision", freshness.get("repositoryRevision"));
-        assertEquals(CONTEXT_DIGEST, task.getContextSnapshot().get("contextDigest"));
-        assertEquals(null, task.getContextSnapshot().get("selectionDigest"));
+        assertEquals("STALE", freshness.get("state"));
+        assertEquals(Map.of("kind", "PROJECT_REVISION", "project", PROJECT_SLUG, "revision", PROJECT_REVISION), freshness.get("sourceRevision"));
+        assertEquals(request.contextDigest(), task.getContextSnapshot().get("contextDigest"));
+        assertFalse(task.getContextSnapshot().containsKey("selectionDigest"));
         assertEquals(task.getProjectionDigest(), task.getContextSnapshot().get("projectionDigest"));
         assertEquals("devlog-ai", ((Map<?, ?>) task.getContextSnapshot().get("scope")).get("projectSlug"));
         assertTrue(task.getContextSnapshot().containsKey("requestEcho"));
@@ -238,46 +259,36 @@ class AnalyzeStoryContextUseCaseTest {
         assertTrue(task.getContextSnapshot().containsKey("projection"));
         @SuppressWarnings("unchecked")
         Map<String, Object> policy = (Map<String, Object>) task.getContextSnapshot().get("policy");
-        assertEquals(StoryContextAgentProjection.PROJECTION_VERSION, policy.get("contractVersion"));
+        assertEquals(StoryContextAgentProjectionV1.PROJECTION_VERSION, policy.get("contractVersion"));
         assertEquals(request.projectionDigest(), policy.get("projectionDigest"));
         verify(aiTaskService).submit(eq(task.getId()), any());
     }
 
     @Test
-    void projectionDigestChangesForGroundingAndSelectedKnowledgeAndIgnoresMapOrder() throws Exception {
-        Map<String, Object> selected = new LinkedHashMap<>();
-        Map<String, Object> selectedKnowledge = new LinkedHashMap<>();
-        selectedKnowledge.put("answer", "one");
-        selectedKnowledge.put("context", "stable");
-        selected.put("selectedKnowledge", selectedKnowledge);
-        Map<String, Object> grounding = new LinkedHashMap<>();
-        grounding.put("allowedEvidenceReferences", List.of(DOCUMENT_REFERENCE));
+    void projectionDigestCoversCompleteV1PayloadAndIgnoresMapOrder() {
+        Map<String, Object> projection = new LinkedHashMap<>();
+        projection.put("contractVersion", StoryContextAgentProjectionV1.CONTRACT_VERSION);
+        projection.put("projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION);
+        projection.put("contextDigest", CONTEXT_DIGEST);
+        projection.put("requestEcho", new LinkedHashMap<>(Map.of("projectSlug", PROJECT_SLUG)));
+        projection.put("context", new LinkedHashMap<>(Map.of("summary", "stable")));
+        projection.put("groundingCandidates", List.of(Map.of("reference", CANONICAL_REFERENCE)));
+        projection.put("policy", new LinkedHashMap<>(Map.of("projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION)));
 
-        String baseline = projectionDigest(selected, grounding);
-        Map<String, Object> changedGrounding = new LinkedHashMap<>(grounding);
-        changedGrounding.put("causalAnswerRequired", true);
-        assertNotEquals(baseline, projectionDigest(selected, changedGrounding));
+        String baseline = projectionDigest(projection);
+        Map<String, Object> changedContext = new LinkedHashMap<>(projection);
+        changedContext.put("context", Map.of("summary", "changed"));
+        assertNotEquals(baseline, projectionDigest(changedContext));
 
-        Map<String, Object> changedSelected = new LinkedHashMap<>(selected);
-        changedSelected.put("selectedKnowledge", new LinkedHashMap<>(Map.of("answer", "two")));
-        assertNotEquals(baseline, projectionDigest(changedSelected, grounding));
-
-        Map<String, Object> reorderedSelected = new LinkedHashMap<>();
-        Map<String, Object> reorderedKnowledge = new LinkedHashMap<>();
-        reorderedKnowledge.put("context", "stable");
-        reorderedKnowledge.put("answer", "one");
-        reorderedSelected.put("selectedKnowledge", reorderedKnowledge);
-        Map<String, Object> reorderedGrounding = new LinkedHashMap<>();
-        reorderedGrounding.put("allowedEvidenceReferences", List.of(DOCUMENT_REFERENCE));
-        assertEquals(baseline, projectionDigest(reorderedSelected, reorderedGrounding));
+        Map<String, Object> reordered = new LinkedHashMap<>();
+        projection.forEach((key, value) -> reordered.put(key, value));
+        assertEquals(baseline, projectionDigest(reordered));
     }
 
-    private String projectionDigest(Map<String, Object> selected, Map<String, Object> grounding)
-            throws Exception {
-        Method method = AnalyzeStoryContextUseCase.class.getDeclaredMethod(
-                "digestProjection", Map.class, Map.class);
-        method.setAccessible(true);
-        return (String) method.invoke(useCase, selected, grounding);
+    private String projectionDigest(Map<String, Object> projection) {
+        Map<String, Object> identity = new LinkedHashMap<>(projection);
+        identity.remove("projectionDigest");
+        return CanonicalContextDigest.calculate(identity);
     }
 
     @Test
@@ -348,7 +359,7 @@ class AnalyzeStoryContextUseCaseTest {
         AiTask task = callbackTask(correlationId, storyId, CANONICAL_REFERENCE, freshness);
         Instant completedAt = Instant.parse("2026-09-09T10:00:00Z");
         AiTaskResultRequest request = completedRequest(
-                correlationId, completedAt, groundedResult(CANONICAL_REFERENCE));
+                correlationId, completedAt, storyId, groundedResult(CANONICAL_REFERENCE));
 
         when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
                 .thenReturn(Optional.of(task));
@@ -377,6 +388,7 @@ class AnalyzeStoryContextUseCaseTest {
         AiTaskResultRequest request = completedRequest(
                 correlationId,
                 Instant.parse("2026-09-09T10:00:00Z"),
+                storyId,
                 groundedResult("src/main/java/Fabricated.java")
         );
         when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
@@ -419,7 +431,7 @@ class AnalyzeStoryContextUseCaseTest {
             IllegalStateException error = assertThrows(
                     IllegalStateException.class,
                     () -> useCase.handleCallback(correlationId, completedRequest(
-                            correlationId, Instant.parse("2026-09-09T10:00:00Z"), result))
+                            correlationId, Instant.parse("2026-09-09T10:00:00Z"), storyId, result))
             );
 
             assertTrue(error.getMessage().contains("relationType"), error.getMessage());
@@ -448,7 +460,7 @@ class AnalyzeStoryContextUseCaseTest {
                     .thenReturn(Optional.of(callbackTask(correlationId, storyId, CANONICAL_REFERENCE, Map.of())));
 
             useCase.handleCallback(correlationId, completedRequest(
-                    correlationId, Instant.parse("2026-09-09T10:00:00Z"), result));
+                    correlationId, Instant.parse("2026-09-09T10:00:00Z"), storyId, result));
         }
 
         verify(storyContextAnalysisRepository, times(2)).save(any());
@@ -469,6 +481,7 @@ class AnalyzeStoryContextUseCaseTest {
         AiTaskResultRequest request = completedRequest(
                 correlationId,
                 Instant.parse("2026-09-09T10:00:00Z"),
+                storyId,
                 resultWithCausalClaims(claim));
         when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId)).thenReturn(Optional.of(task));
 
@@ -576,10 +589,26 @@ class AnalyzeStoryContextUseCaseTest {
                 IllegalStateException.class,
                 () -> useCase.handleCallback(
                         correlationId,
-                        completedRequest(correlationId, Instant.parse("2026-09-09T10:00:00Z"), groundedResult(CANONICAL_REFERENCE))));
+                        completedRequest(correlationId, Instant.parse("2026-09-09T10:00:00Z"), storyId, groundedResult(CANONICAL_REFERENCE))));
 
         assertTrue(error.getMessage().contains("causalClaims must not be empty"));
         verify(storyContextAnalysisRepository, never()).save(any());
+    }
+
+    @Test
+    void canonicalRevisionRejectsUnresolvableSentinelsFailClosed() {
+        for (String revision : List.of("UNKNOWN", "UNSPECIFIED")) {
+            CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                    engineeringContext(), repositoryContext(), CONTEXT_DIGEST, "engineering-context-v2",
+                    new ContextRequestEcho(PROJECT_SLUG, INTENT_ID, List.of(CANONICAL_REFERENCE), null),
+                    Map.of("sourceRevision", Map.of("kind", "PROJECT_REVISION",
+                            "project", PROJECT_SLUG, "revision", revision)),
+                    Map.of("candidateCount", 1, "selectedCount", 1, "discardedCount", 0,
+                            "usedTokens", 1, "budget", 10), Map.of(), List.of());
+            IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                    () -> StoryContextAgentProjectionV1.canonicalRevision(canonical));
+            assertTrue(error.getMessage().contains("not resolvable"));
+        }
     }
 
     private EngineeringContext engineeringContext() {
@@ -596,6 +625,21 @@ class AnalyzeStoryContextUseCaseTest {
                 new EngineeringContextMetadata(
                         1, 1, false, 1, CONTEXT_DIGEST, List.of(), freshness),
                 List.of(), null);
+    }
+
+    private RepositoryContext repositoryContext() {
+        RepositoryEvidence evidence = new RepositoryEvidence(
+                RepositoryContextLayer.PROJECT_DOCUMENTATION, "DOCUMENT", DOCUMENT_REFERENCE,
+                "Canonical evidence", Instant.parse("2026-09-08T10:00:00Z"), EvidenceScore.unscored(),
+                List.of(), new RepositoryEvidence.EvidenceProvenance(
+                        "REPOSITORY", "devlog://evidence/canonical", "docs/stories/0119/story.md",
+                        PROVENANCE_IDENTIFIER), Map.of(), 100, List.of(),
+                new RepositoryEvidenceContent(RepositoryEvidenceContent.Status.COMPLETE,
+                        "Canonical evidence", null, null, null, "repository-revision"));
+        return new RepositoryContext(
+                "engineering-context-v2", ContextProfile.ENGINEERING_STORY, List.of(), "v1", List.of(),
+                List.of(evidence), Map.of(), RepositoryContextDiagnostics.empty(), new RepositoryContext.ContextBudget(50, 200, 10, 10000),
+                100, 1, 0, false, List.of(), List.of(), "repository-context-digest");
     }
 
     private IntentDefinition intent() {
@@ -621,15 +665,68 @@ class AnalyzeStoryContextUseCaseTest {
             boolean causalAnswerRequired
     ) {
         Map<String, Object> groundingContract = new LinkedHashMap<>();
-        groundingContract.put("allowedEvidenceReferences", List.of(allowedReference));
+        Map<String, Object> evidenceProvenance = Map.of(
+                "source", "REPOSITORY",
+                "locator", "devlog://evidence/canonical",
+                "path", "docs/stories/0119/story.md",
+                "identifier", PROVENANCE_IDENTIFIER);
+        Map<String, Object> typedReference = new LinkedHashMap<>();
+        typedReference.put("type", "REPOSITORY_EVIDENCE");
+        typedReference.put("ref", allowedReference);
+        typedReference.put("coreReference", allowedReference);
+        typedReference.put("taskReference", allowedReference);
+        typedReference.put("scope", "PROJECT_REVISION");
+        typedReference.put("project", PROJECT_SLUG);
+        typedReference.put("revision", PROJECT_REVISION);
+        typedReference.put("provenance", evidenceProvenance);
+        typedReference.put("trust", "TECHNICAL_EVIDENCE");
+        groundingContract.put("allowedGroundingReferences", List.of(typedReference));
+        groundingContract.put("groundingContractVersion", "story-context-grounding/v1");
         groundingContract.put("causalAnswerRequired", causalAnswerRequired);
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("storyId", storyId.toString());
+        snapshot.put("scope", Map.of(
+                "projectSlug", PROJECT_SLUG,
+                "storyId", storyId.toString(),
+                "intent", INTENT_ID,
+                "files", List.of(CANONICAL_REFERENCE)));
         snapshot.put("groundingContract", groundingContract);
         snapshot.put("contextFreshness", freshness);
+        snapshot.put("projectionVersion", "sca/v1");
+        snapshot.put("freshness", CALLBACK_FRESHNESS);
+        snapshot.put("groundingDigest", "d".repeat(64));
         snapshot.put("contextDigest", CONTEXT_DIGEST);
         snapshot.put("selectionDigest", null);
         snapshot.put("projectionDigest", PROJECTION_DIGEST);
+        snapshot.put("projection", Map.ofEntries(
+                Map.entry("contractVersion", StoryContextAgentProjectionV1.CONTRACT_VERSION),
+                Map.entry("projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION),
+                Map.entry("contextDigest", CONTEXT_DIGEST),
+                Map.entry("request", snapshot.get("scope")),
+                Map.entry("requestEcho", snapshot.get("scope")),
+                Map.entry("scope", snapshot.get("scope")),
+                Map.entry("freshness", CALLBACK_FRESHNESS),
+                Map.entry("context", Map.of("project", Map.of(), "sections", List.of(),
+                        "repositoryEvidence", List.of(), "relations", Map.of())),
+                Map.entry("groundingCandidates", Map.of("repositoryEvidence", List.of())),
+                Map.entry("accounting", Map.of("candidateCount", 1, "selectedCount", 1,
+                        "discardedCount", 0, "usedTokens", 100, "budget", 10_000,
+                        "truncated", false, "warnings", List.of())),
+                Map.entry("policy", Map.of("compositionVersion", "engineering-context-v2",
+                        "projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION)),
+                Map.entry("projectionDigest", PROJECTION_DIGEST)));
+        Map<String, Object> selectedSnapshot = new LinkedHashMap<>();
+        selectedSnapshot.put("request", snapshot.get("scope"));
+        selectedSnapshot.put("freshness", Map.of(
+                "sourceRevision", Map.of(
+                        "kind", "PROJECT_REVISION",
+                        "project", PROJECT_SLUG,
+                        "revision", PROJECT_REVISION),
+                "state", "STALE"));
+        selectedSnapshot.put("repositoryContext", Map.of("evidence", List.of(Map.of(
+                "reference", allowedReference,
+                "provenance", evidenceProvenance,
+                "content", Map.of("status", "COMPLETE", "text", "Canonical evidence", "revision", PROJECT_REVISION)))));
         return AiTask.builder()
                 .id(UUID.randomUUID())
                 .correlationId(correlationId)
@@ -639,6 +736,8 @@ class AnalyzeStoryContextUseCaseTest {
                 .status(AiTaskStatus.SUBMITTED)
                 .contextDigest(CONTEXT_DIGEST)
                 .projectionDigest(PROJECTION_DIGEST)
+                .selectionDigest(null)
+                .selectedKnowledgeSnapshot(selectedSnapshot)
                 .contextSnapshot(snapshot)
                 .build();
     }
@@ -646,11 +745,17 @@ class AnalyzeStoryContextUseCaseTest {
     private AiTaskResultRequest completedRequest(
             UUID correlationId,
             Instant completedAt,
+            UUID storyId,
             StoryContextAnalysisResult result
     ) {
         PromptExecutionMetadata execution = new PromptExecutionMetadata(
                 "story-context-analysis-prompt-v1", "mock", "deterministic-v1",
-                "c".repeat(64), CONTEXT_DIGEST, null, PROJECTION_DIGEST);
+                "c".repeat(64), CONTEXT_DIGEST, null, PROJECTION_DIGEST,
+                "sca/v1",
+                Map.of("projectSlug", PROJECT_SLUG, "storyId", storyId.toString(),
+                        "intent", INTENT_ID, "files", List.of(CANONICAL_REFERENCE)),
+                CALLBACK_FRESHNESS,
+                "d".repeat(64));
         return new AiTaskResultRequest(
                 correlationId, "job-42", AiTaskResultStatus.COMPLETED, completedAt,
                 List.of(), null, execution, null, result);

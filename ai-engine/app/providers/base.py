@@ -39,6 +39,10 @@ class PromptTraceability:
     profile_version: str | None
     selection_digest: str | None = None
     projection_digest: str | None = None
+    projection_version: str | None = None
+    scope: dict[str, Any] | None = None
+    freshness: dict[str, Any] | None = None
+    grounding_digest: str | None = None
 
 
 @dataclass(frozen=True)

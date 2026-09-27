@@ -55,6 +55,10 @@ class PromptExecutionMetadata(ResultContractModel):
     context_digest: str = Field(alias="contextDigest", pattern=r"^[0-9a-f]{64}$")
     selection_digest: str | None = Field(default=None, alias="selectionDigest", pattern=r"^[0-9a-f]{64}$")
     projection_digest: str | None = Field(default=None, alias="projectionDigest", pattern=r"^[0-9a-f]{64}$")
+    projection_version: str | None = Field(default=None, alias="projectionVersion", max_length=100)
+    scope: dict[str, object] | None = None
+    freshness: dict[str, object] | None = None
+    grounding_digest: str | None = Field(default=None, alias="groundingDigest", pattern=r"^[0-9a-f]{64}$")
 
 
 class AiTaskResultRequest(ResultContractModel):

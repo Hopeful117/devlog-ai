@@ -60,74 +60,69 @@
     },
     "userGuidance": null,
     "selectedKnowledge": {
-      "project": {
-        "id": "00000000-0000-0000-0000-000000000025",
-        "name": "test-project",
-        "slug": "test-project"
+      "contractVersion": "story-context-agent-projection/v1",
+      "projectionVersion": "sca/v1",
+      "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "request": {
+        "projectSlug": "test-project",
+        "storyId": null,
+        "intent": "engineering-story-context-analysis",
+        "files": []
       },
-      "analysis": {
-        "id": "00000000-0000-0000-0000-000000000013"
+      "requestEcho": {
+        "projectSlug": "test-project",
+        "storyId": null,
+        "intent": "engineering-story-context-analysis",
+        "files": []
       },
-      "projectProfile": {
-        "id": "00000000-0000-0000-0000-000000000026",
-        "profileVersion": "v1"
+      "scope": {
+        "projectSlug": "test-project",
+        "storyId": null,
+        "intent": "engineering-story-context-analysis",
+        "files": []
       },
-      "selectedFacts": [
-        {
-          "id": "00000000-0000-0000-0000-000000000101",
-          "type": "DOCKER_SERVICE_DEPENDS_ON",
-          "content": "from=backend,to=ai-engine",
-          "evidenceReferences": [
-            "historical/docker-compose.yml"
-          ]
+      "freshness": {
+        "sourceRevision": {
+          "kind": "PROJECT_REVISION",
+          "project": "test-project",
+          "revision": "abc123"
         },
-        {
-          "id": "00000000-0000-0000-0000-000000000102",
-          "type": "DOCKER_SERVICE_ENV_REFERENCE",
-          "content": "from=backend,to=ai-engine,source=environment,url=http://ai-engine:8000",
-          "evidenceReferences": [
-            "docker-compose.yml"
-          ]
-        }
-      ],
-      "selectedObservations": [
-        {
-          "id": "00000000-0000-0000-0000-000000000201",
-          "type": "ARCHITECTURE_MODULARIZATION",
-          "content": "The controlled deployment defines multiple services with declared startup and configuration references.",
-          "supportingFactIds": [
-            "00000000-0000-0000-0000-000000000101",
-            "00000000-0000-0000-0000-000000000102"
-          ]
-        }
-      ],
-      "diagnostics": {
-        "collectionComplete": true,
-        "truncated": false,
-        "warningCount": 0,
-        "errorCount": 0
+        "state": "FRESH"
       },
-      "selectedInsights": [
-        {
-          "id": "00000000-0000-0000-0000-000000000302",
-          "type": "ARCHITECTURAL",
-          "severity": "INFO",
-          "title": "Core and AI Engine boundary",
-          "content": "The Core owns deterministic authority while the AI Engine performs probabilistic generation."
-        }
-      ],
-      "existingArchitectureKnowledge": [
-        {
-          "insightId": "00000000-0000-0000-0000-000000000301",
-          "title": "Project containerization",
-          "content": "The project uses containers coordinated through a composition file.",
-          "sourceType": "ARCHITECTURE_DESCRIPTION"
-        }
-      ],
-      "repositoryContext": {
-        "contextVersion": "repository-context-engine-v1",
-        "profile": "PROJECT_STATE",
-        "evidence": [
+      "context": {
+        "project": {
+          "id": "00000000-0000-0000-0000-000000000025",
+          "name": "test-project",
+          "slug": "test-project"
+        },
+        "sections": [
+          {
+            "id": "00000000-0000-0000-0000-000000000101",
+            "type": "DOCKER_SERVICE_DEPENDS_ON",
+            "content": "from=backend,to=ai-engine",
+            "evidenceReferences": [
+              "historical/docker-compose.yml"
+            ]
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000102",
+            "type": "DOCKER_SERVICE_ENV_REFERENCE",
+            "content": "from=backend,to=ai-engine,source=environment,url=http://ai-engine:8000",
+            "evidenceReferences": [
+              "docker-compose.yml"
+            ]
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000201",
+            "type": "ARCHITECTURE_MODULARIZATION",
+            "content": "The controlled deployment defines multiple services with declared startup and configuration references.",
+            "supportingFactIds": [
+              "00000000-0000-0000-0000-000000000101",
+              "00000000-0000-0000-0000-000000000102"
+            ]
+          }
+        ],
+        "repositoryEvidence": [
           {
             "reference": "docker-compose.yml",
             "kind": "REPOSITORY_STRUCTURE",
@@ -172,53 +167,101 @@
             "trustTier": "HUMAN_AUTHORED"
           }
         ],
-        "usedTokens": 0,
-        "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-      },
-      "selectedEngineeringEvents": [],
-      "engineeringStories": [
-        {
-          "id": "00000000-0000-0000-0000-000000000401",
-          "projectId": "00000000-0000-0000-0000-000000000025",
-          "storyNumber": 112,
-          "title": "Story 0112 Context Agent",
-          "status": "COMPLETED",
-          "storyPath": "docs/stories/0112-devlog-story-context-agent/story.md",
-          "baseCommit": "abc123",
-          "targetCommit": "def456",
-          "createdAt": "2026-01-01T00:00:00Z",
-          "completedAt": null
-        }
-      ],
-      "selectedHumanContextInputs": [],
-      "knowledgeRelations": [],
-      "evolutionContext": null,
-      "selectionMetadata": {
-        "selectionVersion": "knowledge-selection-v5",
-        "appliedRules": [
-          "REPOSITORY_FIRST_LAYERING",
-          "INTENT_SPECIFIC_RANKING",
-          "USER_GUIDANCE_KEYWORD_BOOST",
-          "STABLE_TYPE_AND_SEMANTIC_ORDER",
-          "DUPLICATE_FACT_CONTENT_ELIMINATION",
-          "OBSERVATION_FACT_CLOSURE",
-          "KNOWLEDGE_BUDGET",
-          "EVOLUTION_CONTEXT_REQUIRED",
-          "KNOWLEDGE_RELATION_PRESERVATION",
-          "ENGINEERING_STORY_RELEVANCE"
+        "relations": [],
+        "selectedFacts": [
+          {
+            "id": "00000000-0000-0000-0000-000000000101",
+            "type": "DOCKER_SERVICE_DEPENDS_ON",
+            "content": "from=backend,to=ai-engine",
+            "evidenceReferences": [
+              "historical/docker-compose.yml"
+            ]
+          },
+          {
+            "id": "00000000-0000-0000-0000-000000000102",
+            "type": "DOCKER_SERVICE_ENV_REFERENCE",
+            "content": "from=backend,to=ai-engine,source=environment,url=http://ai-engine:8000",
+            "evidenceReferences": [
+              "docker-compose.yml"
+            ]
+          }
         ],
-        "selectedKnowledgeCount": 8,
-        "discardedKnowledgeCount": 0,
-        "knowledgeBudget": {
-          "maximumFacts": 40,
-          "maximumObservations": 25,
-          "maximumInsights": 10,
-          "maximumArchitectureKnowledge": 5,
-          "maximumRepositoryEvidence": 60
-        },
-        "completeness": "COMPLETE"
+        "selectedObservations": [
+          {
+            "id": "00000000-0000-0000-0000-000000000201",
+            "type": "ARCHITECTURE_MODULARIZATION",
+            "content": "The controlled deployment defines multiple services with declared startup and configuration references.",
+            "supportingFactIds": [
+              "00000000-0000-0000-0000-000000000101",
+              "00000000-0000-0000-0000-000000000102"
+            ]
+          }
+        ],
+        "repositoryContext": {
+          "evidence": [
+            {
+              "reference": "docker-compose.yml",
+              "kind": "REPOSITORY_STRUCTURE",
+              "layer": "RUNTIME",
+              "summary": "Multi-service Docker Compose configuration",
+              "sourceType": "REPOSITORY",
+              "originatingFile": "docker-compose.yml",
+              "identifier": "docker-compose.yml",
+              "relevanceScore": 90,
+              "selectionReason": "Primary deployment descriptor",
+              "occurredAt": "2026-01-01T00:00:00Z",
+              "relatedReferences": [],
+              "extractionMetadata": {},
+              "content": {},
+              "symbols": {},
+              "resource": "devlog://projects/test-project/commits/abc123/files/docker-compose.yml",
+              "trustTier": "TECHNICAL_EVIDENCE"
+            },
+            {
+              "reference": "document:00000000-0000-0000-0000-000000000025:docs/stories/0112/story.md@abc123",
+              "kind": "STORY_DOCUMENT",
+              "layer": "PROJECT_DOCUMENTATION",
+              "summary": "Story 0112 Context Agent — COMPLETED",
+              "sourceType": "REPOSITORY",
+              "originatingFile": "docs/stories/0112/story.md",
+              "identifier": "docs/stories/0112/story.md",
+              "relevanceScore": 85,
+              "selectionReason": "Story document with body text for context analysis",
+              "occurredAt": "2026-01-01T00:00:00Z",
+              "relatedReferences": [],
+              "extractionMetadata": {
+                "documentStatus": "COMPLETED",
+                "resolvedRevision": "abc123"
+              },
+              "content": {
+                "status": "COMPLETE",
+                "text": "# Story 0112 — DevLog Story Context Agent\n\n## Status\nCOMPLETED\n\n## Summary\nImplement the Story Context Agent that analyzes engineering stories and produces structured context analysis.\n\n## Acceptance Criteria\n- [x] Agent reads story files from workspace\n- [x] Agent produces structured analysis output\n- [x] Analysis includes architecture findings, decision findings, evidence findings\n- [x] All findings are grounded with evidence references\n- [x] Output follows the StoryContextAnalysis schema",
+                "revision": "abc123"
+              },
+              "symbols": {},
+              "resource": "devlog://projects/test-project/commits/abc123/files/docs/stories/0112/story.md",
+              "trustTier": "HUMAN_AUTHORED"
+            }
+          ]
+        }
       },
-      "selectionDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      "groundingCandidates": {
+        "repositoryEvidence": []
+      },
+      "accounting": {
+        "candidateCount": 2,
+        "selectedCount": 2,
+        "discardedCount": 0,
+        "usedTokens": 0,
+        "budget": 0,
+        "truncated": false,
+        "warnings": []
+      },
+      "policy": {
+        "compositionVersion": "repository-context-engine-v1",
+        "projectionVersion": "sca/v1"
+      },
+      "projectionDigest": "35a8ded4b51b2a5546cceeee3cb4879af34d7397af55113ffb96695f0d677ba4"
     },
     "groundingContract": {
       "allowedEvidenceReferences": [
@@ -226,7 +269,7 @@
       ]
     },
     "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "projectionDigest": "ba300430292aa8c60de851af5bdaa2b56a88729393d64a397d9e7d4987f1b8e7",
+    "projectionDigest": "35a8ded4b51b2a5546cceeee3cb4879af34d7397af55113ffb96695f0d677ba4",
     "expectedOutputContract": {
       "type": "object",
       "structured": true,
@@ -295,7 +338,7 @@
   "reproducibility": {
     "repositoryRevision": "6f0d2da87cc4dc77427c701c3ec1443bb843216d",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "5aab32c770010b66e8fb347616d02a2e1a45b9d30d55f52dbdeca1f2ced1113f",
+    "promptContentDigest": "6b9aeb4b6b3c37fef30d7c9c23303e29468592052a6955e107aaed89246dd905",
     "schemaDigest": "7186cf1d381c7dca857f0481c283609d100e372afdf098811a3666ffff1c9f90"
   }
 }

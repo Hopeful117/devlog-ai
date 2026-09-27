@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.ai.reference;
 
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EvidenceRef;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -12,7 +13,30 @@ import java.util.Set;
 public final class AiReferenceRegistryFactory {
     private AiReferenceRegistryFactory() { }
 
+    /** V1-safe registry: repository evidence is scoped only to the resolved project revision. */
     public static AiReferenceRegistry create(SelectedKnowledge knowledge) {
+        return create(knowledge, false);
+    }
+
+    /** Explicit legacy path for versioned non-SCA projections. */
+    public static AiReferenceRegistry createLegacy(SelectedKnowledge knowledge) {
+        return create(knowledge, true);
+    }
+
+    /** Core-owned Story Context Analysis registry, scoped to authorized snapshot references. */
+    public static AiReferenceRegistry createForStoryContext(List<EvidenceRef> authorizedReferences) {
+        List<AiReferenceBinding> bindings = new ArrayList<>();
+        Set<String> seen = new java.util.HashSet<>();
+        for (EvidenceRef value : authorizedReferences == null ? List.<EvidenceRef>of() : authorizedReferences) {
+            if (value == null || !seen.add(value.reference())) continue;
+            bindings.add(new AiReferenceBinding(
+                    new AiReference(AiReferenceType.REPOSITORY_EVIDENCE, value.reference(), AiReferenceScope.PROJECT_REVISION),
+                    "REPOSITORY_EVIDENCE", value.reference(), Set.of("EVIDENCE_REFERENCE")));
+        }
+        return new AiReferenceRegistry(bindings);
+    }
+
+    private static AiReferenceRegistry create(SelectedKnowledge knowledge, boolean includeLegacyRepositoryScope) {
         List<AiReferenceBinding> bindings = new ArrayList<>();
         Map<String, AiReferenceBinding> registered = new LinkedHashMap<>();
         Set<AiReference> architectureKnowledgeReferences = new java.util.LinkedHashSet<>();
@@ -58,7 +82,11 @@ public final class AiReferenceRegistryFactory {
         }
         if (knowledge.repositoryContext() != null) {
             for (RepositoryEvidence value : knowledge.repositoryContext().evidence()) {
-                add(bindings, AiReferenceType.REPOSITORY_EVIDENCE, AiReferenceScope.REPOSITORY,
+                if (includeLegacyRepositoryScope) {
+                    add(bindings, AiReferenceType.REPOSITORY_EVIDENCE, AiReferenceScope.REPOSITORY,
+                            "REPOSITORY_EVIDENCE", value.reference(), value.reference(), Set.of("EVIDENCE_REFERENCE"), registered);
+                }
+                add(bindings, AiReferenceType.REPOSITORY_EVIDENCE, AiReferenceScope.PROJECT_REVISION,
                         "REPOSITORY_EVIDENCE", value.reference(), value.reference(), Set.of("EVIDENCE_REFERENCE"), registered);
             }
         }
