@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.storycontextanalysis.usecase;
 
 import com.hopeful117.devlogai.ai.reference.AiReference;
 import com.hopeful117.devlogai.ai.reference.AiReferenceResolver;
+import com.hopeful117.devlogai.ai.reference.AiReferenceMappingSnapshot;
 import com.hopeful117.devlogai.ai.reference.AiReferenceScope;
 import com.hopeful117.devlogai.ai.reference.AiReferenceType;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
@@ -28,6 +29,7 @@ final class TaskSnapshotEvidenceResolver {
             throw failure("AI reference mapping snapshot is missing");
         }
         AiReferenceResolver references = AiReferenceResolver.fromMap(task.getAiReferenceMappingSnapshot());
+        Map<String, Map<String, Object>> evidenceByReference = evidenceIndex(task);
         Set<String> seenReferences = new HashSet<>();
         Set<String> seenDigests = new HashSet<>();
         List<EvidenceAssertion> resolved = new ArrayList<>();
@@ -38,15 +40,17 @@ final class TaskSnapshotEvidenceResolver {
             }
             String reference = evidenceReference.reference();
             try {
-                references.resolve(new AiReference(AiReferenceType.REPOSITORY_EVIDENCE,
-                        reference, AiReferenceScope.REPOSITORY), "EVIDENCE_REFERENCE");
+                var binding = resolveEvidenceReference(references, reference);
             } catch (RuntimeException exception) {
                 throw failure("Reference is not authorized: " + reference);
             }
             if (!seenReferences.add(reference + "\u0000" + assertion.locator())) {
                 throw failure("Duplicate evidence assertion: " + reference);
             }
-            Map<String, Object> evidence = findEvidence(task.getSelectedKnowledgeSnapshot(), reference);
+            Map<String, Object> evidence = evidenceByReference.get(reference);
+            if (evidence == null) throw failure("Evidence reference is not present in the selected snapshot: " + reference);
+            validateSnapshotBinding(task, reference, evidence);
+            validateReferenceIdentity(task, evidenceReference, evidence);
             String content = contentText(evidence);
             String status = contentValue(evidence, "status");
             if (content == null || !"COMPLETE".equals(status)) {
@@ -84,10 +88,11 @@ final class TaskSnapshotEvidenceResolver {
     ) {
         String reference = text(citation, "reference");
         AiReferenceResolver references = AiReferenceResolver.fromMap(task.getAiReferenceMappingSnapshot());
-        references.resolve(new AiReference(AiReferenceType.REPOSITORY_EVIDENCE,
-                reference, AiReferenceScope.REPOSITORY), "EVIDENCE_REFERENCE");
+        resolveEvidenceReference(references, reference);
 
-        Map<String, Object> evidence = findEvidence(task.getSelectedKnowledgeSnapshot(), reference);
+        Map<String, Object> evidence = evidenceIndex(task).get(reference);
+        if (evidence == null) throw failure("Evidence reference is not present in the selected snapshot: " + reference);
+        validateSnapshotBinding(task, reference, evidence);
         String content = contentText(evidence);
         String status = contentValue(evidence, "status");
         if (content == null || !"COMPLETE".equals(status)) {
@@ -145,6 +150,11 @@ final class TaskSnapshotEvidenceResolver {
                 "excerptMatchOffsets", matches,
                 "canonicalEvidenceIdentity", canonicalIdentity
         );
+    }
+
+    private AiReferenceMappingSnapshot.BindingSnapshot resolveEvidenceReference(AiReferenceResolver references, String reference) {
+        // Story Agent V1 is revision-bound; repository-wide scope is fail-closed.
+        return references.resolve(new AiReference(AiReferenceType.REPOSITORY_EVIDENCE, reference, AiReferenceScope.PROJECT_REVISION), "EVIDENCE_REFERENCE");
     }
 
     private String resolveComparativeLocator(String content, Map<String, Object> locator) {
@@ -205,18 +215,71 @@ final class TaskSnapshotEvidenceResolver {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> findEvidence(Map<String, Object> snapshot, String reference) {
+    private Map<String, Map<String, Object>> evidenceIndex(AiTask task) {
+        Map<String, Map<String, Object>> result = new LinkedHashMap<>();
+        String canonicalRevision = null;
+        Map<String, Object> snapshot = task.getSelectedKnowledgeSnapshot();
         if (snapshot == null) throw failure("Selected knowledge snapshot is missing");
-        Object rawContext = snapshot.get("repositoryContext");
-        if (!(rawContext instanceof Map<?, ?> context)) throw failure("Repository context snapshot is missing");
-        Object rawEvidence = context.get("evidence");
+        Object rawContext = snapshot.get("context");
+        Object rawEvidence = rawContext instanceof Map<?, ?> context ? context.get("repositoryEvidence") : null;
+        // Legacy task snapshots used the internal RepositoryContext envelope.
+        if (!(rawEvidence instanceof List<?>)) {
+            rawContext = snapshot.get("repositoryContext");
+            rawEvidence = rawContext instanceof Map<?, ?> context ? context.get("evidence") : null;
+        }
         if (!(rawEvidence instanceof List<?> evidenceItems)) throw failure("Repository evidence snapshot is missing");
         for (Object raw : evidenceItems) {
-            if (raw instanceof Map<?, ?> value && reference.equals(value.get("reference"))) {
-                return (Map<String, Object>) value;
+            if (!(raw instanceof Map<?, ?> value) || !(value.get("reference") instanceof String reference) || reference.isBlank())
+                throw failure("Snapshot evidence reference is invalid");
+            Object rawContent = value.get("content");
+            if (!(rawContent instanceof Map<?, ?> content) || !(content.get("revision") instanceof String revision) || revision.isBlank()) throw failure("Snapshot evidence revision is invalid");
+            if (canonicalRevision == null) canonicalRevision = revision;
+            else if (!canonicalRevision.equals(revision)) throw failure("Snapshot contains mixed project revisions");
+            if (result.put(reference, (Map<String, Object>) value) != null)
+                throw failure("Snapshot contains duplicate evidence reference: " + reference);
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void validateSnapshotBinding(AiTask task, String reference, Map<String, Object> evidence) {
+        Map<String, Object> content = contentMap(evidence);
+        Object revision = content.get("revision");
+        Object snapshot = task.getContextSnapshot();
+        if (snapshot instanceof Map<?, ?> context && context.get("scope") instanceof Map<?, ?> scope
+                && scope.get("revision") instanceof String expected && !expected.equals(revision))
+            throw failure("Evidence revision does not match PROJECT_REVISION snapshot: " + reference);
+        Object contract = contextSnapshotContract(task);
+        if (contract instanceof Map<?, ?> c && c.get("allowedGroundingReferences") instanceof List<?> entries) {
+            for (Object entry : entries) if (entry instanceof Map<?, ?> e && reference.equals(e.get("ref"))) {
+                if (contextSnapshotProject(task) != null && !Objects.equals(e.get("project"), contextSnapshotProject(task)))
+                    throw failure("Evidence project does not match PROJECT_REVISION snapshot: " + reference);
+                if (!Objects.equals(e.get("revision"), revision) || !Objects.equals(e.get("provenance"), evidence.get("provenance")))
+                    throw failure("Evidence project, revision, or provenance does not match snapshot: " + reference);
             }
         }
-        throw failure("Evidence reference is not present in the selected snapshot: " + reference);
+    }
+
+    private void validateReferenceIdentity(AiTask task, EvidenceRef requested, Map<String,Object> evidence) {
+        Object raw = contextSnapshotContract(task);
+        if (!(raw instanceof Map<?, ?> contract) || !(contract.get("allowedGroundingReferences") instanceof List<?> entries)) throw failure("Typed grounding contract is missing");
+        Map<?, ?> matched = null;
+        for (Object entry : entries) if (entry instanceof Map<?, ?> e && Objects.equals(e.get("ref"), requested.reference())) matched = e;
+        if (matched == null || !"REPOSITORY_EVIDENCE".equals(matched.get("type")) || !"PROJECT_REVISION".equals(matched.get("scope"))) throw failure("EvidenceRef namespace or scope is not authorized: " + requested.reference());
+        if (!Objects.equals(matched.get("provenance"), evidence.get("provenance"))) throw failure("EvidenceRef provenance does not match source: " + requested.reference());
+        Object resource = matched.get("resource");
+        if (resource != null && !Objects.equals(resource, requested.resource())) throw failure("EvidenceRef resource does not match source: " + requested.reference());
+    }
+
+    private Object contextSnapshotProject(AiTask task) {
+        Map<String, Object> snapshot = task.getContextSnapshot();
+        if (snapshot == null || !(snapshot.get("scope") instanceof Map<?, ?> scope)) return null;
+        return scope.get("projectSlug");
+    }
+
+    private Object contextSnapshotContract(AiTask task) {
+        Map<String, Object> snapshot = task.getContextSnapshot();
+        return snapshot == null ? null : snapshot.get("groundingContract");
     }
 
     @SuppressWarnings("unchecked")

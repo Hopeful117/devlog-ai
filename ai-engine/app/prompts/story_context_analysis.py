@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from app.providers.base import GenerationPolicy, Prompt, PromptTraceability
 from app.prompts.structured_context import SHARED_STRUCTURED_CONTEXT_CONTRACT
 from app.schemas.ai_task import PromptRequest
+from app.schemas.story_context_agent_projection import StoryContextAgentProjectionV1
 from app.schemas.story_context_analysis import ProviderStoryContextAnalysisResult
 
 
@@ -96,16 +97,34 @@ class StoryContextAnalysisPromptBuilder:
                 "Expected output contract does not match the versioned Intent"
             )
 
-        required_sections = {
-            "project", "analysis", "projectProfile", "selectedFacts",
-            "selectedObservations", "diagnostics", "selectedInsights",
-            "selectionMetadata", "repositoryContext", "engineeringStories",
-        }
-        missing = sorted(required_sections - request.selected_knowledge.keys())
-        if missing:
-            raise PromptConstructionError(
-                f"SelectedKnowledge is missing required sections: {', '.join(missing)}"
-            )
+        # Story 0152 sends the Core-owned V1 projection as the primary payload.
+        # The legacy SelectedKnowledge shape remains supported only for other intents.
+        if request.task_type.value == "STORY_CONTEXT_ANALYSIS":
+            if request.selected_knowledge.get("contractVersion") != "story-context-agent-projection/v1":
+                raise PromptConstructionError("Story Context Analysis requires story-context-agent-projection/v1")
+            try:
+                projection = StoryContextAgentProjectionV1.model_validate(request.selected_knowledge)
+            except Exception as error:
+                raise PromptConstructionError(f"StoryContextAgentProjectionV1 is invalid: {error}") from error
+            projection_value = projection.model_dump(by_alias=True, mode="json", exclude_none=True)
+            # ``storyId`` is a named part of the Core request identity. Keep
+            # its explicit null on the wire while still omitting incidental
+            # optional scalar nulls elsewhere in the projection.
+            for key in ("request", "requestEcho", "scope"):
+                projection_value[key]["storyId"] = projection.request["storyId"]
+            knowledge_json = self._canonical(projection_value)
+        else:
+            required_sections = {
+                "project", "analysis", "projectProfile", "selectedFacts",
+                "selectedObservations", "diagnostics", "selectedInsights",
+                "selectionMetadata", "repositoryContext", "engineeringStories",
+            }
+            missing = sorted(required_sections - request.selected_knowledge.keys())
+            if missing:
+                raise PromptConstructionError(
+                    f"SelectedKnowledge is missing required sections: {', '.join(missing)}"
+                )
+            knowledge_json = self._canonical(request.selected_knowledge)
 
         selection_digest = request.selection_digest
         if selection_digest is not None and (len(selection_digest) != 64 or any(
@@ -123,8 +142,6 @@ class StoryContextAnalysisPromptBuilder:
         ):
             raise PromptConstructionError("Prompt projectionDigest is invalid")
 
-        knowledge_json = self._canonical(request.selected_knowledge)
-        intent_json = self._canonical(request.intent.model_dump(by_alias=True, mode="json"))
         guidance_json = self._canonical(
             request.user_guidance.model_dump(
                 by_alias=True, mode="json", exclude_none=True
@@ -191,6 +208,10 @@ class StoryContextAnalysisPromptBuilder:
                 profile_version=None,
                 selection_digest=selection_digest,
                 projection_digest=projection_digest,
+                projection_version=request.metadata.get("projectionVersion"),
+                scope=request.metadata.get("scope"),
+                freshness=(projection_value.get("freshness") if request.task_type.value == "STORY_CONTEXT_ANALYSIS" else request.metadata.get("freshness")),
+                grounding_digest=request.metadata.get("groundingDigest"),
             ),
             generation_policy=GenerationPolicy(10, 5000, True),
             content_digest=content_digest,

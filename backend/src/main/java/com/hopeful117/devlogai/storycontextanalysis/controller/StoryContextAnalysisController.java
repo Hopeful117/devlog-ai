@@ -21,10 +21,10 @@ public class StoryContextAnalysisController {
     private final AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
     private final StoryContextAnalysisQueryService storyContextAnalysisQueryService;
 
-    @PostMapping("/api/v1/projects/{projectSlug}/stories/{storyId}/analyze-context")
+    @PostMapping({"/api/v1/projects/{projectSlug}/analyze-context", "/api/v1/projects/{projectSlug}/stories/{storyId}/analyze-context"})
     public ResponseEntity<AnalyzeContextResponse> analyzeContext(
             @PathVariable @NotBlank String projectSlug,
-            @PathVariable @NotNull UUID storyId,
+            @PathVariable(required = false) UUID storyId,
             @Valid @RequestBody(required = false) AnalyzeContextRequest request
     ) {
         List<String> files = request != null ? request.files() : List.of();

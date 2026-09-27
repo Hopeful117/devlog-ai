@@ -27,8 +27,8 @@ public class StoryContextAnalysis {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "story_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "story_id", nullable = true)
     private EngineeringStory story;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import hashlib
 import logging
 from uuid import UUID
 
@@ -133,6 +134,10 @@ class StoryContextAnalysisGenerationService:
                     context_digest=prompt.traceability.context_digest,
                     selection_digest=prompt.traceability.selection_digest,
                     projection_digest=prompt.traceability.projection_digest,
+                    projection_version=prompt.traceability.projection_version,
+                    scope=prompt.traceability.scope,
+                    freshness=prompt.traceability.freshness,
+                    grounding_digest=prompt.traceability.grounding_digest,
                 ),
                 synthesis=None,
                 analysis_result=output,
@@ -163,24 +168,26 @@ class StoryContextAnalysisGenerationService:
         grounding_contract: dict[str, object],
     ) -> None:
         # Use Java-authored grounding contract (authoritative per Story 0112 D14)
+        if grounding_contract.get("groundingContractVersion") != "story-context-grounding/v1":
+            raise StoryContextAnalysisGroundingError("V1 requires the typed grounding contract")
+        if "allowedEvidenceReferences" in grounding_contract:
+            raise StoryContextAnalysisGroundingError("legacy grounding allow-list is forbidden in V1")
         allowed_refs = set()
-        typed_list = grounding_contract.get("allowedGroundingReferences", [])
-        if isinstance(typed_list, list):
-            for entry in typed_list:
-                if not isinstance(entry, dict) or entry.get("type") != "REPOSITORY_EVIDENCE":
-                    raise StoryContextAnalysisGroundingError("Invalid typed repository grounding reference")
-                scope = entry.get("scope")
-                if not isinstance(scope, dict) or not scope.get("project") or not scope.get("revision"):
-                    raise StoryContextAnalysisGroundingError("Repository grounding scope is incomplete")
-                if entry.get("ref") != entry.get("coreReference") or entry.get("ref") != entry.get("taskReference"):
-                    raise StoryContextAnalysisGroundingError("Repository grounding mapping is inconsistent")
-                if isinstance(entry.get("ref"), str):
-                    allowed_refs.add(entry["ref"])
-        allowed_list = grounding_contract.get("allowedEvidenceReferences", []) if not typed_list else []
-        if isinstance(allowed_list, list):
-            for ref in allowed_list:
-                if isinstance(ref, str):
-                    allowed_refs.add(ref)
+        typed_list = grounding_contract.get("allowedGroundingReferences")
+        if not isinstance(typed_list, list):
+            raise StoryContextAnalysisGroundingError("typed grounding allow-list is required")
+        for entry in typed_list:
+            if not isinstance(entry, dict) or entry.get("type") != "REPOSITORY_EVIDENCE":
+                raise StoryContextAnalysisGroundingError("Invalid typed repository grounding reference")
+            scope = entry.get("scope")
+            if scope != "PROJECT_REVISION":
+                raise StoryContextAnalysisGroundingError("REPOSITORY scope is forbidden in Story Context V1")
+            if not entry.get("project") or not entry.get("revision"):
+                raise StoryContextAnalysisGroundingError("Repository grounding scope is incomplete")
+            if entry.get("ref") != entry.get("coreReference") or entry.get("ref") != entry.get("taskReference"):
+                raise StoryContextAnalysisGroundingError("Repository grounding mapping is inconsistent")
+            if isinstance(entry.get("ref"), str):
+                allowed_refs.add(entry["ref"])
 
         all_findings = (
             output.architecture_findings
@@ -395,9 +402,44 @@ class StoryContextAnalysisGenerationService:
                     code=error_code,
                     message=str(error)[:5000] or "LLM output validation failed",
                 ),
-                prompt_execution=self._execution_metadata(prompt) if prompt else None,
+                prompt_execution=(
+                    self._execution_metadata(prompt)
+                    if prompt is not None
+                    else self._failure_execution_metadata(submission)
+                ),
                 interaction_traces=traces.traces if traces else [],
             ),
+        )
+
+    def _failure_execution_metadata(
+        self, submission: AiTaskSubmissionRequest
+    ) -> PromptExecutionMetadata:
+        """Build a valid identity echo when prompt construction never completed.
+
+        Core owns these identities and requires them on every Story Context
+        callback, including failures. Provider/prompt fields are deliberately
+        marked unavailable because no prompt was rendered.
+        """
+        metadata = submission.metadata
+        context_digest = submission.context_digest or metadata.get("contextDigest")
+        projection_digest = submission.projection_digest or metadata.get("projectionDigest")
+        if not isinstance(context_digest, str) or not isinstance(projection_digest, str):
+            raise ValueError("Prompt construction failure cannot preserve Core identities")
+        selection_digest = submission.selection_digest or metadata.get("selectionDigest")
+        return PromptExecutionMetadata(
+            prompt_version=submission.intent.prompt_template,
+            provider="unavailable",
+            model_identifier="unavailable",
+            prompt_content_digest=hashlib.sha256(
+                f"prompt-construction-failure:{submission.correlation_id}".encode()
+            ).hexdigest(),
+            context_digest=context_digest,
+            selection_digest=selection_digest,
+            projection_digest=projection_digest,
+            projection_version=metadata.get("projectionVersion"),
+            scope=metadata.get("scope"),
+            freshness=metadata.get("freshness"),
+            grounding_digest=metadata.get("groundingDigest"),
         )
 
     def _execution_metadata(self, prompt: Prompt) -> PromptExecutionMetadata:
@@ -409,4 +451,8 @@ class StoryContextAnalysisGenerationService:
             context_digest=prompt.traceability.context_digest,
             selection_digest=prompt.traceability.selection_digest,
             projection_digest=prompt.traceability.projection_digest,
+            projection_version=prompt.traceability.projection_version,
+            scope=prompt.traceability.scope,
+            freshness=prompt.traceability.freshness,
+            grounding_digest=prompt.traceability.grounding_digest,
         )

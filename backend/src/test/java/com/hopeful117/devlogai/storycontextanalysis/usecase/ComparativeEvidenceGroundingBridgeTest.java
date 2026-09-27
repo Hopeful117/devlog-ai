@@ -107,7 +107,7 @@ class ComparativeEvidenceGroundingBridgeTest {
         List<Map<String, Object>> bindings = evidence.stream().map(item -> Map.of(
                 "type", AiReferenceType.REPOSITORY_EVIDENCE.name(),
                 "ref", item.get("reference"),
-                "scope", AiReferenceScope.REPOSITORY.name(),
+                "scope", AiReferenceScope.PROJECT_REVISION.name(),
                 "canonicalSourceIdentity", item.get("reference"),
                 "groundingCapabilities", List.of("EVIDENCE_REFERENCE"))).toList();
         return Map.of(

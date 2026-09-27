@@ -372,7 +372,8 @@ def _pydantic_issues(prefix: str, error: ValidationError) -> list[ValidationIssu
 
 
 def _items(selected: dict[str, Any], key: str) -> list[dict[str, Any]]:
-    value = selected.get(key, [])
+    source = selected.get("context") if isinstance(selected.get("context"), dict) else selected
+    value = source.get(key, [])
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, dict)]
@@ -396,7 +397,8 @@ def _fixture_evidence_references(selected: dict[str, Any]) -> set[str]:
             if isinstance(value, list):
                 references.update(item for item in value if isinstance(item, str))
 
-    repository_context = selected.get("repositoryContext")
+    source = selected.get("context") if isinstance(selected.get("context"), dict) else selected
+    repository_context = source.get("repositoryContext")
     if isinstance(repository_context, dict):
         evidence = repository_context.get("evidence", [])
         if isinstance(evidence, list):

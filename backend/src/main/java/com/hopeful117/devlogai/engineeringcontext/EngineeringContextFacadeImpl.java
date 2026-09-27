@@ -88,6 +88,7 @@ public class EngineeringContextFacadeImpl implements EngineeringContextFacade {
                 "selectedCount", repositoryContext.evidence().size(),
                 "discardedCount", repositoryContext.discardedCount(),
                 "usedTokens", repositoryContext.usedTokens(),
+                "budget", repositoryContext.budget().maximumTokens(),
                 "truncated", repositoryContext.truncated());
         return new CanonicalEngineeringContext(context, repositoryContext,
                 repositoryContext.contextDigest(), repositoryContext.contextVersion(),

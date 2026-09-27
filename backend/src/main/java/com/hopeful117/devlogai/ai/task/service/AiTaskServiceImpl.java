@@ -171,13 +171,17 @@ public class AiTaskServiceImpl implements AiTaskService {
             contextSnapshot.put("groundingContract", groundingContract);
         }
 
-        // Extract storyId from selected knowledge for callback
-        if (selectedKnowledgeSnapshot != null && selectedKnowledgeSnapshot.containsKey("engineeringStories")) {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> stories = (List<Map<String, Object>>) selectedKnowledgeSnapshot.get("engineeringStories");
-            if (stories != null && !stories.isEmpty() && stories.get(0).containsKey("id")) {
-                contextSnapshot.put("storyId", stories.get(0).get("id").toString());
-            }
+        // Persist the canonical request identity, including nullable storyId, for callback persistence.
+        if (selectedKnowledgeSnapshot != null && selectedKnowledgeSnapshot.get("scope") instanceof Map<?, ?> scope) {
+            Map<String, Object> canonicalScope = new LinkedHashMap<>();
+            scope.forEach((key, value) -> canonicalScope.put(String.valueOf(key), value));
+            contextSnapshot.put("scope", canonicalScope);
+            contextSnapshot.put("storyId", canonicalScope.get("storyId"));
+        } else if (selectedKnowledgeSnapshot != null && selectedKnowledgeSnapshot.get("request") instanceof Map<?, ?> request) {
+            Map<String, Object> canonicalScope = new LinkedHashMap<>();
+            request.forEach((key, value) -> canonicalScope.put(String.valueOf(key), value));
+            contextSnapshot.put("scope", canonicalScope);
+            contextSnapshot.put("storyId", canonicalScope.get("storyId"));
         }
 
         Map<String, Object> intentSnapshot = objectMapper.convertValue(intent, Map.class);
@@ -228,7 +232,7 @@ public class AiTaskServiceImpl implements AiTaskService {
         task.setSelectedKnowledgeSnapshot(snapshot);
         task.setAiReferenceMappingSnapshot(
                 AiReferenceMappingSnapshot.from(
-                        com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory.create(selectedKnowledge))
+                        com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory.createLegacy(selectedKnowledge))
                         .asMap());
         task.setSelectionVersion(selectedKnowledge.selectionMetadata().selectionVersion());
         task.setSelectionDigest(selectedKnowledge.selectionDigest());
@@ -265,7 +269,7 @@ public class AiTaskServiceImpl implements AiTaskService {
         task.setSelectedKnowledgeSnapshot(selectedKnowledgeSnapshot);
         task.setAiReferenceMappingSnapshot(selectedKnowledge == null ? null
                 : AiReferenceMappingSnapshot.from(
-                        com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory.create(selectedKnowledge))
+                        com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory.createLegacy(selectedKnowledge))
                         .asMap());
         task.setSelectionVersion(selectedKnowledge == null ? null
                 : selectedKnowledge.selectionMetadata().selectionVersion());
