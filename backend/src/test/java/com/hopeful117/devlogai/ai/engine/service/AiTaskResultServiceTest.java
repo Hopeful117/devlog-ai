@@ -313,6 +313,21 @@ class AiTaskResultServiceTest {
         assertEquals("AI_TASK_NOT_READY", result.getCode());
         assertEquals(AiTaskStatus.CREATED, result.getCurrentStatus());
         verifyNoInteractions(proposalRepository, factRepository, observationRepository);
+        verify(interactionTracePersistenceService, never()).persist(any(), any());
+    }
+
+    @Test
+    void shouldRejectInvalidGenericPayloadBeforePersistingTrace() {
+        UUID correlationId = UUID.randomUUID();
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED, Instant.now(), List.of(),
+                new AiTaskResultError("INVALID", "not allowed"), promptMetadata(), null,
+                null, List.of(interactionTraceRequest()));
+
+        assertThrows(InvalidAiTaskResultException.class,
+                () -> service.handle(correlationId, request));
+
+        verifyNoInteractions(aiTaskRepository, interactionTracePersistenceService);
     }
 
     @Test
@@ -331,6 +346,7 @@ class AiTaskResultServiceTest {
 
         assertEquals("AI_TASK_TERMINAL_CONFLICT", result.getCode());
         assertEquals(AiTaskStatus.FAILED, result.getCurrentStatus());
+        verify(interactionTracePersistenceService, never()).persist(any(), any());
     }
 
     @Test
@@ -363,6 +379,7 @@ class AiTaskResultServiceTest {
 
         verify(proposalRepository, never()).saveAll(any());
         verify(aiTaskRepository, never()).save(any());
+        verify(interactionTracePersistenceService, never()).persist(any(), any());
     }
 
     @Test
@@ -588,7 +605,8 @@ class AiTaskResultServiceTest {
                 "a".repeat(64), "b".repeat(64));
         AiTaskResultRequest request = new AiTaskResultRequest(
                 correlationId, "job-42", AiTaskResultStatus.COMPLETED,
-                Instant.now(), List.of(), null, promptExec, null, null);
+                Instant.now(), List.of(), null, promptExec, null, null,
+                List.of(interactionTraceRequest()));
 
         when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
                 .thenReturn(Optional.of(task));
@@ -600,6 +618,7 @@ class AiTaskResultServiceTest {
         assertTrue(ex.getMessage().contains("analysisResult"));
         verify(analyzeStoryContextUseCase).validateCoreIssuedIdentities(task, request.promptExecution());
         verify(analyzeStoryContextUseCase, never()).handleCallback(any(), any());
+        verify(interactionTracePersistenceService, never()).persist(any(), any());
     }
 
     @Test
@@ -627,6 +646,76 @@ class AiTaskResultServiceTest {
     }
 
     @Test
+    void shouldPersistTraceOnlyAfterAcceptedGenericFailure() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.PROCESSING);
+        Instant completedAt = Instant.now();
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.FAILED, completedAt, List.of(),
+                new AiTaskResultError("MODEL_ERROR", "Provider failed"), promptMetadata(), null,
+                null, List.of(interactionTraceRequest()));
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId)).thenReturn(Optional.of(task));
+        when(proposalRepository.countByAiTaskId(task.getId())).thenReturn(0L);
+
+        service.handle(correlationId, request);
+
+        verify(interactionTracePersistenceService).persist(task, request.interactionTraces());
+    }
+
+    @Test
+    void shouldRejectTerminalStoryContextCallbackWhenPayloadDigestDiffers() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
+        task.setIntentId("engineering-story-context-analysis");
+        task.setIntentVersion("v1");
+        StoryContextAnalysisResult analysisResult = new StoryContextAnalysisResult(
+                null, null, null, null, null, null, null, null, null, null, null, null, null);
+        Instant firstCompletedAt = Instant.parse("2026-09-06T10:00:00Z");
+        AiTaskResultRequest first = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED, firstCompletedAt,
+                List.of(), null, promptMetadata(), null, analysisResult,
+                List.of(interactionTraceRequest()));
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId)).thenReturn(Optional.of(task));
+        when(communicationDecisionService.evaluate(task.getAnalysis().getId())).thenReturn(CommunicationDecision.SILENCE);
+
+        service.handle(correlationId, first);
+        task.setStatus(AiTaskStatus.COMPLETED);
+
+        AiTaskResultAcknowledgement duplicate = service.handle(correlationId, first);
+        assertTrue(duplicate.duplicate());
+
+        AiTaskResultRequest changed = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                firstCompletedAt, List.of(), null, promptMetadata(), null, analysisResult,
+                List.of(interactionTraceRequestWithProvider("different-provider")));
+        AiTaskResultConflictException conflict = assertThrows(
+                AiTaskResultConflictException.class, () -> service.handle(correlationId, changed));
+
+        assertEquals("AI_TASK_TERMINAL_CONFLICT", conflict.getCode());
+        verify(analyzeStoryContextUseCase, times(1)).handleCallback(correlationId, first);
+        verify(interactionTracePersistenceService, times(2))
+                .persist(task, first.interactionTraces());
+    }
+
+    @Test
+    void shouldRejectMalformedGenericInteractionTraceBeforeRepositoryOrPersistence() {
+        UUID correlationId = UUID.randomUUID();
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.FAILED, Instant.now(), List.of(),
+                new AiTaskResultError("MODEL_ERROR", "Provider failed"), promptMetadata(), null,
+                null, List.of(malformedInteractionTrace()));
+
+        InvalidAiTaskResultException error = assertThrows(
+                InvalidAiTaskResultException.class, () -> service.handle(correlationId, request));
+
+        assertTrue(error.getMessage().contains("interactionTraces[0]"));
+        assertTrue(error.getMessage().contains("attempt"));
+        assertTrue(error.getMessage().contains("selectedKnowledgeFingerprint"));
+        verify(aiTaskRepository, never()).findByCorrelationIdForUpdate(any());
+        verify(interactionTracePersistenceService, never()).persist(any(), any());
+    }
+
+    @Test
     void shouldRejectDuplicateStoryContextAnalysisCallbackWithMismatchedCoreIdentity() {
         UUID correlationId = UUID.randomUUID();
         AiTask task = task(correlationId, AiTaskStatus.COMPLETED);
@@ -642,7 +731,7 @@ class AiTaskResultServiceTest {
                 new PromptExecutionMetadata(
                         "story-context-prompt-v1", "mock", "model",
                         "a".repeat(64), "mismatched-context-digest"),
-                null, null);
+                null, null, List.of(interactionTraceRequest()));
         doThrow(new IllegalStateException("Context digest mismatch in callback"))
                 .when(analyzeStoryContextUseCase)
                 .validateCoreIssuedIdentities(task, request.promptExecution());
@@ -655,6 +744,7 @@ class AiTaskResultServiceTest {
         verify(analyzeStoryContextUseCase)
                 .validateCoreIssuedIdentities(task, request.promptExecution());
         verify(proposalRepository, never()).countByAiTaskId(any());
+        verify(interactionTracePersistenceService, never()).persist(any(), any());
     }
 
     @Test
@@ -686,6 +776,7 @@ class AiTaskResultServiceTest {
         assertEquals("LLM did not respond", task.getFailureMessage());
         assertEquals(completedAt, task.getCompletedAt());
         verify(analyzeStoryContextUseCase).handleCallback(correlationId, request);
+        verify(interactionTracePersistenceService).persist(task, request.interactionTraces());
     }
 
     private AiTask task(UUID correlationId, AiTaskStatus status) {
@@ -724,5 +815,27 @@ class AiTaskResultServiceTest {
         return new PromptExecutionMetadata(
                 "describe-project-prompt-v1", "mock", "deterministic-v1",
                 "a".repeat(64), "b".repeat(64));
+    }
+
+    private AiInteractionTraceRequest interactionTraceRequest() {
+        return interactionTraceRequestWithProvider("mock");
+    }
+
+    private AiInteractionTraceRequest interactionTraceRequestWithProvider(String provider) {
+        Instant started = Instant.parse("2026-09-06T09:59:59Z");
+        return new AiInteractionTraceRequest(
+                UUID.randomUUID(), 1, "INITIAL_GENERATION", "NORMAL", provider,
+                "model", "engineering-story-context-analysis", "v1", "story-context-prompt-v1",
+                started, started.plusSeconds(1), 100, "SUCCEEDED", null, null,
+                "a".repeat(64), "b".repeat(64), 0, 0, 0, 0, "c".repeat(64),
+                null, null, null, null, null, null, null, null, null, null);
+    }
+
+    private AiInteractionTraceRequest malformedInteractionTrace() {
+        return new AiInteractionTraceRequest(
+                null, 0, "x".repeat(41), "", " ", "x".repeat(256), "intent", "v1",
+                "prompt", null, null, -1, " ", "x".repeat(81), "x".repeat(5001),
+                "bad", "bad", -1, -1, -1, -1, "bad", -1, -1, -1,
+                "x".repeat(101), "x".repeat(101), null, null, null, null, "x".repeat(5001));
     }
 }

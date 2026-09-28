@@ -17,15 +17,27 @@ public record PromptExecutionMetadata(
         @Size(max = 100) String projectionVersion,
         Map<String, Object> scope,
         Map<String, Object> freshness,
-        @Pattern(regexp = "[0-9a-f]{64}") String groundingDigest
+        @Pattern(regexp = "[0-9a-f]{64}") String groundingDigest,
+        @Size(max = 100) String protocolVersion
 ) {
     public PromptExecutionMetadata(String promptVersion, String provider, String modelIdentifier,
             String promptContentDigest, String contextDigest, String selectionDigest, String projectionDigest) {
-        this(promptVersion, provider, modelIdentifier, promptContentDigest, contextDigest, selectionDigest, projectionDigest, null, null, null, null);
+        this(promptVersion, provider, modelIdentifier, promptContentDigest, contextDigest, selectionDigest, projectionDigest, null, null, null, null,
+                "story-context-agent-protocol/v1");
     }
 
     public PromptExecutionMetadata(String promptVersion, String provider, String modelIdentifier,
             String promptContentDigest, String contextDigest) {
-        this(promptVersion, provider, modelIdentifier, promptContentDigest, contextDigest, null, null, null, null, null, null);
+        this(promptVersion, provider, modelIdentifier, promptContentDigest, contextDigest, null, null, null, null, null, null,
+                "story-context-agent-protocol/v1");
+    }
+
+    public PromptExecutionMetadata(String promptVersion, String provider, String modelIdentifier,
+            String promptContentDigest, String contextDigest, String selectionDigest, String projectionDigest,
+            String projectionVersion, Map<String, Object> scope, Map<String, Object> freshness,
+            String groundingDigest) {
+        this(promptVersion, provider, modelIdentifier, promptContentDigest, contextDigest, selectionDigest,
+                projectionDigest, projectionVersion, scope, freshness, groundingDigest,
+                "story-context-agent-protocol/v1");
     }
 }

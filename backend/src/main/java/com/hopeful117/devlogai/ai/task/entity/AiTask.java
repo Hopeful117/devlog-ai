@@ -107,6 +107,15 @@ public class AiTask {
     @Column(length = 255)
     private String externalJobId;
 
+    @Column(name = "terminal_callback_digest", length = 64)
+    private String terminalCallbackDigest;
+
+    @Column(name = "submission_digest", length = 64)
+    private String submissionDigest;
+
+    @Column(name = "idempotency_key_hash", length = 64)
+    private String idempotencyKeyHash;
+
     @Column(nullable = false)
     @Builder.Default
     private int attemptCount = 0;
