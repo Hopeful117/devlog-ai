@@ -4,13 +4,11 @@ import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysis
 import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.Validation;
-import jakarta.validation.Validator;
-import jakarta.validation.ConstraintViolation;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Comparator;
 import java.util.UUID;
 
 public record AiTaskResultRequest(
@@ -25,10 +23,10 @@ public record AiTaskResultRequest(
         @Valid StoryContextAnalysisResult analysisResult,
         @Valid List<AiInteractionTraceRequest> interactionTraces
 ) {
-    private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
-
     public AiTaskResultRequest {
-        interactionTraces = interactionTraces == null ? List.of() : List.copyOf(interactionTraces);
+        interactionTraces = interactionTraces == null
+                ? List.of()
+                : Collections.unmodifiableList(new ArrayList<>(interactionTraces));
     }
 
     /** Validates payloads decoded after raw-body HMAC authentication. */
@@ -36,39 +34,11 @@ public record AiTaskResultRequest(
         if (correlationId == null || status == null || completedAt == null || proposals == null) {
             throw new InvalidAiTaskResultException("AI task result callback is missing required fields");
         }
+        AiTaskResultCallbackContractValidator.validateInteractionTraces(interactionTraces);
         for (AiProposalResult proposal : proposals) {
             if (proposal == null || proposal.type() == null || proposal.payload() == null
                     || proposal.confidence() == null) {
                 throw new InvalidAiTaskResultException("AI task result callback contains an incomplete proposal");
-            }
-        }
-        validateInteractionTraces(interactionTraces);
-    }
-
-    /**
-     * Validates traces at the domain callback boundary as well as at REST
-     * deserialization. Direct callers and the isolated trace transaction must
-     * enforce the same Bean Validation contract before any mutation.
-     */
-    public static void validateInteractionTraces(List<AiInteractionTraceRequest> traces) {
-        if (traces == null) {
-            return;
-        }
-        for (int index = 0; index < traces.size(); index++) {
-            AiInteractionTraceRequest trace = traces.get(index);
-            if (trace == null) {
-                throw new InvalidAiTaskResultException(
-                        "AI task result callback contains a null interaction trace at index " + index);
-            }
-            List<String> violations = VALIDATOR.validate(trace).stream()
-                    .sorted(Comparator.comparing((ConstraintViolation<AiInteractionTraceRequest> violation) ->
-                            violation.getPropertyPath().toString())
-                            .thenComparing(ConstraintViolation::getMessage))
-                    .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())
-                    .toList();
-            if (!violations.isEmpty()) {
-                throw new InvalidAiTaskResultException(
-                        "Invalid interaction trace at index " + index + ": " + String.join(", ", violations));
             }
         }
     }
