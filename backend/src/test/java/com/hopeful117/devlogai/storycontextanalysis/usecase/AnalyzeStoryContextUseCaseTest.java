@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.storycontextanalysis.usecase;
 import com.hopeful117.devlogai.ai.engine.client.AIEngineClient;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskResultRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskResultStatus;
+import com.hopeful117.devlogai.ai.engine.dto.AiInteractionTraceRequest;
 import com.hopeful117.devlogai.ai.engine.dto.PromptExecutionMetadata;
 import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
@@ -302,11 +303,6 @@ class AnalyzeStoryContextUseCaseTest {
         when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
         when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
         when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent);
-        when(analysisRepository.save(any(Analysis.class))).thenAnswer(invocation -> {
-            Analysis saved = invocation.getArgument(0);
-            saved.setId(UUID.randomUUID());
-            return saved;
-        });
         when(engineeringContextFacade.getCanonicalEngineeringContext(
                 PROJECT_SLUG, INTENT_ID, List.of(), storyId)).thenReturn(null);
 
@@ -327,12 +323,6 @@ class AnalyzeStoryContextUseCaseTest {
         when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
         when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
         when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
-        when(analysisRepository.save(any(Analysis.class))).thenAnswer(invocation -> {
-            Analysis saved = invocation.getArgument(0);
-            saved.setId(UUID.randomUUID());
-            return saved;
-        });
-
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
                 () -> useCase.execute(PROJECT_SLUG, storyId, List.of(), null));
@@ -344,6 +334,28 @@ class AnalyzeStoryContextUseCaseTest {
         verify(engineeringContextFacade, never()).getEngineeringContext(any(), any(), any(), any());
         verify(aiTaskService, never()).createForStoryContextAnalysisEntity(
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void differentRequestWithReusedIdempotencyKeyConflictsBeforeConstruction() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        AiTask existing = AiTask.builder().id(UUID.randomUUID())
+                .submissionDigest("different-request")
+                .build();
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(aiTaskRepository.findByIdempotencyKeyHash(any())).thenReturn(Optional.of(existing));
+
+        assertThrows(com.hopeful117.devlogai.shared.exception.ConflictException.class,
+                () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null, "same-key"));
+        verify(engineeringContextFacade, never()).getCanonicalEngineeringContext(
+                any(), any(), any(), any());
+        verify(analysisRepository, never()).save(any(Analysis.class));
     }
 
     @Test
@@ -401,6 +413,26 @@ class AnalyzeStoryContextUseCaseTest {
 
         assertTrue(error.getMessage().contains("unauthorized evidence"));
         assertEquals(AiTaskStatus.SUBMITTED, task.getStatus());
+        verify(storyContextAnalysisRepository, never()).save(any());
+        verify(aiTaskRepository, never()).save(any());
+    }
+
+    @Test
+    void handleCallbackRejectsMalformedInteractionTraceBeforeLookupOrMutation() {
+        UUID correlationId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        AiTask task = callbackTask(correlationId, storyId, CANONICAL_REFERENCE, Map.of());
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.parse("2026-09-09T10:00:00Z"), List.of(), null,
+                callbackPromptExecution(storyId), null, groundedResult(CANONICAL_REFERENCE),
+                java.util.Collections.singletonList(null));
+
+        assertThrows(com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException.class,
+                () -> useCase.handleCallback(correlationId, request));
+
+        assertEquals(AiTaskStatus.SUBMITTED, task.getStatus());
+        verify(aiTaskRepository, never()).findByCorrelationIdForUpdate(any());
         verify(storyContextAnalysisRepository, never()).save(any());
         verify(aiTaskRepository, never()).save(any());
     }
@@ -759,6 +791,17 @@ class AnalyzeStoryContextUseCaseTest {
         return new AiTaskResultRequest(
                 correlationId, "job-42", AiTaskResultStatus.COMPLETED, completedAt,
                 List.of(), null, execution, null, result);
+    }
+
+    private PromptExecutionMetadata callbackPromptExecution(UUID storyId) {
+        return new PromptExecutionMetadata(
+                "story-context-analysis-prompt-v1", "mock", "deterministic-v1",
+                "c".repeat(64), CONTEXT_DIGEST, null, PROJECTION_DIGEST,
+                "sca/v1",
+                Map.of("projectSlug", PROJECT_SLUG, "storyId", storyId.toString(),
+                        "intent", INTENT_ID, "files", List.of(CANONICAL_REFERENCE)),
+                CALLBACK_FRESHNESS,
+                "d".repeat(64));
     }
 
     private StoryContextAnalysisResult groundedResult(String reference) {

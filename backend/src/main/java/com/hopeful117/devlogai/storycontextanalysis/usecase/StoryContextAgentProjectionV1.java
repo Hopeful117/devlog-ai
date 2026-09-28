@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.storycontextanalysis.usecase;
 import com.hopeful117.devlogai.engineeringcontext.CanonicalContextDigest;
 import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidence;
+import com.hopeful117.devlogai.contracts.storycontextagent.StoryContextAgentProtocolV1;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import tools.jackson.databind.ObjectMapper;
 import java.util.*;
@@ -43,6 +44,7 @@ public final class StoryContextAgentProjectionV1 {
             }
         }
         Map<String,Object> result = new LinkedHashMap<>();
+        result.put("protocolVersion", StoryContextAgentProtocolV1.PROTOCOL_VERSION);
         result.put("contractVersion", CONTRACT_VERSION);
         result.put("projectionVersion", PROJECTION_VERSION);
         result.put("contextDigest", requireDigest(canonical.contextDigest(), "contextDigest"));

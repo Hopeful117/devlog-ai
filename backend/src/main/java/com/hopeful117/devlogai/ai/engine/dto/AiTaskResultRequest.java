@@ -1,10 +1,13 @@
 package com.hopeful117.devlogai.ai.engine.dto;
 
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
+import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,7 +24,23 @@ public record AiTaskResultRequest(
         @Valid List<AiInteractionTraceRequest> interactionTraces
 ) {
     public AiTaskResultRequest {
-        interactionTraces = interactionTraces == null ? List.of() : List.copyOf(interactionTraces);
+        interactionTraces = interactionTraces == null
+                ? List.of()
+                : Collections.unmodifiableList(new ArrayList<>(interactionTraces));
+    }
+
+    /** Validates payloads decoded after raw-body HMAC authentication. */
+    public void validateCallbackContract() {
+        if (correlationId == null || status == null || completedAt == null || proposals == null) {
+            throw new InvalidAiTaskResultException("AI task result callback is missing required fields");
+        }
+        AiTaskResultCallbackContractValidator.validateInteractionTraces(interactionTraces);
+        for (AiProposalResult proposal : proposals) {
+            if (proposal == null || proposal.type() == null || proposal.payload() == null
+                    || proposal.confidence() == null) {
+                throw new InvalidAiTaskResultException("AI task result callback contains an incomplete proposal");
+            }
+        }
     }
 
     public AiTaskResultRequest(UUID correlationId, String externalJobId,
