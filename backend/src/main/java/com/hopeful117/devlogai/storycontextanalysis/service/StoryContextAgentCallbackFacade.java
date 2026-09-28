@@ -22,6 +22,7 @@ public class StoryContextAgentCallbackFacade {
 
     @Transactional
     public AiTaskResultAcknowledgement callback(UUID aiTaskId, AiTaskResultRequest request) {
+        request.validateCallbackContract();
         AiTask task = aiTaskRepository.findById(aiTaskId)
                 .orElseThrow(() -> new EntityNotFoundException("AI task", aiTaskId));
         if (task.getId() == null || !task.getId().equals(aiTaskId)) {

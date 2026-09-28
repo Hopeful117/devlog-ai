@@ -9,6 +9,8 @@ import jakarta.validation.Validator;
 import jakarta.validation.ConstraintViolation;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Comparator;
 import java.util.UUID;
@@ -28,7 +30,23 @@ public record AiTaskResultRequest(
     private static final Validator VALIDATOR = Validation.buildDefaultValidatorFactory().getValidator();
 
     public AiTaskResultRequest {
-        interactionTraces = interactionTraces == null ? List.of() : List.copyOf(interactionTraces);
+        interactionTraces = interactionTraces == null
+                ? List.of()
+                : Collections.unmodifiableList(new ArrayList<>(interactionTraces));
+    }
+
+    /** Validates payloads decoded after raw-body HMAC authentication. */
+    public void validateCallbackContract() {
+        if (correlationId == null || status == null || completedAt == null || proposals == null) {
+            throw new InvalidAiTaskResultException("AI task result callback is missing required fields");
+        }
+        AiTaskResultCallbackContractValidator.validateInteractionTraces(interactionTraces);
+        for (AiProposalResult proposal : proposals) {
+            if (proposal == null || proposal.type() == null || proposal.payload() == null
+                    || proposal.confidence() == null) {
+                throw new InvalidAiTaskResultException("AI task result callback contains an incomplete proposal");
+            }
+        }
     }
 
     /** Validates payloads decoded after raw-body HMAC authentication. */

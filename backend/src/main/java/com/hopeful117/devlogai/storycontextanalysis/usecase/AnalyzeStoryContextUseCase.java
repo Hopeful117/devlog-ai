@@ -429,6 +429,7 @@ public class AnalyzeStoryContextUseCase {
 
     @Transactional
     public void handleCallback(UUID correlationId, AiTaskResultRequest request) {
+        request.validateCallbackContract();
         AiTask task = aiTaskRepository.findByCorrelationIdForUpdate(correlationId)
                 .orElseThrow(() -> new EntityNotFoundException("AI task correlation", correlationId));
 
