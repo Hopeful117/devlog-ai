@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.contracts.projectcontext.ProjectContext;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.service.annotation.GetExchange;
 import org.springframework.web.service.annotation.HttpExchange;
@@ -45,7 +46,34 @@ public interface DevlogProjectContextClient {
             @PathVariable UUID aiTaskId
     );
 
+    @GetExchange("/story-context-agent/projects/{projectSlug}/context")
+    Map<String, Object> getStoryContextAgentProjection(
+            @PathVariable String projectSlug,
+            @RequestParam(value = "storyId", required = false) UUID storyId,
+            @RequestParam(value = "files", required = false) List<String> files,
+            @RequestParam("intent") String intent
+    );
+
+    @PostExchange("/story-context-agent/projects/{projectSlug}/tasks")
+    Map<String, Object> submitStoryContextAgentTask(
+            @PathVariable String projectSlug,
+            @RequestParam(value = "storyId", required = false) UUID storyId,
+            @RequestBody SubmitRequest request
+    );
+
+    @PostExchange("/story-context-agent/tasks/{aiTaskId}/callback")
+    Map<String, Object> callbackStoryContextAgentTask(
+            @PathVariable UUID aiTaskId,
+            @RequestHeader("X-SCA-Signature") String signature,
+            @RequestBody Map<String, Object> request
+    );
+
+    @GetExchange("/story-context-agent/tasks/{aiTaskId}/snapshot")
+    Map<String, Object> getStoryContextAgentSnapshot(@PathVariable UUID aiTaskId);
+
     record AnalyzeContextRequest(List<String> files, Map<String, Object> guidance) {}
+
+    record SubmitRequest(String intent, List<String> files, Map<String, Object> guidance) {}
 
     record AnalyzeContextResponse(UUID aiTaskId) {}
 

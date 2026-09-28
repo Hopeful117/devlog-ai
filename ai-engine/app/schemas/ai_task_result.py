@@ -59,6 +59,7 @@ class PromptExecutionMetadata(ResultContractModel):
     scope: dict[str, object] | None = None
     freshness: dict[str, object] | None = None
     grounding_digest: str | None = Field(default=None, alias="groundingDigest", pattern=r"^[0-9a-f]{64}$")
+    protocol_version: str | None = Field(default=None, alias="protocolVersion", max_length=100)
 
 
 class AiTaskResultRequest(ResultContractModel):

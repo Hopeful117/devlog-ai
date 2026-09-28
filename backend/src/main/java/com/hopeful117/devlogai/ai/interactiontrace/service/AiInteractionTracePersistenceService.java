@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.ai.interactiontrace.service;
 
 import com.hopeful117.devlogai.ai.engine.dto.AiInteractionTraceRequest;
+import com.hopeful117.devlogai.ai.engine.dto.AiTaskResultRequest;
 import com.hopeful117.devlogai.ai.interactiontrace.entity.AiInteractionTrace;
 import com.hopeful117.devlogai.ai.interactiontrace.repository.AiInteractionTraceRepository;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
@@ -28,6 +29,7 @@ public class AiInteractionTracePersistenceService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void persist(AiTask task, List<AiInteractionTraceRequest> requests) {
         if (requests == null || requests.isEmpty()) return;
+        AiTaskResultRequest.validateInteractionTraces(requests);
         boolean diagnostic = "DIAGNOSTIC".equalsIgnoreCase(configuredLevel);
         Instant expiresAt = diagnostic ? Instant.now().plus(diagnosticRetention) : null;
         for (AiInteractionTraceRequest request : requests) {

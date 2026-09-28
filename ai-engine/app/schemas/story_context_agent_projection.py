@@ -129,6 +129,9 @@ class StoryContextAgentProjectionV1(ContractModel):
             raise ValueError("compatibility must be omitted when absent, not null")
         return value
 
+    protocol_version: Literal["story-context-agent-protocol/v1"] = Field(
+        default="story-context-agent-protocol/v1", alias="protocolVersion"
+    )
     contract_version: Literal["story-context-agent-projection/v1"] = Field(alias="contractVersion")
     projection_version: Literal["sca/v1"] = Field(alias="projectionVersion")
     context_digest: str = Field(alias="contextDigest", min_length=64, max_length=64, pattern="^[0-9a-f]{64}$")
@@ -145,7 +148,12 @@ class StoryContextAgentProjectionV1(ContractModel):
 
     @model_validator(mode="after")
     def validate_contract(self):
-        if _projection_digest(self.model_dump(by_alias=True, exclude_none=True)) != self.projection_digest:
+        digest_input = self.model_dump(by_alias=True, exclude_none=True)
+        # 0152 payloads predate the protocol alias; preserve their digest while
+        # accepting the explicit protocolVersion required by 0153.
+        if "protocolVersion" not in self.model_fields_set:
+            digest_input.pop("protocolVersion", None)
+        if _projection_digest(digest_input) != self.projection_digest:
             raise ValueError("projectionDigest does not identify the canonical projection")
         if self.context_digest == self.projection_digest:
             raise ValueError("contextDigest and projectionDigest must identify different layers")

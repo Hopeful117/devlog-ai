@@ -302,11 +302,6 @@ class AnalyzeStoryContextUseCaseTest {
         when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
         when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
         when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent);
-        when(analysisRepository.save(any(Analysis.class))).thenAnswer(invocation -> {
-            Analysis saved = invocation.getArgument(0);
-            saved.setId(UUID.randomUUID());
-            return saved;
-        });
         when(engineeringContextFacade.getCanonicalEngineeringContext(
                 PROJECT_SLUG, INTENT_ID, List.of(), storyId)).thenReturn(null);
 
@@ -327,12 +322,6 @@ class AnalyzeStoryContextUseCaseTest {
         when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
         when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
         when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
-        when(analysisRepository.save(any(Analysis.class))).thenAnswer(invocation -> {
-            Analysis saved = invocation.getArgument(0);
-            saved.setId(UUID.randomUUID());
-            return saved;
-        });
-
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
                 () -> useCase.execute(PROJECT_SLUG, storyId, List.of(), null));
@@ -344,6 +333,28 @@ class AnalyzeStoryContextUseCaseTest {
         verify(engineeringContextFacade, never()).getEngineeringContext(any(), any(), any(), any());
         verify(aiTaskService, never()).createForStoryContextAnalysisEntity(
                 any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void differentRequestWithReusedIdempotencyKeyConflictsBeforeConstruction() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        AiTask existing = AiTask.builder().id(UUID.randomUUID())
+                .submissionDigest("different-request")
+                .build();
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(aiTaskRepository.findByIdempotencyKeyHash(any())).thenReturn(Optional.of(existing));
+
+        assertThrows(com.hopeful117.devlogai.shared.exception.ConflictException.class,
+                () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null, "same-key"));
+        verify(engineeringContextFacade, never()).getCanonicalEngineeringContext(
+                any(), any(), any(), any());
+        verify(analysisRepository, never()).save(any(Analysis.class));
     }
 
     @Test

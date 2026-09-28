@@ -8,12 +8,14 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EvidenceRef;
+import com.hopeful117.devlogai.contracts.storycontextagent.StoryContextAgentProtocolV1;
 import com.hopeful117.devlogai.engineeringcontext.EngineeringContextFacade;
 import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
@@ -25,12 +27,14 @@ import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import com.hopeful117.devlogai.storycontextanalysis.entity.StoryContextAnalysis;
 import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
+import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAgentMetrics;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
@@ -55,13 +59,60 @@ public class AnalyzeStoryContextUseCase {
     private final StoryContextAnalysisRepository storyContextAnalysisRepository;
     private final ObjectMapper objectMapper;
     private final AnalysisRepository analysisRepository;
+    @Autowired(required = false)
+    private StoryContextAgentMetrics metrics;
     private static final TaskSnapshotEvidenceResolver evidenceResolver = new TaskSnapshotEvidenceResolver();
+
+    /** Read-only projection path; it performs no task creation or second selection. */
+    public Map<String, Object> project(String projectSlug, UUID storyId, List<String> files) {
+        return project(projectSlug, storyId, INTENT_ID, files);
+    }
+
+    public Map<String, Object> project(String projectSlug, UUID storyId, String intent, List<String> files) {
+        Project project = projectRepository.findBySlug(projectSlug)
+                .orElseThrow(() -> new EntityNotFoundException("Project", projectSlug));
+        EngineeringStory story = storyId == null ? null : storyRepository.findById(storyId)
+                .orElseThrow(() -> new EntityNotFoundException("EngineeringStory", storyId));
+        if (story != null && !story.getProject().getId().equals(project.getId())) {
+            throw new IllegalArgumentException("Story does not belong to project");
+        }
+        List<String> requestedFiles = files == null ? List.of() : List.copyOf(files);
+        CanonicalEngineeringContext canonical = engineeringContextFacade.getCanonicalEngineeringContext(
+                projectSlug, intent, requestedFiles, storyId);
+        if (canonical == null) {
+            throw new IllegalStateException("Canonical EngineeringContext is required for Story Context projection");
+        }
+        Map<String, Object> projection = StoryContextAgentProjectionV1.build(
+                canonical, projectSlug, storyId, intent, requestedFiles, story, objectMapper);
+        if (metrics != null) {
+            metrics.increment("sca_projection_construction_total");
+            if (Boolean.TRUE.equals(((Map<?, ?>) projection.get("accounting")).get("truncated"))) {
+                metrics.increment("sca_budget_truncated_total");
+            }
+        }
+        return projection;
+    }
 
     public UUID execute(
             String projectSlug,
             UUID storyId,
             List<String> files,
             Map<String, Object> guidance
+    ) {
+        return execute(projectSlug, storyId, INTENT_ID, files, guidance);
+    }
+
+    public UUID execute(
+            String projectSlug, UUID storyId, String requestedIntent, List<String> files,
+            Map<String, Object> guidance
+    ) {
+        return execute(projectSlug, storyId, requestedIntent, files, guidance, null);
+    }
+
+    @Transactional
+    public UUID execute(
+            String projectSlug, UUID storyId, String requestedIntent, List<String> files,
+            Map<String, Object> guidance, String idempotencyKey
     ) {
         Project project = projectRepository.findBySlug(projectSlug)
                 .orElseThrow(() -> new EntityNotFoundException("Project", projectSlug));
@@ -71,21 +122,42 @@ public class AnalyzeStoryContextUseCase {
             throw new IllegalArgumentException("Story does not belong to project");
         }
 
-        var intentDef = intentCatalog.resolve(INTENT_ID, INTENT_VERSION);
+        if (requestedIntent == null || requestedIntent.isBlank()) {
+            throw new IllegalArgumentException("intent is required");
+        }
+        var intentDef = intentCatalog.resolve(requestedIntent, INTENT_VERSION);
 
-        Analysis executionAnalysis = analysisRepository.save(Analysis.builder()
-                .project(project)
-                .type(AnalysisType.STORY_CONTEXT_ANALYSIS)
-                .intentId(INTENT_ID)
-                .intentVersion(INTENT_VERSION)
-                .status(AnalysisStatus.IN_PROGRESS)
-                .startedAt(Instant.now())
-                .build());
+        List<String> requestedFiles = files == null ? List.of() : List.copyOf(files);
+        Map<String, Object> submissionIdentity = new LinkedHashMap<>();
+        submissionIdentity.put("projectSlug", projectSlug);
+        submissionIdentity.put("storyId", storyId == null ? null : storyId.toString());
+        submissionIdentity.put("intent", requestedIntent);
+        submissionIdentity.put("files", requestedFiles);
+        submissionIdentity.put("guidance", guidance == null ? Map.of() : guidance);
+        String submissionDigest = sha256(canonicalJson(submissionIdentity));
+        String idempotencyKeyHash = idempotencyKey == null || idempotencyKey.isBlank()
+                ? null : sha256(idempotencyKey);
+        // PostgreSQL advisory locks make the check-and-create operation atomic
+        // across application instances without locking unrelated AI tasks.
+        aiTaskRepository.acquireSubmissionLock(idempotencyKeyHash == null
+                ? submissionDigest : idempotencyKeyHash);
+        if (idempotencyKeyHash != null) {
+            Optional<AiTask> existing = aiTaskRepository.findByIdempotencyKeyHash(idempotencyKeyHash);
+            if (existing.isPresent()) {
+                if (!Objects.equals(existing.get().getSubmissionDigest(), submissionDigest)) {
+                    throw new com.hopeful117.devlogai.shared.exception.ConflictException(
+                            "Idempotency-Key was already used for a different request");
+                }
+                return existing.get().getId();
+            }
+        }
+        Optional<AiTask> sameRequest = aiTaskRepository.findBySubmissionDigest(submissionDigest);
+        if (sameRequest.isPresent()) return sameRequest.get().getId();
 
         CanonicalEngineeringContext canonicalContext = engineeringContextFacade.getCanonicalEngineeringContext(
                 projectSlug,
-                INTENT_ID,
-                files != null ? files : List.of(),
+                requestedIntent,
+                requestedFiles,
                 storyId
         );
         if (canonicalContext == null) {
@@ -94,7 +166,13 @@ public class AnalyzeStoryContextUseCase {
 
         UserGuidance userGuidance = mapGuidance(guidance);
         Map<String, Object> storyAgentProjection = StoryContextAgentProjectionV1.build(
-                canonicalContext, projectSlug, storyId, INTENT_ID, files, story, objectMapper);
+                canonicalContext, projectSlug, storyId, requestedIntent, files, story, objectMapper);
+        if (metrics != null) {
+            metrics.increment("sca_projection_construction_total");
+            if (Boolean.TRUE.equals(((Map<?, ?>) storyAgentProjection.get("accounting")).get("truncated"))) {
+                metrics.increment("sca_budget_truncated_total");
+            }
+        }
         String projectionDigest = (String) storyAgentProjection.get("projectionDigest");
 
         // The Core canonical construction owns the digest; this use case only propagates it.
@@ -106,11 +184,20 @@ public class AnalyzeStoryContextUseCase {
         // Authorize only the canonical repository evidence projected into this prompt.
         Map<String, Object> groundingContract = buildGroundingContract(canonicalContext, projectSlug, guidance);
 
+        Analysis executionAnalysis = analysisRepository.save(Analysis.builder()
+                .project(project)
+                .type(AnalysisType.STORY_CONTEXT_ANALYSIS)
+                .intentId(requestedIntent)
+                .intentVersion(INTENT_VERSION)
+                .status(AnalysisStatus.IN_PROGRESS)
+                .startedAt(Instant.now())
+                .build());
+
         // Create AiTask with selected knowledge and grounding contract
         AiTask aiTask = aiTaskService.createForStoryContextAnalysisEntity(
                 executionAnalysis.getId(),
                 AiTaskType.STORY_CONTEXT_ANALYSIS,
-                INTENT_ID,
+                requestedIntent,
                 INTENT_VERSION,
                 intentDef.promptTemplate(),
                 storyAgentProjection,
@@ -123,11 +210,13 @@ public class AnalyzeStoryContextUseCase {
         aiTask.setContextDigest(contextDigest);
         aiTask.setSelectionDigest(null);
         aiTask.setProjectionDigest(projectionDigest);
+        aiTask.setSubmissionDigest(submissionDigest);
+        aiTask.setIdempotencyKeyHash(idempotencyKeyHash);
         // Freeze the complete execution contract before SUBMITTED. Callback data is
         // an echo only and must never be able to complete or repair this snapshot.
         Map<String, Object> taskContextSnapshot = buildExecutionSnapshot(
                 aiTask, canonicalContext, storyAgentProjection, projectionDigest,
-                projectSlug, storyId, files, guidance, groundingContract);
+                projectSlug, storyId, requestedIntent, files, guidance, groundingContract, submissionDigest);
         aiTask.setContextSnapshot(taskContextSnapshot);
         aiTaskRepository.save(aiTask);
 
@@ -141,6 +230,7 @@ public class AnalyzeStoryContextUseCase {
         promptMetadata.put("contextDigest", contextDigest);
         if (aiTask.getSelectionDigest() != null) promptMetadata.put("selectionDigest", aiTask.getSelectionDigest());
         promptMetadata.put("projectionDigest", projectionDigest);
+        promptMetadata.put("protocolVersion", StoryContextAgentProtocolV1.PROTOCOL_VERSION);
         promptMetadata.put("contractVersion", StoryContextAgentProjectionV1.CONTRACT_VERSION);
         promptMetadata.put("projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION);
         promptMetadata.put("scope", taskContextSnapshot.get("scope"));
@@ -168,17 +258,23 @@ public class AnalyzeStoryContextUseCase {
 
     private Map<String, Object> buildExecutionSnapshot(
             AiTask task, CanonicalEngineeringContext canonical, Map<String, Object> projection,
-            String projectionDigest, String projectSlug, UUID storyId, List<String> files,
-            Map<String, Object> guidance, Map<String, Object> groundingContract) {
+            String projectionDigest, String projectSlug, UUID storyId, String requestedIntent, List<String> files,
+            Map<String, Object> guidance, Map<String, Object> groundingContract, String submissionDigest) {
+        if (task.getId() == null) {
+            throw new IllegalStateException("AI task id is required before creating the Story Context snapshot");
+        }
         Map<String, Object> snapshot = new LinkedHashMap<>(
                 task.getContextSnapshot() == null ? Map.of() : task.getContextSnapshot());
+        snapshot.put("protocolVersion", StoryContextAgentProtocolV1.PROTOCOL_VERSION);
+        snapshot.put("aiTaskId", task.getId());
+        snapshot.put("snapshotId", task.getId());
         snapshot.put("contextDigest", canonical.contextDigest());
         snapshot.put("projectionDigest", projectionDigest);
         snapshot.put("contextVersion", canonical.contextVersion());
         snapshot.put("projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION);
         Map<String,Object> scope = new LinkedHashMap<>();
         scope.put("projectSlug", projectSlug); scope.put("storyId", storyId == null ? null : storyId.toString());
-        scope.put("intent", INTENT_ID); scope.put("files", files == null ? List.of() : List.copyOf(files));
+        scope.put("intent", requestedIntent); scope.put("files", files == null ? List.of() : List.copyOf(files));
         snapshot.put("scope", scope);
         Map<String, Object> requestEcho = valueMap(canonical.requestEcho());
         snapshot.put("requestEcho", requestEcho);
@@ -204,6 +300,10 @@ public class AnalyzeStoryContextUseCase {
         snapshot.put("canonicalContext", valueMap(canonical));
         snapshot.put("projection", projectionEnvelope(projection, groundingContract));
         snapshot.put("guidance", guidance == null ? Map.of() : new LinkedHashMap<>(guidance));
+        snapshot.put("status", "SUBMITTED");
+        snapshot.put("submissionDigest", submissionDigest);
+        StoryContextAgentProtocolV1.requireSnapshotIdentity(snapshot, task.getId(),
+                canonical.contextDigest(), projectionDigest);
         return snapshot;
     }
 
@@ -391,7 +491,10 @@ public class AnalyzeStoryContextUseCase {
 
     public void validateCoreIssuedIdentities(AiTask task, PromptExecutionMetadata metadata) {
         if (metadata == null) {
-            throw new IllegalStateException("Story Context Analysis callback is missing prompt identities");
+            throw new InvalidAiTaskResultException("Story Context Analysis callback is missing prompt identities");
+        }
+        if (!StoryContextAgentProtocolV1.PROTOCOL_VERSION.equals(metadata.protocolVersion())) {
+            throw new InvalidAiTaskResultException("Story Context Analysis callback protocolVersion is missing or unsupported");
         }
         Map<String, Object> snapshot = task.getContextSnapshot() == null ? Map.of() : task.getContextSnapshot();
         String expectedContext = task.getContextDigest();
@@ -402,53 +505,53 @@ public class AnalyzeStoryContextUseCase {
         Object expectedFreshness = snapshot.get("freshness");
         Object expectedGrounding = snapshot.get("groundingDigest");
         if (expectedProjection == null || !expectedProjection.matches("[0-9a-f]{64}")) {
-            throw new IllegalStateException("Story Context Analysis task is missing a valid projection digest");
+            throw new InvalidAiTaskResultException("Story Context Analysis task is missing a valid projection digest");
         }
         if (metadata.projectionDigest() == null
                 || !metadata.projectionDigest().matches("[0-9a-f]{64}")) {
-            throw new IllegalStateException("Story Context Analysis callback is missing a valid projection digest");
+            throw new InvalidAiTaskResultException("Story Context Analysis callback is missing a valid projection digest");
         }
         if (!Objects.equals(expectedContext, metadata.contextDigest())) {
-            throw new IllegalStateException("Context digest mismatch in callback");
+            throw new InvalidAiTaskResultException("Context digest mismatch in callback");
         }
         if (!Objects.equals(expectedProjection, metadata.projectionDigest())) {
-            throw new IllegalStateException("Projection digest mismatch in callback");
+            throw new InvalidAiTaskResultException("Projection digest mismatch in callback");
         }
         if (!Objects.equals(expectedSelection, metadata.selectionDigest())) {
-            throw new IllegalStateException("Selection digest mismatch in callback");
+            throw new InvalidAiTaskResultException("Selection digest mismatch in callback");
         }
         if (!Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, metadata.projectionVersion())
                 || !Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, expectedProjectionVersion)) {
-            throw new IllegalStateException("Projection version mismatch in callback");
+            throw new InvalidAiTaskResultException("Projection version mismatch in callback");
         }
         if (!(metadata.scope() instanceof Map<?, ?>) || !Objects.equals(expectedScope, metadata.scope())) {
-            throw new IllegalStateException("Scope mismatch in callback");
+            throw new InvalidAiTaskResultException("Scope mismatch in callback");
         }
         if (!(metadata.freshness() instanceof Map<?, ?>) || !Objects.equals(expectedFreshness, metadata.freshness())) {
-            throw new IllegalStateException("Freshness mismatch in callback");
+            throw new InvalidAiTaskResultException("Freshness mismatch in callback");
         }
         if (!(expectedGrounding instanceof String grounding) || !grounding.matches("[0-9a-f]{64}")
                 || !Objects.equals(grounding, metadata.groundingDigest())) {
-            throw new IllegalStateException("Grounding identity mismatch in callback");
+            throw new InvalidAiTaskResultException("Grounding identity mismatch in callback");
         }
         boolean hasIdentitySnapshot = snapshot.containsKey("contextDigest")
                 || snapshot.containsKey("projectionDigest") || snapshot.containsKey("selectionDigest");
         if (hasIdentitySnapshot && (!Objects.equals(expectedContext, snapshot.get("contextDigest"))
                 || !Objects.equals(expectedProjection, snapshot.get("projectionDigest"))
                 || !Objects.equals(expectedSelection, snapshot.get("selectionDigest")))) {
-            throw new IllegalStateException("AI task snapshot identity is incomplete or inconsistent");
+            throw new InvalidAiTaskResultException("AI task snapshot identity is incomplete or inconsistent");
         }
         validateSnapshotScope(task);
         if (!Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, snapshot.get("projectionVersion")))
-            throw new IllegalStateException("AI task snapshot projection version is missing or inconsistent");
+            throw new InvalidAiTaskResultException("AI task snapshot projection version is missing or inconsistent");
         if (!(snapshot.get("freshness") instanceof Map<?, ?>) || !(snapshot.get("groundingContract") instanceof Map<?, ?>))
-            throw new IllegalStateException("AI task snapshot freshness and grounding identity are required");
+            throw new InvalidAiTaskResultException("AI task snapshot freshness and grounding identity are required");
         Object projection = snapshot.get("projection");
         if (!(projection instanceof Map<?, ?> p)
                 || !Objects.equals(expectedContext, p.get("contextDigest"))
                 || !Objects.equals(expectedProjection, p.get("projectionDigest"))
                 || !Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, p.get("projectionVersion")))
-            throw new IllegalStateException("AI task snapshot projection identity is incomplete or inconsistent");
+            throw new InvalidAiTaskResultException("AI task snapshot projection identity is incomplete or inconsistent");
     }
 
     /**

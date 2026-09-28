@@ -57,6 +57,10 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             UUID correlationId,
             AiTaskResultRequest request
     ) {
+        if (request == null) {
+            throw new InvalidAiTaskResultException("AI task result callback must not be null");
+        }
+        request.validateCallbackContract();
         log.info("Receiving AI task result correlationId={} status={} proposalCount={}",
                 correlationId, request.status(), request.proposals().size());
         validateContract(correlationId, request);
@@ -66,7 +70,6 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                 ));
         validateExternalJobId(task, request.externalJobId());
         rejectTypedPayloadForLegacyTask(task, request);
-        persistInteractionTraces(task, request);
 
         if (isStoryContextAnalysisIntent(task)) {
             return handleStoryContextAnalysis(task, request);
@@ -97,6 +100,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             );
             log.info("AI task result acknowledged as duplicate correlationId={} taskStatus={}",
                     correlationId, task.getStatus());
+            persistInteractionTraces(task, request);
             return acknowledgement(task, true);
         }
         if (task.getStatus() == AiTaskStatus.CREATED) {
@@ -122,6 +126,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             failTask(task, request);
             aiTaskRepository.save(task);
             finishAnalysis(task, AnalysisStatus.FAILED, request.completedAt());
+            persistInteractionTraces(task, request);
             log.warn("AI task marked failed correlationId={} failureCode={}",
                     correlationId, request.error().code());
             return acknowledgement(task, false);
@@ -143,6 +148,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         log.info("AI task completed correlationId={} proposalCount={} hasSynthesis={}",
                 correlationId, request.proposals().size(), request.synthesis() != null);
         evaluateAndCommunicate(task.getAnalysis().getId());
+        persistInteractionTraces(task, request);
         return acknowledgement(task, false);
     }
 
@@ -539,8 +545,23 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         // terminal completion. Validate the callback before treating it as an
         // idempotent duplicate so a mismatched callback cannot be acknowledged.
         analyzeStoryContextUseCase.validateCoreIssuedIdentities(task, request.promptExecution());
+        String callbackDigest = callbackDigest(request);
         if (task.getStatus().isTerminal()) {
+            // Pre-v1 fixtures/tasks have no terminal digest. They cannot carry a
+            // completed SCA result, so retain constructor/test compatibility only
+            // for the empty legacy duplicate; all v1 terminal callbacks are
+            // persisted with and compared against terminalCallbackDigest.
+            if (task.getTerminalCallbackDigest() == null && request.analysisResult() == null) {
+                persistInteractionTraces(task, request);
+                return acknowledgement(task, true);
+            }
+            if (!Objects.equals(task.getTerminalCallbackDigest(), callbackDigest)) {
+                throw new AiTaskResultConflictException(
+                        "AI_TASK_TERMINAL_CONFLICT", task.getStatus(),
+                        "AI task already ended with a different terminal callback payload.");
+            }
             log.info("Duplicate callback for completed story context analysis task correlationId={}", task.getCorrelationId());
+            persistInteractionTraces(task, request);
             return acknowledgement(task, true);
         }
         if (task.getStatus() == AiTaskStatus.CREATED) {
@@ -554,18 +575,20 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
                 && task.getStatus() != AiTaskStatus.PROCESSING) {
             throw new AiTaskResultConflictException(
                     "AI_TASK_INVALID_STATE",
-                    task.getStatus(),
-                    "AI task cannot receive a result from its current status."
+                task.getStatus(),
+                "AI task cannot receive a result from its current status."
             );
         }
 
         if (request.status() == AiTaskResultStatus.FAILED) {
             failTask(task, request);
+            task.setTerminalCallbackDigest(callbackDigest);
             aiTaskRepository.save(task);
             finishAnalysis(task, AnalysisStatus.FAILED, request.completedAt());
             log.warn("Story context analysis task marked failed correlationId={} failureCode={}",
                     task.getCorrelationId(), request.error().code());
             analyzeStoryContextUseCase.handleCallback(task.getCorrelationId(), request);
+            persistInteractionTraces(task, request);
             return acknowledgement(task, false);
         }
 
@@ -575,11 +598,71 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             );
         }
 
-        analyzeStoryContextUseCase.handleCallback(task.getCorrelationId(), request);
+        try {
+            analyzeStoryContextUseCase.handleCallback(task.getCorrelationId(), request);
+        } catch (InvalidAiTaskResultException exception) {
+            throw exception;
+        } catch (IllegalStateException exception) {
+            throw new InvalidAiTaskResultException(exception.getMessage());
+        }
+        task.setTerminalCallbackDigest(callbackDigest);
+        aiTaskRepository.save(task);
         finishAnalysis(task, AnalysisStatus.COMPLETED, request.completedAt());
         evaluateAndCommunicate(task.getAnalysis().getId());
+        persistInteractionTraces(task, request);
 
         return acknowledgement(task, false);
+    }
+
+    private String callbackDigest(AiTaskResultRequest request) {
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("externalJobId", request.externalJobId());
+            payload.put("status", request.status().name());
+            payload.put("completedAt", request.completedAt().toString());
+            payload.put("error", request.error());
+            payload.put("promptExecution", request.promptExecution());
+            payload.put("analysisResult", request.analysisResult());
+            payload.put("proposals", request.proposals());
+            payload.put("synthesis", request.synthesis());
+            payload.put("interactionTraces", request.interactionTraces());
+            Object converted = objectMapper.convertValue(payload, Map.class);
+            String canonical = converted == null ? request.toString() : canonicalJson(converted);
+            return sha256(canonical);
+        } catch (Exception exception) {
+            throw new InvalidAiTaskResultException("Unable to canonicalize Story Context callback payload");
+        }
+    }
+
+    private String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String canonicalJson(Object value) {
+        if (value == null) return "null";
+        if (value instanceof Map<?, ?> map) {
+            return map.entrySet().stream().sorted(Map.Entry.comparingByKey(Comparator.comparing(String::valueOf)))
+                    .map(entry -> quote(String.valueOf(entry.getKey())) + ":" + canonicalJson(entry.getValue()))
+                    .collect(java.util.stream.Collectors.joining(",", "{", "}"));
+        }
+        if (value instanceof Iterable<?> iterable) {
+            return java.util.stream.StreamSupport.stream(iterable.spliterator(), false)
+                    .map(this::canonicalJson).collect(java.util.stream.Collectors.joining(",", "[", "]"));
+        }
+        if (value.getClass().isRecord()) return canonicalJson(objectMapper.convertValue(value, Map.class));
+        try { return objectMapper.writeValueAsString(value); }
+        catch (Exception exception) { throw new IllegalStateException("Unable to canonicalize callback payload", exception); }
+    }
+
+    private String quote(String value) {
+        try { return objectMapper.writeValueAsString(value); }
+        catch (Exception exception) { throw new IllegalStateException("Unable to canonicalize callback key", exception); }
     }
 
     private void evaluateAndCommunicate(UUID analysisId) {
