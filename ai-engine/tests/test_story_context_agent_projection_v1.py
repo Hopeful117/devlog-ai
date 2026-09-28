@@ -12,6 +12,7 @@ CONTEXT_DIGEST = "a" * 64
 
 def projection(**overrides):
     value = {
+        "protocolVersion": "story-context-agent-protocol/v1",
         "contractVersion": "story-context-agent-projection/v1", "projectionVersion": "sca/v1",
         "contextDigest": CONTEXT_DIGEST,
         "request": {"projectSlug": "devlog-ai", "storyId": None, "intent": "summarize", "files": []},

@@ -440,7 +440,7 @@ class StoryContextAnalysisGenerationService:
             scope=metadata.get("scope"),
             freshness=metadata.get("freshness"),
             grounding_digest=metadata.get("groundingDigest"),
-            protocol_version="story-context-agent-protocol/v1",
+            protocol_version=metadata.get("protocolVersion"),
         )
 
     def _execution_metadata(self, prompt: Prompt) -> PromptExecutionMetadata:
@@ -456,5 +456,5 @@ class StoryContextAnalysisGenerationService:
             scope=prompt.traceability.scope,
             freshness=prompt.traceability.freshness,
             grounding_digest=prompt.traceability.grounding_digest,
-            protocol_version="story-context-agent-protocol/v1",
+            protocol_version=prompt.traceability.protocol_version,
         )
