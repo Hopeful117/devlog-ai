@@ -60,6 +60,7 @@
     },
     "userGuidance": null,
     "selectedKnowledge": {
+      "protocolVersion": "story-context-agent-protocol/v1",
       "contractVersion": "story-context-agent-projection/v1",
       "projectionVersion": "sca/v1",
       "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -261,7 +262,7 @@
         "compositionVersion": "repository-context-engine-v1",
         "projectionVersion": "sca/v1"
       },
-      "projectionDigest": "35a8ded4b51b2a5546cceeee3cb4879af34d7397af55113ffb96695f0d677ba4"
+      "projectionDigest": "8fbd8d7b6bc9aba15b0275a9044c19ae8c2f7d2243b6389220bb09a2bbfc0d46"
     },
     "groundingContract": {
       "groundingContractVersion": "story-context-grounding/v1",
@@ -271,7 +272,7 @@
       "causalQuestion": {"source":"ADR-042","target":"Story-0039","relationAsked":"CAUSAL","answerRequired":true}
     },
     "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "projectionDigest": "35a8ded4b51b2a5546cceeee3cb4879af34d7397af55113ffb96695f0d677ba4",
+    "projectionDigest": "8fbd8d7b6bc9aba15b0275a9044c19ae8c2f7d2243b6389220bb09a2bbfc0d46",
     "expectedOutputContract": {
       "type": "object",
       "structured": true,

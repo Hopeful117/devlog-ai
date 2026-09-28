@@ -43,6 +43,7 @@ class PromptTraceability:
     scope: dict[str, Any] | None = None
     freshness: dict[str, Any] | None = None
     grounding_digest: str | None = None
+    protocol_version: str | None = None
 
 
 @dataclass(frozen=True)

@@ -212,6 +212,7 @@ class StoryContextAnalysisPromptBuilder:
                 scope=request.metadata.get("scope"),
                 freshness=(projection_value.get("freshness") if request.task_type.value == "STORY_CONTEXT_ANALYSIS" else request.metadata.get("freshness")),
                 grounding_digest=request.metadata.get("groundingDigest"),
+                protocol_version=request.metadata.get("protocolVersion"),
             ),
             generation_policy=GenerationPolicy(10, 5000, True),
             content_digest=content_digest,

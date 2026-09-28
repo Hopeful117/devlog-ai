@@ -47,8 +47,13 @@ public class StoryContextAnalysisController {
 
     public record AnalyzeContextRequest(
             List<String> files,
-            Map<String, Object> guidance
-    ) {}
+            Map<String, Object> guidance,
+            String intent
+    ) {
+        public AnalyzeContextRequest(List<String> files, Map<String, Object> guidance) {
+            this(files, guidance, "engineering-story-context-analysis");
+        }
+    }
 
     public record AnalyzeContextResponse(UUID aiTaskId) {}
 }
