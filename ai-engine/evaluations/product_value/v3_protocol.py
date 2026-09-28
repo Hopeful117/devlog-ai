@@ -6,6 +6,7 @@ validates captured results so a later smoke runner can be fail-fast and replayab
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
@@ -631,14 +632,17 @@ def replay_slot_through_core(slot: dict[str, Any], repository_root: str | Path) 
     if slot.get("semanticScoringEligible") is not True:
         raise ValueError("invalid slot is not eligible for Core semantic replay")
     result = slot["parsedResponse"]
-    selected = slot["selectedKnowledgeSnapshot"]
+    selected = copy.deepcopy(slot["selectedKnowledgeSnapshot"])
     evidence = selected.get("repositoryContext", {}).get("evidence", [])
-    grounding = slot.get("groundingContract") or {
-        "allowedEvidenceReferences": [item.get("reference") for item in evidence],
-        "causalAnswerRequired": True,
-        "causalContractVersion": "V2",
-        "causalQuestion": result.get("causalAssessment", {}).get("question"),
-    }
+    revision = ((evidence[0].get("content") or {}).get("revision") if evidence else None) or slot.get("repositoryRevision") or "revision"
+    scope = {"projectSlug": "repository", "storyId": None, "intent": None, "files": []}
+    selected.setdefault("freshness", {"sourceRevision": {"kind": "PROJECT_REVISION", "project": scope["projectSlug"], "revision": revision}, "state": "FRESH"})
+    selected.setdefault("context", {"project": {}, "sections": [], "repositoryEvidence": evidence, "relations": []})
+    for item in selected["context"]["repositoryEvidence"]:
+        item.setdefault("provenance", {"sourceType": "REPOSITORY"})
+        item.setdefault("trust", item.get("trustTier", "TECHNICAL_EVIDENCE"))
+    typed = [{"type": "REPOSITORY_EVIDENCE", "ref": item.get("reference"), "scope": "PROJECT_REVISION", "project": scope["projectSlug"], "revision": revision, "provenance": item.get("provenance", {"sourceType": "REPOSITORY"}), "trust": item.get("trust", "TECHNICAL_EVIDENCE"), "coreReference": item.get("reference"), "taskReference": item.get("reference")} for item in evidence]
+    grounding = copy.deepcopy(slot.get("groundingContract")) if slot.get("groundingContract") else {"groundingContractVersion": "story-context-grounding/v1", "allowedGroundingReferences": typed, "causalAnswerRequired": True, "causalContractVersion": "V2", "causalQuestion": result.get("causalAssessment", {}).get("question")}
     root = Path(repository_root).resolve()
     with tempfile.TemporaryDirectory(prefix="v3-offline-replay-") as directory:
         input_path = Path(directory) / "input.json"
@@ -648,6 +652,7 @@ def replay_slot_through_core(slot: dict[str, Any], repository_root: str | Path) 
             "result": result,
             "selectedKnowledge": selected,
             "groundingContract": grounding,
+            "scope": scope,
             "contextDigest": slot["contextDigest"],
         }]}, ensure_ascii=False), encoding="utf-8")
         subprocess.run([

@@ -264,9 +264,11 @@
       "projectionDigest": "35a8ded4b51b2a5546cceeee3cb4879af34d7397af55113ffb96695f0d677ba4"
     },
     "groundingContract": {
-      "allowedEvidenceReferences": [
-        "docker-compose.yml"
-      ]
+      "groundingContractVersion": "story-context-grounding/v1",
+      "allowedGroundingReferences": [{"type":"REPOSITORY_EVIDENCE","ref":"docker-compose.yml","scope":"PROJECT_REVISION","project":"test-project","revision":"abc123","provenance":{"sourceType":"REPOSITORY"},"trust":"TECHNICAL_EVIDENCE","coreReference":"docker-compose.yml","taskReference":"docker-compose.yml"}],
+      "causalAnswerRequired": true,
+      "causalContractVersion": "V2",
+      "causalQuestion": {"source":"ADR-042","target":"Story-0039","relationAsked":"CAUSAL","answerRequired":true}
     },
     "contextDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "projectionDigest": "35a8ded4b51b2a5546cceeee3cb4879af34d7397af55113ffb96695f0d677ba4",
@@ -338,7 +340,7 @@
   "reproducibility": {
     "repositoryRevision": "6f0d2da87cc4dc77427c701c3ec1443bb843216d",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "6b9aeb4b6b3c37fef30d7c9c23303e29468592052a6955e107aaed89246dd905",
+    "promptContentDigest": "1d50d1dd4eb195171a5f8dbf167c9727d62dbe7cede0c441452b45fb3913d7d8",
     "schemaDigest": "7186cf1d381c7dca857f0481c283609d100e372afdf098811a3666ffff1c9f90"
   }
 }

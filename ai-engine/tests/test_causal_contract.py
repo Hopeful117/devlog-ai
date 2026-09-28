@@ -57,6 +57,9 @@ def claim(classification=CausalClassification.NOT_ESTABLISHED, refs=None, **kwar
     )
 
 
+def grounding_contract(*references, **extra):
+    return {"groundingContractVersion":"story-context-grounding/v1","allowedGroundingReferences":[{"type":"REPOSITORY_EVIDENCE","ref":r,"scope":"PROJECT_REVISION","project":"test-project","revision":"rev-1","provenance":{"sourceType":"REPOSITORY"},"trust":"TECHNICAL_EVIDENCE","coreReference":r,"taskReference":r} for r in references], **extra}
+
 def test_causal_classifications_are_explicit_and_relation_metadata_is_not_a_field():
     assert {item.value for item in CausalClassification} == {
         "EXPLICITLY_DOCUMENTED", "STRONGLY_SUPPORTED", "NOT_ESTABLISHED"
@@ -138,7 +141,7 @@ def test_causal_required_output_cannot_be_empty():
         service._validate_output(
             output,
             {},
-            {"causalAnswerRequired": True},
+            grounding_contract(causalAnswerRequired=True),
         )
 
 
@@ -187,11 +190,11 @@ def test_service_rejects_unknown_causal_reference_and_duplicate_relationship():
         "output_classification": [],
     })()
     with pytest.raises(StoryContextAnalysisOutputValidationError, match="unknown evidence"):
-        service._validate_output(output, {}, {"allowedEvidenceReferences": []})
+        service._validate_output(output, {}, grounding_contract())
 
     output.causal_claims = [valid, valid.model_copy(update={"explanation": "duplicate"})]
     with pytest.raises(StoryContextAnalysisOutputValidationError, match="Duplicate causal"):
-        service._validate_output(output, {}, {"allowedEvidenceReferences": ["e1"]})
+        service._validate_output(output, {}, grounding_contract("e1"))
 
 
 def test_confidence_does_not_change_not_established():
@@ -346,6 +349,8 @@ def test_v2_python_validation_rejects_question_substitution():
             {},
             {
                 "causalContractVersion": "V2",
+                "groundingContractVersion": "story-context-grounding/v1",
+                "allowedGroundingReferences": [],
                 "causalAnswerRequired": True,
                 "causalQuestion": {
                     "source": "ADR-043", "target": "ExecutionConfiguration",
