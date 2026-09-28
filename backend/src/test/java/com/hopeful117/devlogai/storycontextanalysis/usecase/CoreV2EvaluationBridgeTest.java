@@ -47,7 +47,7 @@ class CoreV2EvaluationBridgeTest {
                 AiTask task = AiTask.builder()
                         .id(UUID.randomUUID())
                         .contextDigest(contextDigest)
-                        .contextSnapshot(Map.of("groundingContract", groundingContract))
+                        .contextSnapshot(Map.of("groundingContract", groundingContract, "scope", item.get("scope")))
                         .selectedKnowledgeSnapshot(selectedKnowledge)
                         .aiReferenceMappingSnapshot(referenceMapping(selectedKnowledge))
                         .build();
@@ -71,7 +71,7 @@ class CoreV2EvaluationBridgeTest {
         List<Map<String, Object>> bindings = evidence.stream().map(item -> Map.of(
                 "type", AiReferenceType.REPOSITORY_EVIDENCE.name(),
                 "ref", item.get("reference"),
-                "scope", AiReferenceScope.REPOSITORY.name(),
+                "scope", AiReferenceScope.PROJECT_REVISION.name(),
                 "canonicalSourceIdentity", item.get("reference"),
                 "groundingCapabilities", List.of("EVIDENCE_REFERENCE")
         )).toList();

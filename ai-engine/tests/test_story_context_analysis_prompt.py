@@ -12,11 +12,9 @@ def test_story_context_prompt_uses_only_java_authored_grounding_contract() -> No
     builder = StoryContextAnalysisPromptBuilder()
 
     prompt = builder.build(request)
-    assert (
-        'GROUNDING CONTRACT (AUTHORITATIVE)\n'
-        '{"allowedEvidenceReferences":["docker-compose.yml"]}\n\n'
-        'SELECTED KNOWLEDGE'
-    ) in prompt.user_message
+    assert "groundingContractVersion\":\"story-context-grounding/v1" in prompt.user_message
+    assert "allowedGroundingReferences" in prompt.user_message
+    assert "SELECTED KNOWLEDGE" in prompt.user_message
 
     empty_contract_prompt = builder.build(
         request.model_copy(update={"grounding_contract": {}})
@@ -39,9 +37,11 @@ def test_story_context_prompt_requires_evidence_ledger_and_safe_retry() -> None:
     request = load_scenario(SCENARIO_ID).prompt_request.model_copy(
         update={
             "grounding_contract": {
-                "allowedEvidenceReferences": ["docker-compose.yml"],
+                "groundingContractVersion": "story-context-grounding/v1",
+                "allowedGroundingReferences": [{"type":"REPOSITORY_EVIDENCE","ref":"docker-compose.yml","scope":"PROJECT_REVISION","project":"test-project","revision":"abc123","provenance":{"sourceType":"REPOSITORY"},"trust":"TECHNICAL_EVIDENCE","coreReference":"docker-compose.yml","taskReference":"docker-compose.yml"}],
                 "causalAnswerRequired": True,
-                "causalRelationship": {"source": "ADR-A", "target": "Component-B"},
+                "causalContractVersion": "V2",
+                "causalQuestion": {"source":"ADR-A","target":"Component-B","relationAsked":"CAUSAL","answerRequired": True},
             }
         }
     )
