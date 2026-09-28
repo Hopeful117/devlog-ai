@@ -663,33 +663,6 @@ class AiTaskResultServiceTest {
     }
 
     @Test
-    void shouldRejectMalformedGenericTraceBeforeAnyMutation() {
-        UUID correlationId = UUID.randomUUID();
-        AiTask task = task(correlationId, AiTaskStatus.PROCESSING);
-        AiTaskStatus initialStatus = task.getStatus();
-        Instant completedAt = Instant.now();
-        AiInteractionTraceRequest malformed = new AiInteractionTraceRequest(
-                UUID.randomUUID(), 0, "INITIAL_GENERATION", "NORMAL", "mock", "model",
-                "describe-project", "v1", "prompt-v1", completedAt, completedAt,
-                -1, "SUCCEEDED", null, null, "a".repeat(64), "b".repeat(64),
-                 0, 0, 0, 0, "c".repeat(64), null, null, null, null, null, null,
-                 null, null, null, null);
-        AiTaskResultRequest request = new AiTaskResultRequest(
-                correlationId, "job-42", AiTaskResultStatus.FAILED, completedAt, List.of(),
-                new AiTaskResultError("MODEL_ERROR", "Provider failed"), promptMetadata(), null,
-                null, List.of(malformed));
-
-        InvalidAiTaskResultException exception = assertThrows(
-                InvalidAiTaskResultException.class, () -> service.handle(correlationId, request));
-
-        assertTrue(exception.getMessage().contains("durationMs"));
-        assertEquals(initialStatus, task.getStatus());
-        assertNull(task.getCompletedAt());
-        verifyNoInteractions(aiTaskRepository, analysisRepository, proposalRepository,
-                interactionTracePersistenceService, analyzeStoryContextUseCase);
-    }
-
-    @Test
     void shouldRejectTerminalStoryContextCallbackWhenPayloadDigestDiffers() {
         UUID correlationId = UUID.randomUUID();
         AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
@@ -708,79 +681,38 @@ class AiTaskResultServiceTest {
         service.handle(correlationId, first);
         task.setStatus(AiTaskStatus.COMPLETED);
 
+        AiTaskResultAcknowledgement duplicate = service.handle(correlationId, first);
+        assertTrue(duplicate.duplicate());
+
         AiTaskResultRequest changed = new AiTaskResultRequest(
                 correlationId, "job-42", AiTaskResultStatus.COMPLETED,
-                firstCompletedAt.plusSeconds(1), List.of(), null, promptMetadata(), null, analysisResult);
+                firstCompletedAt, List.of(), null, promptMetadata(), null, analysisResult,
+                List.of(interactionTraceRequestWithProvider("different-provider")));
         AiTaskResultConflictException conflict = assertThrows(
                 AiTaskResultConflictException.class, () -> service.handle(correlationId, changed));
 
         assertEquals("AI_TASK_TERMINAL_CONFLICT", conflict.getCode());
         verify(analyzeStoryContextUseCase, times(1)).handleCallback(correlationId, first);
-        verify(interactionTracePersistenceService, times(1))
+        verify(interactionTracePersistenceService, times(2))
                 .persist(task, first.interactionTraces());
     }
 
     @Test
-    void shouldIncludeInteractionTracesInStoryContextTerminalDigest() {
+    void shouldRejectMalformedGenericInteractionTraceBeforeRepositoryOrPersistence() {
         UUID correlationId = UUID.randomUUID();
-        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
-        task.setIntentId("engineering-story-context-analysis");
-        task.setIntentVersion("v1");
-        StoryContextAnalysisResult analysisResult = new StoryContextAnalysisResult(
-                null, null, null, null, null, null, null, null, null, null, null, null, null);
-        Instant completedAt = Instant.parse("2026-09-06T10:00:00Z");
-        AiTaskResultRequest first = new AiTaskResultRequest(
-                correlationId, "job-42", AiTaskResultStatus.COMPLETED, completedAt,
-                List.of(), null, promptMetadata(), null, analysisResult,
-                List.of(interactionTraceRequest()));
-        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId)).thenReturn(Optional.of(task));
-        when(communicationDecisionService.evaluate(task.getAnalysis().getId())).thenReturn(CommunicationDecision.SILENCE);
-
-        service.handle(correlationId, first);
-        task.setStatus(AiTaskStatus.COMPLETED);
-
-        AiTaskResultAcknowledgement duplicate = service.handle(correlationId, first);
-        assertTrue(duplicate.duplicate());
-
-        AiTaskResultRequest changedTrace = new AiTaskResultRequest(
-                correlationId, "job-42", AiTaskResultStatus.COMPLETED, completedAt,
-                List.of(), null, promptMetadata(), null, analysisResult,
-                List.of(interactionTraceRequest()));
-        AiTaskResultConflictException conflict = assertThrows(
-                AiTaskResultConflictException.class,
-                () -> service.handle(correlationId, changedTrace));
-
-        assertEquals("AI_TASK_TERMINAL_CONFLICT", conflict.getCode());
-        verify(analyzeStoryContextUseCase, times(1)).handleCallback(correlationId, first);
-        verify(interactionTracePersistenceService, times(2)).persist(task, first.interactionTraces());
-    }
-
-    @Test
-    void shouldRejectMalformedStoryContextTraceBeforeAnyMutation() {
-        UUID correlationId = UUID.randomUUID();
-        AiTask task = task(correlationId, AiTaskStatus.SUBMITTED);
-        task.setIntentId("engineering-story-context-analysis");
-        task.setIntentVersion("v1");
-        Instant completedAt = Instant.now();
-        AiInteractionTraceRequest malformed = new AiInteractionTraceRequest(
-                UUID.randomUUID(), 1, "INITIAL_GENERATION", "NORMAL", "mock", "model",
-                "engineering-story-context-analysis", "v1", "story-context-prompt-v1",
-                completedAt, completedAt, 0, "SUCCEEDED", null, null,
-                 "not-a-sha", "b".repeat(64), 0, 0, 0, 0, "c".repeat(64),
-                 null, null, null, null, null, null, null, null, null, null);
         AiTaskResultRequest request = new AiTaskResultRequest(
-                correlationId, "job-42", AiTaskResultStatus.COMPLETED, completedAt,
-                List.of(), null, promptMetadata(), null,
-                new StoryContextAnalysisResult(null, null, null, null, null, null, null,
-                        null, null, null, null, null, null), List.of(malformed));
+                correlationId, "job-42", AiTaskResultStatus.FAILED, Instant.now(), List.of(),
+                new AiTaskResultError("MODEL_ERROR", "Provider failed"), promptMetadata(), null,
+                null, List.of(malformedInteractionTrace()));
 
-        InvalidAiTaskResultException exception = assertThrows(
+        InvalidAiTaskResultException error = assertThrows(
                 InvalidAiTaskResultException.class, () -> service.handle(correlationId, request));
 
-        assertTrue(exception.getMessage().contains("selectedKnowledgeFingerprint"));
-        assertEquals(AiTaskStatus.SUBMITTED, task.getStatus());
-        verifyNoInteractions(aiTaskRepository, analysisRepository, proposalRepository,
-                interactionTracePersistenceService, analyzeStoryContextUseCase);
+        assertTrue(error.getMessage().contains("interactionTraces[0]"));
+        assertTrue(error.getMessage().contains("attempt"));
+        assertTrue(error.getMessage().contains("selectedKnowledgeFingerprint"));
+        verify(aiTaskRepository, never()).findByCorrelationIdForUpdate(any());
+        verify(interactionTracePersistenceService, never()).persist(any(), any());
     }
 
     @Test
@@ -886,12 +818,24 @@ class AiTaskResultServiceTest {
     }
 
     private AiInteractionTraceRequest interactionTraceRequest() {
+        return interactionTraceRequestWithProvider("mock");
+    }
+
+    private AiInteractionTraceRequest interactionTraceRequestWithProvider(String provider) {
         Instant started = Instant.parse("2026-09-06T09:59:59Z");
         return new AiInteractionTraceRequest(
-                UUID.randomUUID(), 1, "INITIAL_GENERATION", "NORMAL", "mock",
+                UUID.randomUUID(), 1, "INITIAL_GENERATION", "NORMAL", provider,
                 "model", "engineering-story-context-analysis", "v1", "story-context-prompt-v1",
                 started, started.plusSeconds(1), 100, "SUCCEEDED", null, null,
                 "a".repeat(64), "b".repeat(64), 0, 0, 0, 0, "c".repeat(64),
                 null, null, null, null, null, null, null, null, null, null);
+    }
+
+    private AiInteractionTraceRequest malformedInteractionTrace() {
+        return new AiInteractionTraceRequest(
+                null, 0, "x".repeat(41), "", " ", "x".repeat(256), "intent", "v1",
+                "prompt", null, null, -1, " ", "x".repeat(81), "x".repeat(5001),
+                "bad", "bad", -1, -1, -1, -1, "bad", -1, -1, -1,
+                "x".repeat(101), "x".repeat(101), null, null, null, null, "x".repeat(5001));
     }
 }

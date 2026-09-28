@@ -43,6 +43,20 @@ public record AiTaskResultRequest(
         }
     }
 
+    /** Validates payloads decoded after raw-body HMAC authentication. */
+    public void validateCallbackContract() {
+        if (correlationId == null || status == null || completedAt == null || proposals == null) {
+            throw new InvalidAiTaskResultException("AI task result callback is missing required fields");
+        }
+        AiTaskResultCallbackContractValidator.validateInteractionTraces(interactionTraces);
+        for (AiProposalResult proposal : proposals) {
+            if (proposal == null || proposal.type() == null || proposal.payload() == null
+                    || proposal.confidence() == null) {
+                throw new InvalidAiTaskResultException("AI task result callback contains an incomplete proposal");
+            }
+        }
+    }
+
     public AiTaskResultRequest(UUID correlationId, String externalJobId,
                                AiTaskResultStatus status, Instant completedAt,
                                List<AiProposalResult> proposals, AiTaskResultError error) {

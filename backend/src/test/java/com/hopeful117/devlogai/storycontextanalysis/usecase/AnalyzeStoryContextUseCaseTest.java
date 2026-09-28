@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.storycontextanalysis.usecase;
 import com.hopeful117.devlogai.ai.engine.client.AIEngineClient;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskResultRequest;
 import com.hopeful117.devlogai.ai.engine.dto.AiTaskResultStatus;
+import com.hopeful117.devlogai.ai.engine.dto.AiInteractionTraceRequest;
 import com.hopeful117.devlogai.ai.engine.dto.PromptExecutionMetadata;
 import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
@@ -417,6 +418,26 @@ class AnalyzeStoryContextUseCaseTest {
     }
 
     @Test
+    void handleCallbackRejectsMalformedInteractionTraceBeforeLookupOrMutation() {
+        UUID correlationId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        AiTask task = callbackTask(correlationId, storyId, CANONICAL_REFERENCE, Map.of());
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.parse("2026-09-09T10:00:00Z"), List.of(), null,
+                callbackPromptExecution(storyId), null, groundedResult(CANONICAL_REFERENCE),
+                java.util.Collections.singletonList(null));
+
+        assertThrows(com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException.class,
+                () -> useCase.handleCallback(correlationId, request));
+
+        assertEquals(AiTaskStatus.SUBMITTED, task.getStatus());
+        verify(aiTaskRepository, never()).findByCorrelationIdForUpdate(any());
+        verify(storyContextAnalysisRepository, never()).save(any());
+        verify(aiTaskRepository, never()).save(any());
+    }
+
+    @Test
     void relationshipBearingFindingsRequireRelationType() {
         List<StoryContextAnalysisResult> results = List.of(
                 resultWithSections(List.of(new StoryContextAnalysisResult.ArchitectureFinding(
@@ -770,6 +791,17 @@ class AnalyzeStoryContextUseCaseTest {
         return new AiTaskResultRequest(
                 correlationId, "job-42", AiTaskResultStatus.COMPLETED, completedAt,
                 List.of(), null, execution, null, result);
+    }
+
+    private PromptExecutionMetadata callbackPromptExecution(UUID storyId) {
+        return new PromptExecutionMetadata(
+                "story-context-analysis-prompt-v1", "mock", "deterministic-v1",
+                "c".repeat(64), CONTEXT_DIGEST, null, PROJECTION_DIGEST,
+                "sca/v1",
+                Map.of("projectSlug", PROJECT_SLUG, "storyId", storyId.toString(),
+                        "intent", INTENT_ID, "files", List.of(CANONICAL_REFERENCE)),
+                CALLBACK_FRESHNESS,
+                "d".repeat(64));
     }
 
     private StoryContextAnalysisResult groundedResult(String reference) {
