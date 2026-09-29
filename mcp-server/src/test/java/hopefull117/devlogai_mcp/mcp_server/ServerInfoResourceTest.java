@@ -30,8 +30,13 @@ class ServerInfoResourceTest {
         assertThat(result.path("status").asText()).isEqualTo("ready");
         assertThat(names(result.path("tools"))).containsExactly(
                 "analyze_story_context",
+                "devlog_story_agent",
                 "get_engineering_context",
-                "search_project_history");
+                "search_project_history",
+                "story_context_agent_callback",
+                "story_context_agent_get_projection",
+                "story_context_agent_get_snapshot",
+                "story_context_agent_submit_task");
         assertThat(values(result.path("tools"), "description"))
                 .allSatisfy(description -> assertThat(description).isNotBlank());
         assertThat(result.path("prompts").isArray()).isTrue();
@@ -46,7 +51,8 @@ class ServerInfoResourceTest {
                 "project-insight",
                 "project-story",
                 "projects",
-                "server-info");
+                "server-info",
+                "story-change-briefing");
         assertThat(values(result.path("resources"), "uri"))
                 .contains("devlog://server/info")
                 .contains("devlog://evidence/{reference}")

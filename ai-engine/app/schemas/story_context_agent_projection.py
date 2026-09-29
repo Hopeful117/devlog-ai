@@ -151,7 +151,7 @@ class StoryContextAgentProjectionV1(ContractModel):
         digest_input = self.model_dump(by_alias=True, exclude_none=True)
         # 0152 payloads predate the protocol alias; preserve their digest while
         # accepting the explicit protocolVersion required by 0153.
-        if "protocolVersion" not in self.model_fields_set:
+        if "protocol_version" not in self.model_fields_set:
             digest_input.pop("protocolVersion", None)
         if _projection_digest(digest_input) != self.projection_digest:
             raise ValueError("projectionDigest does not identify the canonical projection")

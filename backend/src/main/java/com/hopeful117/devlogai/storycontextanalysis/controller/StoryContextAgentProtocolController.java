@@ -91,7 +91,7 @@ public class StoryContextAgentProtocolController {
     public ResponseEntity<AiTaskResponse> snapshot(@PathVariable UUID aiTaskId) {
         return metrics.time("snapshot", () -> {
             metrics.request("snapshot");
-            AiTaskResponse response = aiTaskService.getById(aiTaskId);
+            AiTaskResponse response = aiTaskService.getStoryContextSnapshot(aiTaskId);
             if (!aiTaskId.equals(response.id())) return ResponseEntity.notFound().build();
             return ResponseEntity.ok(response);
         });

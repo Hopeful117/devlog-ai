@@ -77,4 +77,6 @@ public interface AiTaskService {
     AiTaskResponse complete(UUID id);
 
     AiTaskResponse fail(UUID id, FailAiTaskRequest request);
+
+    AiTaskResponse getStoryContextSnapshot(UUID id);
 }

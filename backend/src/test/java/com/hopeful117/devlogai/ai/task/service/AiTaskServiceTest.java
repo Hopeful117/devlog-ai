@@ -31,6 +31,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -58,6 +61,9 @@ class AiTaskServiceTest {
 
     @Mock
     private SelectedKnowledgePromptProjectionService promptProjectionService;
+
+    @Mock
+    private Clock clock;
 
     @InjectMocks
     private AiTaskServiceImpl aiTaskService;
@@ -313,5 +319,37 @@ class AiTaskServiceTest {
         assertTrue(exception.getMessage().contains("result callback"));
         assertEquals(AiTaskStatus.PROCESSING, task.getStatus());
         verify(aiTaskRepository, never()).save(any());
+    }
+
+    @Test
+    void shouldReturnStoryContextSnapshotBeforeTtl() {
+        UUID id = UUID.randomUUID();
+        Instant now = Instant.parse("2026-09-30T00:00:00Z");
+        AiTask task = AiTask.builder()
+                .taskType(AiTaskType.STORY_CONTEXT_ANALYSIS)
+                .createdAt(now.minusSeconds(Duration.ofDays(30).toSeconds() - 1))
+                .build();
+        AiTaskResponse response = mock(AiTaskResponse.class);
+        when(aiTaskRepository.findById(id)).thenReturn(Optional.of(task));
+        when(clock.instant()).thenReturn(now);
+        when(aiTaskMapper.toResponse(task)).thenReturn(response);
+
+        assertSame(response, aiTaskService.getStoryContextSnapshot(id));
+    }
+
+    @Test
+    void shouldHideExpiredStoryContextSnapshot() {
+        UUID id = UUID.randomUUID();
+        Instant now = Instant.parse("2026-09-30T00:00:00Z");
+        AiTask task = AiTask.builder()
+                .taskType(AiTaskType.STORY_CONTEXT_ANALYSIS)
+                .createdAt(now.minus(Duration.ofDays(30)))
+                .build();
+        when(aiTaskRepository.findById(id)).thenReturn(Optional.of(task));
+        when(clock.instant()).thenReturn(now);
+
+        assertThrows(EntityNotFoundException.class,
+                () -> aiTaskService.getStoryContextSnapshot(id));
+        verifyNoInteractions(aiTaskMapper);
     }
 }
