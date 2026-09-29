@@ -76,7 +76,7 @@ class OpenAiLlmProvider:
         if parsed is None:
             raise ValueError("OpenAI returned no parsed structured output")
         if isinstance(parsed, BaseModel):
-            parsed = parsed.model_dump()
+            parsed = parsed.model_dump(mode="json", by_alias=True)
         usage = getattr(response, "usage", None)
         completed_at = datetime.now(timezone.utc)
         return ProviderGenerationResult(

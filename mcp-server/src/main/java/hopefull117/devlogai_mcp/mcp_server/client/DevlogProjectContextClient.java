@@ -71,9 +71,18 @@ public interface DevlogProjectContextClient {
     @GetExchange("/story-context-agent/tasks/{aiTaskId}/snapshot")
     Map<String, Object> getStoryContextAgentSnapshot(@PathVariable UUID aiTaskId);
 
+    @PostExchange("/projects/{projectSlug}/story-agent")
+    Map<String, Object> executeStoryAgent(
+            @PathVariable String projectSlug,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestBody StoryAgentRequest request
+    );
+
     record AnalyzeContextRequest(List<String> files, Map<String, Object> guidance) {}
 
     record SubmitRequest(String intent, List<String> files, Map<String, Object> guidance) {}
+
+    record StoryAgentRequest(UUID storyId, String intent, List<String> files, Map<String, Object> guidance) {}
 
     record AnalyzeContextResponse(UUID aiTaskId) {}
 

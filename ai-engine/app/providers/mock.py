@@ -42,7 +42,7 @@ class MockLlmProvider:
             raw_output = {"proposals": []}
 
         if isinstance(raw_output, BaseModel):
-            raw_output = raw_output.model_dump()
+            raw_output = raw_output.model_dump(mode="json", by_alias=True)
         return response_model.model_validate(raw_output)
 
     async def generate_structured_with_trace(
@@ -53,7 +53,7 @@ class MockLlmProvider:
         completed_at = datetime.now(timezone.utc)
         return ProviderGenerationResult(
             output=output,
-            raw_output=json.dumps(output.model_dump(mode="json"), sort_keys=True),
+            raw_output=json.dumps(output.model_dump(mode="json", by_alias=True), sort_keys=True),
             started_at=started_at,
             completed_at=completed_at,
             input_tokens=None,

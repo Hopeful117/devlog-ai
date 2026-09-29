@@ -59,7 +59,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
-import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -110,13 +109,32 @@ class AnalyzeStoryContextUseCaseTest {
         useCase = new AnalyzeStoryContextUseCase(
                 projectRepository,
                 storyRepository,
-                engineeringContextFacade,
+                new StoryContextPreparationService(
+                        projectRepository,
+                        storyRepository,
+                        engineeringContextFacade,
+                        objectMapper),
                 intentCatalog,
                 aiTaskService,
                 aiEngineClient,
                 aiTaskRepository,
-                storyContextAnalysisRepository,
                 objectMapper,
+                new StoryContextDigestService(objectMapper),
+                new StoryContextCallbackIdentityValidator(),
+                new StoryContextCallbackService(
+                        aiTaskRepository,
+                        storyRepository,
+                        storyContextAnalysisRepository,
+                        objectMapper,
+                        new StoryContextCallbackIdentityValidator()),
+                new StoryContextSubmissionService(
+                        intentCatalog,
+                        aiTaskService,
+                        aiEngineClient,
+                        aiTaskRepository,
+                        analysisRepository,
+                        objectMapper,
+                        new StoryContextDigestService(objectMapper)),
                 analysisRepository
         );
     }
@@ -571,10 +589,7 @@ class AnalyzeStoryContextUseCaseTest {
     }
 
     @Test
-    void restGuidanceUsesSharedFieldsWhenBuildingPythonPromptContract() throws Exception {
-        Method mapper = AnalyzeStoryContextUseCase.class.getDeclaredMethod("mapGuidance", Map.class);
-        mapper.setAccessible(true);
-
+    void restGuidanceUsesSharedFieldsWhenBuildingPythonPromptContract() {
         var guidance = Map.<String, Object>of(
                 "focus", "repository relationships",
                 "audience", "maintainers",
@@ -583,8 +598,7 @@ class AnalyzeStoryContextUseCaseTest {
                 "outputContext", "implementation review",
                 "priorities", List.of("trust", "digests"));
 
-        var mapped = (com.hopeful117.devlogai.intent.model.UserGuidance)
-                mapper.invoke(useCase, guidance);
+        var mapped = com.hopeful117.devlogai.intent.model.UserGuidance.from(guidance);
 
         assertEquals("repository relationships", mapped.focus());
         assertEquals("maintainers", mapped.audience());

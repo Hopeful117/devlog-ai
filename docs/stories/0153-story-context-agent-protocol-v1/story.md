@@ -2,7 +2,7 @@
 
 ## Statut
 
-Prête pour implémentation — story contractuelle et additive, sans implémentation incluse.
+ACCEPTÉE PAR L'HUMAIN — implémentation techniquement vérifiée.
 
 ## Objectif produit
 
@@ -114,12 +114,18 @@ La migration est additive. Aucun snapshot existant n’est réécrit. Le retrait
 
 ## Décisions restantes
 
-- propriétaire et mécanisme d’authentification du callback ;
-- TTL, conservation et politique d’accès des snapshots ;
-- codes HTTP finaux pour conflits d’idempotence et callbacks terminaux ;
-- budget numérique par intent ;
-- date de fin de la compatibilité `selectedKnowledge` ;
-- mécanisme de notification MCP, le polling restant le comportement v1.
+Les décisions suivantes sont maintenant retenues pour v1 :
+
+- **Callback** : secret HMAC détenu par Core, avec signature du payload et du
+  chemin, vérifiée par Java/Core ;
+- **Snapshots** : TTL de 30 jours avec accès contrôlé, sans réécriture après
+  expiration ;
+- **Conflits** : `409 Conflict` pour un retry avec payload différent ou un
+  callback terminal divergent, sans mutation ;
+- **Budget** : budget fixe et déterministe par intent ;
+- **Legacy** : `selectedKnowledge` est maintenu sans retrait dans cette
+  version ;
+- **MCP** : polling via `submit_task` puis `get_snapshot` en v1.
 
 ## Références
 

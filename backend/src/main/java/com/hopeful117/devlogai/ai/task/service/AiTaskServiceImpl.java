@@ -26,6 +26,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +41,7 @@ import java.util.LinkedHashMap;
 @RequiredArgsConstructor
 @Transactional
 public class AiTaskServiceImpl implements AiTaskService {
+    private static final Duration STORY_CONTEXT_SNAPSHOT_TTL = Duration.ofDays(30);
 
     private final AiTaskRepository aiTaskRepository;
     private final AnalysisRepository analysisRepository;
@@ -45,6 +50,7 @@ public class AiTaskServiceImpl implements AiTaskService {
     private final ObjectMapper objectMapper;
     private final IntentCatalog intentCatalog;
     private final SelectedKnowledgePromptProjectionService promptProjectionService;
+    private final Clock clock;
 
     @Override
     public AiTaskResponse create(CreateAiTaskRequest request) {
@@ -404,5 +410,20 @@ public class AiTaskServiceImpl implements AiTaskService {
                             .formatted(task.getStatus(), target)
             );
         }
+    }
+
+    @Override
+    public AiTaskResponse getStoryContextSnapshot(UUID id) {
+        AiTask task = findTask(id);
+        if (task.getTaskType() != AiTaskType.STORY_CONTEXT_ANALYSIS) {
+            throw new EntityNotFoundException("Story Context snapshot", id);
+        }
+        if (task.getCreatedAt() == null) {
+            throw new EntityNotFoundException("Story Context snapshot", id);
+        }
+        if (!clock.instant().isBefore(task.getCreatedAt().plus(STORY_CONTEXT_SNAPSHOT_TTL))) {
+            throw new EntityNotFoundException("Story Context snapshot", id);
+        }
+        return aiTaskMapper.toResponse(task);
     }
 }
