@@ -62,6 +62,26 @@ public class ResourceSupport {
         return get(call, notFoundMessage);
     }
 
+    /** Maps the non-disclosing outcomes of an authorized snapshot read. */
+    public String getAuthorizedSnapshot(Supplier<String> call, String notFoundMessage) {
+        try {
+            return call.get();
+        } catch (HttpClientErrorException.Unauthorized exception) {
+            throw unauthenticated("Authentication is required");
+        } catch (HttpClientErrorException.NotFound exception) {
+            throw notFound(notFoundMessage);
+        } catch (HttpClientErrorException.Forbidden exception) {
+            throw notFound(notFoundMessage);
+        } catch (RestClientResponseException exception) {
+            HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
+            if (status != null && status.is5xxServerError()) {
+                throw internal("DevLog backend failed while reading the Story Context snapshot");
+            }
+            throw internal("DevLog backend rejected the Story Context snapshot request (%s)"
+                    .formatted(exception.getStatusCode()));
+        }
+    }
+
     /**
      * Reads an artifact exposed by a global identifier and enforces that it
      * belongs to the resolved project before returning it.
@@ -202,6 +222,12 @@ public class ResourceSupport {
 
     public static McpError invalidParams(String message) {
         return McpError.builder(ErrorCodes.INVALID_PARAMS)
+                .message(message)
+                .build();
+    }
+
+    public static McpError unauthenticated(String message) {
+        return McpError.builder(ErrorCodes.INVALID_REQUEST)
                 .message(message)
                 .build();
     }

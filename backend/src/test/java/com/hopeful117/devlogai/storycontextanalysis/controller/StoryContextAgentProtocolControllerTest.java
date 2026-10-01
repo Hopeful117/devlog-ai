@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class StoryContextAgentProtocolControllerTest {
@@ -85,6 +86,21 @@ class StoryContextAgentProtocolControllerTest {
                 .andExpect(status().isUnauthorized());
 
         assertEquals(1, registry.find("sca_operation_latency").tag("operation", "callback").timer().count());
+    }
+
+    @Test
+    void snapshotWithoutAuthenticatedRequestPrincipalReturnsUnauthorized() throws Exception {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new StoryContextAgentProtocolController(
+                mock(AnalyzeStoryContextUseCase.class), mock(StoryContextAgentCallbackFacade.class),
+                mock(AiTaskService.class), new StoryContextAgentCallbackAuthenticator("secret"),
+                new StoryContextAgentMetrics(registry), new ObjectMapper(),
+                mock(com.hopeful117.devlogai.storycontextanalysis.service.AuthorizedStoryContextSnapshotReader.class),
+                new com.hopeful117.devlogai.authorization.RequestAuthenticatedPrincipalResolver()))
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
+
+        mvc.perform(get("/api/v1/story-context-agent/tasks/{id}/snapshot", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
     }
 
     private String sign(String path, String body) throws Exception {

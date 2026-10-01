@@ -7,12 +7,15 @@ import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAgentCallbackFacade;
 import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAgentCallbackAuthenticator;
 import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAgentMetrics;
+import com.hopeful117.devlogai.storycontextanalysis.service.AuthorizedStoryContextSnapshotReader;
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipalResolver;
+import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.AnalyzeStoryContextUseCase;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.ObjectMapper;
 
@@ -24,7 +27,6 @@ import java.util.UUID;
 
 /** REST adapter for the versioned SCA protocol. It delegates to existing Core services. */
 @RestController
-@RequiredArgsConstructor
 @RequestMapping("/api/v1/story-context-agent")
 public class StoryContextAgentProtocolController {
     private final AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
@@ -33,6 +35,40 @@ public class StoryContextAgentProtocolController {
     private final StoryContextAgentCallbackAuthenticator authenticator;
     private final StoryContextAgentMetrics metrics;
     private final ObjectMapper objectMapper;
+    private final AuthorizedStoryContextSnapshotReader snapshotReader;
+    private final AuthenticatedPrincipalResolver principalResolver;
+
+    @Autowired
+    public StoryContextAgentProtocolController(
+            AnalyzeStoryContextUseCase analyzeStoryContextUseCase,
+            StoryContextAgentCallbackFacade callbackFacade,
+            AiTaskService aiTaskService,
+            StoryContextAgentCallbackAuthenticator authenticator,
+            StoryContextAgentMetrics metrics,
+            ObjectMapper objectMapper,
+            AuthorizedStoryContextSnapshotReader snapshotReader,
+            AuthenticatedPrincipalResolver principalResolver) {
+        this.analyzeStoryContextUseCase = analyzeStoryContextUseCase;
+        this.callbackFacade = callbackFacade;
+        this.aiTaskService = aiTaskService;
+        this.authenticator = authenticator;
+        this.metrics = metrics;
+        this.objectMapper = objectMapper;
+        this.snapshotReader = snapshotReader;
+        this.principalResolver = principalResolver;
+    }
+
+    /** Compatibility constructor for callback-only unit tests. */
+    public StoryContextAgentProtocolController(
+            AnalyzeStoryContextUseCase analyzeStoryContextUseCase,
+            StoryContextAgentCallbackFacade callbackFacade,
+            AiTaskService aiTaskService,
+            StoryContextAgentCallbackAuthenticator authenticator,
+            StoryContextAgentMetrics metrics,
+            ObjectMapper objectMapper) {
+        this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator,
+                metrics, objectMapper, null, null);
+    }
 
     @GetMapping("/projects/{projectSlug}/context")
     public ResponseEntity<Map<String, Object>> projection(
@@ -88,12 +124,16 @@ public class StoryContextAgentProtocolController {
     }
 
     @GetMapping("/tasks/{aiTaskId}/snapshot")
-    public ResponseEntity<AiTaskResponse> snapshot(@PathVariable UUID aiTaskId) {
+    public ResponseEntity<AiTaskResponse> snapshot(
+            @PathVariable UUID aiTaskId, HttpServletRequest servletRequest) {
         return metrics.time("snapshot", () -> {
             metrics.request("snapshot");
-            AiTaskResponse response = aiTaskService.getStoryContextSnapshot(aiTaskId);
-            if (!aiTaskId.equals(response.id())) return ResponseEntity.notFound().build();
-            return ResponseEntity.ok(response);
+            if (snapshotReader == null || principalResolver == null) {
+                throw new UnauthenticatedPrincipalException();
+            }
+            var principal = principalResolver.resolve(servletRequest)
+                    .orElseThrow(UnauthenticatedPrincipalException::new);
+            return ResponseEntity.ok(snapshotReader.readStoryContextSnapshot(principal, aiTaskId));
         });
     }
 

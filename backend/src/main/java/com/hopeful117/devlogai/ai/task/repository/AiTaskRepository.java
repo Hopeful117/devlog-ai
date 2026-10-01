@@ -11,6 +11,7 @@ import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import com.hopeful117.devlogai.storycontextanalysis.service.SnapshotIdentity;
 
 public interface AiTaskRepository extends JpaRepository<AiTask, UUID> {
 
@@ -35,4 +36,12 @@ public interface AiTaskRepository extends JpaRepository<AiTask, UUID> {
     Optional<AiTask> findFirstByAnalysisIdOrderByCreatedAtDescIdDesc(UUID analysisId);
 
     List<AiTask> findByIntentIdAndIntentVersion(String intentId, String intentVersion);
+
+    @Query("""
+            select new com.hopeful117.devlogai.storycontextanalysis.service.SnapshotIdentity(
+                task.id, analysis.project.id, task.taskType, task.createdAt)
+            from AiTask task join task.analysis analysis
+            where task.id = :snapshotId and task.contextSnapshot is not null
+            """)
+    Optional<SnapshotIdentity> findStoryContextSnapshotIdentity(@Param("snapshotId") UUID snapshotId);
 }

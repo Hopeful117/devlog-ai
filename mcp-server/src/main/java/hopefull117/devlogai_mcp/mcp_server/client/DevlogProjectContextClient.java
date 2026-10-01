@@ -69,7 +69,11 @@ public interface DevlogProjectContextClient {
     );
 
     @GetExchange("/story-context-agent/tasks/{aiTaskId}/snapshot")
-    Map<String, Object> getStoryContextAgentSnapshot(@PathVariable UUID aiTaskId);
+    Map<String, Object> getStoryContextAgentSnapshot(
+            @PathVariable UUID aiTaskId,
+            @RequestHeader("X-DevLog-Principal-Id") String principalId,
+            @RequestHeader("X-DevLog-Principal-Kind") String principalKind,
+            @RequestHeader("X-DevLog-Authentication-Source") String authenticationSource);
 
     @PostExchange("/projects/{projectSlug}/story-agent")
     Map<String, Object> executeStoryAgent(
