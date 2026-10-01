@@ -12,6 +12,7 @@ import com.hopeful117.devlogai.source.exception.SourceSelectionException;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.exception.InvalidParameterException;
+import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
 import com.hopeful117.devlogai.shared.logging.CorrelationIdFilter;
 import com.hopeful117.devlogai.shared.response.ApiErrorCode;
 import com.hopeful117.devlogai.shared.response.ApiErrorResponse;
@@ -35,6 +36,13 @@ import java.time.Instant;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+    @ExceptionHandler(UnauthenticatedPrincipalException.class)
+    public ResponseEntity<ApiErrorResponse> handleUnauthenticated(
+            UnauthenticatedPrincipalException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNAUTHORIZED, ApiErrorCode.UNAUTHENTICATED,
+                "Authentication is required.", request);
+    }
+
     @ExceptionHandler(SourceRevisionUnavailableException.class)
     public ResponseEntity<ApiErrorResponse> handleSourceRevisionUnavailable(
             SourceRevisionUnavailableException ex, HttpServletRequest request) {

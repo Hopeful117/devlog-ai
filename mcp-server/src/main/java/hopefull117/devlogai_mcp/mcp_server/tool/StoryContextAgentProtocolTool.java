@@ -2,6 +2,8 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.service.StoryContextAgentCallbackSigner;
+import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
+import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -19,6 +21,8 @@ public class StoryContextAgentProtocolTool {
     private final DevlogProjectContextClient client;
     private final StoryContextAgentCallbackSigner callbackSigner;
     private final ObjectMapper objectMapper;
+    private final McpAuthenticatedPrincipalProvider principalProvider;
+    private final ResourceSupport resourceSupport;
 
     @McpTool(name = "story_context_agent_get_projection",
             description = "Read the Core-owned versioned Story Context Agent projection without creating a task")
@@ -55,7 +59,12 @@ public class StoryContextAgentProtocolTool {
             description = "Read the immutable Story Context Agent task snapshot and status")
     public String getSnapshot(
             @McpArg(description = "AI task and snapshot UUID", required = true) UUID aiTaskId) {
-        return write(client.getStoryContextAgentSnapshot(aiTaskId));
+        var principal = principalProvider.currentPrincipal()
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        return resourceSupport.getAuthorizedSnapshot(
+                () -> write(client.getStoryContextAgentSnapshot(aiTaskId, principal.principalId(),
+                        principal.kind().name(), principal.authenticationSource())),
+                "Story Context snapshot '%s' not found".formatted(aiTaskId));
     }
 
     private String write(Object value) {
