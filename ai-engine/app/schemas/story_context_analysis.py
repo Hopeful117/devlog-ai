@@ -261,6 +261,26 @@ class ImplementationQuestion(StoryContextAnalysisContractModel):
     related_components: list[str] = Field(default_factory=list, alias="relatedComponents")
 
 
+class FollowUpNextStep(StoryContextAnalysisContractModel):
+    status: Literal["RECOMMENDED", "NEEDS_CLARIFICATION", "NO_SAFE_NEXT_STEP"]
+    description: str = Field(min_length=1, max_length=2000)
+    evidence_references: list[EvidenceRef] = Field(default_factory=list, alias="evidenceReferences")
+
+
+class StoryAgentFollowUpResult(StoryContextAnalysisContractModel):
+    status: Literal["COMPLETED", "NOT_ESTABLISHED", "FAILED", "TIMED_OUT"]
+    answer: str = Field(min_length=1, max_length=10000)
+    evidence_references: list[EvidenceRef] = Field(default_factory=list, alias="evidenceReferences")
+    uncertainties: list[Uncertainty] = Field(default_factory=list)
+    missing_information: list[MissingInformation] = Field(default_factory=list, alias="missingInformation")
+    next_step: FollowUpNextStep = Field(alias="nextStep")
+    parent_snapshot_id: UUID = Field(alias="parentSnapshotId")
+    follow_up_id: UUID = Field(alias="followUpId")
+    snapshot_id: UUID = Field(alias="snapshotId")
+    context_digest: str = Field(alias="contextDigest", pattern=r"^[0-9a-f]{64}$")
+    projection_digest: str = Field(alias="projectionDigest", pattern=r"^[0-9a-f]{64}$")
+
+
 class Confidence(StoryContextAnalysisContractModel):
     level: str = Field(min_length=1, max_length=10, pattern="^(HIGH|MEDIUM|LOW)$")
     rationale: str = ""

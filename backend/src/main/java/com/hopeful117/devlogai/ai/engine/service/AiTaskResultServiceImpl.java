@@ -147,7 +147,9 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         finishAnalysis(task, AnalysisStatus.COMPLETED, request.completedAt());
         log.info("AI task completed correlationId={} proposalCount={} hasSynthesis={}",
                 correlationId, request.proposals().size(), request.synthesis() != null);
-        evaluateAndCommunicate(task.getAnalysis().getId());
+        if (task.getParentSnapshotId() == null) {
+            evaluateAndCommunicate(task.getAnalysis().getId());
+        }
         persistInteractionTraces(task, request);
         return acknowledgement(task, false);
     }
@@ -592,7 +594,12 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             return acknowledgement(task, false);
         }
 
-        if (request.analysisResult() == null) {
+        if (task.getParentSnapshotId() != null && request.followUpResult() == null) {
+            throw new InvalidAiTaskResultException(
+                    "Story Context follow-up callback must include followUpResult"
+            );
+        }
+        if (task.getParentSnapshotId() == null && request.analysisResult() == null) {
             throw new InvalidAiTaskResultException(
                     "Story Context Analysis callback must include analysisResult"
             );
@@ -623,6 +630,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             payload.put("error", request.error());
             payload.put("promptExecution", request.promptExecution());
             payload.put("analysisResult", request.analysisResult());
+            payload.put("followUpResult", request.followUpResult());
             payload.put("proposals", request.proposals());
             payload.put("synthesis", request.synthesis());
             payload.put("interactionTraces", request.interactionTraces());

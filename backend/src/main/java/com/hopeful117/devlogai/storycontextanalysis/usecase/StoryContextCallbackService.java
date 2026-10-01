@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.Map;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** Owns callback state transitions and persistence after contract validation. */
@@ -54,6 +56,18 @@ public class StoryContextCallbackService {
         }
 
         callbackIdentityValidator.validate(task, request.promptExecution());
+        if (task.getParentSnapshotId() != null) {
+            handleFollowUp(task, request.followUpResult());
+            task.setStatus(AiTaskStatus.COMPLETED);
+            task.setCompletedAt(request.completedAt());
+            PromptExecutionMetadata metadata = request.promptExecution();
+            task.setPromptVersion(metadata.promptVersion());
+            task.setProvider(metadata.provider());
+            task.setModelIdentifier(metadata.modelIdentifier());
+            task.setPromptContentDigest(metadata.promptContentDigest());
+            aiTaskRepository.save(task);
+            return;
+        }
         StoryContextAnalysisResult analysisResult = request.analysisResult();
         if (analysisResult == null) {
             throw new IllegalStateException("Story Context Analysis callback must include analysisResult");
@@ -84,6 +98,47 @@ public class StoryContextCallbackService {
         task.setModelIdentifier(metadata.modelIdentifier());
         task.setPromptContentDigest(metadata.promptContentDigest());
         aiTaskRepository.save(task);
+    }
+
+    private void handleFollowUp(AiTask task, Map<String, Object> result) {
+        if (result == null) throw new IllegalStateException("followUpResult is required");
+        if (!task.getId().toString().equals(String.valueOf(result.get("followUpId")))) {
+            throw new IllegalStateException("followUpId does not match the task");
+        }
+        if (!task.getParentSnapshotId().toString().equals(String.valueOf(result.get("parentSnapshotId")))) {
+            throw new IllegalStateException("parentSnapshotId does not match the task");
+        }
+        if (!task.getId().toString().equals(String.valueOf(result.get("snapshotId")))) {
+            throw new IllegalStateException("snapshotId does not match the follow-up task");
+        }
+        if (!task.getContextDigest().equals(result.get("contextDigest"))
+                || !task.getProjectionDigest().equals(result.get("projectionDigest"))) {
+            throw new IllegalStateException("Follow-up digest does not match the authorized snapshot");
+        }
+        Object status = result.get("status");
+        if (!(status instanceof String) || !Set.of("COMPLETED", "NOT_ESTABLISHED", "FAILED", "TIMED_OUT").contains(status)) {
+            throw new IllegalStateException("Invalid follow-up status");
+        }
+        Object nextStep = result.get("nextStep");
+        if (!(nextStep instanceof Map<?, ?> next) || !Set.of("RECOMMENDED", "NEEDS_CLARIFICATION", "NO_SAFE_NEXT_STEP").contains(next.get("status"))) {
+            throw new IllegalStateException("Follow-up nextStep is required");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> contract = (Map<String, Object>) task.getContextSnapshot().get("groundingContract");
+        Set<String> allowed = AnalyzeStoryContextUseCase.allowedGroundingReferences(contract, task);
+        validateReferences(result.get("evidenceReferences"), allowed);
+        validateReferences(next.get("evidenceReferences"), allowed);
+        task.setSynthesisSnapshot(objectMapper.convertValue(result, Map.class));
+    }
+
+    private void validateReferences(Object raw, Set<String> allowed) {
+        if (!(raw instanceof List<?> references)) return;
+        for (Object value : references) {
+            if (!(value instanceof Map<?, ?> reference) || !(reference.get("reference") instanceof String ref)
+                    || !allowed.contains(ref)) {
+                throw new IllegalStateException("Follow-up contains an unauthorized grounding reference");
+            }
+        }
     }
 
     private static UUID callbackStoryId(AiTask task) {

@@ -116,6 +116,12 @@ public class AiTask {
     @Column(name = "idempotency_key_hash", length = 64)
     private String idempotencyKeyHash;
 
+    @Column(name = "parent_snapshot_id", updatable = false)
+    private UUID parentSnapshotId;
+
+    @Column(name = "follow_up_request_digest", length = 64, updatable = false)
+    private String followUpRequestDigest;
+
     @Column(nullable = false)
     @Builder.Default
     private int attemptCount = 0;

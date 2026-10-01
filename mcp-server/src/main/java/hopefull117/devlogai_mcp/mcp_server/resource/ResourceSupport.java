@@ -82,6 +82,25 @@ public class ResourceSupport {
         }
     }
 
+    /** Maps follow-up submission errors without exposing backend diagnostics. */
+    public String submitAuthorizedSnapshot(Supplier<String> call, String notFoundMessage) {
+        try {
+            return call.get();
+        } catch (HttpClientErrorException.Unauthorized exception) {
+            throw unauthenticated("Authentication is required");
+        } catch (HttpClientErrorException.NotFound | HttpClientErrorException.Forbidden exception) {
+            throw notFound(notFoundMessage);
+        } catch (HttpClientErrorException.BadRequest | HttpClientErrorException.Conflict exception) {
+            throw invalidParams("The follow-up request was rejected");
+        } catch (RestClientResponseException exception) {
+            HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
+            if (status != null && status.is5xxServerError()) {
+                throw internal("DevLog backend failed while submitting the Story Context follow-up");
+            }
+            throw internal("DevLog backend rejected the Story Context follow-up request");
+        }
+    }
+
     /**
      * Reads an artifact exposed by a global identifier and enforces that it
      * belongs to the resolved project before returning it.

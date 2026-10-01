@@ -21,6 +21,8 @@ public interface AiTaskRepository extends JpaRepository<AiTask, UUID> {
 
     Optional<AiTask> findByIdempotencyKeyHash(String idempotencyKeyHash);
 
+    Optional<AiTask> findByParentSnapshotId(UUID parentSnapshotId);
+
     /** Serializes the idempotency check and insert within the current transaction. */
     @Query(value = "select pg_advisory_xact_lock(hashtextextended(:lockKey, 0))", nativeQuery = true)
     Long acquireSubmissionLock(@Param("lockKey") String lockKey);
@@ -39,7 +41,7 @@ public interface AiTaskRepository extends JpaRepository<AiTask, UUID> {
 
     @Query("""
             select new com.hopeful117.devlogai.storycontextanalysis.service.SnapshotIdentity(
-                task.id, analysis.project.id, task.taskType, task.createdAt)
+                task.id, analysis.project.id, task.taskType, task.createdAt, task.parentSnapshotId)
             from AiTask task join task.analysis analysis
             where task.id = :snapshotId and task.contextSnapshot is not null
             """)

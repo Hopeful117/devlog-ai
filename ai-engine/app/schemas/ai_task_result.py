@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.models.proposal import AiTaskResultStatus, ProposalType
 from app.schemas.insight import ArchitectureDeltaConclusion
 from app.schemas.story_context_analysis import StoryContextAnalysisResult
+from app.schemas.story_context_analysis import StoryAgentFollowUpResult
 from app.schemas.interaction_trace import AiInteractionTrace
 from app.schemas.typed_reference import ProviderAiReference
 
@@ -74,6 +75,7 @@ class AiTaskResultRequest(ResultContractModel):
     )
     synthesis: AnalysisSynthesisResult | None = Field(default=None)
     analysis_result: StoryContextAnalysisResult | None = Field(default=None, alias="analysisResult")
+    follow_up_result: StoryAgentFollowUpResult | None = Field(default=None, alias="followUpResult")
     interaction_traces: list[AiInteractionTrace] = Field(
         default_factory=list, alias="interactionTraces"
     )

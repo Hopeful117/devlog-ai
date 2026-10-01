@@ -40,11 +40,17 @@ public class AuthorizedStoryContextSnapshotReader {
         // This projection intentionally excludes all JSON snapshot columns.
         var identity = aiTaskRepository.findStoryContextSnapshotIdentity(snapshotId)
                 .orElseThrow(() -> notFound(snapshotId));
+        Instant expiryOrigin = identity.createdAt();
+        if (identity.parentSnapshotId() != null) {
+            expiryOrigin = aiTaskRepository.findStoryContextSnapshotIdentity(identity.parentSnapshotId())
+                    .map(SnapshotIdentity::createdAt)
+                    .orElse(null);
+        }
         if (identity.taskType() != AiTaskType.STORY_CONTEXT_ANALYSIS
-                || identity.createdAt() == null
+                || expiryOrigin == null
                 || !membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
                         principal.principalId(), identity.projectId(), READ_ROLES)
-                || !clock.instant().isBefore(identity.createdAt().plus(SNAPSHOT_TTL))) {
+                || !clock.instant().isBefore(expiryOrigin.plus(SNAPSHOT_TTL))) {
             throw notFound(snapshotId);
         }
 

@@ -9,6 +9,7 @@ from app.schemas.story_context_agent_protocol import (
     StoryContextAgentSnapshot,
     StoryContextAgentTaskIdentity,
 )
+from app.schemas.story_context_analysis import StoryAgentFollowUpResult
 
 
 def identity(**overrides):
@@ -80,3 +81,27 @@ def test_callback_protocol_version_cannot_be_omitted_or_changed():
         StoryContextAgentCallbackIdentity.model_validate({
             **base, "protocolVersion": "story-context-agent-protocol/v2"
         })
+
+
+def test_follow_up_result_requires_next_step_and_snapshot_digests():
+    value = {
+        "status": "NOT_ESTABLISHED",
+        "answer": "The authorized snapshot does not establish this.",
+        "evidenceReferences": [],
+        "uncertainties": [],
+        "missingInformation": [],
+        "nextStep": {
+            "status": "NEEDS_CLARIFICATION",
+            "description": "Clarify which implementation boundary is intended.",
+            "evidenceReferences": [],
+        },
+        "parentSnapshotId": uuid4(),
+        "followUpId": uuid4(),
+        "snapshotId": uuid4(),
+        "contextDigest": "a" * 64,
+        "projectionDigest": "b" * 64,
+    }
+    result = StoryAgentFollowUpResult.model_validate(value)
+    assert result.next_step.status == "NEEDS_CLARIFICATION"
+    with pytest.raises(ValidationError):
+        StoryAgentFollowUpResult.model_validate({**value, "nextStep": None})
