@@ -26,6 +26,7 @@ from app.schemas.story_context_analysis import (
     CausalAssessment,
     ProviderStoryContextAnalysisResult,
     provider_result_to_internal,
+    StoryAgentFollowUpResult,
 )
 from app.services.interaction_trace import InteractionTraceCollector
 
@@ -117,6 +118,7 @@ class StoryContextAnalysisGenerationService:
             self._provider.model_identifier,
         )
 
+        follow_up = self._is_follow_up(submission)
         await self._callback_client.send_result(
             submission.correlation_id,
             AiTaskResultRequest(
@@ -140,7 +142,8 @@ class StoryContextAnalysisGenerationService:
                     grounding_digest=prompt.traceability.grounding_digest,
                 ),
                 synthesis=None,
-                analysis_result=output,
+                analysis_result=None if follow_up else output,
+                follow_up_result=output if follow_up else None,
                 interaction_traces=traces.traces,
             ),
         )
@@ -151,7 +154,14 @@ class StoryContextAnalysisGenerationService:
         context: dict[str, object],
         grounding_contract: dict[str, object],
         traces: InteractionTraceCollector,
-    ) -> StoryContextAnalysisResult:
+    ) -> StoryContextAnalysisResult | StoryAgentFollowUpResult:
+        if self._is_follow_up_from_prompt(prompt):
+            provider_output = await traces.generate_and_validate(
+                prompt,
+                StoryAgentFollowUpResult,
+                lambda output: self._validate_follow_up_output(output, grounding_contract),
+            )
+            return provider_output
         provider_output = await traces.generate_and_validate(
             prompt,
             ProviderStoryContextAnalysisResult,
@@ -160,6 +170,34 @@ class StoryContextAnalysisGenerationService:
             ),
         )
         return provider_result_to_internal(provider_output)
+
+    def _is_follow_up(self, submission: AiTaskSubmissionRequest) -> bool:
+        return isinstance(submission.metadata.get("parentSnapshotId"), str)
+
+    def _is_follow_up_from_prompt(self, prompt: Prompt) -> bool:
+        return "FOLLOW-UP QUESTION" in getattr(prompt, "user_message", "")
+
+    def _validate_follow_up_output(
+        self, output: StoryAgentFollowUpResult, grounding_contract: dict[str, object]
+    ) -> None:
+        allowed_refs = self._allowed_grounding_refs(grounding_contract)
+        references = output.evidence_references + output.next_step.evidence_references
+        for uncertainty in output.uncertainties:
+            references.extend(getattr(uncertainty, "related_evidence", []))
+        unknown = {reference.reference for reference in references} - allowed_refs
+        if unknown:
+            raise StoryContextAnalysisGroundingError(
+                f"Follow-up references unknown evidence: {sorted(unknown)}"
+            )
+    def _allowed_grounding_refs(self, grounding_contract: dict[str, object]) -> set[str]:
+        typed_list = grounding_contract.get("allowedGroundingReferences")
+        if grounding_contract.get("groundingContractVersion") != "story-context-grounding/v1" or not isinstance(typed_list, list):
+            raise StoryContextAnalysisGroundingError("typed grounding allow-list is required")
+        return {
+            entry["ref"] for entry in typed_list
+            if isinstance(entry, dict) and entry.get("type") == "REPOSITORY_EVIDENCE"
+            and isinstance(entry.get("ref"), str)
+        }
 
     def _validate_output(
         self,

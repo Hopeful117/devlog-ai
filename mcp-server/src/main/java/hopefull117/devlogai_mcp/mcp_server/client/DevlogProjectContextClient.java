@@ -75,6 +75,14 @@ public interface DevlogProjectContextClient {
             @RequestHeader("X-DevLog-Principal-Kind") String principalKind,
             @RequestHeader("X-DevLog-Authentication-Source") String authenticationSource);
 
+    @PostExchange("/story-context-agent/snapshots/{snapshotId}/follow-up")
+    Map<String, Object> submitStoryContextAgentFollowUp(
+            @PathVariable UUID snapshotId,
+            @RequestHeader("X-DevLog-Principal-Id") String principalId,
+            @RequestHeader("X-DevLog-Principal-Kind") String principalKind,
+            @RequestHeader("X-DevLog-Authentication-Source") String authenticationSource,
+            @RequestBody FollowUpRequest request);
+
     @PostExchange("/projects/{projectSlug}/story-agent")
     Map<String, Object> executeStoryAgent(
             @PathVariable String projectSlug,
@@ -85,6 +93,8 @@ public interface DevlogProjectContextClient {
     record AnalyzeContextRequest(List<String> files, Map<String, Object> guidance) {}
 
     record SubmitRequest(String intent, List<String> files, Map<String, Object> guidance) {}
+
+    record FollowUpRequest(String question, Map<String, Object> guidance) {}
 
     record StoryAgentRequest(UUID storyId, String intent, List<String> files, Map<String, Object> guidance) {}
 

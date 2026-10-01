@@ -67,6 +67,21 @@ public class StoryContextAgentProtocolTool {
                 "Story Context snapshot '%s' not found".formatted(aiTaskId));
     }
 
+    @McpTool(name = "story_context_agent_follow_up",
+            description = "Submit one bounded follow-up question against an authorized Story Context snapshot")
+    public String followUp(
+            @McpArg(description = "Initial Story Context snapshot UUID", required = true) UUID snapshotId,
+            @McpArg(description = "Bounded follow-up question", required = true) String question,
+            @McpArg(description = "Optional bounded guidance", required = false) Map<String, Object> guidance) {
+        var principal = principalProvider.currentPrincipal()
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        return resourceSupport.submitAuthorizedSnapshot(
+                () -> write(client.submitStoryContextAgentFollowUp(snapshotId, principal.principalId(),
+                        principal.kind().name(), principal.authenticationSource(),
+                        new DevlogProjectContextClient.FollowUpRequest(question, guidance))),
+                "Story Context snapshot '%s' not found".formatted(snapshotId));
+    }
+
     private String write(Object value) {
         try {
             return objectMapper.writeValueAsString(value);

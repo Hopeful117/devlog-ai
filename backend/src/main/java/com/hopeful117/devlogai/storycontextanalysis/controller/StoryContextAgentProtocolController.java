@@ -11,6 +11,7 @@ import com.hopeful117.devlogai.storycontextanalysis.service.AuthorizedStoryConte
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipalResolver;
 import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.AnalyzeStoryContextUseCase;
+import com.hopeful117.devlogai.storycontextanalysis.usecase.StoryAgentFollowUpService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
@@ -37,6 +38,7 @@ public class StoryContextAgentProtocolController {
     private final ObjectMapper objectMapper;
     private final AuthorizedStoryContextSnapshotReader snapshotReader;
     private final AuthenticatedPrincipalResolver principalResolver;
+    private final StoryAgentFollowUpService followUpService;
 
     @Autowired
     public StoryContextAgentProtocolController(
@@ -47,7 +49,8 @@ public class StoryContextAgentProtocolController {
             StoryContextAgentMetrics metrics,
             ObjectMapper objectMapper,
             AuthorizedStoryContextSnapshotReader snapshotReader,
-            AuthenticatedPrincipalResolver principalResolver) {
+            AuthenticatedPrincipalResolver principalResolver,
+            StoryAgentFollowUpService followUpService) {
         this.analyzeStoryContextUseCase = analyzeStoryContextUseCase;
         this.callbackFacade = callbackFacade;
         this.aiTaskService = aiTaskService;
@@ -56,6 +59,21 @@ public class StoryContextAgentProtocolController {
         this.objectMapper = objectMapper;
         this.snapshotReader = snapshotReader;
         this.principalResolver = principalResolver;
+        this.followUpService = followUpService;
+    }
+
+    /** Compatibility constructor for callback-only unit tests. */
+    public StoryContextAgentProtocolController(
+            AnalyzeStoryContextUseCase analyzeStoryContextUseCase,
+            StoryContextAgentCallbackFacade callbackFacade,
+            AiTaskService aiTaskService,
+            StoryContextAgentCallbackAuthenticator authenticator,
+            StoryContextAgentMetrics metrics,
+            ObjectMapper objectMapper,
+            AuthorizedStoryContextSnapshotReader snapshotReader,
+            AuthenticatedPrincipalResolver principalResolver) {
+        this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator,
+                metrics, objectMapper, snapshotReader, principalResolver, null);
     }
 
     /** Compatibility constructor for callback-only unit tests. */
@@ -67,7 +85,7 @@ public class StoryContextAgentProtocolController {
             StoryContextAgentMetrics metrics,
             ObjectMapper objectMapper) {
         this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator,
-                metrics, objectMapper, null, null);
+                metrics, objectMapper, null, null, null);
     }
 
     @GetMapping("/projects/{projectSlug}/context")
@@ -137,7 +155,21 @@ public class StoryContextAgentProtocolController {
         });
     }
 
+    @PostMapping("/snapshots/{snapshotId}/follow-up")
+    public ResponseEntity<StoryAgentFollowUpService.FollowUpSubmission> followUp(
+            @PathVariable UUID snapshotId,
+            @Valid @RequestBody FollowUpRequest request,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            HttpServletRequest servletRequest) {
+        var principal = principalResolver.resolve(servletRequest)
+                .orElseThrow(UnauthenticatedPrincipalException::new);
+        return ResponseEntity.accepted().body(followUpService.submit(
+                principal, snapshotId, request.question(), request.guidance(), idempotencyKey));
+    }
+
     public record SubmitRequest(@NotBlank String intent, List<String> files, Map<String, Object> guidance) { }
+
+    public record FollowUpRequest(@NotBlank String question, Map<String, Object> guidance) { }
 
     public record SubmitResponse(String protocolVersion, String projectionVersion, UUID aiTaskId, UUID snapshotId,
                                  String contextDigest, String projectionDigest, String selectionDigest,

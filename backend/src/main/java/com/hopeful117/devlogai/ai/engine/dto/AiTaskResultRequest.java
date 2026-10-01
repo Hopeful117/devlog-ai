@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public record AiTaskResultRequest(
@@ -21,6 +22,7 @@ public record AiTaskResultRequest(
         @Valid PromptExecutionMetadata promptExecution,
         @Valid AnalysisSynthesisResult synthesis,
         @Valid StoryContextAnalysisResult analysisResult,
+        Map<String, Object> followUpResult,
         @Valid List<AiInteractionTraceRequest> interactionTraces
 ) {
     public AiTaskResultRequest {
@@ -41,13 +43,16 @@ public record AiTaskResultRequest(
                 throw new InvalidAiTaskResultException("AI task result callback contains an incomplete proposal");
             }
         }
+        if (followUpResult != null && followUpResult.isEmpty()) {
+            throw new InvalidAiTaskResultException("followUpResult must not be empty");
+        }
     }
 
     public AiTaskResultRequest(UUID correlationId, String externalJobId,
                                AiTaskResultStatus status, Instant completedAt,
                                List<AiProposalResult> proposals, AiTaskResultError error) {
         this(correlationId, externalJobId, status, completedAt, proposals, error,
-                null, null, null, List.of());
+                null, null, null, null, List.of());
     }
 
     public AiTaskResultRequest(UUID correlationId, String externalJobId,
@@ -55,7 +60,7 @@ public record AiTaskResultRequest(
                                List<AiProposalResult> proposals, AiTaskResultError error,
                                PromptExecutionMetadata promptExecution, AnalysisSynthesisResult synthesis) {
         this(correlationId, externalJobId, status, completedAt, proposals, error,
-                promptExecution, synthesis, null, List.of());
+                promptExecution, synthesis, null, null, List.of());
     }
 
     public AiTaskResultRequest(UUID correlationId, String externalJobId,
@@ -65,6 +70,18 @@ public record AiTaskResultRequest(
                                AnalysisSynthesisResult synthesis,
                                StoryContextAnalysisResult analysisResult) {
         this(correlationId, externalJobId, status, completedAt, proposals, error,
-                promptExecution, synthesis, analysisResult, List.of());
+                promptExecution, synthesis, analysisResult, null, List.of());
+    }
+
+    /** Compatibility constructor for callers that provide interaction traces. */
+    public AiTaskResultRequest(UUID correlationId, String externalJobId,
+                               AiTaskResultStatus status, Instant completedAt,
+                               List<AiProposalResult> proposals, AiTaskResultError error,
+                               PromptExecutionMetadata promptExecution,
+                               AnalysisSynthesisResult synthesis,
+                               StoryContextAnalysisResult analysisResult,
+                               List<AiInteractionTraceRequest> interactionTraces) {
+        this(correlationId, externalJobId, status, completedAt, proposals, error,
+                promptExecution, synthesis, analysisResult, null, interactionTraces);
     }
 }

@@ -7,7 +7,7 @@ from app.providers.base import GenerationPolicy, Prompt, PromptTraceability
 from app.prompts.structured_context import SHARED_STRUCTURED_CONTEXT_CONTRACT
 from app.schemas.ai_task import PromptRequest
 from app.schemas.story_context_agent_projection import StoryContextAgentProjectionV1
-from app.schemas.story_context_analysis import ProviderStoryContextAnalysisResult
+from app.schemas.story_context_analysis import ProviderStoryContextAnalysisResult, StoryAgentFollowUpResult
 
 
 class PromptConstructionError(ValueError):
@@ -96,6 +96,7 @@ class StoryContextAnalysisPromptBuilder:
             raise PromptConstructionError(
                 "Expected output contract does not match the versioned Intent"
             )
+        follow_up = isinstance(request.metadata.get("parentSnapshotId"), str)
 
         # Story 0152 sends the Core-owned V1 projection as the primary payload.
         # The legacy SelectedKnowledge shape remains supported only for other intents.
@@ -147,11 +148,19 @@ class StoryContextAnalysisPromptBuilder:
                 by_alias=True, mode="json", exclude_none=True
             ) if request.user_guidance else {}
         )
-        schema_json = self._canonical(ProviderStoryContextAnalysisResult.model_json_schema())
+        output_model = StoryAgentFollowUpResult if follow_up else ProviderStoryContextAnalysisResult
+        schema_json = self._canonical(output_model.model_json_schema())
         grounding_json = self._canonical(request.grounding_contract)
 
         user_message = (
-            "INTENT\n"
+            ("FOLLOW-UP QUESTION\n"
+             "Answer only from the supplied authorized snapshot. Do not request tools, retrieve new context, or broaden scope.\n"
+             f"parentSnapshotId: {request.metadata.get('parentSnapshotId')}\n"
+             f"followUpId: {request.metadata.get('followUpId')}\n"
+             f"snapshotId: {request.ai_task_id}\n"
+             f"question: {request.metadata.get('followUpQuestion')}\n"
+             if follow_up else "")
+            + "INTENT\n"
             f"ID: {request.intent.id}\n"
             f"Version: {request.intent.version}\n"
             f"Objective: {request.intent.objective}\n\n"
@@ -169,9 +178,11 @@ class StoryContextAnalysisPromptBuilder:
             "EXPECTED OUTPUT SCHEMA\n"
             f"{schema_json}\n\n"
             "OUTPUT REQUIREMENTS\n"
-            "Produce a ProviderStoryContextAnalysisResult with all required fields.\n"
-            "confidence must be exactly one scalar value: HIGH, MEDIUM, or LOW; do not emit a confidence object.\n"
-            "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
+             + ("Produce a StoryAgentFollowUpResult. The nextStep field is mandatory; use NOT_ESTABLISHED and NEEDS_CLARIFICATION when evidence is insufficient.\n"
+                if follow_up else "Produce a ProviderStoryContextAnalysisResult with all required fields.\n")
+             + ("Follow-up evidenceReferences and nextStep evidenceReferences must use only authorized references.\n"
+                if follow_up else "confidence must be exactly one scalar value: HIGH, MEDIUM, or LOW; do not emit a confidence object.\n"
+             "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
             "Classify each finding as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION in outputClassification.\n"
             "ArchitectureFinding, DecisionFinding, HistoricalContextItem, and ImpactedComponentFinding MUST include relationType (EXPLICIT, TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE, or INFERRED_HYPOTHESIS).\n"
             "For V2 causal analysis, build one causalAssessment for the exact Core-owned causalQuestion. Select only bounded LINE_RANGE or SECTION locators over authorized repository evidence; do not fabricate resolved content or digests.\n"
@@ -182,7 +193,7 @@ class StoryContextAnalysisPromptBuilder:
             "Never promote causality using confidence, plausibility, wording, or relationType alone. Every cited causal reference requires a role.\n"
             "If causalAnswerRequired=true and causalContractVersion=V2, return exactly one causalAssessment whose question equals causalQuestion; use NOT_ESTABLISHED rather than inventing support. Otherwise follow the legacy causalClaims contract.\n"
             "If a section has no grounded findings, return an empty array for that section.\n"
-            "Do not fabricate content to populate sections."
+             "Do not fabricate content to populate sections.")
         )
 
         content = f"{SYSTEM_MESSAGE}\n\n{user_message}"
@@ -194,7 +205,7 @@ class StoryContextAnalysisPromptBuilder:
             intent_version=request.intent.version,
             system_message=SYSTEM_MESSAGE,
             user_message=user_message,
-            expected_output_schema=ProviderStoryContextAnalysisResult.model_json_schema(),
+            expected_output_schema=output_model.model_json_schema(),
             traceability=PromptTraceability(
                 request_id=str(request.request_id),
                 correlation_id=str(request.correlation_id),
