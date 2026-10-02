@@ -19,6 +19,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DevLogStoryAgentService implements DevLogStoryAgent {
 
+    private static final String STORY_CONTEXT_ANALYSIS_INTENT = "engineering-story-context-analysis";
+
     private final AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
     private final AiTaskService aiTaskService;
     private final StoryContextAnalysisQueryService analysisQueryService;
@@ -26,14 +28,15 @@ public class DevLogStoryAgentService implements DevLogStoryAgent {
 
     @Override
     public DevLogStoryAgentExecution execute(DevLogStoryAgentRequest request) {
+        Map<String, Object> guidance = withNaturalIntent(request);
         PreparedStoryContext prepared = analyzeStoryContextUseCase.prepare(
                 request.projectSlug(),
                 request.storyId(),
-                request.intent(),
+                STORY_CONTEXT_ANALYSIS_INTENT,
                 request.files());
         var taskId = analyzeStoryContextUseCase.executePrepared(
                 prepared,
-                request.guidance(),
+                guidance,
                 request.idempotencyKey());
 
         AiTaskResponse task = aiTaskService.getById(taskId);
@@ -49,6 +52,12 @@ public class DevLogStoryAgentService implements DevLogStoryAgent {
                 task.id(),
                 result,
                 diagnostics);
+    }
+
+    private Map<String, Object> withNaturalIntent(DevLogStoryAgentRequest request) {
+        Map<String, Object> guidance = new LinkedHashMap<>(request.guidance());
+        guidance.put("focus", request.intent());
+        return guidance;
     }
 
     private Map<String, Object> result(AiTaskResponse task) {

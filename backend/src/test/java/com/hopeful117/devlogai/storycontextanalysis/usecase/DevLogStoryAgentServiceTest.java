@@ -37,9 +37,11 @@ class DevLogStoryAgentServiceTest {
     void submitsOnceAndReturnsProcessingExecutionWithoutResult() {
         UUID taskId = UUID.randomUUID();
         DevLogStoryAgentRequest request = request();
-        when(analyzeStoryContextUseCase.prepare("project", null, "intent", List.of("README.md")))
+        when(analyzeStoryContextUseCase.prepare("project", null,
+                "engineering-story-context-analysis", List.of("README.md")))
                 .thenReturn(mock(PreparedStoryContext.class));
-        when(analyzeStoryContextUseCase.executePrepared(any(), eq(Map.of()), eq("key")))
+        when(analyzeStoryContextUseCase.executePrepared(any(),
+                eq(Map.of("focus", "intent")), eq("key")))
                 .thenReturn(taskId);
         when(aiTaskService.getById(taskId)).thenReturn(task(taskId, AiTaskStatus.PROCESSING));
 
@@ -48,8 +50,10 @@ class DevLogStoryAgentServiceTest {
         assertEquals(AiTaskStatus.PROCESSING, execution.status());
         assertEquals(Map.of(), execution.result());
         assertEquals(Map.of("status", "PROCESSING"), execution.diagnostics());
-        verify(analyzeStoryContextUseCase).prepare("project", null, "intent", List.of("README.md"));
-        verify(analyzeStoryContextUseCase).executePrepared(any(), eq(Map.of()), eq("key"));
+        verify(analyzeStoryContextUseCase).prepare("project", null,
+                "engineering-story-context-analysis", List.of("README.md"));
+        verify(analyzeStoryContextUseCase).executePrepared(any(),
+                eq(Map.of("focus", "intent")), eq("key"));
         verifyNoInteractions(analysisQueryService);
     }
 
@@ -57,9 +61,11 @@ class DevLogStoryAgentServiceTest {
     void readsCompletedAnalysisAndPreservesDigests() {
         UUID taskId = UUID.randomUUID();
         AiTaskResponse task = task(taskId, AiTaskStatus.COMPLETED);
-        when(analyzeStoryContextUseCase.prepare(any(), any(), any(), any()))
+        when(analyzeStoryContextUseCase.prepare(any(), any(),
+                eq("engineering-story-context-analysis"), any()))
                 .thenReturn(mock(PreparedStoryContext.class));
-        when(analyzeStoryContextUseCase.executePrepared(any(), any(), any())).thenReturn(taskId);
+        when(analyzeStoryContextUseCase.executePrepared(any(),
+                eq(Map.of("focus", "intent")), any())).thenReturn(taskId);
         when(aiTaskService.getById(taskId)).thenReturn(task);
         when(analysisQueryService.findResponseByAiTaskId(taskId))
                 .thenReturn(java.util.Optional.of(new StoryContextAnalysisResponse(null, Map.of())));
