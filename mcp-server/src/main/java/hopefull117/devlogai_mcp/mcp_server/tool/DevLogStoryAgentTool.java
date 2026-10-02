@@ -2,6 +2,7 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import lombok.RequiredArgsConstructor;
+import org.springframework.lang.Nullable;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.stereotype.Component;
@@ -23,11 +24,11 @@ public class DevLogStoryAgentTool {
             description = "Runs one bounded, read-only DevLog Story Agent execution and returns its structured result or execution diagnostics.")
     public String execute(
             @McpArg(description = "DevLog project slug", required = true) String projectSlug,
-            @McpArg(description = "Optional Engineering Story UUID", required = false) UUID storyId,
-            @McpArg(description = "Intent identifier", required = true) String intent,
-            @McpArg(description = "Optional repository file paths", required = false) List<String> files,
-            @McpArg(description = "Optional human guidance", required = false) Map<String, Object> guidance,
-            @McpArg(description = "Optional idempotency key", required = false) String idempotencyKey) {
+            @McpArg(description = "Optional Engineering Story UUID", required = false) @Nullable UUID storyId,
+            @McpArg(description = "Natural-language investigation objective", required = true) String intent,
+            @McpArg(description = "Optional repository file paths", required = false) @Nullable List<String> files,
+            @McpArg(description = "Optional human guidance", required = false) @Nullable Map<String, Object> guidance,
+            @McpArg(description = "Optional idempotency key", required = false) @Nullable String idempotencyKey) {
         Map<String, Object> execution = client.executeStoryAgent(
                 projectSlug,
                 idempotencyKey,
