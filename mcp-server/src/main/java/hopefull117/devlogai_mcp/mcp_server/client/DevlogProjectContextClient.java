@@ -104,6 +104,17 @@ public interface DevlogProjectContextClient {
             UUID id,
             String status,
             String failureCode,
-            String failureMessage
-    ) {}
+            String failureMessage,
+            String contextDigest,
+            String projectionDigest,
+            Map<String, Object> contextSnapshot
+    ) {
+        public AiTaskStatusResponse(UUID id, String status, String failureCode, String failureMessage) {
+            this(id, status, failureCode, failureMessage, null, null, Map.of());
+        }
+
+        public AiTaskStatusResponse {
+            contextSnapshot = contextSnapshot == null ? Map.of() : Map.copyOf(contextSnapshot);
+        }
+    }
 }
