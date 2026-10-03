@@ -615,6 +615,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         task.setTerminalCallbackDigest(callbackDigest);
         aiTaskRepository.save(task);
         finishAnalysis(task, AnalysisStatus.COMPLETED, request.completedAt());
+        evaluateAndCommunicate(task.getAnalysis().getId());
         persistInteractionTraces(task, request);
 
         return acknowledgement(task, false);
