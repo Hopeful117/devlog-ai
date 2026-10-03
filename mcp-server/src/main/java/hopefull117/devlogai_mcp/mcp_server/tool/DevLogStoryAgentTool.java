@@ -93,7 +93,8 @@ public class DevLogStoryAgentTool {
                     return completedExecution(latestExecution, taskStatus,
                             client.getStoryContextAnalysis(taskId));
                 } catch (RuntimeException exception) {
-                    log.debug("Completed Story Agent task {} has no readable analysis yet", taskId, exception);
+                    log.warn("Completed Story Agent task {} has no readable result", taskId, exception);
+                    return completedWithoutResult(latestExecution, taskId, exception);
                 }
             }
         }
@@ -105,6 +106,21 @@ public class DevLogStoryAgentTool {
                 "lastKnownStatus", lastKnownStatus,
                 "aiTaskId", taskId.toString()));
         return latestExecution;
+    }
+
+    private Map<String, Object> completedWithoutResult(
+            Map<String, Object> execution,
+            UUID taskId,
+            RuntimeException exception) {
+        Map<String, Object> incomplete = new LinkedHashMap<>(execution);
+        incomplete.put("status", "COMPLETED");
+        incomplete.put("diagnostics", Map.of(
+                "status", "COMPLETED",
+                "code", "COMPLETED_RESULT_UNAVAILABLE",
+                "message", "The agent completed, but its structured result could not be read.",
+                "aiTaskId", taskId.toString(),
+                "cause", exception.getClass().getSimpleName()));
+        return incomplete;
     }
 
     private boolean sleepUntilNextPoll(long deadline) {
