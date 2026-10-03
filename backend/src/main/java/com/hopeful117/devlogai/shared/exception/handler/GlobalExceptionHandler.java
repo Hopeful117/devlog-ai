@@ -212,6 +212,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleValidation(
             MethodArgumentNotValidException ex,
             HttpServletRequest request) {
+        var violations = ex.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getField() + ":" + error.getDefaultMessage())
+                .toList();
+        log.warn("Request validation failed method={} path={} violations={}",
+                request.getMethod(), request.getRequestURI(), violations);
 
         String message = ex.getBindingResult()
                 .getFieldErrors()

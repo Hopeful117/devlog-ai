@@ -23,7 +23,7 @@ import java.util.UUID;
 @Component
 public class SelectedFileContentEnricher {
     private static final Set<String> ELIGIBLE_KINDS =
-            Set.of("SOURCE_FILE", "TEST_FILE");
+            Set.of("SOURCE_FILE", "TEST_FILE", "CONFIG_FILE");
     private static final String LIMIT_WARNING =
             "CONTENT_ENRICHMENT_LIMIT_APPLIED";
     private static final String BUDGET_EXHAUSTED =
@@ -59,6 +59,8 @@ public class SelectedFileContentEnricher {
 
         List<RepositoryEvidence> eligible = selection.selected().stream()
                 .filter(value -> ELIGIBLE_KINDS.contains(value.kind()))
+                .filter(value -> !"CONFIG_FILE".equals(value.kind())
+                        || requestedInObjective(value, request))
                 .toList();
         List<SelectedContentAllocationPolicy.Allocation> allocations =
                 allocationPolicy.allocate(eligible);
@@ -98,6 +100,13 @@ public class SelectedFileContentEnricher {
                 .mapToInt(RepositoryEvidence::estimatedTokens).sum();
         return new EnrichmentResult(new EvidenceSelector.SelectionResult(
                 selected, decisions, finalUsedTokens), List.copyOf(warnings));
+    }
+
+    private boolean requestedInObjective(RepositoryEvidence evidence, ContextRequest request) {
+        String objective = request.intent() == null ? null : request.intent().objective();
+        String file = evidence.provenance().originatingFile();
+        return objective != null && file != null
+                && objective.toLowerCase().contains(file.toLowerCase());
     }
 
     private int metadataTokenDelta(

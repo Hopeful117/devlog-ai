@@ -2,8 +2,10 @@ package com.hopeful117.devlogai.storycontextanalysis.usecase;
 
 import com.hopeful117.devlogai.engineeringcontext.CanonicalContextDigest;
 import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
-import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidence;
 import com.hopeful117.devlogai.contracts.storycontextagent.StoryContextAgentProtocolV1;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextFreshness;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import tools.jackson.databind.ObjectMapper;
 import java.util.*;
@@ -11,6 +13,8 @@ import java.util.*;
 public final class StoryContextAgentProjectionV1 {
     public static final String CONTRACT_VERSION = "story-context-agent-projection/v1";
     public static final String PROJECTION_VERSION = "sca/v1";
+    public static final String V2_CONTRACT_VERSION = "story-context-agent-projection/v2";
+    public static final String V2_PROJECTION_VERSION = "sca/v2";
 
     private StoryContextAgentProjectionV1() { }
 
@@ -18,6 +22,12 @@ public final class StoryContextAgentProjectionV1 {
     public static Map<String,Object> build(CanonicalEngineeringContext canonical,
             String projectSlug, UUID storyId, String intent, List<String> files,
             EngineeringStory story, ObjectMapper mapper) {
+        return build(canonical, projectSlug, storyId, intent, files, story, null, mapper);
+    }
+
+    public static Map<String,Object> build(CanonicalEngineeringContext canonical,
+            String projectSlug, UUID storyId, String intent, List<String> files,
+            EngineeringStory story, String question, ObjectMapper mapper) {
         Objects.requireNonNull(canonical, "canonical context");
         if (projectSlug == null || projectSlug.isBlank() || intent == null || intent.isBlank()) {
             throw new IllegalArgumentException("projectSlug and intent are required");
@@ -35,6 +45,12 @@ public final class StoryContextAgentProjectionV1 {
         request.put("storyId", storyId == null ? null : storyId.toString());
         request.put("intent", intent);
         request.put("files", canonicalFiles);
+        if (question != null) {
+            if (question.isBlank() || question.length() > 2000) {
+                throw new IllegalArgumentException("question must be between 1 and 2000 characters");
+            }
+            request.put("question", question.trim());
+        }
         if (canonical.requestEcho() != null) {
             if (!Objects.equals(projectSlug, canonical.requestEcho().projectSlug())
                     || !Objects.equals(intent, canonical.requestEcho().intent())
@@ -45,8 +61,9 @@ public final class StoryContextAgentProjectionV1 {
         }
         Map<String,Object> result = new LinkedHashMap<>();
         result.put("protocolVersion", StoryContextAgentProtocolV1.PROTOCOL_VERSION);
-        result.put("contractVersion", CONTRACT_VERSION);
-        result.put("projectionVersion", PROJECTION_VERSION);
+        boolean questionAware = question != null;
+        result.put("contractVersion", questionAware ? V2_CONTRACT_VERSION : CONTRACT_VERSION);
+        result.put("projectionVersion", questionAware ? V2_PROJECTION_VERSION : PROJECTION_VERSION);
         result.put("contextDigest", requireDigest(canonical.contextDigest(), "contextDigest"));
         result.put("request", request);
         result.put("requestEcho", new LinkedHashMap<>(request));
@@ -57,7 +74,7 @@ public final class StoryContextAgentProjectionV1 {
         result.put("accounting", accounting(canonical));
         result.put("policy", Map.of("compositionVersion",
                 canonical.contextVersion() == null ? "unknown" : canonical.contextVersion(),
-                "projectionVersion", PROJECTION_VERSION));
+                "projectionVersion", questionAware ? V2_PROJECTION_VERSION : PROJECTION_VERSION));
         result.put("projectionDigest", projectionDigest(result, mapper));
         return Collections.unmodifiableMap(result);
     }
@@ -66,11 +83,23 @@ public final class StoryContextAgentProjectionV1 {
         Map<String,Object> x = new LinkedHashMap<>();
         x.put("project", m.convertValue(c.projection().project(), Map.class));
         x.put("sections", c.projection().sections() == null ? List.of() : c.projection().sections());
+        String revision = canonicalRevision(c);
         x.put("repositoryEvidence", c.repositoryContext() == null || c.repositoryContext().evidence() == null
                 ? List.of() : c.repositoryContext().evidence().stream()
-                .map(evidence -> m.convertValue(evidence, Map.class)).toList());
+                .map(evidence -> evidenceSnapshot(evidence, revision, m)).toList());
         x.put("relations", c.relationsByReference());
         return x;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> evidenceSnapshot(RepositoryEvidence evidence, String revision,
+            ObjectMapper mapper) {
+        Map<String, Object> snapshot = new LinkedHashMap<>(mapper.convertValue(evidence, Map.class));
+        Object rawContent = snapshot.get("content");
+        if (!(rawContent instanceof Map<?, ?> content) || !(content.get("revision") instanceof String)) {
+            snapshot.put("content", Map.of("revision", revision));
+        }
+        return snapshot;
     }
 
     private static Map<String,Object> freshness(CanonicalEngineeringContext c, String project) {
@@ -89,12 +118,30 @@ public final class StoryContextAgentProjectionV1 {
             if (evidence.content() != null) addRevision(revisions, evidence.content().revision());
         }
         Object rawFreshness = c.freshness().get("sourceRevision");
+        if (rawFreshness == null) {
+            Object summary = c.freshness().get("summary");
+            if (summary instanceof EngineeringContextFreshness freshness) {
+                rawFreshness = freshness.repositoryRevision();
+            } else if (summary instanceof ProjectFreshnessSummary freshness) {
+                for (var source : freshness.checkedSources()) {
+                    if (source.source() != null) {
+                        addRevision(revisions, source.source().currentRevision());
+                    }
+                }
+            } else if (summary instanceof Map<?, ?> freshness) {
+                rawFreshness = freshness.get("repositoryRevision");
+            }
+        }
         if (rawFreshness instanceof Map<?, ?> source) {
             Object revision = source.get("revision");
             if (revision != null && !(revision instanceof String)) {
                 throw new IllegalArgumentException("PROJECT_REVISION identity is invalid");
             }
             addRevision(revisions, (String) revision);
+        } else if (rawFreshness != null && !(rawFreshness instanceof String)) {
+            throw new IllegalArgumentException("PROJECT_REVISION identity is invalid");
+        } else {
+            addRevision(revisions, (String) rawFreshness);
         }
         if (revisions.isEmpty()) throw new IllegalArgumentException("PROJECT_REVISION identity is missing");
         if (revisions.size() != 1) throw new IllegalArgumentException("Evidence snapshot contains mixed project revisions");

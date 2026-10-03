@@ -9,6 +9,7 @@ import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
+import com.hopeful117.devlogai.intent.model.UserGuidance;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -115,6 +116,24 @@ class RepositoryContextAdapterTest {
         assertEquals("engineering-story-preparation",
                 ctx.analysis().intentId());
         assertEquals("v1", ctx.analysis().intentVersion());
+    }
+
+    @Test
+    void questionIsIncludedInCoreSelectionGuidance() {
+        UUID projectId = UUID.randomUUID();
+        RepositoryContext expected = mock(RepositoryContext.class);
+
+        when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
+                projectId, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
+        when(repositoryContextService.build(any(), any(), any(), any())).thenReturn(expected);
+
+        adapter.buildRepositoryContext(projectId, "Prepare the story", snapshot(projectId),
+                List.of("backend/src/Main.java"), null, "Which component owns polling?");
+
+        ArgumentCaptor<UserGuidance> guidanceCaptor = ArgumentCaptor.forClass(UserGuidance.class);
+        verify(repositoryContextService).build(any(), any(), guidanceCaptor.capture(), any());
+        assertEquals("Prepare the story Which component owns polling? backend/src/Main.java",
+                guidanceCaptor.getValue().focus());
     }
 
     @Test

@@ -28,12 +28,16 @@ public class DevLogStoryAgentService implements DevLogStoryAgent {
 
     @Override
     public DevLogStoryAgentExecution execute(DevLogStoryAgentRequest request) {
+        if (!STORY_CONTEXT_ANALYSIS_INTENT.equals(request.intent())) {
+            throw new IllegalArgumentException("Unsupported Story Agent intent: " + request.intent());
+        }
         Map<String, Object> guidance = withNaturalIntent(request);
         PreparedStoryContext prepared = analyzeStoryContextUseCase.prepare(
                 request.projectSlug(),
                 request.storyId(),
                 STORY_CONTEXT_ANALYSIS_INTENT,
-                request.files());
+                request.files(),
+                request.question());
         var taskId = analyzeStoryContextUseCase.executePrepared(
                 prepared,
                 guidance,
@@ -56,7 +60,7 @@ public class DevLogStoryAgentService implements DevLogStoryAgent {
 
     private Map<String, Object> withNaturalIntent(DevLogStoryAgentRequest request) {
         Map<String, Object> guidance = new LinkedHashMap<>(request.guidance());
-        guidance.put("focus", request.intent());
+        guidance.put("focus", request.question());
         return guidance;
     }
 

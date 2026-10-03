@@ -76,30 +76,33 @@ public class StoryContextSubmissionService {
                 executionAnalysis.getId(), AiTaskType.STORY_CONTEXT_ANALYSIS, requestedIntent,
                 INTENT_VERSION, intent.promptTemplate(), projection, contextDigest, groundingContract,
                 guidance, AiReferenceRegistryFactory.createForStoryContext(canonicalContext.authorizedReferences()));
-        task.setContextDigest(contextDigest);
         task.setSelectionDigest(null);
+        task.setContextDigest(contextDigest);
         task.setProjectionDigest(projectionDigest);
         task.setSubmissionDigest(submissionDigest);
         task.setIdempotencyKeyHash(idempotencyKeyHash);
         Map<String, Object> snapshot = buildExecutionSnapshot(
                 task, canonicalContext, projection, projectionDigest, projectSlug, storyId,
-                requestedIntent, files, guidance, groundingContract, submissionDigest);
+                requestedIntent, files, prepared.question(), guidance, groundingContract, submissionDigest);
         task.setContextSnapshot(snapshot);
         aiTaskRepository.save(task);
+        aiTaskRepository.flush();
         aiTaskService.submit(task.getId(), new SubmitAiTaskRequest(null));
 
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("projectSlug", projectSlug);
-        metadata.put("storyId", storyId == null ? null : storyId.toString());
+        if (storyId != null) {
+            metadata.put("storyId", storyId.toString());
+        }
         metadata.put("contextDigest", contextDigest);
         metadata.put("projectionDigest", projectionDigest);
         metadata.put("protocolVersion", StoryContextAgentProtocolV1.PROTOCOL_VERSION);
-        metadata.put("contractVersion", StoryContextAgentProjectionV1.CONTRACT_VERSION);
-        metadata.put("projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION);
+        metadata.put("contractVersion", projection.get("contractVersion"));
+        metadata.put("projectionVersion", projection.get("projectionVersion"));
         metadata.put("scope", snapshot.get("scope"));
         metadata.put("freshness", projection.get("freshness"));
         metadata.put("groundingDigest", digestService.sha256(digestService.canonicalJson(groundingContract)));
-        metadata.put("storyAgentContractVersion", StoryContextAgentProjectionV1.CONTRACT_VERSION);
+        metadata.put("storyAgentContractVersion", projection.get("contractVersion"));
         PromptRequest prompt = new PromptRequest(
                 UUID.randomUUID(), task.getCorrelationId(), prepared.project().getId(), task.getId(),
                 AiTaskType.STORY_CONTEXT_ANALYSIS, intent, userGuidance, projection, intent.outputSchema(),
@@ -148,7 +151,8 @@ public class StoryContextSubmissionService {
     private Map<String, Object> buildExecutionSnapshot(
             AiTask task, CanonicalEngineeringContext canonical, Map<String, Object> projection,
             String projectionDigest, String projectSlug, UUID storyId, String intent, List<String> files,
-            Map<String, Object> guidance, Map<String, Object> groundingContract, String submissionDigest) {
+            String question, Map<String, Object> guidance, Map<String, Object> groundingContract,
+            String submissionDigest) {
         Map<String, Object> snapshot = new LinkedHashMap<>(
                 task.getContextSnapshot() == null ? Map.of() : task.getContextSnapshot());
         snapshot.put("protocolVersion", StoryContextAgentProtocolV1.PROTOCOL_VERSION);
@@ -157,19 +161,22 @@ public class StoryContextSubmissionService {
         snapshot.put("contextDigest", canonical.contextDigest());
         snapshot.put("projectionDigest", projectionDigest);
         snapshot.put("contextVersion", canonical.contextVersion());
-        snapshot.put("projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION);
+        snapshot.put("projectionVersion", projection.get("projectionVersion"));
         Map<String, Object> scope = new LinkedHashMap<>();
         scope.put("projectSlug", projectSlug);
         scope.put("storyId", storyId == null ? null : storyId.toString());
         scope.put("intent", intent);
         scope.put("files", files == null ? List.of() : List.copyOf(files));
+        if (question != null) scope.put("question", question);
         snapshot.put("scope", scope);
-        snapshot.put("requestEcho", valueMap(canonical.requestEcho()));
+        Object requestEcho = projection.get("requestEcho");
+        snapshot.put("requestEcho", requestEcho instanceof Map<?, ?> map
+                ? new LinkedHashMap<>(map) : valueMap(canonical.requestEcho()));
         Object normalizedFreshness = projection.get("freshness");
         snapshot.put("freshness", normalizedFreshness);
         snapshot.put("contextFreshness", normalizedFreshness);
         snapshot.put("revisions", revisions(canonical));
-        snapshot.put("policy", Map.of("contractVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION,
+        snapshot.put("policy", Map.of("contractVersion", projection.get("projectionVersion"),
                 "projectionDigest", projectionDigest,
                 "selection", "CORE_CANONICAL_ONLY", "retrieval", "NONE",
                 "allowListVersion", "typed-grounding-v1"));

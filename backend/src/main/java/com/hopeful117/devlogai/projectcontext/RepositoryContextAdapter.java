@@ -100,10 +100,21 @@ public class RepositoryContextAdapter {
             List<String> files,
             UUID storyId
     ) {
+        return buildRepositoryContext(projectId, storyDescription, snapshot, files, storyId, null);
+    }
+
+    public RepositoryContext buildRepositoryContext(
+            UUID projectId,
+            String storyDescription,
+            ProjectContextSnapshot snapshot,
+            List<String> files,
+            UUID storyId,
+            String question
+    ) {
         var currentStory = resolveStory(snapshot, storyId);
-        String selectionText = selectionText(storyDescription, currentStory, files);
+        String selectionText = selectionText(storyDescription, question, currentStory, files);
         BoundedKnowledge boundedKnowledge = boundedKnowledge(
-                snapshot, storyDescription, currentStory, files);
+                snapshot, selectionText, currentStory, files);
         AnalysisContext syntheticContext =
                 synthesizeAnalysisContext(projectId, snapshot, boundedKnowledge, currentStory);
 
@@ -187,11 +198,13 @@ public class RepositoryContextAdapter {
 
     private String selectionText(
             String storyDescription,
+            String question,
             ProjectContextSnapshot.EngineeringStorySnapshot currentStory,
             List<String> files
     ) {
         List<String> parts = new ArrayList<>();
         addIfPresent(parts, storyDescription);
+        addIfPresent(parts, question);
         if (currentStory != null) {
             addIfPresent(parts, currentStory.title());
             addIfPresent(parts, currentStory.storyPath());
@@ -257,7 +270,7 @@ public class RepositoryContextAdapter {
             return new BoundedKnowledge(List.of(), List.of());
         }
         UUID analysisId = snapshot.latestProjectProfile().analysisId();
-        List<String> storyTerms = IntentTerms.extract(selectionText(null, currentStory, files));
+        List<String> storyTerms = IntentTerms.extract(selectionText(null, null, currentStory, files));
         List<String> intentTerms = IntentTerms.extract(intentText);
         List<ScoredFact> facts = rankedFacts(analysisId, storyTerms, intentTerms);
         List<ScoredObservation> observations = rankedObservations(

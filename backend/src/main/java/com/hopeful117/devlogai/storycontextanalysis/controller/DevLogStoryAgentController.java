@@ -6,7 +6,6 @@ import com.hopeful117.devlogai.storycontextanalysis.usecase.DevLogStoryAgentRequ
 import com.hopeful117.devlogai.storycontextanalysis.usecase.DevLogStoryAgentService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +28,8 @@ public class DevLogStoryAgentController {
                 projectSlug,
                 payload.storyId(),
                 payload.intent(),
-                payload.files(),
+                effectiveQuestion(payload.intent(), payload.question()),
+                payload.files() == null ? List.of() : payload.files(),
                 payload.guidance(),
                 idempotencyKey
         );
@@ -41,13 +41,19 @@ public class DevLogStoryAgentController {
         if (execution.status() == AiTaskStatus.COMPLETED) {
             return ResponseEntity.ok(execution);
         }
-        return ResponseEntity.status(500).body(execution);
+        // Failed executions are valid agent diagnostics, not transport failures.
+        return ResponseEntity.ok(execution);
+    }
+
+    private String effectiveQuestion(String intent, String question) {
+        return question == null || question.isBlank() ? intent : question;
     }
 
     public record AgentRequest(
             UUID storyId,
             @NotBlank String intent,
-            @NotNull List<@NotBlank String> files,
+            String question,
+            List<@NotBlank String> files,
             Map<String, Object> guidance) {
     }
 }

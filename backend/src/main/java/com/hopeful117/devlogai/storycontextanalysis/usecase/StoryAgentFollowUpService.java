@@ -114,8 +114,9 @@ public class StoryAgentFollowUpService {
         metadata.put("contextDigest", parent.getContextDigest());
         metadata.put("projectionDigest", parent.getProjectionDigest());
         metadata.put("protocolVersion", StoryContextAgentProtocolV1.PROTOCOL_VERSION);
-        metadata.put("contractVersion", StoryContextAgentProjectionV1.CONTRACT_VERSION);
-        metadata.put("projectionVersion", StoryContextAgentProjectionV1.PROJECTION_VERSION);
+        metadata.put("contractVersion", parent.getContextSnapshot().get("projection") instanceof Map<?, ?> projection
+                ? projection.get("contractVersion") : StoryContextAgentProjectionV1.CONTRACT_VERSION);
+        metadata.put("projectionVersion", parent.getContextSnapshot().get("projectionVersion"));
         metadata.put("scope", parent.getContextSnapshot().get("scope"));
         metadata.put("freshness", parent.getContextSnapshot().get("freshness"));
         metadata.put("groundingDigest", parent.getContextSnapshot().get("groundingDigest"));

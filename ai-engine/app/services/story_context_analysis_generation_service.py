@@ -140,6 +140,7 @@ class StoryContextAnalysisGenerationService:
                     scope=prompt.traceability.scope,
                     freshness=prompt.traceability.freshness,
                     grounding_digest=prompt.traceability.grounding_digest,
+                    protocol_version="story-context-agent-protocol/v1",
                 ),
                 synthesis=None,
                 analysis_result=None if follow_up else output,
@@ -226,6 +227,8 @@ class StoryContextAnalysisGenerationService:
                 raise StoryContextAnalysisGroundingError("Repository grounding mapping is inconsistent")
             if isinstance(entry.get("ref"), str):
                 allowed_refs.add(entry["ref"])
+
+        self._validate_requested_file_grounding(output, context, typed_list)
 
         all_findings = (
             output.architecture_findings
@@ -355,6 +358,51 @@ class StoryContextAnalysisGenerationService:
             if cls.classification not in {"FACTUAL_EXTRACTION", "AI_INTERPRETATION", "RECOMMENDATION"}:
                 raise StoryContextAnalysisOutputValidationError(
                     f"Invalid output classification: {cls.classification}"
+                )
+
+    def _validate_requested_file_grounding(
+        self,
+        output: StoryContextAnalysisResult,
+        context: dict[str, object],
+        typed_list: list[object],
+    ) -> None:
+        request = context.get("request") or context.get("scope")
+        if not isinstance(request, dict):
+            return
+        requested_files = request.get("files")
+        if not isinstance(requested_files, list) or not requested_files:
+            return
+        requested = {value for value in requested_files if isinstance(value, str) and value}
+        if not requested:
+            return
+
+        file_grounded_refs = {
+            entry.get("ref")
+            for entry in typed_list
+            if isinstance(entry, dict)
+            and isinstance(entry.get("ref"), str)
+            and any(
+                entry["ref"] == file or entry["ref"].endswith(f":{file}")
+                or (isinstance(entry.get("provenance"), dict)
+                    and entry["provenance"].get("originatingFile") == file)
+                for file in requested
+            )
+        }
+        findings = (
+            output.architecture_findings
+            + output.decision_findings
+            + output.evidence_findings
+            + output.historical_context
+            + output.constraint_findings
+            + output.impacted_component_findings
+        )
+        for finding in findings:
+            references = {
+                value.reference for value in finding.grounding.evidence_references
+            }
+            if references and not references & file_grounded_refs:
+                raise StoryContextAnalysisGroundingError(
+                    f"Finding {finding.title} does not cite evidence from requested file scope"
                 )
 
     def _validate_v2_assessment(

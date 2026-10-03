@@ -106,6 +106,49 @@ def test_story_id_null_and_optional_scalars_omitted_are_wire_valid():
     assert "selectedKnowledge" not in parsed.model_dump(by_alias=True)
 
 
+def test_question_aware_projection_v2_requires_and_preserves_question():
+    payload = projection()
+    for key in ("request", "requestEcho", "scope"):
+        payload[key] = {**payload[key], "question": "Which component owns polling?"}
+    payload["contractVersion"] = "story-context-agent-projection/v2"
+    payload["projectionVersion"] = "sca/v2"
+    payload["policy"] = {"compositionVersion": "ctx/v1", "projectionVersion": "sca/v2"}
+    payload["projectionDigest"] = _projection_digest(payload)
+
+    parsed = StoryContextAgentProjectionV1.model_validate(payload)
+
+    assert parsed.request["question"] == "Which component owns polling?"
+
+
+def test_question_aware_projection_v2_rejects_missing_or_oversized_question():
+    missing = projection()
+    missing["contractVersion"] = "story-context-agent-projection/v2"
+    missing["projectionVersion"] = "sca/v2"
+    missing["policy"] = {"compositionVersion": "ctx/v1", "projectionVersion": "sca/v2"}
+    missing["projectionDigest"] = _projection_digest(missing)
+    with pytest.raises(ValidationError, match="canonical keys"):
+        StoryContextAgentProjectionV1.model_validate(missing)
+
+    oversized = projection()
+    for key in ("request", "requestEcho", "scope"):
+        oversized[key] = {**oversized[key], "question": "x" * 2001}
+    oversized["contractVersion"] = "story-context-agent-projection/v2"
+    oversized["projectionVersion"] = "sca/v2"
+    oversized["policy"] = {"compositionVersion": "ctx/v1", "projectionVersion": "sca/v2"}
+    oversized["projectionDigest"] = _projection_digest(oversized)
+    with pytest.raises(ValidationError, match="question"):
+        StoryContextAgentProjectionV1.model_validate(oversized)
+
+
+def test_projection_rejects_mismatched_contract_and_projection_versions():
+    payload = projection(
+        contractVersion="story-context-agent-projection/v2",
+        projectionVersion="sca/v1",
+    )
+    with pytest.raises(ValidationError, match="same version"):
+        StoryContextAgentProjectionV1.model_validate(payload)
+
+
 def test_foreign_project_and_invalid_revisions_fail_closed():
     with pytest.raises(ValidationError, match="source project"):
         StoryContextAgentProjectionV1.model_validate(

@@ -30,6 +30,7 @@ public final class StoryContextResultValidator {
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.historicalContext(), allowedRefSet, true);
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.constraintFindings(), allowedRefSet, false);
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.impactedComponentFindings(), allowedRefSet, true);
+        validateImplementationPreparation(result.implementationPreparation(), allowedRefSet);
 
         if ("V2".equals(groundingContract.get("causalContractVersion"))) {
             result = AnalyzeStoryContextUseCase.validateV2CausalAssessment(result, task, groundingContract);
@@ -56,5 +57,41 @@ public final class StoryContextResultValidator {
             throw new IllegalStateException("Invalid confidence level: " + result.confidence());
         }
         return result;
+    }
+
+    static void validateImplementationPreparation(
+            StoryContextAnalysisResult.ImplementationPreparation preparation,
+            Set<String> allowedRefSet) {
+        for (StoryContextAnalysisResult.ImplementationFile item : preparation.affectedFiles()) {
+            validatePreparationEvidence(item.evidenceReferences(), allowedRefSet, "affected file " + item.path());
+            boolean supported = item.evidenceReferences().stream().anyMatch(reference ->
+                    item.path().equals(reference.reference())
+                            || item.path().equals(reference.resource())
+                            || (reference.resource() != null && reference.resource().endsWith("/" + item.path())));
+            if (!supported) {
+                throw new IllegalStateException("Affected file is not supported by cited evidence: " + item.path());
+            }
+        }
+        for (StoryContextAnalysisResult.ImplementationConstraint item : preparation.constraints()) {
+            validatePreparationEvidence(item.evidenceReferences(), allowedRefSet, "constraint");
+        }
+        for (StoryContextAnalysisResult.ImplementationTestPlanItem item : preparation.testPlan()) {
+            validatePreparationEvidence(item.evidenceReferences(), allowedRefSet, "test plan " + item.target());
+        }
+    }
+
+    private static void validatePreparationEvidence(
+            java.util.List<EvidenceRef> references,
+            Set<String> allowedRefSet,
+            String itemDescription) {
+        if (references.isEmpty()) {
+            throw new IllegalStateException("Implementation preparation item is ungrounded: " + itemDescription);
+        }
+        for (EvidenceRef evidenceRef : references) {
+            if (!allowedRefSet.contains(evidenceRef.reference())) {
+                throw new IllegalStateException(
+                        "Implementation preparation references unauthorized evidence: " + evidenceRef.reference());
+            }
+        }
     }
 }

@@ -261,6 +261,30 @@ class ImplementationQuestion(StoryContextAnalysisContractModel):
     related_components: list[str] = Field(default_factory=list, alias="relatedComponents")
 
 
+class ImplementationFile(StoryContextAnalysisContractModel):
+    path: str = Field(min_length=1, max_length=500)
+    reason: str = Field(min_length=1, max_length=10000)
+    evidence_references: list[EvidenceRef] = Field(default_factory=list, alias="evidenceReferences")
+
+
+class ImplementationConstraint(StoryContextAnalysisContractModel):
+    description: str = Field(min_length=1, max_length=10000)
+    constraint_type: str = Field(alias="constraintType", min_length=1, max_length=100)
+    evidence_references: list[EvidenceRef] = Field(default_factory=list, alias="evidenceReferences")
+
+
+class ImplementationTestPlanItem(StoryContextAnalysisContractModel):
+    target: str = Field(min_length=1, max_length=500)
+    description: str = Field(min_length=1, max_length=10000)
+    evidence_references: list[EvidenceRef] = Field(default_factory=list, alias="evidenceReferences")
+
+
+class ImplementationPreparation(StoryContextAnalysisContractModel):
+    affected_files: list[ImplementationFile] = Field(default_factory=list, alias="affectedFiles")
+    constraints: list[ImplementationConstraint] = Field(default_factory=list)
+    test_plan: list[ImplementationTestPlanItem] = Field(default_factory=list, alias="testPlan")
+
+
 class FollowUpNextStep(StoryContextAnalysisContractModel):
     status: Literal["RECOMMENDED", "NEEDS_CLARIFICATION", "NO_SAFE_NEXT_STEP"]
     description: str = Field(min_length=1, max_length=2000)
@@ -323,7 +347,12 @@ class StoryContextAnalysisResult(StoryContextAnalysisContractModel):
     impacted_component_findings: list[ImpactedComponentFinding] = Field(default_factory=list, alias="impactedComponentFindings")
     uncertainties: list[Uncertainty] = Field(default_factory=list)
     missing_information: list[MissingInformation] = Field(default_factory=list, alias="missingInformation")
-    implementation_questions: list[ImplementationQuestion] = Field(default_factory=list, alias="implementationQuestions")
+    implementation_questions: list[ImplementationQuestion] = Field(
+        default_factory=list, alias="implementationQuestions"
+    )
+    implementation_preparation: ImplementationPreparation = Field(
+        default_factory=ImplementationPreparation, alias="implementationPreparation"
+    )
     confidence: Confidence
     provenance: Provenance
     output_classification: OutputClassification = Field(

@@ -19,6 +19,9 @@ public record DevLogStoryAgentRequest(
     @NotBlank
     String intent,
 
+    @NotBlank
+    String question,
+
     @NotNull
     List<@NotBlank String> files,
 
@@ -31,6 +34,11 @@ public record DevLogStoryAgentRequest(
     public DevLogStoryAgentRequest {
         requireNonBlank(projectSlug, "projectSlug");
         requireNonBlank(intent, "intent");
+        requireNonBlank(question, "question");
+        if (question.length() > 2000) {
+            throw new IllegalArgumentException("question must not exceed 2000 characters");
+        }
+        question = question.trim();
         Objects.requireNonNull(files, "files");
 
         files = List.copyOf(files);

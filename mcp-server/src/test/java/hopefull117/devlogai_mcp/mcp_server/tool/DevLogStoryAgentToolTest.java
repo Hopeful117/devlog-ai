@@ -34,7 +34,8 @@ class DevLogStoryAgentToolTest {
         when(client.executeStoryAgent(
                 eq("devlog-ai"), eq("request-1"),
                 eq(new DevlogProjectContextClient.StoryAgentRequest(
-                        storyId, "engineering-story-context-analysis", List.of("README.md"), guidance))))
+                        storyId, "engineering-story-context-analysis", "engineering-story-context-analysis",
+                        List.of("README.md"), guidance))))
                 .thenReturn(response);
         when(client.getAiTaskStatus(storyId)).thenReturn(
                 new DevlogProjectContextClient.AiTaskStatusResponse(storyId, "FAILED", "FAILED", "failure"));
@@ -52,7 +53,8 @@ class DevLogStoryAgentToolTest {
         verify(client).executeStoryAgent(
                 eq("devlog-ai"), eq("request-1"),
                 eq(new DevlogProjectContextClient.StoryAgentRequest(
-                        storyId, "engineering-story-context-analysis", List.of("README.md"), guidance)));
+                        storyId, "engineering-story-context-analysis", "engineering-story-context-analysis",
+                        List.of("README.md"), guidance)));
         verify(client).getAiTaskStatus(storyId);
     }
 
@@ -63,7 +65,8 @@ class DevLogStoryAgentToolTest {
         DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper, 100, 0);
         UUID taskId = UUID.randomUUID();
         when(client.executeStoryAgent(eq("devlog-ai"), eq("request-1"),
-                eq(new DevlogProjectContextClient.StoryAgentRequest(null, "intent", null, null))))
+                eq(new DevlogProjectContextClient.StoryAgentRequest(null,
+                        "engineering-story-context-analysis", "intent", null, null))))
                 .thenReturn(Map.of("status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId,
                         "result", Map.of(), "diagnostics", Map.of("status", "SUBMITTED")));
         when(client.getAiTaskStatus(taskId)).thenReturn(
@@ -92,7 +95,8 @@ class DevLogStoryAgentToolTest {
         snapshot.put("scope", Map.of("projectSlug", "trading-os"));
 
         when(client.executeStoryAgent(eq("trading-os"), eq("request-1"),
-                eq(new DevlogProjectContextClient.StoryAgentRequest(null, "intent", null, null))))
+                eq(new DevlogProjectContextClient.StoryAgentRequest(null,
+                        "engineering-story-context-analysis", "intent", null, null))))
                 .thenReturn(Map.of("status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId));
         when(client.getAiTaskStatus(taskId)).thenReturn(
                 new DevlogProjectContextClient.AiTaskStatusResponse(taskId, "COMPLETED", null, null,
@@ -117,7 +121,8 @@ class DevLogStoryAgentToolTest {
         DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper, 0, 0);
         UUID taskId = UUID.randomUUID();
         when(client.executeStoryAgent(eq("devlog-ai"), eq("request-1"),
-                eq(new DevlogProjectContextClient.StoryAgentRequest(null, "intent", null, null))))
+                eq(new DevlogProjectContextClient.StoryAgentRequest(null,
+                        "engineering-story-context-analysis", "intent", null, null))))
                 .thenReturn(Map.of("status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId));
 
         JsonNode json = objectMapper.readTree(tool.execute("devlog-ai", null, "intent", null, null, "request-1"));
@@ -133,7 +138,8 @@ class DevLogStoryAgentToolTest {
         DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper, 100, 0);
         UUID taskId = UUID.randomUUID();
         when(client.executeStoryAgent(eq("trading-os"), eq("request-1"),
-                eq(new DevlogProjectContextClient.StoryAgentRequest(null, "intent", null, null))))
+                eq(new DevlogProjectContextClient.StoryAgentRequest(null,
+                        "engineering-story-context-analysis", "intent", null, null))))
                 .thenReturn(Map.of("status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId));
         when(client.getAiTaskStatus(taskId)).thenReturn(
                 new DevlogProjectContextClient.AiTaskStatusResponse(taskId, "COMPLETED", null, null,
