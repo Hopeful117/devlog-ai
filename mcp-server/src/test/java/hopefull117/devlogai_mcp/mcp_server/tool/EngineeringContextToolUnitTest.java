@@ -2,7 +2,12 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidence;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidenceContent;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringEvidenceSymbols;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextMetadata;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringSymbolDeclaration;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringSymbolLocation;
+import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringSymbolParameter;
 import com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier;
 import com.hopeful117.devlogai.contracts.engineeringcontext.ContextSection;
 import com.hopeful117.devlogai.contracts.engineeringcontext.ContextRequestEcho;
@@ -18,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -140,5 +146,63 @@ class EngineeringContextToolUnitTest {
                 List.of(),
                 null
         );
+    }
+
+    @Test
+    void shouldPreserveEnrichedEvidenceFieldsAtMcpBoundary() throws Exception {
+        var evidence = new EngineeringEvidence(
+                "SOURCE_FILE",
+                "RELATED_SOURCE_CODE",
+                "Engineering context controller",
+                "REPOSITORY_STRUCTURE",
+                "backend/src/main/java/EngineeringContextController.java",
+                "source-id-1",
+                "file:backend/src/main/java/EngineeringContextController.java",
+                88,
+                "SELECTED_BY_RANK",
+                Instant.parse("2026-08-01T10:15:30Z"),
+                List.of("diff:abc123:backend/src/main/java/EngineeringContextController.java"),
+                Map.of("resolvedRevision", "revision-1"),
+                new EngineeringEvidenceContent(
+                        "TRUNCATED", "class Example {\n", "CONTENT_ENRICHMENT_TRUNCATED", "revision-1"),
+                new EngineeringEvidenceSymbols(
+                        "EXTRACTED", false, 1, 1, "java-declaration-extractor", "v1", "revision-1",
+                        List.of(new EngineeringSymbolDeclaration(
+                                "METHOD", "getEngineeringContext", "EngineeringContextController",
+                                List.of("public"), "ResponseEntity<EngineeringContext>",
+                                List.of(new EngineeringSymbolParameter("String", "projectSlug")),
+                                List.of("@GetMapping"), new EngineeringSymbolLocation(15, 4, 19, 5)))),
+                null,
+                TrustTier.TECHNICAL_EVIDENCE
+        );
+        var context = new EngineeringContext(
+                new ProjectContext(
+                        UUID.randomUUID(), "devlog-ai", "devlog-ai", "DevLog AI", "ACTIVE", List.of()),
+                "Inspect enriched context",
+                List.of(evidence),
+                new EngineeringContextMetadata(
+                        1, 1, true, 4800, "context-digest", List.of("CONTENT_ENRICHMENT_TRUNCATED"), null),
+                List.of(),
+                null
+        );
+
+        when(devlogProjectContextClient.getEngineeringContext(
+                "devlog-ai", "Inspect enriched context", List.of(), null)).thenReturn(context);
+
+        var json = new tools.jackson.databind.ObjectMapper().readTree(
+                engineeringContextTool.getEngineeringContext("devlog-ai", "Inspect enriched context", List.of(), null));
+
+        assertThat(json.at("/evidence/0/content/text").asText()).isEqualTo("class Example {\n");
+        assertThat(json.at("/evidence/0/content/revision").asText()).isEqualTo("revision-1");
+        assertThat(json.at("/evidence/0/symbols/extractorId").asText())
+                .isEqualTo("java-declaration-extractor");
+        assertThat(json.at("/evidence/0/symbols/declarations/0/name").asText())
+                .isEqualTo("getEngineeringContext");
+        assertThat(json.at("/evidence/0/symbols/declarations/0/location/beginLine").asInt())
+                .isEqualTo(15);
+        assertThat(json.at("/evidence/0/occurredAt").asText())
+                .isEqualTo("2026-08-01T10:15:30Z");
+        assertThat(json.at("/metadata/warnings/0").asText())
+                .isEqualTo("CONTENT_ENRICHMENT_TRUNCATED");
     }
 }
