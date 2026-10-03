@@ -11,6 +11,8 @@ import org.springframework.web.service.annotation.GetExchange;
 import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -114,7 +116,9 @@ public interface DevlogProjectContextClient {
         }
 
         public AiTaskStatusResponse {
-            contextSnapshot = contextSnapshot == null ? Map.of() : Map.copyOf(contextSnapshot);
+            contextSnapshot = contextSnapshot == null
+                    ? Map.of()
+                    : Collections.unmodifiableMap(new LinkedHashMap<>(contextSnapshot));
         }
     }
 }
