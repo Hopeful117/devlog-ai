@@ -18,13 +18,17 @@ public record PreparedStoryContext(
         EngineeringStory story,
         CanonicalEngineeringContext canonicalContext,
         Map<String, Object> projection,
-        String projectionDigest) {
+        String projectionDigest,
+        String question) {
     public PreparedStoryContext {
         if (projectSlug == null || projectSlug.isBlank()) {
             throw new IllegalArgumentException("projectSlug is required");
         }
         if (intent == null || intent.isBlank()) {
             throw new IllegalArgumentException("intent is required");
+        }
+        if (question != null && (question.isBlank() || question.length() > 2000)) {
+            throw new IllegalArgumentException("question must be between 1 and 2000 characters");
         }
         if (files == null || project == null || canonicalContext == null || projection == null
                 || projectionDigest == null || projectionDigest.isBlank()) {

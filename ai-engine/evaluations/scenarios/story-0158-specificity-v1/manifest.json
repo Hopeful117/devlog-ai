@@ -1,0 +1,48 @@
+{
+  "protocolVersion": "story-0158-specificity/v1",
+  "repetitions": 3,
+  "minimumTotalScore": 8,
+  "minimumSpecificityDelta": 1,
+  "scenarios": [
+    {
+      "scenarioId": "0158-broad-question",
+      "questionKind": "BROAD",
+      "question": "What changed in the story context and what should an engineer understand first?",
+      "files": ["docs/stories/0112-devlog-story-context-agent/story.md", "docker-compose.yml"],
+      "contextFixture": "engineering-story-context-analysis-v1",
+      "expectedEvidence": ["docker-compose.yml", "document:00000000-0000-0000-0000-000000000025:docs/stories/0112/story.md@abc123"],
+      "expectedAbstention": false,
+      "nextStepRequired": true
+    },
+    {
+      "scenarioId": "0158-targeted-component",
+      "questionKind": "TARGETED",
+      "question": "Which component owns the backend to ai-engine dependency and where is it configured?",
+      "files": ["docker-compose.yml"],
+      "contextFixture": "engineering-story-context-analysis-v1",
+      "expectedEvidence": ["docker-compose.yml"],
+      "expectedAbstention": false,
+      "nextStepRequired": true
+    },
+    {
+      "scenarioId": "0158-insufficient-evidence",
+      "questionKind": "INSUFFICIENT_EVIDENCE",
+      "question": "Which production incident caused this dependency to be introduced?",
+      "files": [],
+      "contextFixture": "engineering-story-context-analysis-v1",
+      "expectedEvidence": [],
+      "expectedAbstention": true,
+      "nextStepRequired": true
+    },
+    {
+      "scenarioId": "0158-truncated-context",
+      "questionKind": "TRUNCATED_CONTEXT",
+      "question": "What exact implementation decision explains the runtime dependency?",
+      "files": ["docker-compose.yml"],
+      "contextFixture": "engineering-story-context-analysis-v1",
+      "expectedEvidence": ["docker-compose.yml"],
+      "expectedAbstention": true,
+      "nextStepRequired": true
+    }
+  ]
+}

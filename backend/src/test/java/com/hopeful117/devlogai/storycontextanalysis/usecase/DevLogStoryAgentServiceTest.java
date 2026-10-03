@@ -38,10 +38,10 @@ class DevLogStoryAgentServiceTest {
         UUID taskId = UUID.randomUUID();
         DevLogStoryAgentRequest request = request();
         when(analyzeStoryContextUseCase.prepare("project", null,
-                "engineering-story-context-analysis", List.of("README.md")))
+                "engineering-story-context-analysis", List.of("README.md"), "question"))
                 .thenReturn(mock(PreparedStoryContext.class));
         when(analyzeStoryContextUseCase.executePrepared(any(),
-                eq(Map.of("focus", "intent")), eq("key")))
+                eq(Map.of("focus", "question")), eq("key")))
                 .thenReturn(taskId);
         when(aiTaskService.getById(taskId)).thenReturn(task(taskId, AiTaskStatus.PROCESSING));
 
@@ -51,9 +51,9 @@ class DevLogStoryAgentServiceTest {
         assertEquals(Map.of(), execution.result());
         assertEquals(Map.of("status", "PROCESSING"), execution.diagnostics());
         verify(analyzeStoryContextUseCase).prepare("project", null,
-                "engineering-story-context-analysis", List.of("README.md"));
+                "engineering-story-context-analysis", List.of("README.md"), "question");
         verify(analyzeStoryContextUseCase).executePrepared(any(),
-                eq(Map.of("focus", "intent")), eq("key"));
+                eq(Map.of("focus", "question")), eq("key"));
         verifyNoInteractions(analysisQueryService);
     }
 
@@ -62,10 +62,10 @@ class DevLogStoryAgentServiceTest {
         UUID taskId = UUID.randomUUID();
         AiTaskResponse task = task(taskId, AiTaskStatus.COMPLETED);
         when(analyzeStoryContextUseCase.prepare(any(), any(),
-                eq("engineering-story-context-analysis"), any()))
+                eq("engineering-story-context-analysis"), any(), eq("question")))
                 .thenReturn(mock(PreparedStoryContext.class));
         when(analyzeStoryContextUseCase.executePrepared(any(),
-                eq(Map.of("focus", "intent")), any())).thenReturn(taskId);
+                eq(Map.of("focus", "question")), any())).thenReturn(taskId);
         when(aiTaskService.getById(taskId)).thenReturn(task);
         when(analysisQueryService.findResponseByAiTaskId(taskId))
                 .thenReturn(java.util.Optional.of(new StoryContextAnalysisResponse(null, Map.of())));
@@ -83,7 +83,7 @@ class DevLogStoryAgentServiceTest {
     }
 
     private static DevLogStoryAgentRequest request() {
-        return new DevLogStoryAgentRequest("project", null, "intent", List.of("README.md"), Map.of(), "key");
+        return new DevLogStoryAgentRequest("project", null, "engineering-story-context-analysis", "question", List.of("README.md"), Map.of(), "key");
     }
 
     private static AiTaskResponse task(UUID id, AiTaskStatus status) {

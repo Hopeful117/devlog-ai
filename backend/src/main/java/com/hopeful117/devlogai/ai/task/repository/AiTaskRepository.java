@@ -24,7 +24,7 @@ public interface AiTaskRepository extends JpaRepository<AiTask, UUID> {
     Optional<AiTask> findByParentSnapshotId(UUID parentSnapshotId);
 
     /** Serializes the idempotency check and insert within the current transaction. */
-    @Query(value = "select pg_advisory_xact_lock(hashtextextended(:lockKey, 0))", nativeQuery = true)
+    @Query(value = "with lock_result as materialized (select pg_advisory_xact_lock(hashtextextended(:lockKey, 0))) select 1 from lock_result", nativeQuery = true)
     Long acquireSubmissionLock(@Param("lockKey") String lockKey);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

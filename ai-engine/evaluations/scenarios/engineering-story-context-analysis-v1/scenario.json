@@ -43,9 +43,10 @@
           "constraintFindings",
           "impactedComponentFindings",
           "uncertainties",
-          "missingInformation",
-          "implementationQuestions",
-          "confidence",
+                   "missingInformation",
+                   "implementationQuestions",
+                   "implementationPreparation",
+                   "confidence",
           "provenance",
           "outputClassification",
           "causalClaims"
@@ -288,9 +289,10 @@
         "constraintFindings",
         "impactedComponentFindings",
         "uncertainties",
-        "missingInformation",
-        "implementationQuestions",
-        "confidence",
+         "missingInformation",
+         "implementationQuestions",
+         "implementationPreparation",
+         "confidence",
         "provenance",
         "outputClassification",
         "causalClaims"
@@ -341,7 +343,7 @@
   "reproducibility": {
     "repositoryRevision": "6f0d2da87cc4dc77427c701c3ec1443bb843216d",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "e5dcf2ec9356e570aba55093d63fd11592333a43de96e5a272660a6f3c81f5ef",
-    "schemaDigest": "7186cf1d381c7dca857f0481c283609d100e372afdf098811a3666ffff1c9f90"
+    "promptContentDigest": "dc541e5d6207867141581d2e5a1ea4ccbf388ec40f487772683fdad5fa7b4f9f",
+    "schemaDigest": "2dc45cd54a73d5f1ede6394194fc5187b9062d850e8dbb810ca32e6863df4db7"
   }
 }

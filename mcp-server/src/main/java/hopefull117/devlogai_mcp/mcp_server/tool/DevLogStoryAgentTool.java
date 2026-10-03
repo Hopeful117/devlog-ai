@@ -19,6 +19,7 @@ import java.util.UUID;
 @Component
 @Slf4j
 public class DevLogStoryAgentTool {
+    private static final String STORY_CONTEXT_ANALYSIS_INTENT = "engineering-story-context-analysis";
     private static final long DEFAULT_POLL_TIMEOUT_MS = 120_000L;
     private static final long DEFAULT_POLL_INTERVAL_MS = 2_000L;
 
@@ -46,6 +47,16 @@ public class DevLogStoryAgentTool {
         this.pollIntervalMs = pollIntervalMs;
     }
 
+    public String execute(
+            String projectSlug,
+            @Nullable UUID storyId,
+            String intent,
+            @Nullable List<String> files,
+            @Nullable Map<String, Object> guidance,
+            @Nullable String idempotencyKey) {
+        return execute(projectSlug, storyId, intent, null, files, guidance, idempotencyKey);
+    }
+
     @McpTool(
             name = "devlog_story_agent",
             description = "Runs one bounded, read-only DevLog Story Agent execution and returns its structured result or execution diagnostics.")
@@ -53,13 +64,25 @@ public class DevLogStoryAgentTool {
             @McpArg(description = "DevLog project slug", required = true) String projectSlug,
             @McpArg(description = "Optional Engineering Story UUID", required = false) @Nullable UUID storyId,
             @McpArg(description = "Natural-language investigation objective", required = true) String intent,
+            @McpArg(description = "Optional specific question; intent is used when omitted", required = false)
+            @Nullable String question,
             @McpArg(description = "Optional repository file paths", required = false) @Nullable List<String> files,
             @McpArg(description = "Optional human guidance", required = false) @Nullable Map<String, Object> guidance,
             @McpArg(description = "Optional idempotency key", required = false) @Nullable String idempotencyKey) {
-        Map<String, Object> execution = client.executeStoryAgent(
-                projectSlug,
-                idempotencyKey,
-                new DevlogProjectContextClient.StoryAgentRequest(storyId, intent, files, guidance));
+        Map<String, Object> execution;
+        try {
+            String effectiveQuestion = question == null || question.isBlank() ? intent : question;
+            execution = client.executeStoryAgent(
+                    projectSlug,
+                    idempotencyKey,
+                    new DevlogProjectContextClient.StoryAgentRequest(
+                            storyId, STORY_CONTEXT_ANALYSIS_INTENT, effectiveQuestion, files, guidance));
+        } catch (RuntimeException exception) {
+            log.error("Story Agent backend submission failed projectSlug={} storyId={} hasQuestion={} fileCount={} hasGuidance={} hasIdempotencyKey={}",
+                    projectSlug, storyId, question != null, files == null ? 0 : files.size(),
+                    guidance != null && !guidance.isEmpty(), idempotencyKey != null, exception);
+            throw exception;
+        }
         execution = awaitTerminalExecution(execution);
         try {
             return objectMapper.writeValueAsString(execution);

@@ -70,6 +70,11 @@ public class AnalyzeStoryContextUseCase {
         return preparationService.prepare(projectSlug, storyId, intent, files);
     }
 
+    public PreparedStoryContext prepare(String projectSlug, UUID storyId, String intent,
+                                        List<String> files, String question) {
+        return preparationService.prepare(projectSlug, storyId, intent, files, question);
+    }
+
     public UUID execute(
             String projectSlug,
             UUID storyId,
@@ -105,7 +110,7 @@ public class AnalyzeStoryContextUseCase {
 
         List<String> requestedFiles = files == null ? List.of() : List.copyOf(files);
         SubmissionIdentity identity = submissionIdentity(
-                projectSlug, storyId, requestedIntent, requestedFiles, guidance, idempotencyKey);
+                projectSlug, storyId, requestedIntent, requestedFiles, null, guidance, idempotencyKey);
         Optional<UUID> existingSubmission = existingSubmission(identity);
         if (existingSubmission.isPresent()) {
             return existingSubmission.get();
@@ -121,7 +126,7 @@ public class AnalyzeStoryContextUseCase {
             PreparedStoryContext prepared, Map<String, Object> guidance, String idempotencyKey) {
         SubmissionIdentity identity = submissionIdentity(
                 prepared.projectSlug(), prepared.storyId(), prepared.intent(), prepared.files(),
-                guidance, idempotencyKey);
+                prepared.question(), guidance, idempotencyKey);
         Optional<UUID> existingSubmission = existingSubmission(identity);
         if (existingSubmission.isPresent()) {
             return existingSubmission.get();
@@ -138,11 +143,12 @@ public class AnalyzeStoryContextUseCase {
 
     private SubmissionIdentity submissionIdentity(
             String projectSlug, UUID storyId, String requestedIntent, List<String> files,
-            Map<String, Object> guidance, String idempotencyKey) {
+            String question, Map<String, Object> guidance, String idempotencyKey) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("projectSlug", projectSlug);
         values.put("storyId", storyId == null ? null : storyId.toString());
         values.put("intent", requestedIntent);
+        values.put("question", question);
         values.put("files", files);
         values.put("guidance", guidance == null ? Map.of() : guidance);
         return new SubmissionIdentity(
@@ -282,7 +288,8 @@ public class AnalyzeStoryContextUseCase {
                 result.objectiveUnderstanding(), result.architectureFindings(), result.decisionFindings(),
                 result.evidenceFindings(), result.historicalContext(), result.constraintFindings(),
                 result.impactedComponentFindings(), result.uncertainties(), result.missingInformation(),
-                result.implementationQuestions(), result.confidence(), result.provenance(),
+                result.implementationQuestions(), result.implementationPreparation(),
+                result.confidence(), result.provenance(),
                 result.outputClassification(), List.of(), bound);
     }
 

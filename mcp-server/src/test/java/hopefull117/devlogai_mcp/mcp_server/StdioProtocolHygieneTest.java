@@ -83,6 +83,9 @@ class StdioProtocolHygieneTest {
             JsonNode toolsListResponse = readJsonLine(stdout, executor, READ_TIMEOUT);
             assertThat(toolsListResponse.path("id").asInt()).isEqualTo(4);
             assertThat(toolsListResponse.path("result").path("tools").isArray()).isTrue();
+            JsonNode storyAgent = findTool(toolsListResponse, "devlog_story_agent");
+            assertThat(storyAgent.path("inputSchema").path("required").toString())
+                    .doesNotContain("storyId");
 
             writeJsonLine(stdin, """
                     {"jsonrpc":"2.0","id":5,"method":"prompts/list","params":{}}
@@ -176,6 +179,16 @@ class StdioProtocolHygieneTest {
         List<String> values = new ArrayList<>();
         capabilities.forEach(capability -> values.add(capability.path(field).asText()));
         return values;
+    }
+
+    private static JsonNode findTool(JsonNode toolsResponse, String name) {
+        for (JsonNode tool : toolsResponse.path("result").path("tools")) {
+            if (name.equals(tool.path("name").asText())) {
+                return tool;
+            }
+        }
+        fail("MCP tool not found: " + name);
+        return null;
     }
 
     private static JsonNode readJsonLine(

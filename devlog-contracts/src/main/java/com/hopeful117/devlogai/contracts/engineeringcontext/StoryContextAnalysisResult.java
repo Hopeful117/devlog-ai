@@ -14,6 +14,7 @@ public record StoryContextAnalysisResult(
         List<Uncertainty> uncertainties,
         List<MissingInformation> missingInformation,
         List<ImplementationQuestion> implementationQuestions,
+        ImplementationPreparation implementationPreparation,
         Confidence confidence,
         Provenance provenance,
         OutputClassification outputClassification,
@@ -31,6 +32,8 @@ public record StoryContextAnalysisResult(
         uncertainties = uncertainties != null ? List.copyOf(uncertainties) : List.of();
         missingInformation = missingInformation != null ? List.copyOf(missingInformation) : List.of();
         implementationQuestions = implementationQuestions != null ? List.copyOf(implementationQuestions) : List.of();
+        implementationPreparation = implementationPreparation != null
+                ? implementationPreparation : new ImplementationPreparation(List.of(), List.of(), List.of());
         confidence = confidence != null ? confidence : Confidence.LOW;
         provenance = provenance != null ? provenance : new Provenance(null, null, null);
         outputClassification = outputClassification != null ? outputClassification : new OutputClassification(List.of());
@@ -56,7 +59,8 @@ public record StoryContextAnalysisResult(
         this(objectiveUnderstanding, architectureFindings, decisionFindings,
                 evidenceFindings, historicalContext, constraintFindings,
                 impactedComponentFindings, uncertainties, missingInformation,
-                implementationQuestions, confidence, provenance,
+                implementationQuestions, new ImplementationPreparation(List.of(), List.of(), List.of()),
+                confidence, provenance,
                 outputClassification, List.of(), null);
     }
 
@@ -80,7 +84,8 @@ public record StoryContextAnalysisResult(
         this(objectiveUnderstanding, architectureFindings, decisionFindings,
                 evidenceFindings, historicalContext, constraintFindings,
                 impactedComponentFindings, uncertainties, missingInformation,
-                implementationQuestions, confidence, provenance,
+                implementationQuestions, new ImplementationPreparation(List.of(), List.of(), List.of()),
+                confidence, provenance,
                 outputClassification, causalClaims, null);
     }
 
@@ -383,6 +388,54 @@ public record StoryContextAnalysisResult(
             if (question == null || question.isBlank()) throw new IllegalArgumentException("question must not be blank");
             if (context == null || context.isBlank()) throw new IllegalArgumentException("context must not be blank");
             relatedComponents = relatedComponents != null ? List.copyOf(relatedComponents) : List.of();
+        }
+    }
+
+    public record ImplementationFile(
+            String path,
+            String reason,
+            List<EvidenceRef> evidenceReferences
+    ) {
+        public ImplementationFile {
+            if (path == null || path.isBlank()) throw new IllegalArgumentException("path must not be blank");
+            if (reason == null || reason.isBlank()) throw new IllegalArgumentException("reason must not be blank");
+            evidenceReferences = evidenceReferences != null ? List.copyOf(evidenceReferences) : List.of();
+        }
+    }
+
+    public record ImplementationConstraint(
+            String description,
+            String constraintType,
+            List<EvidenceRef> evidenceReferences
+    ) {
+        public ImplementationConstraint {
+            if (description == null || description.isBlank()) throw new IllegalArgumentException("description must not be blank");
+            if (constraintType == null || constraintType.isBlank()) throw new IllegalArgumentException("constraintType must not be blank");
+            evidenceReferences = evidenceReferences != null ? List.copyOf(evidenceReferences) : List.of();
+        }
+    }
+
+    public record ImplementationTestPlanItem(
+            String target,
+            String description,
+            List<EvidenceRef> evidenceReferences
+    ) {
+        public ImplementationTestPlanItem {
+            if (target == null || target.isBlank()) throw new IllegalArgumentException("target must not be blank");
+            if (description == null || description.isBlank()) throw new IllegalArgumentException("description must not be blank");
+            evidenceReferences = evidenceReferences != null ? List.copyOf(evidenceReferences) : List.of();
+        }
+    }
+
+    public record ImplementationPreparation(
+            List<ImplementationFile> affectedFiles,
+            List<ImplementationConstraint> constraints,
+            List<ImplementationTestPlanItem> testPlan
+    ) {
+        public ImplementationPreparation {
+            affectedFiles = affectedFiles != null ? List.copyOf(affectedFiles) : List.of();
+            constraints = constraints != null ? List.copyOf(constraints) : List.of();
+            testPlan = testPlan != null ? List.copyOf(testPlan) : List.of();
         }
     }
 

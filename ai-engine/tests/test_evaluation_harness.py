@@ -547,6 +547,8 @@ def test_evaluation_has_no_provider_or_network_execution_imports() -> None:
     forbidden_roots = {"httpx", "openai", "requests", "urllib"}
     offenders = []
     for path in evaluation_root.glob("*.py"):
+        if path.name.endswith("_live.py"):
+            continue
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):

@@ -32,6 +32,8 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextDiagnostics;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse;
+import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
@@ -302,6 +304,40 @@ class AnalyzeStoryContextUseCaseTest {
         Map<String, Object> reordered = new LinkedHashMap<>();
         projection.forEach((key, value) -> reordered.put(key, value));
         assertEquals(baseline, projectionDigest(reordered));
+    }
+
+    @Test
+    void questionIsPropagatedThroughCorePreparationAndProjectionV2() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                engineeringContext(), repositoryContext(), CONTEXT_DIGEST, "engineering-context-v2",
+                new ContextRequestEcho(PROJECT_SLUG, INTENT_ID, List.of(), storyId),
+                Map.of("status", "STALE", "repositoryRevision", PROJECT_REVISION),
+                Map.of("candidateCount", 1, "selectedCount", 1, "discardedCount", 0,
+                        "usedTokens", 100, "budget", 10_000),
+                Map.of(DOCUMENT_REFERENCE, "TECHNICAL_EVIDENCE"),
+                List.of(new EvidenceRef(DOCUMENT_REFERENCE, "document://story-0119")));
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(engineeringContextFacade.getCanonicalEngineeringContext(
+                PROJECT_SLUG, INTENT_ID, List.of(), storyId, "Which component owns polling?"))
+                .thenReturn(canonical);
+
+        PreparedStoryContext prepared = new StoryContextPreparationService(
+                projectRepository, storyRepository, engineeringContextFacade, new ObjectMapper())
+                .prepare(PROJECT_SLUG, storyId, INTENT_ID, List.of(),
+                        "Which component owns polling?");
+
+        assertEquals("Which component owns polling?",
+                ((Map<?, ?>) prepared.projection().get("request")).get("question"));
+        assertEquals(prepared.projection().get("request"), prepared.projection().get("requestEcho"));
+        assertEquals("story-context-agent-projection/v2", prepared.projection().get("contractVersion"));
+        verify(engineeringContextFacade).getCanonicalEngineeringContext(
+                PROJECT_SLUG, INTENT_ID, List.of(), storyId, "Which component owns polling?");
     }
 
     private String projectionDigest(Map<String, Object> projection) {
@@ -657,6 +693,23 @@ class AnalyzeStoryContextUseCaseTest {
         }
     }
 
+    @Test
+    void canonicalRevisionAcceptsRepositoryRevisionFromCanonicalFreshnessSummary() {
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                engineeringContext(), repositoryContext(), CONTEXT_DIGEST, "engineering-context-v2",
+                new ContextRequestEcho(PROJECT_SLUG, INTENT_ID, List.of(CANONICAL_REFERENCE), null),
+                Map.of("summary", new ProjectFreshnessSummary(
+                        ProjectFreshnessSummary.PROJECTION_VERSION, UUID.randomUUID(), List.of(
+                                new ProjectFreshnessResponse("v1", UUID.randomUUID(), UUID.randomUUID(),
+                                        new ProjectFreshnessResponse.Source(UUID.randomUUID(), "GitHub", "main",
+                                                "origin/main", PROJECT_REVISION, PROJECT_REVISION),
+                                        null, null, null, null, null)), 0, false)),
+                Map.of("candidateCount", 1, "selectedCount", 1, "discardedCount", 0,
+                        "usedTokens", 1, "budget", 10), Map.of(), List.of());
+
+        assertEquals(PROJECT_REVISION, StoryContextAgentProjectionV1.canonicalRevision(canonical));
+    }
+
     private EngineeringContext engineeringContext() {
         EngineeringEvidence evidence = new EngineeringEvidence(
                 "SOURCE_FILE", "CODE", "Canonical evidence", "REPOSITORY",
@@ -864,9 +917,10 @@ class AnalyzeStoryContextUseCaseTest {
     ) {
         StoryContextAnalysisResult base = groundedResult(CANONICAL_REFERENCE);
         return new StoryContextAnalysisResult(
-                base.objectiveUnderstanding(), architecture, decisions, evidence, history, constraints,
-                impacted, base.uncertainties(), base.missingInformation(), base.implementationQuestions(),
-                base.confidence(), base.provenance(), base.outputClassification(), List.of(), null);
+                 base.objectiveUnderstanding(), architecture, decisions, evidence, history, constraints,
+                 impacted, base.uncertainties(), base.missingInformation(), base.implementationQuestions(),
+                 base.implementationPreparation(),
+                 base.confidence(), base.provenance(), base.outputClassification(), List.of(), null);
     }
 
     private StoryContextAnalysisResult resultWithCausalClaims(
@@ -875,9 +929,9 @@ class AnalyzeStoryContextUseCaseTest {
         StoryContextAnalysisResult base = groundedResult(CANONICAL_REFERENCE);
         return new StoryContextAnalysisResult(
                 base.objectiveUnderstanding(), base.architectureFindings(), base.decisionFindings(),
-                base.evidenceFindings(), base.historicalContext(), base.constraintFindings(),
-                base.impactedComponentFindings(), base.uncertainties(), base.missingInformation(),
-                base.implementationQuestions(), base.confidence(), base.provenance(),
-                base.outputClassification(), List.of(claims));
+                 base.evidenceFindings(), base.historicalContext(), base.constraintFindings(),
+                 base.impactedComponentFindings(), base.uncertainties(), base.missingInformation(),
+                 base.implementationQuestions(), base.implementationPreparation(), base.confidence(), base.provenance(),
+                 base.outputClassification(), List.of(claims), null);
     }
 }

@@ -101,8 +101,10 @@ class StoryContextAnalysisPromptBuilder:
         # Story 0152 sends the Core-owned V1 projection as the primary payload.
         # The legacy SelectedKnowledge shape remains supported only for other intents.
         if request.task_type.value == "STORY_CONTEXT_ANALYSIS":
-            if request.selected_knowledge.get("contractVersion") != "story-context-agent-projection/v1":
-                raise PromptConstructionError("Story Context Analysis requires story-context-agent-projection/v1")
+            if request.selected_knowledge.get("contractVersion") not in {
+                "story-context-agent-projection/v1", "story-context-agent-projection/v2"
+            }:
+                raise PromptConstructionError("Story Context Analysis requires a supported projection version")
             try:
                 projection = StoryContextAgentProjectionV1.model_validate(request.selected_knowledge)
             except Exception as error:
@@ -114,6 +116,9 @@ class StoryContextAnalysisPromptBuilder:
             for key in ("request", "requestEcho", "scope"):
                 projection_value[key]["storyId"] = projection.request["storyId"]
             knowledge_json = self._canonical(projection_value)
+            question_text = projection_value["request"].get(
+                "question", projection_value["request"].get("intent", "")
+            )
         else:
             required_sections = {
                 "project", "analysis", "projectProfile", "selectedFacts",
@@ -126,6 +131,7 @@ class StoryContextAnalysisPromptBuilder:
                     f"SelectedKnowledge is missing required sections: {', '.join(missing)}"
                 )
             knowledge_json = self._canonical(request.selected_knowledge)
+            question_text = ""
 
         selection_digest = request.selection_digest
         if selection_digest is not None and (len(selection_digest) != 64 or any(
@@ -151,6 +157,19 @@ class StoryContextAnalysisPromptBuilder:
         output_model = StoryAgentFollowUpResult if follow_up else ProviderStoryContextAnalysisResult
         schema_json = self._canonical(output_model.model_json_schema())
         grounding_json = self._canonical(request.grounding_contract)
+        truncation_rule = ""
+        if request.task_type.value == "STORY_CONTEXT_ANALYSIS" and projection_value["accounting"].get("truncated"):
+            truncation_rule = (
+                "TRUNCATED CONTEXT SAFETY RULE (AUTHORITATIVE)\n"
+                "The authorized projection is truncated. You MUST NOT present an exact implementation "
+                "decision, causal explanation, ownership claim, or configuration detail as established "
+                "unless that exact claim is directly present in the retained evidence. A mention of "
+                "Docker Compose, a component, or a configuration file is background context only and "
+                "does not establish the exact decision by itself. The first sentence of "
+                "objectiveUnderstanding.summary MUST begin with NOT_ESTABLISHED and name the omitted "
+                "evidence. Populate missingInformation and implementationQuestions with the evidence "
+                "that must be checked next; leave unsupported exact findings empty.\n\n"
+            )
 
         user_message = (
             ("FOLLOW-UP QUESTION\n"
@@ -160,7 +179,9 @@ class StoryContextAnalysisPromptBuilder:
              f"snapshotId: {request.ai_task_id}\n"
              f"question: {request.metadata.get('followUpQuestion')}\n"
              if follow_up else "")
-            + "INTENT\n"
+             + "QUESTION\n"
+             f"{request.metadata.get('followUpQuestion', question_text)}\n\n"
+             + "INTENT\n"
             f"ID: {request.intent.id}\n"
             f"Version: {request.intent.version}\n"
             f"Objective: {request.intent.objective}\n\n"
@@ -175,9 +196,10 @@ class StoryContextAnalysisPromptBuilder:
             f"{knowledge_json}\n\n"
             "USER GUIDANCE (NON-AUTHORITATIVE)\n"
             f"{guidance_json}\n\n"
-            "EXPECTED OUTPUT SCHEMA\n"
-            f"{schema_json}\n\n"
-            "OUTPUT REQUIREMENTS\n"
+             "EXPECTED OUTPUT SCHEMA\n"
+             f"{schema_json}\n\n"
+             "OUTPUT REQUIREMENTS\n"
+             + truncation_rule
              + ("Produce a StoryAgentFollowUpResult. The nextStep field is mandatory; use NOT_ESTABLISHED and NEEDS_CLARIFICATION when evidence is insufficient.\n"
                 if follow_up else "Produce a ProviderStoryContextAnalysisResult with all required fields.\n")
              + ("Follow-up evidenceReferences and nextStep evidenceReferences must use only authorized references.\n"
@@ -191,8 +213,16 @@ class StoryContextAnalysisPromptBuilder:
             "Use EXPLICITLY_DOCUMENTED only for direct causal statements; use STRONGLY_SUPPORTED only with at least two distinct material relationship supports.\n"
             "Chronology, temporal proximity, shared topic, related-document metadata, same Story, same commit, compatibility, possible relevance, contradictory, or insufficient evidence require NOT_ESTABLISHED.\n"
             "Never promote causality using confidence, plausibility, wording, or relationType alone. Every cited causal reference requires a role.\n"
-            "If causalAnswerRequired=true and causalContractVersion=V2, return exactly one causalAssessment whose question equals causalQuestion; use NOT_ESTABLISHED rather than inventing support. Otherwise follow the legacy causalClaims contract.\n"
-            "If a section has no grounded findings, return an empty array for that section.\n"
+             "If causalAnswerRequired=true and causalContractVersion=V2, return exactly one causalAssessment whose question equals causalQuestion; use NOT_ESTABLISHED rather than inventing support. Otherwise follow the legacy causalClaims contract.\n"
+             "Answer the QUESTION before providing broader context. Do not produce a generic project summary unless it directly answers the QUESTION.\n"
+             "Prefer evidence that directly addresses the QUESTION; distinguish directly relevant evidence from general background.\n"
+             "The first sentence of objectiveUnderstanding.summary must directly answer the QUESTION. For change or evolution questions, describe the concrete changed components, decisions, files, or commits before listing stable project technologies.\n"
+             "When files are explicitly scoped in the request, use them to answer the question, but cite only evidence references actually present in the authorized context.\n"
+              "For an actionable question about a component, configuration, or decision, include at least one implementationQuestions item describing the evidence-backed next investigation step. For insufficient or truncated evidence, use missingInformation and implementationQuestions to state what must be checked next; do not turn a plausible background fact into an exact answer.\n"
+              "Populate implementationPreparation with only evidence-backed affectedFiles, constraints, and testPlan items. Each item must cite authorized evidenceReferences. Use empty arrays when the context does not establish the item; never infer a file, constraint, or test solely from a component name.\n"
+              "If the authorized context does not contain enough question-specific evidence, state NOT_ESTABLISHED or identify missing information instead of guessing.\n"
+             "When the exact answer is not established, the first sentence of objectiveUnderstanding.summary must say NOT_ESTABLISHED and name the missing evidence; do not bury abstention after a generic project summary.\n"
+             "If a section has no grounded findings, return an empty array for that section.\n"
              "Do not fabricate content to populate sections.")
         )
 
@@ -254,6 +284,7 @@ class StoryContextAnalysisPromptBuilder:
             "The previous output was invalid. Fix the following error:\n"
             f"{error_message}\n\n"
             "The failure category is explicit. For SEMANTIC_SUPPORT_ERROR, downgrade the claim to NOT_ESTABLISHED when support is insufficient; do not invent evidence or add references outside the authoritative contract.\n"
+            "For GROUNDING_ERROR caused by requested file scope, remove every finding that does not cite an authorized reference for one of the requested files; return empty finding arrays, missingInformation, and implementationQuestions instead of using broad analysis references.\n"
             "Produce a corrected ProviderStoryContextAnalysisResult that satisfies all constraints. "
             "confidence must remain a scalar HIGH, MEDIUM, or LOW value."
         )

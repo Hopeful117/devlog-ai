@@ -5,6 +5,7 @@ import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -43,7 +44,7 @@ public class EngineeringContextTool {
                     description = "Optional Engineering Story UUID to scope context to story commit window",
                     required = false
             )
-            UUID storyId
+             @Nullable UUID storyId
     ) {
         EngineeringContext engineeringContext =
                 devlogProjectContextClient.getEngineeringContext(

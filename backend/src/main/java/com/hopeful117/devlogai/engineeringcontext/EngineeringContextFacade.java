@@ -21,4 +21,9 @@ public interface EngineeringContextFacade {
         String digest = context.metadata() == null ? null : context.metadata().contextDigest();
         return new CanonicalEngineeringContext(context, digest, "engineering-context-v1", storyId, refs);
     }
+
+    default CanonicalEngineeringContext getCanonicalEngineeringContext(
+            String projectSlug, String intent, List<String> files, UUID storyId, String question) {
+        throw new UnsupportedOperationException("question-aware engineering context is not supported");
+    }
 }

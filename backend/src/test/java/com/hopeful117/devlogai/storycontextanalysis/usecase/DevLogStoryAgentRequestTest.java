@@ -15,9 +15,11 @@ class DevLogStoryAgentRequestTest {
     @Test
     void acceptsEmptyFilesAndNormalizesOptionalValues() {
         DevLogStoryAgentRequest request = new DevLogStoryAgentRequest(
-                "devlog-ai", null, "engineering-story-context-analysis", List.of(), null, "   ");
+                "devlog-ai", null, "engineering-story-context-analysis", "What changed?",
+                List.of(), null, "   ");
 
         assertEquals(List.of(), request.files());
+        assertEquals("What changed?", request.question());
         assertEquals(Map.of(), request.guidance());
         assertEquals(null, request.idempotencyKey());
     }
@@ -31,11 +33,11 @@ class DevLogStoryAgentRequestTest {
     @Test
     void rejectsNullOrBlankFiles() {
         assertThrows(NullPointerException.class,
-                () -> new DevLogStoryAgentRequest("project", null, "intent", null, null, null));
+                () -> new DevLogStoryAgentRequest("project", null, "intent", "question", null, null, null));
         assertThrows(NullPointerException.class,
-                () -> new DevLogStoryAgentRequest("project", null, "intent", List.of((String) null), null, null));
+                () -> new DevLogStoryAgentRequest("project", null, "intent", "question", List.of((String) null), null, null));
         assertThrows(IllegalArgumentException.class,
-                () -> new DevLogStoryAgentRequest("project", null, "intent", List.of(" "), null, null));
+                () -> new DevLogStoryAgentRequest("project", null, "intent", "question", List.of(" "), null, null));
     }
 
     @Test
@@ -44,7 +46,7 @@ class DevLogStoryAgentRequestTest {
         Map<String, Object> guidance = new HashMap<>(Map.of("focus", "contracts"));
 
         DevLogStoryAgentRequest request =
-                new DevLogStoryAgentRequest("project", null, "intent", files, guidance, null);
+                new DevLogStoryAgentRequest("project", null, "intent", "question", files, guidance, null);
 
         files.add("docs/story.md");
         guidance.put("audience", "developer");
@@ -54,6 +56,6 @@ class DevLogStoryAgentRequestTest {
     }
 
     private static DevLogStoryAgentRequest request(String projectSlug, String intent) {
-        return new DevLogStoryAgentRequest(projectSlug, null, intent, List.of(), null, null);
+        return new DevLogStoryAgentRequest(projectSlug, null, intent, "question", List.of(), null, null);
     }
 }

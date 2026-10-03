@@ -98,7 +98,13 @@ public interface DevlogProjectContextClient {
 
     record FollowUpRequest(String question, Map<String, Object> guidance) {}
 
-    record StoryAgentRequest(UUID storyId, String intent, List<String> files, Map<String, Object> guidance) {}
+    record StoryAgentRequest(UUID storyId, String intent, String question,
+                             List<String> files, Map<String, Object> guidance) {
+        public StoryAgentRequest(UUID storyId, String intent, List<String> files,
+                                 Map<String, Object> guidance) {
+            this(storyId, intent, null, files, guidance);
+        }
+    }
 
     record AnalyzeContextResponse(UUID aiTaskId) {}
 

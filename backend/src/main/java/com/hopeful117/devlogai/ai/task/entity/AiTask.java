@@ -97,7 +97,7 @@ public class AiTask {
     private AiTaskStatus status = AiTaskStatus.CREATED;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(nullable = false, updatable = false, columnDefinition = "jsonb")
+    @Column(nullable = false, columnDefinition = "jsonb")
     private Map<String, Object> contextSnapshot;
 
     @JdbcTypeCode(SqlTypes.JSON)

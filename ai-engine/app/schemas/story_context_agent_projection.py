@@ -132,8 +132,8 @@ class StoryContextAgentProjectionV1(ContractModel):
     protocol_version: Literal["story-context-agent-protocol/v1"] = Field(
         default="story-context-agent-protocol/v1", alias="protocolVersion"
     )
-    contract_version: Literal["story-context-agent-projection/v1"] = Field(alias="contractVersion")
-    projection_version: Literal["sca/v1"] = Field(alias="projectionVersion")
+    contract_version: Literal["story-context-agent-projection/v1", "story-context-agent-projection/v2"] = Field(alias="contractVersion")
+    projection_version: Literal["sca/v1", "sca/v2"] = Field(alias="projectionVersion")
     context_digest: str = Field(alias="contextDigest", min_length=64, max_length=64, pattern="^[0-9a-f]{64}$")
     projection_digest: str = Field(alias="projectionDigest", min_length=64, max_length=64, pattern="^[0-9a-f]{64}$")
     request: dict[str, Any]
@@ -148,6 +148,11 @@ class StoryContextAgentProjectionV1(ContractModel):
 
     @model_validator(mode="after")
     def validate_contract(self):
+        if (self.contract_version, self.projection_version) not in {
+            ("story-context-agent-projection/v1", "sca/v1"),
+            ("story-context-agent-projection/v2", "sca/v2"),
+        }:
+            raise ValueError("contractVersion and projectionVersion must use the same version")
         digest_input = self.model_dump(by_alias=True, exclude_none=True)
         # 0152 payloads predate the protocol alias; preserve their digest while
         # accepting the explicit protocolVersion required by 0153.
@@ -163,6 +168,9 @@ class StoryContextAgentProjectionV1(ContractModel):
             if self.compatibility.selected_knowledge.get("projectionDigest") != self.projection_digest:
                 raise ValueError("selectedKnowledge.projectionDigest must equal root projectionDigest")
         required = {"projectSlug", "storyId", "intent", "files"}
+        question_aware = self.contract_version.endswith("/v2")
+        if question_aware:
+            required.add("question")
         if set(self.request) != required or set(self.request_echo) != required:
             raise ValueError("request and requestEcho must contain exactly the canonical keys")
         if self.request != self.request_echo or self.scope != self.request:
@@ -171,6 +179,10 @@ class StoryContextAgentProjectionV1(ContractModel):
             raise ValueError("projectSlug is required")
         if not isinstance(self.request["intent"], str) or not self.request["intent"]:
             raise ValueError("intent is required")
+        if question_aware and (not isinstance(self.request.get("question"), str)
+                               or not self.request["question"].strip()
+                               or len(self.request["question"]) > 2000):
+            raise ValueError("question must be between 1 and 2000 characters")
         if not isinstance(self.request["files"], list) or any(not isinstance(item, str) for item in self.request["files"]):
             raise ValueError("files must be a list of strings")
         if self.freshness.source_revision.project != self.scope["projectSlug"]:

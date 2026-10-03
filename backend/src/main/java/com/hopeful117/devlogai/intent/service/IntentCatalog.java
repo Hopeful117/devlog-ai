@@ -216,7 +216,8 @@ public class IntentCatalog {
                         "objectiveUnderstanding", "architectureFindings", "decisionFindings",
                         "evidenceFindings", "historicalContext", "constraintFindings",
                         "impactedComponentFindings", "uncertainties", "missingInformation",
-                        "implementationQuestions", "confidence", "provenance", "outputClassification"));
+                        "implementationQuestions", "implementationPreparation", "confidence",
+                        "provenance", "outputClassification"));
     }
 
     private static void register(Map<String, IntentDefinition> target, IntentDefinition intent) {

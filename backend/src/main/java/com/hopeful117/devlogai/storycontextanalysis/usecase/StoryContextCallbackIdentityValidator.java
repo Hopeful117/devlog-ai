@@ -44,8 +44,9 @@ public class StoryContextCallbackIdentityValidator {
         if (!Objects.equals(expectedSelection, metadata.selectionDigest())) {
             throw new InvalidAiTaskResultException("Selection digest mismatch in callback");
         }
-        if (!Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, metadata.projectionVersion())
-                || !Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, expectedProjectionVersion)) {
+        if (!Objects.equals(expectedProjectionVersion, metadata.projectionVersion())
+                || !Set.of(StoryContextAgentProjectionV1.PROJECTION_VERSION,
+                StoryContextAgentProjectionV1.V2_PROJECTION_VERSION).contains(expectedProjectionVersion)) {
             throw new InvalidAiTaskResultException("Projection version mismatch in callback");
         }
         if (!(metadata.scope() instanceof Map<?, ?>) || !Objects.equals(expectedScope, metadata.scope())) {
@@ -66,7 +67,7 @@ public class StoryContextCallbackIdentityValidator {
             throw new InvalidAiTaskResultException("AI task snapshot identity is incomplete or inconsistent");
         }
         validateSnapshotScope(task);
-        if (!Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, snapshot.get("projectionVersion"))) {
+        if (!Objects.equals(expectedProjectionVersion, snapshot.get("projectionVersion"))) {
             throw new InvalidAiTaskResultException("AI task snapshot projection version is missing or inconsistent");
         }
         if (!(snapshot.get("freshness") instanceof Map<?, ?>)
@@ -77,7 +78,7 @@ public class StoryContextCallbackIdentityValidator {
         if (!(projection instanceof Map<?, ?> p)
                 || !Objects.equals(expectedContext, p.get("contextDigest"))
                 || !Objects.equals(expectedProjection, p.get("projectionDigest"))
-                || !Objects.equals(StoryContextAgentProjectionV1.PROJECTION_VERSION, p.get("projectionVersion"))) {
+                || !Objects.equals(expectedProjectionVersion, p.get("projectionVersion"))) {
             throw new InvalidAiTaskResultException("AI task snapshot projection identity is incomplete or inconsistent");
         }
     }
@@ -85,7 +86,7 @@ public class StoryContextCallbackIdentityValidator {
     private static void validateSnapshotScope(AiTask task) {
         Object raw = taskSnapshotScope(task);
         if (!(raw instanceof Map<?, ?> scope)) throw new IllegalStateException("AI task snapshot scope is missing");
-        Set<String> keys = Set.of("projectSlug", "storyId", "intent", "files");
+        Set<String> keys = Set.of("projectSlug", "storyId", "intent", "files", "question");
         if (!scope.keySet().stream().allMatch(keys::contains)
                 || scope.get("projectSlug") == null || scope.get("files") == null) {
             throw new IllegalStateException("AI task snapshot scope is incomplete or inconsistent");

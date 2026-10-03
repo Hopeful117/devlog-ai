@@ -29,6 +29,11 @@ public class StoryContextPreparationService {
     private StoryContextAgentMetrics metrics;
 
     public PreparedStoryContext prepare(String projectSlug, UUID storyId, String intent, List<String> files) {
+        return prepare(projectSlug, storyId, intent, files, null);
+    }
+
+    public PreparedStoryContext prepare(String projectSlug, UUID storyId, String intent,
+                                        List<String> files, String question) {
         Project project = projectRepository.findBySlug(projectSlug)
                 .orElseThrow(() -> new EntityNotFoundException("Project", projectSlug));
         EngineeringStory story = storyId == null ? null : storyRepository.findById(storyId)
@@ -38,14 +43,17 @@ public class StoryContextPreparationService {
         }
 
         List<String> requestedFiles = files == null ? List.of() : List.copyOf(files);
-        CanonicalEngineeringContext canonical = engineeringContextFacade.getCanonicalEngineeringContext(
-                projectSlug, intent, requestedFiles, storyId);
+        CanonicalEngineeringContext canonical = question == null
+                ? engineeringContextFacade.getCanonicalEngineeringContext(
+                        projectSlug, intent, requestedFiles, storyId)
+                : engineeringContextFacade.getCanonicalEngineeringContext(
+                        projectSlug, intent, requestedFiles, storyId, question);
         if (canonical == null) {
             throw new IllegalStateException("Canonical EngineeringContext is required for Story Context Analysis");
         }
 
         var projection = StoryContextAgentProjectionV1.build(
-                canonical, projectSlug, storyId, intent, requestedFiles, story, objectMapper);
+                canonical, projectSlug, storyId, intent, requestedFiles, story, question, objectMapper);
         if (metrics != null) {
             metrics.increment("sca_projection_construction_total");
             if (Boolean.TRUE.equals(((java.util.Map<?, ?>) projection.get("accounting")).get("truncated"))) {
@@ -55,6 +63,6 @@ public class StoryContextPreparationService {
 
         return new PreparedStoryContext(
                 projectSlug, storyId, intent, requestedFiles, project, story, canonical, projection,
-                (String) projection.get("projectionDigest"));
+                (String) projection.get("projectionDigest"), question);
     }
 }

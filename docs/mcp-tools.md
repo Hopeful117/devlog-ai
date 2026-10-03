@@ -20,7 +20,7 @@ Analyse le contexte d'une Engineering Story pour les phases Discuss/Plan et
 retourne le résultat structuré et persisté de l'analyse.
 
 ```text
-arguments : projectSlug*, storyId*, files, guidance
+arguments : projectSlug*, storyId*, intent*, question*, files, guidance
 retour    : StoryContextAnalysisResult
 ```
 
