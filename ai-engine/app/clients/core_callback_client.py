@@ -128,10 +128,13 @@ class CoreCallbackClient:
         correlation_id: UUID,
         attempts: int,
     ) -> CoreCallbackError:
+        body = self._json_object(response)
+        detail = body.get("message") or body.get("detail") or body.get("code")
+        suffix = f", detail={detail}" if detail else ""
         return CoreCallbackError(
             "Core callback failed: "
             f"status={response.status_code}, correlationId={correlation_id}, "
-            f"attempts={attempts}"
+            f"attempts={attempts}{suffix}"
         )
 
     def _json_object(self, response: httpx.Response) -> dict[str, Any]:
