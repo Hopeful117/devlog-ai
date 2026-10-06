@@ -710,6 +710,45 @@ class AnalyzeStoryContextUseCaseTest {
         assertEquals(PROJECT_REVISION, StoryContextAgentProjectionV1.canonicalRevision(canonical));
     }
 
+    @Test
+    void canonicalRevisionUsesEvidenceSnapshotWhenFreshnessCheckpointIsOlder() {
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                engineeringContext(), repositoryContext(), CONTEXT_DIGEST, "engineering-context-v2",
+                new ContextRequestEcho(PROJECT_SLUG, INTENT_ID, List.of(CANONICAL_REFERENCE), null),
+                Map.of("sourceRevision", Map.of("kind", "PROJECT_REVISION",
+                        "project", PROJECT_SLUG, "revision", "newer-live-revision")),
+                Map.of("candidateCount", 1, "selectedCount", 1, "discardedCount", 0,
+                        "usedTokens", 1, "budget", 10), Map.of(), List.of());
+
+        assertEquals(PROJECT_REVISION, StoryContextAgentProjectionV1.canonicalRevision(canonical));
+    }
+
+    @Test
+    void canonicalRevisionRejectsMixedEvidenceRevisions() {
+        RepositoryContext base = repositoryContext();
+        RepositoryEvidence first = base.evidence().getFirst();
+        RepositoryEvidence second = first.withContent(new RepositoryEvidenceContent(
+                RepositoryEvidenceContent.Status.COMPLETE, "Other revision", null, null, null,
+                "other-revision"));
+        RepositoryContext mixed = new RepositoryContext(
+                base.contextVersion(), base.profile(), base.activeProfileKeys(), base.contextPlanVersion(),
+                base.contextIntelligenceExplanations(), List.of(first, second), base.selectedByLayer(),
+                base.diagnostics(), base.budget(), base.usedTokens(), 2, base.discardedCount(),
+                base.truncated(), base.selectionDecisions(), base.warnings(), base.contextDigest());
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                engineeringContext(), mixed, CONTEXT_DIGEST, "engineering-context-v2",
+                new ContextRequestEcho(PROJECT_SLUG, INTENT_ID, List.of(CANONICAL_REFERENCE), null),
+                Map.of("sourceRevision", Map.of("kind", "PROJECT_REVISION",
+                        "project", PROJECT_SLUG, "revision", PROJECT_REVISION)),
+                Map.of("candidateCount", 2, "selectedCount", 2, "discardedCount", 0,
+                        "usedTokens", 2, "budget", 10), Map.of(), List.of());
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> StoryContextAgentProjectionV1.canonicalRevision(canonical));
+
+        assertTrue(error.getMessage().contains("mixed project revisions"));
+    }
+
     private EngineeringContext engineeringContext() {
         EngineeringEvidence evidence = new EngineeringEvidence(
                 "SOURCE_FILE", "CODE", "Canonical evidence", "REPOSITORY",
