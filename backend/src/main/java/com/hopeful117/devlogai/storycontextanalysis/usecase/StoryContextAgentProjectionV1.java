@@ -113,10 +113,19 @@ public final class StoryContextAgentProjectionV1 {
 
     /** Returns the sole revision owning the complete evidence snapshot. */
     static String canonicalRevision(CanonicalEngineeringContext c) {
-        Set<String> revisions = new LinkedHashSet<>();
+        Set<String> evidenceRevisions = new LinkedHashSet<>();
         if (c.repositoryContext() != null) for (var evidence : c.repositoryContext().evidence()) {
-            if (evidence.content() != null) addRevision(revisions, evidence.content().revision());
+            if (evidence.extractionMetadata() != null) {
+                addRevision(evidenceRevisions, evidence.extractionMetadata().get("resolvedRevision"));
+            }
+            if (evidence.content() != null) addRevision(evidenceRevisions, evidence.content().revision());
+            if (evidence.symbols() != null) addRevision(evidenceRevisions, evidence.symbols().revision());
         }
+        if (evidenceRevisions.size() > 1) {
+            throw new IllegalArgumentException("Evidence snapshot contains mixed project revisions");
+        }
+
+        Set<String> freshnessRevisions = new LinkedHashSet<>();
         Object rawFreshness = c.freshness().get("sourceRevision");
         if (rawFreshness == null) {
             Object summary = c.freshness().get("summary");
@@ -125,7 +134,7 @@ public final class StoryContextAgentProjectionV1 {
             } else if (summary instanceof ProjectFreshnessSummary freshness) {
                 for (var source : freshness.checkedSources()) {
                     if (source.source() != null) {
-                        addRevision(revisions, source.source().currentRevision());
+                        addRevision(freshnessRevisions, source.source().currentRevision());
                     }
                 }
             } else if (summary instanceof Map<?, ?> freshness) {
@@ -137,15 +146,16 @@ public final class StoryContextAgentProjectionV1 {
             if (revision != null && !(revision instanceof String)) {
                 throw new IllegalArgumentException("PROJECT_REVISION identity is invalid");
             }
-            addRevision(revisions, (String) revision);
+            addRevision(freshnessRevisions, (String) revision);
         } else if (rawFreshness != null && !(rawFreshness instanceof String)) {
             throw new IllegalArgumentException("PROJECT_REVISION identity is invalid");
         } else {
-            addRevision(revisions, (String) rawFreshness);
+            addRevision(freshnessRevisions, (String) rawFreshness);
         }
-        if (revisions.isEmpty()) throw new IllegalArgumentException("PROJECT_REVISION identity is missing");
-        if (revisions.size() != 1) throw new IllegalArgumentException("Evidence snapshot contains mixed project revisions");
-        return revisions.iterator().next();
+        if (evidenceRevisions.size() == 1) return evidenceRevisions.iterator().next();
+        if (freshnessRevisions.isEmpty()) throw new IllegalArgumentException("PROJECT_REVISION identity is missing");
+        if (freshnessRevisions.size() != 1) throw new IllegalArgumentException("Evidence snapshot contains mixed project revisions");
+        return freshnessRevisions.iterator().next();
     }
 
     private static void addRevision(Set<String> revisions, String revision) {
