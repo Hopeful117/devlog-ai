@@ -52,6 +52,7 @@ class Settings:
             llm_api_key = os.getenv("ANTHROPIC_API_KEY") or llm_api_key
         if llm_provider == "openrouter":
             llm_api_key = os.getenv("OPENROUTER_API_KEY") or llm_api_key
+        service_auth_secret = os.getenv("DEVLOG_SERVICE_AUTH_SECRET") or os.getenv("SCA_CALLBACK_SECRET")
         settings = cls(
             llm_provider=llm_provider,
             llm_model=os.getenv("LLM_MODEL", "gpt-5.6-luna"),
@@ -63,9 +64,7 @@ class Settings:
             ),
             llm_max_retries=int(os.getenv("LLM_MAX_RETRIES", "2")),
             core_base_url=os.getenv("CORE_BASE_URL", "http://localhost:18080"),
-            sca_callback_secret=os.getenv(
-                "SCA_CALLBACK_SECRET", os.getenv("DEVLOG_SERVICE_AUTH_SECRET", "")
-            ),
+            sca_callback_secret=service_auth_secret or "",
             core_callback_timeout_seconds=float(
                 os.getenv("CORE_CALLBACK_TIMEOUT_SECONDS", "5")
             ),
@@ -78,7 +77,7 @@ class Settings:
             core_callback_max_delay_ms=int(
                 os.getenv("CORE_CALLBACK_MAX_DELAY_MS", "1000")
             ),
-            service_auth_secret=os.getenv("DEVLOG_SERVICE_AUTH_SECRET") or None,
+            service_auth_secret=service_auth_secret,
             service_auth_max_clock_skew_seconds=int(
                 os.getenv("DEVLOG_SERVICE_AUTH_MAX_CLOCK_SKEW_SECONDS", "60")
             ),
@@ -163,6 +162,7 @@ class Settings:
                 "CHATGPT_ISSUER": self.chatgpt_issuer,
                 "CHATGPT_EXT_AGENT_HOST_ID": self.chatgpt_ext_agent_host_id,
                 "DEVLOG_CREDENTIAL_ENCRYPTION_KEY": self.credential_encryption_key,
+                "DEVLOG_SERVICE_AUTH_SECRET": self.service_auth_secret,
             }
             missing = [name for name, value in required.items() if not value]
             if missing:

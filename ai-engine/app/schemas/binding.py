@@ -29,3 +29,10 @@ class CredentialAssociationVerificationRequest(ContractModel):
 
 class CredentialAssociationVerificationResponse(ContractModel):
     verified: bool
+    state: str = "IDENTITY_AUTHORIZED"
+    scopes: str = ""
+
+
+class CredentialRevocationRequest(ContractModel):
+    credential_handle: str = Field(alias="credentialHandle", min_length=1, max_length=255)
+    provider: str = Field(min_length=1, max_length=100)

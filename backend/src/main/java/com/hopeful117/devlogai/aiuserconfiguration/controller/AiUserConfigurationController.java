@@ -5,12 +5,15 @@ import com.hopeful117.devlogai.aiuserconfiguration.model.AiModelSelectionOrigin;
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiUserConfigurationState;
 import com.hopeful117.devlogai.aiuserconfiguration.service.AiUserConfigurationService;
 import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
+import com.hopeful117.devlogai.aicredentialbinding.service.AiCredentialAssociationService;
+import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialAssociation;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipalResolver;
 import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,11 +29,20 @@ import java.util.Map;
 public class AiUserConfigurationController {
     private final AiUserConfigurationService service;
     private final AuthenticatedPrincipalResolver principalResolver;
+    private final AiCredentialAssociationService associationService;
+
+    @Autowired
+    public AiUserConfigurationController(AiUserConfigurationService service,
+                                         AuthenticatedPrincipalResolver principalResolver,
+                                         AiCredentialAssociationService associationService) {
+        this.service = service;
+        this.principalResolver = principalResolver;
+        this.associationService = associationService;
+    }
 
     public AiUserConfigurationController(AiUserConfigurationService service,
                                          AuthenticatedPrincipalResolver principalResolver) {
-        this.service = service;
-        this.principalResolver = principalResolver;
+        this(service, principalResolver, null);
     }
 
     @GetMapping
@@ -38,7 +50,10 @@ public class AiUserConfigurationController {
         var principal = principalResolver.resolve(request)
                 .orElseThrow(UnauthenticatedPrincipalException::new);
         var configuration = service.find(principal);
-        return ResponseEntity.ok(ConfigurationResponse.from(configuration, service.state(configuration)));
+        var association = configuration.filter(value -> value.getAuthenticationMethod() == AiAuthenticationMethod.OAUTH)
+                .flatMap(value -> findAssociation(principal, value.getProvider()));
+        var state = associationService == null ? service.state(configuration) : service.state(configuration, association);
+        return ResponseEntity.ok(ConfigurationResponse.from(configuration, state));
     }
 
     @PutMapping
@@ -49,8 +64,22 @@ public class AiUserConfigurationController {
                 .orElseThrow(UnauthenticatedPrincipalException::new);
         var configuration = service.save(principal, request.provider(), request.authenticationMethod(),
                 request.selectedModel(), request.modelSelectionOrigin(), request.allowedParameters());
+        var savedConfiguration = java.util.Optional.of(configuration);
+        var association = findAssociation(principal, configuration.getProvider());
+        var state = associationService == null ? service.state(savedConfiguration)
+                : service.state(savedConfiguration, association);
         return ResponseEntity.ok(ConfigurationResponse.from(
-                java.util.Optional.of(configuration), service.state(java.util.Optional.of(configuration))));
+                savedConfiguration, state));
+    }
+
+    private java.util.Optional<AiCredentialAssociation> findAssociation(
+            com.hopeful117.devlogai.authorization.AuthenticatedPrincipal principal, String provider) {
+        try {
+            if (associationService == null) return java.util.Optional.empty();
+            return java.util.Optional.of(associationService.require(principal, provider));
+        } catch (RuntimeException exception) {
+            return java.util.Optional.empty();
+        }
     }
 
     @DeleteMapping

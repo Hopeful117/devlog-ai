@@ -17,31 +17,19 @@ import static org.mockito.Mockito.when;
 
 class AiCredentialAssociationControllerTest {
     @Test
-    void buildsTheDomainPrincipalFromTheValidatedJwt() {
+    void revokesTheAssociationForTheValidatedJwt() {
         AiCredentialAssociationService service = mock(AiCredentialAssociationService.class);
-        AiCredentialAssociation association = association();
-        when(service.associate(argThat(principal -> principal != null
-                        && principal.principalId().equals("principal-1")
-                        && principal.authenticationSource().equals("https://issuer.example")),
-                eq("chatgpt-subject"), eq("credential-handle"), eq("chatgpt")))
-                .thenReturn(association);
+        var response = new AiCredentialAssociationController(service).revoke(jwt());
 
-        var response = new AiCredentialAssociationController(service).associate(
-                jwt(), new AiCredentialAssociationController.AssociationRequest(
-                        "chatgpt-subject", "credential-handle"));
-
-        assertThat(response.getStatusCode().value()).isEqualTo(200);
-        assertThat(response.getBody().principalId()).isEqualTo("principal-1");
-        verify(service).associate(argThat(principal -> principal.principalId().equals("principal-1")),
-                eq("chatgpt-subject"), eq("credential-handle"), eq("chatgpt"));
+        assertThat(response.getStatusCode().value()).isEqualTo(204);
+        verify(service).revoke(argThat(principal -> principal.principalId().equals("principal-1")), eq("chatgpt"));
     }
 
     @Test
     void rejectsRequestsWithoutAValidatedJwt() {
         AiCredentialAssociationService service = mock(AiCredentialAssociationService.class);
 
-        assertThatThrownBy(() -> new AiCredentialAssociationController(service).associate(null,
-                new AiCredentialAssociationController.AssociationRequest("subject", "handle")))
+        assertThatThrownBy(() -> new AiCredentialAssociationController(service).revoke(null))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("Authentication is required");
     }
@@ -54,12 +42,4 @@ class AiCredentialAssociationControllerTest {
                 .build();
     }
 
-    private static AiCredentialAssociation association() {
-        AiCredentialAssociation association = new AiCredentialAssociation();
-        association.setPrincipalId("principal-1");
-        association.setChatgptSubject("chatgpt-subject");
-        association.setProvider("chatgpt");
-        association.setUpdatedAt(Instant.parse("2026-01-01T00:00:00Z"));
-        return association;
-    }
 }

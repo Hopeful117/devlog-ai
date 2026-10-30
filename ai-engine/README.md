@@ -45,6 +45,8 @@ pytest
 - `GET /health`
 - `POST /api/v1/ai/tasks`
 - `POST /api/v1/deliverables/generate`
+- `GET /api/v1/auth/chatgpt/start` and `/callback`
+- `GET /api/v1/auth/chatgpt/status` and `POST /disconnect`
 
 The Deliverable endpoint implements ADR-034. Its closed request schema accepts only validated
 Insight snapshots plus communication parameters. It does not accept repository data, Facts,
@@ -71,6 +73,21 @@ uvicorn app.main:app --reload
 
 Additional settings are `LLM_TIMEOUT_SECONDS`, `LLM_MAX_OUTPUT_TOKENS`,
 `CORE_BASE_URL`, and `CORE_CALLBACK_TIMEOUT_SECONDS`.
+
+Sign in with ChatGPT is opt-in with `LLM_PROVIDER=openai_chatgpt` and requires
+the existing OAuth encryption key, redirect URI, issuer/JWKS settings, and
+`CHATGPT_OAUTH_ENABLED=true` plus `DEVLOG_SERVICE_AUTH_SECRET`. OAuth access, refresh, and ID tokens remain
+encrypted in the AI Engine. Core receives only an opaque credential handle,
+the non-secret subject, granted scopes, and a bounded runtime state. The
+catalog product id `openai_chatgpt` is explicitly mapped to the internal
+credential id `chatgpt`; there is no provider or credential fallback.
+Core starts the flow with a short-lived, single-use principal-bound intent. The
+AI Engine validates the HMAC-signed opaque intent before creating its OAuth
+transaction. After the provider callback, the AI Engine returns a one-time
+completion code; an authenticated Core principal must submit that code to
+complete the association. Core then redeems and acknowledges the completion
+using replay-protected service authentication. OAuth tokens and authorization
+codes never enter the URL or callback.
 
 The HTTP acknowledgement remains `202 Accepted`. V1 processing uses FastAPI
 in-process background tasks and then sends the ADR-020 callback. This executor

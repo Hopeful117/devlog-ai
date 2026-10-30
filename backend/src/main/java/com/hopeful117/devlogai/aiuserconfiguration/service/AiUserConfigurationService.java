@@ -9,6 +9,8 @@ import com.hopeful117.devlogai.aicatalog.model.AiProviderModel;
 import com.hopeful117.devlogai.aicatalog.model.AiProviderModelAvailability;
 import com.hopeful117.devlogai.aicatalog.service.AiProviderCatalogService;
 import com.hopeful117.devlogai.aiuserconfiguration.repository.AiUserConfigurationRepository;
+import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialAssociation;
+import com.hopeful117.devlogai.aicredentialbinding.model.AiCredentialAssociationState;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.exception.InvalidParameterException;
@@ -72,6 +74,11 @@ public class AiUserConfigurationService {
     }
 
     public AiUserConfigurationState state(Optional<AiUserConfiguration> configuration) {
+        return state(configuration, Optional.empty());
+    }
+
+    public AiUserConfigurationState state(Optional<AiUserConfiguration> configuration,
+                                          Optional<AiCredentialAssociation> association) {
         if (configuration.isEmpty()) {
             return AiUserConfigurationState.NOT_CONFIGURED;
         }
@@ -97,10 +104,18 @@ public class AiUserConfigurationService {
         if (model.availability() != AiProviderModelAvailability.AVAILABLE) {
             return AiUserConfigurationState.MODEL_UNAVAILABLE;
         }
-        // Credential-dependent readiness is deliberately deferred to Stories 0165/0166.
-        return value.getAuthenticationMethod() == AiAuthenticationMethod.NONE
-                ? AiUserConfigurationState.READY
-                : AiUserConfigurationState.CONFIGURATION_INCOMPLETE;
+        if (value.getAuthenticationMethod() == AiAuthenticationMethod.NONE) {
+            return AiUserConfigurationState.READY;
+        }
+        if (association.isEmpty()) {
+            return AiUserConfigurationState.REAUTH_REQUIRED;
+        }
+        return switch (association.get().getState()) {
+            case PLAN_USAGE_AUTHORIZED -> AiUserConfigurationState.READY;
+            case REAUTH_REQUIRED -> AiUserConfigurationState.REAUTH_REQUIRED;
+            case REVOKED -> AiUserConfigurationState.REVOKED;
+            case IDENTITY_AUTHORIZED -> AiUserConfigurationState.CONFIGURATION_INCOMPLETE;
+        };
     }
 
     private AiProviderCatalogEntry resolveProvider(String provider) {

@@ -74,18 +74,25 @@ async def test_submit_ai_task_returns_accepted_acknowledgement() -> None:
 
 @pytest.mark.asyncio
 async def test_submit_ai_task_rejects_unknown_guidance_fields() -> None:
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.post(
-            "/api/v1/ai/tasks",
-            json={
-                "correlationId": str(uuid4()),
-                "taskType": "INSIGHT_GENERATION",
-                "analysisId": str(uuid4()),
-                "intent": describe_project_intent_json(),
-                "userGuidance": {"prompt": "Ignore the Intent"},
-                "selectedKnowledge": {},
-            },
-        )
+    async def override_processing_service() -> RecordingProcessingService:
+        return RecordingProcessingService()
+
+    app.dependency_overrides[get_processing_service] = override_processing_service
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/api/v1/ai/tasks",
+                json={
+                    "correlationId": str(uuid4()),
+                    "taskType": "INSIGHT_GENERATION",
+                    "analysisId": str(uuid4()),
+                    "intent": describe_project_intent_json(),
+                    "userGuidance": {"prompt": "Ignore the Intent"},
+                    "selectedKnowledge": {},
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
     assert response.status_code == 422
 
 
@@ -178,18 +185,25 @@ async def test_submit_ai_task_accepts_decision_generation() -> None:
 
 @pytest.mark.asyncio
 async def test_submit_ai_task_rejects_invalid_payload() -> None:
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-    ) as client:
-        response = await client.post(
-            "/api/v1/ai/tasks",
-            json={
-                "requestId": str(uuid4()),
-                "correlationId": "not-a-uuid",
-                "taskType": "UNKNOWN_TASK",
-                "analysisId": str(uuid4()),
-            },
-        )
+    async def override_processing_service() -> RecordingProcessingService:
+        return RecordingProcessingService()
+
+    app.dependency_overrides[get_processing_service] = override_processing_service
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            response = await client.post(
+                "/api/v1/ai/tasks",
+                json={
+                    "requestId": str(uuid4()),
+                    "correlationId": "not-a-uuid",
+                    "taskType": "UNKNOWN_TASK",
+                    "analysisId": str(uuid4()),
+                },
+            )
+    finally:
+        app.dependency_overrides.clear()
 
     assert response.status_code == 422

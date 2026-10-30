@@ -2,42 +2,70 @@ package com.hopeful117.devlogai.aicredentialbinding.controller;
 
 import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialAssociation;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiCredentialAssociationService;
+import com.hopeful117.devlogai.aicredentialbinding.model.AiProviderIdentity;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.authorization.PrincipalKind;
 import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
+import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAgentCallbackAuthenticator;
+import jakarta.servlet.http.HttpServletRequest;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/ai-credential-associations")
 public class AiCredentialAssociationController {
-    private static final String CHATGPT_PROVIDER = "chatgpt";
+    private static final String CHATGPT_PROVIDER = AiProviderIdentity.ENGINE_CHATGPT;
     private final AiCredentialAssociationService service;
+    private final StoryContextAgentCallbackAuthenticator callbackAuthenticator;
+    private final ObjectMapper objectMapper;
 
     public AiCredentialAssociationController(AiCredentialAssociationService service) {
-        this.service = service;
+        this(service, null, null);
     }
 
-    @PostMapping("/chatgpt")
-    public ResponseEntity<AssociationResponse> associate(
-            @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody AssociationRequest request) {
-        var principal = authenticatedPrincipal(jwt);
-        var association = service.associate(principal, request.chatgptSubject(),
-                request.credentialHandle(), CHATGPT_PROVIDER);
-        return ResponseEntity.ok(AssociationResponse.from(association));
+    @Autowired
+    public AiCredentialAssociationController(AiCredentialAssociationService service,
+                                             StoryContextAgentCallbackAuthenticator callbackAuthenticator,
+                                             ObjectMapper objectMapper) {
+        this.service = service;
+        this.callbackAuthenticator = callbackAuthenticator;
+        this.objectMapper = objectMapper;
     }
 
     @DeleteMapping("/chatgpt")
     public ResponseEntity<Void> revoke(@AuthenticationPrincipal Jwt jwt) {
         var principal = authenticatedPrincipal(jwt);
         service.revoke(principal, CHATGPT_PROVIDER);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/revoked")
+    public ResponseEntity<Void> revoked(HttpServletRequest request,
+                                        @RequestHeader(value = "X-DevLog-Service-Signature", required = false) String signature,
+                                        @RequestHeader(value = "X-DevLog-Service-Timestamp", required = false) String timestamp,
+                                        @RequestHeader(value = "X-DevLog-Service-Nonce", required = false) String nonce,
+                                        @RequestHeader(value = "X-DevLog-Service-Request-Id", required = false) String requestId,
+                                        @RequestBody byte[] body) {
+        if (callbackAuthenticator == null || !callbackAuthenticator.isServiceValid(
+                request.getMethod(), request.getRequestURI(), body, signature,
+                timestamp, nonce, requestId)) {
+            return ResponseEntity.status(401).build();
+        }
+        try {
+            var payload = objectMapper.readValue(body, Map.class);
+            service.revokeByCredentialHandle((String) payload.get("credentialHandle"),
+                    (String) payload.get("provider"));
+        } catch (Exception exception) {
+            return ResponseEntity.badRequest().build();
+        }
         return ResponseEntity.noContent().build();
     }
 
@@ -49,12 +77,13 @@ public class AiCredentialAssociationController {
         return new AuthenticatedPrincipal(jwt.getSubject(), PrincipalKind.HUMAN, jwt.getIssuer().toString());
     }
 
-    public record AssociationRequest(@NotBlank String chatgptSubject, @NotBlank String credentialHandle) { }
-
-    public record AssociationResponse(String principalId, String chatgptSubject, String provider, Instant updatedAt) {
+    public record AssociationResponse(String provider, String state, String grantedScopes, Instant updatedAt) {
         static AssociationResponse from(AiCredentialAssociation association) {
-            return new AssociationResponse(association.getPrincipalId(), association.getChatgptSubject(),
-                    association.getProvider(), association.getUpdatedAt());
+            return new AssociationResponse(association.getProvider(),
+                    association.getState() == null ? "IDENTITY_AUTHORIZED"
+                            : association.getState().name(), association.getGrantedScopes() == null ? ""
+                            : association.getGrantedScopes(),
+                    association.getUpdatedAt());
         }
     }
 }

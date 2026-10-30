@@ -7,6 +7,8 @@ import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBindingSta
 import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialAssociation;
 import com.hopeful117.devlogai.aicredentialbinding.repository.AiCredentialAssociationRepository;
 import com.hopeful117.devlogai.aicredentialbinding.repository.AiCredentialBindingRepository;
+import com.hopeful117.devlogai.aicredentialbinding.model.AiProviderIdentity;
+import com.hopeful117.devlogai.aicredentialbinding.model.AiCredentialAssociationState;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.authorization.ProjectMembershipRepository;
 import com.hopeful117.devlogai.authorization.ProjectRole;
@@ -30,6 +32,7 @@ public class AiCredentialBindingServiceImpl implements AiCredentialBindingServic
 
     private final AiCredentialBindingRepository bindingRepository;
     private final AiCredentialAssociationRepository associationRepository;
+    private final AiEngineCredentialAssociationClient credentialClient;
     private final AiTaskRepository aiTaskRepository;
     private final ProjectMembershipRepository membershipRepository;
     private final Clock clock;
@@ -43,6 +46,7 @@ public class AiCredentialBindingServiceImpl implements AiCredentialBindingServic
                                      String provider, String credentialHandle) {
         requirePrincipal(principal);
         requireValue(provider, "provider");
+        provider = AiProviderIdentity.engineProvider(provider);
         requireValue(credentialHandle, "credentialHandle");
         AiTask task = taskRepository(taskId);
         if (task.getStatus() != com.hopeful117.devlogai.ai.task.entity.AiTaskStatus.CREATED) {
@@ -71,17 +75,25 @@ public class AiCredentialBindingServiceImpl implements AiCredentialBindingServic
     @Transactional
     public AiCredentialBinding issue(AuthenticatedPrincipal principal, UUID taskId, String provider) {
         requirePrincipal(principal);
+        requireValue(provider, "provider");
+        provider = AiProviderIdentity.engineProvider(provider);
         AiCredentialAssociation association = associationRepository
-                .findByPrincipalIdAndProvider(principal.principalId(), provider)
+                .findByPrincipalIdAndProviderForUpdate(principal.principalId(), provider)
                 .orElseThrow(() -> new EntityNotFoundException("AI credential association", principal.principalId()));
+        if (association.getState() != AiCredentialAssociationState.PLAN_USAGE_AUTHORIZED) {
+            throw new EntityNotFoundException("AI credential association", principal.principalId());
+        }
+        verifyAssociation(association);
         return issue(principal, taskId, provider, association.getCredentialHandle());
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = EntityNotFoundException.class)
     public AiCredentialBinding validate(AuthenticatedPrincipal principal, UUID bindingId,
                                         UUID taskId, String provider) {
         requirePrincipal(principal);
+        requireValue(provider, "provider");
+        provider = AiProviderIdentity.engineProvider(provider);
         AiCredentialBinding binding = bindingRepository.findByIdForUpdate(bindingId)
                 .orElseThrow(() -> notFound(bindingId));
         Instant now = clock.instant();
@@ -97,6 +109,20 @@ public class AiCredentialBindingServiceImpl implements AiCredentialBindingServic
             throw notFound(bindingId);
         }
         authorize(principal, binding.getAiTask());
+        AiCredentialAssociation association = associationRepository
+                .findByPrincipalIdAndProvider(principal.principalId(), provider)
+                .orElseThrow(() -> notFound(bindingId));
+        if (!association.getCredentialHandle().equals(binding.getCredentialHandle())
+                || association.getState() != AiCredentialAssociationState.PLAN_USAGE_AUTHORIZED) {
+            revokeBinding(binding, "CREDENTIAL_ASSOCIATION_REVOKED");
+            throw notFound(bindingId);
+        }
+        try {
+            verifyAssociation(association);
+        } catch (RuntimeException exception) {
+            revokeBinding(binding, "CREDENTIAL_ASSOCIATION_UNAVAILABLE");
+            throw notFound(bindingId);
+        }
         return binding;
     }
 
@@ -126,6 +152,22 @@ public class AiCredentialBindingServiceImpl implements AiCredentialBindingServic
                 || !membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
                 principal.principalId(), task.getAnalysis().getProject().getId(), ALLOWED_ROLES)) {
             throw new EntityNotFoundException("AI credential binding", task.getId());
+        }
+    }
+
+    private void verifyAssociation(AiCredentialAssociation association) {
+        var verification = credentialClient.verify(association);
+        if (verification.state() != AiCredentialAssociationState.PLAN_USAGE_AUTHORIZED) {
+            throw new EntityNotFoundException("AI credential association", association.getPrincipalId());
+        }
+    }
+
+    private void revokeBinding(AiCredentialBinding binding, String reason) {
+        if (binding.getStatus() == AiCredentialBindingStatus.ACTIVE) {
+            binding.setStatus(AiCredentialBindingStatus.REVOKED);
+            binding.setRevokedAt(clock.instant());
+            binding.setRevocationReason(reason);
+            bindingRepository.save(binding);
         }
     }
 

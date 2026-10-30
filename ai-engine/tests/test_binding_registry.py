@@ -44,3 +44,21 @@ def test_registry_rejects_expired_binding(tmp_path):
 
     with pytest.raises(ValueError, match="already expired"):
         registry.register(value)
+
+
+def test_registry_normalizes_product_chatgpt_identity(tmp_path):
+    registry = BindingRegistry(str(tmp_path / "bindings.sqlite3"))
+    value = binding(provider="openai_chatgpt")
+    registry.register(value)
+
+    assert registry.resolve(value.binding_id, value.task_id, "chatgpt") == "vault-ref-123"
+
+
+def test_registry_rejects_bindings_after_credential_revocation(tmp_path):
+    registry = BindingRegistry(str(tmp_path / "bindings.sqlite3"))
+    value = binding()
+    registry.register(value)
+    registry.revoke_credential(value.credential_handle)
+
+    with pytest.raises(ValueError, match="not valid"):
+        registry.resolve(value.binding_id, value.task_id, value.provider)

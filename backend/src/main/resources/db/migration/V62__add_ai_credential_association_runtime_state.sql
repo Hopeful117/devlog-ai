@@ -1,0 +1,3 @@
+ALTER TABLE ai_credential_associations
+    ADD COLUMN state VARCHAR(32) NOT NULL DEFAULT 'REAUTH_REQUIRED',
+    ADD COLUMN granted_scopes VARCHAR(1000) NOT NULL DEFAULT '';
