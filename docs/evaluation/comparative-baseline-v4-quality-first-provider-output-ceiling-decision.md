@@ -32,7 +32,7 @@ Repository evidence fixes the V4 provider configuration as:
 | Field | Frozen value | Evidence |
 |---|---|---|
 | Provider | `openai` | `ai-engine/evaluations/comparative_baseline_v4/v4-manifest.json:25` |
-| Model | `gpt-4.1-mini` | `ai-engine/evaluations/comparative_baseline_v4/v4-manifest.json:26` |
+| Model | `gpt-5.6-luna` | `ai-engine/evaluations/comparative_baseline_v4/v4-manifest.json:26` |
 | API surface | OpenAI Responses API, `responses.create` | `ai-engine/evaluations/comparative_baseline/live_adapters.py:298-335` |
 | SDK | Python `openai` SDK, repository constraint `>=2.0,<3.0` | `ai-engine/pyproject.toml:11-15`; runtime identity `sdk_version` in `live_adapters.py` |
 | Retries | SDK/provider retries disabled for V4 | `v4-manifest.json:55`; adapter `live_adapters.py:306-314` |
@@ -48,11 +48,11 @@ The frozen request sends `max_output_tokens` directly to
 
 All sources below are first-party OpenAI documentation.
 
-### Source S1: GPT-4.1 Mini model page
+### Source S1: gpt-5.6-luna model page
 
-- URL: <https://developers.openai.com/api/docs/models/gpt-4.1-mini>
+- URL: <https://developers.openai.com/api/docs/models/gpt-5.6-luna>
 - Access date: `2026-09-18`
-- Relevant facts: model ID `gpt-4.1-mini`; context window `1,047,576` tokens; maximum output `32,768` tokens; low latency without a reasoning step; Responses API supported; function calling supported.
+- Relevant facts: model ID `gpt-5.6-luna`; context window `1,047,576` tokens; maximum output `32,768` tokens; low latency without a reasoning step; Responses API supported; function calling supported.
 
 ### Source S2: Responses API `responses.create` reference
 
@@ -70,7 +70,7 @@ All sources below are first-party OpenAI documentation.
 
 - URL: <https://developers.openai.com/api/docs/guides/reasoning>
 - Access date: `2026-09-18`
-- Relevant facts: when a model has reasoning tokens, they consume output capacity; reaching `max_output_tokens` can produce `status=incomplete` with `incomplete_details.reason=max_output_tokens`, potentially before visible output; the guide's `25,000` starting buffer recommendation is explicitly for reasoning models and is not transferred to frozen `gpt-4.1-mini` as a V4 number.
+- Relevant facts: when a model has reasoning tokens, they consume output capacity; reaching `max_output_tokens` can produce `status=incomplete` with `incomplete_details.reason=max_output_tokens`, potentially before visible output; the guide's `25,000` starting buffer recommendation is explicitly for reasoning models and is not transferred to frozen `gpt-5.6-luna` as a V4 number.
 
 ### Source S5: Responses streaming events reference
 
@@ -88,7 +88,7 @@ All sources below are first-party OpenAI documentation.
 
 - URL: <https://developers.openai.com/api/docs/pricing>
 - Access date: `2026-09-18`
-- Relevant facts: standard `gpt-4.1-mini` output is listed at `$1.60` per one million tokens; tokens are billed at the selected model's input/output rates; the API surface itself is not separately priced.
+- Relevant facts: standard `gpt-5.6-luna` output is listed at `$1.60` per one million tokens; tokens are billed at the selected model's input/output rates; the API surface itself is not separately priced.
 
 ## 5. Documented Capacity and Semantics
 
@@ -97,8 +97,8 @@ All sources below are first-party OpenAI documentation.
 The documented model maximum is:
 
 ```text
-gpt-4.1-mini maximum output tokens = 32768
-gpt-4.1-mini context window = 1047576
+gpt-5.6-luna maximum output tokens = 32768
+gpt-5.6-luna context window = 1047576
 ```
 
 The context window is not the selected output ceiling. It is the total model
@@ -111,7 +111,7 @@ availability even when the output ceiling is set to `32768`.
 | Generated material | Classification | Basis |
 |---|---|---|
 | Visible final output | `CONFIRMED` | S2 explicitly includes visible output tokens. |
-| Reasoning tokens | `CONFIRMED` for models that emit reasoning; `NOT_APPLICABLE` to frozen model | S2 and S4 include reasoning tokens; S1 says frozen `gpt-4.1-mini` has no reasoning step. |
+| Reasoning tokens | `CONFIRMED` for models that emit reasoning; `NOT_APPLICABLE` to frozen model | S2 and S4 include reasoning tokens; S1 says frozen `gpt-5.6-luna` has no reasoning step. |
 | Model-generated tool-call arguments/call structure | `CONFIRMED` as generated output accounting | S3 says output limits apply to all generated/non-visible tokens and names tool-call-related structure; S6 establishes tool calls as model-generated response output. |
 | Tool execution output supplied by the application | `NOT_INCLUDED` in provider generation ceiling | S6 distinguishes the model tool call from the application-generated function-call output. |
 | Other non-visible output formatting/delimiters | `CONFIRMED` | S3 explicitly includes non-visible generated formatting/delimiter tokens. |
@@ -119,7 +119,7 @@ availability even when the output ceiling is set to `32768`.
 For this frozen non-reasoning model, the practical ceiling is therefore a
 single bound on model-generated output, including visible structured answer or
 tool-call generation and any non-visible generated structure. There is no
-documented separate reasoning allocation to reserve for `gpt-4.1-mini`.
+documented separate reasoning allocation to reserve for `gpt-5.6-luna`.
 
 ### Incomplete semantics
 
@@ -296,7 +296,7 @@ The configured ceiling is not a token charge. It is an upper bound on one
 provider response. Actual generated output remains measured and is the relevant
 usage variable.
 
-OpenAI's pricing page lists standard `gpt-4.1-mini` output at `$1.60` per one
+OpenAI's pricing page lists standard `gpt-5.6-luna` output at `$1.60` per one
 million tokens and states that tokens are billed at the selected model's input
 and output rates. At that listed standard rate, 32768 generated output tokens
 would be approximately `$0.0524` for output tokens alone, before input tokens,
@@ -377,10 +377,10 @@ modified.
 - A: `ANSWER_QUALITY`.
 - B: `NO`.
 - C: `YES`.
-- D: `gpt-4.1-mini`.
+- D: `gpt-5.6-luna`.
 - E: OpenAI Responses API, `responses.create`.
 - F: `32768` maximum output tokens.
-- G: `NO` for the frozen model; the generic Responses parameter includes reasoning tokens on models that emit them, but `gpt-4.1-mini` is documented as having no reasoning step.
+- G: `NO` for the frozen model; the generic Responses parameter includes reasoning tokens on models that emit them, but `gpt-5.6-luna` is documented as having no reasoning step.
 - H: `YES`.
 - I: `YES`.
 - J: `COMPATIBLE_BUT_INTERNAL_ALLOCATION_UNKNOWN`.
@@ -390,7 +390,7 @@ modified.
 - N: `YES`.
 - O: `PROVIDER_MAXIMUM_SELECTED`.
 - P: `32768`.
-- Q: Official GPT-4.1 Mini model documentation specifies a maximum output of 32,768 tokens; official Responses/token-counting documentation specifies that the request ceiling applies to generated output, including non-visible generated material.
+- Q: Official gpt-5.6-luna model documentation specifies a maximum output of 32,768 tokens; official Responses/token-counting documentation specifies that the request ceiling applies to generated output, including non-visible generated material.
 - R: `YES`.
 - S: `NO`.
 - T: `NO / NO / NO / NO` for runtime / provider / model / tool semantics.

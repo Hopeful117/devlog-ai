@@ -171,7 +171,7 @@
   },
   "humanUtility": "NOT_YET_ESTABLISHED",
   "interpretationStability": 0.3333333333333333,
-  "model": "gpt-4.1-mini",
+  "model": "gpt-5.6-luna",
   "oracleChanged": false,
   "project": "trading-os",
   "provider": "openai",
@@ -181,7 +181,7 @@
     {
       "caseId": "CASE-01",
       "completedAt": "2026-09-15T18:47:29.839019+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -348,7 +348,7 @@
     {
       "caseId": "CASE-01",
       "completedAt": "2026-09-15T18:47:41.886794+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -473,7 +473,7 @@
     {
       "caseId": "CASE-01",
       "completedAt": "2026-09-15T18:47:55.317866+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -607,7 +607,7 @@
     {
       "caseId": "CASE-02",
       "completedAt": "2026-09-15T18:48:04.674606+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -712,7 +712,7 @@
     {
       "caseId": "CASE-02",
       "completedAt": "2026-09-15T18:48:18.194818+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -812,7 +812,7 @@
     {
       "caseId": "CASE-02",
       "completedAt": "2026-09-15T18:48:27.184582+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -926,7 +926,7 @@
     {
       "caseId": "CASE-03",
       "completedAt": "2026-09-15T18:48:39.410044+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -1030,7 +1030,7 @@
     {
       "caseId": "CASE-03",
       "completedAt": "2026-09-15T18:48:52.549179+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": []
       },
@@ -1058,7 +1058,7 @@
     {
       "caseId": "CASE-03",
       "completedAt": "2026-09-15T18:49:14.211385+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": []
       },
@@ -1086,7 +1086,7 @@
     {
       "caseId": "CASE-04",
       "completedAt": "2026-09-15T18:49:18.301455+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -1140,7 +1140,7 @@
     {
       "caseId": "CASE-04",
       "completedAt": "2026-09-15T18:49:21.712157+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -1189,7 +1189,7 @@
     {
       "caseId": "CASE-04",
       "completedAt": "2026-09-15T18:49:27.908639+00:00",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {

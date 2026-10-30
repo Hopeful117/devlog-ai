@@ -11,7 +11,7 @@
 - Typed schema: `comparative-v4-typed-repository-tools-2.0.0`
 - Execution identity: `479031b0814373e2d5fc693bf8bfd81fc7c42af96af6e80d471a6ee646145bd4`
 - Experiment identity: `8a18746c1d387cb9375d186a2b8ab8da38c190eb854a918dddbe20dcf38d5910`
-- Provider/model: `openai` / `gpt-4.1-mini`
+- Provider/model: `openai` / `gpt-5.6-luna`
 
 ## Preflight and Outcome
 

@@ -568,7 +568,7 @@ class AiTaskResultServiceTest {
         ));
 
         PromptExecutionMetadata promptExec = new PromptExecutionMetadata(
-                "story-context-prompt-v1", "openai", "gpt-4.1-mini",
+                "story-context-prompt-v1", "openai", "gpt-5.6-luna",
                 "digest-abc", "context-digest-xyz");
         StoryContextAnalysisResult analysisResult = new StoryContextAnalysisResult(
                 null, null, null, null, null, null, null, null, null, null, null, null, null);

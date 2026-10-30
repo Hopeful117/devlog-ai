@@ -1,4 +1,4 @@
-"""Sequential GPT-4.1-mini DEVLOG-only model-effect collection.
+"""Sequential gpt-5.6-luna DEVLOG-only model-effect collection.
 
 The provider/runtime implementation is reused from the frozen V4 collection.
 The DEVLOG input is loaded from the already-persisted historical exact-input
@@ -27,7 +27,7 @@ from evaluations.comparative_baseline_v4.runtime import V4CollectionRuntime
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MODEL = "gpt-4.1-mini"
+MODEL = "gpt-5.6-luna"
 FROZEN_REVISION = "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
 QUESTIONS = ("CASE-01-COMPARATIVE", "CASE-03", "CASE-04")
 SOURCE_ROOT = ROOT / "data/comparative-baseline/story0133-comparative-baseline-1.0.0/raw"

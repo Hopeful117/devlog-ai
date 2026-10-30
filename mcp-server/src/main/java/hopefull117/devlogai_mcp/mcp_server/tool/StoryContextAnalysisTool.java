@@ -16,6 +16,7 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@Deprecated(forRemoval = false)
 public class StoryContextAnalysisTool {
 
     private static final int TIMEOUT_SECONDS = 120;

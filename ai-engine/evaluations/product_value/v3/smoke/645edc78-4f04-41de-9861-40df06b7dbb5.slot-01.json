@@ -10,7 +10,7 @@
         "attempt": 1,
         "error": "1 validation error for ProviderStoryContextAnalysisResult\n  Invalid JSON: EOF while parsing a string at line 1 column 15536 [type=json_invalid, input_value='{\"objectiveUnderstanding...ions\":[],\"confidence\":\"', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.11/v/json_invalid",
         "finishReason": "NOT_REPORTED",
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5.6-luna",
         "provider": "openai",
         "responsePresent": true,
         "retryOf": null,
@@ -32,7 +32,7 @@
       "authority": "Java Core TaskSnapshotEvidenceResolver",
       "status": "NOT_EVALUATED"
     },
-    "executionConfigurationDigest": "b77d3d093e86ffc6f0296a63483218f3bca9c340db1410a85d3248e7c6f8cefe",
+    "executionConfigurationDigest": "987e5406627caf46d9fe9c0aa2248c0e2f2b2332ba27bac982cd6c7a92994365",
     "executionConfigurationRevision": "story0132-v3-execution-config-3.0.0",
     "finalSlotStatus": "INVALID_STRUCTURAL_OUTPUT",
     "gates": {
@@ -85,7 +85,7 @@
       "semanticScoringEligible": false
     },
     "mappingHash": "67474f09e41c07899c8c7117754b21e794f285380ffd50675e701a0a3c2c40c0",
-    "model": "gpt-4.1-mini",
+    "model": "gpt-5.6-luna",
     "offlineReplay": {
       "equal": false,
       "status": "NOT_EVALUATED"
@@ -1071,7 +1071,7 @@
         "incompleteDetails": {
           "reason": "max_output_tokens"
         },
-        "model": "gpt-4.1-mini-2025-04-14",
+        "model": "gpt-5.6-luna",
         "status": "incomplete",
         "usage": {
           "input_tokens": 64622,
@@ -1092,7 +1092,7 @@
     "providerConfiguration": {
       "maxOutputTokens": 3000,
       "maximumTotalAttemptsPerSlot": 2,
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "openaiSdkMaxRetries": 0,
       "provider": "openai",
       "providerAdapterMaxRetries": 0,
@@ -3496,7 +3496,7 @@
       "max_output_tokens": 3000,
       "max_tool_calls": null,
       "metadata": {},
-      "model": "gpt-4.1-mini-2025-04-14",
+      "model": "gpt-5.6-luna",
       "moderation": null,
       "object": "response",
       "output": [

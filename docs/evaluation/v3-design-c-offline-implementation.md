@@ -26,7 +26,7 @@ authorized set.
 |---|---|---|
 | Context selection | `story0132-v3-design-c-context-selection-1.0.0` | `de3d7236b83f752c68347c9a3bf03ec2f97c15f8869ba170c9b83ecdad1dbf90` |
 | Provider schema | `story0132-v3-design-c-causal-provider-schema-1.0.1` | `6b291e77e1708b0bc3a745869544f8ba9215389d469811e1205b9cd3e129dd24` |
-| Execution configuration | `story0132-v3-design-c-execution-config-1.2.1` | `b47bb5205d7757b3998ebdb2aa88f85989fb7f23a5bd921767d8fe0c46aaa2cf` |
+| Execution configuration | `story0132-v3-design-c-execution-config-1.2.1` | `abfaa273b030bd70c33340849b998f4b0179902a852a823216ff192398df6b20` |
 
 The semantic task, benchmark case identity, mapping, and mapping hash remain
 unchanged. The existing mapping hash is

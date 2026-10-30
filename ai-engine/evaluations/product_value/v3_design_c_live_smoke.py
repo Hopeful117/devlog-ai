@@ -39,7 +39,7 @@ ROOT = Path(__file__).resolve().parents[3]
 TRADING_OS = TRADING_OS_REPOSITORY
 MAPPING_HASH = "67474f09e41c07899c8c7117754b21e794f285380ffd50675e701a0a3c2c40c0"
 EXECUTION_CONFIGURATION = {
-    "provider": "openai", "model": "gpt-4.1-mini", "maxOutputTokens": 2500,
+    "provider": "openai", "model": "gpt-5.6-luna", "maxOutputTokens": 2500,
     "openaiSdkMaxRetries": 0, "providerAdapterMaxRetries": 0,
     "technicalRetryMax": 1, "maximumTotalAttemptsPerSlot": 2,
     "semanticRetry": "DISABLED", "timeoutSeconds": 90,
@@ -56,7 +56,7 @@ SLOTS = (
 
 def _environment_conflicts() -> None:
     expected = {
-        "LLM_PROVIDER": "openai", "LLM_MODEL": "gpt-4.1-mini",
+        "LLM_PROVIDER": "openai", "LLM_MODEL": "gpt-5.6-luna",
         "LLM_MAX_OUTPUT_TOKENS": "2500", "LLM_MAX_RETRIES": "0",
         "LLM_TIMEOUT_SECONDS": "90",
     }
@@ -163,7 +163,7 @@ async def _execute_slot(
         counters["providerCalls"] += 1
         try:
             response = await client.responses.create(
-                model="gpt-4.1-mini",
+                model="gpt-5.6-luna",
                 input=[
                     {"role": "system", "content": prompt["systemMessage"]},
                     {"role": "user", "content": prompt["userMessage"]},
@@ -221,7 +221,7 @@ async def _execute_slot(
         validate_causal_result(provider_result, visible)
         adapter_result = causal_to_story_context(
             provider_result, context_digest=slot["contextDigest"],
-            prompt_digest=prompt["promptDigest"], provider="openai", model="gpt-4.1-mini",
+            prompt_digest=prompt["promptDigest"], provider="openai", model="gpt-5.6-luna",
         )
         core = _core_validate(adapter_result, rendered["projectedSelectedKnowledge"],
                               prompt["groundingContract"], slot["contextDigest"])
@@ -258,7 +258,7 @@ async def run_design_c_smoke(*, output_directory: Path) -> dict:
         raise RuntimeError("Design C context identity mismatch")
     if provider_schema_identity()["digest"] != "6b291e77e1708b0bc3a745869544f8ba9215389d469811e1205b9cd3e129dd24":
         raise RuntimeError("Design C provider schema identity mismatch")
-    if execution_configuration_identity()["digest"] != "b47bb5205d7757b3998ebdb2aa88f85989fb7f23a5bd921767d8fe0c46aaa2cf":
+    if execution_configuration_identity()["digest"] != "abfaa273b030bd70c33340849b998f4b0179902a852a823216ff192398df6b20":
         raise RuntimeError("Design C execution identity mismatch")
     rendered = render_smoke_inputs()
     _preflight(rendered)

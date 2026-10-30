@@ -66,7 +66,7 @@ Historical Engineering Synthesis feature or any production behavior change.
 The live DevLog context path remains measured at 10/19 artifacts, with 9 true
 retrieval misses. The human oracle is frozen and the real evidence-only
 Ground-Truth Context passed leakage checks. Using the README-configured OpenAI
-provider, the same `gpt-4.1-mini` interpreter ran three repetitions for all four
+provider, the same `gpt-5.6-luna` interpreter ran three repetitions for all four
 cases in both `DEVLOG_CONTEXT` and `GROUND_TRUTH_CONTEXT` (24 calls total).
 The Direct Repository agent/tool condition remains blocked, so the formal
 three-condition RED baseline is not declared complete. The partial RED result

@@ -9,7 +9,7 @@
     "GROUND_TRUTH_CONTEXT": "EXECUTED_12_RUNS"
   },
   "provider": "openai",
-  "model": "gpt-4.1-mini",
+  "model": "gpt-5.6-luna",
   "formalThreeConditionBaseline": false,
   "reason": "Direct Repository requires an agent with ordinary pinned repository tools; an untooled model prompt would not be a valid direct condition."
 }

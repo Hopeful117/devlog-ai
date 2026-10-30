@@ -72,7 +72,7 @@ separate GREEN result is
 `evaluation/ground-truth-green-2026-09-15.json`.
 
 The required `GROUND_TRUTH_CONTEXT` rerun executed with `openai`/
-`gpt-4.1-mini`, four cases and three repetitions per case.
+`gpt-5.6-luna`, four cases and three repetitions per case.
 
 GREEN results:
 

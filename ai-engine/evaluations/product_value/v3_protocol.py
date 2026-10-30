@@ -31,12 +31,12 @@ V3_SMOKE_PROVIDER_CALLS_EXPECTED = 3
 V3_SMOKE_PROVIDER_CALLS_MAXIMUM = 6
 V3_PROVIDER_CONFIGURATION_HUMAN_APPROVED = "YES"
 V3_EXECUTION_CONFIGURATION_REVISION = "story0132-v3-execution-config-3.0.0"
-V3_EXECUTION_CONFIGURATION_DIGEST = "b77d3d093e86ffc6f0296a63483218f3bca9c340db1410a85d3248e7c6f8cefe"
+V3_EXECUTION_CONFIGURATION_DIGEST = "987e5406627caf46d9fe9c0aa2248c0e2f2b2332ba27bac982cd6c7a92994365"
 V3_PROVIDER_SCHEMA_DIGEST = "f1cd0a1c97e752d319ba7be63198060705bdc4a740abab08ddfe183840342093"
 V3_RAW_CAPTURE_BOUNDARY = "SDK_RESPONSE_BEFORE_PARSE"
 V3_PROVIDER_CONFIGURATION = {
     "provider": "openai",
-    "model": "gpt-4.1-mini",
+    "model": "gpt-5.6-luna",
     "maxOutputTokens": 3000,
     "openaiSdkMaxRetries": 0,
     "providerAdapterMaxRetries": 0,
@@ -211,7 +211,7 @@ def build_candidate_manifest(
         },
         "providerConfigurationApproval": V3_PROVIDER_CONFIGURATION_HUMAN_APPROVED,
         "executionConfigurationRevision": V3_EXECUTION_CONFIGURATION_REVISION,
-        "executionConfigurationDigest": V3_EXECUTION_CONFIGURATION_DIGEST,
+    "executionConfigurationDigest": V3_EXECUTION_CONFIGURATION_DIGEST,
         "providerSchemaDigest": V3_PROVIDER_SCHEMA_DIGEST,
         "rawCaptureBoundary": V3_RAW_CAPTURE_BOUNDARY,
         "providerConfiguration": dict(V3_PROVIDER_CONFIGURATION),

@@ -2,7 +2,9 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
-import lombok.RequiredArgsConstructor;
+import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
+import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
+import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.lang.Nullable;
@@ -13,14 +15,26 @@ import java.util.List;
 import java.util.UUID;
 
 @Component
-@RequiredArgsConstructor
 public class EngineeringContextTool {
     private final DevlogProjectContextClient devlogProjectContextClient;
     private final ObjectMapper objectMapper;
-    @McpTool(
-            name = "get_engineering_context",
-            description = "Returns relevant engineering context for a project and engineering intent"
-    )
+    private final McpAuthenticatedPrincipalProvider principalProvider;
+
+    public EngineeringContextTool(
+            DevlogProjectContextClient devlogProjectContextClient,
+            ObjectMapper objectMapper) {
+        this(devlogProjectContextClient, objectMapper, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public EngineeringContextTool(
+            DevlogProjectContextClient devlogProjectContextClient,
+            ObjectMapper objectMapper,
+            McpAuthenticatedPrincipalProvider principalProvider) {
+        this.devlogProjectContextClient = devlogProjectContextClient;
+        this.objectMapper = objectMapper;
+        this.principalProvider = principalProvider;
+    }
     public String getEngineeringContext(
             @McpArg(
                     description = "Slug identifying the DevLog project",
@@ -45,13 +59,38 @@ public class EngineeringContextTool {
                     required = false
             )
              @Nullable UUID storyId
+     ) {
+        if (principalProvider == null) {
+            EngineeringContext engineeringContext = devlogProjectContextClient.getEngineeringContext(
+                    projectSlug, intent, files, storyId);
+            return objectMapper.writeValueAsString(engineeringContext);
+        }
+        return getEngineeringContext(projectSlug, intent, files, storyId, null);
+    }
+
+    @McpTool(
+            name = "get_engineering_context",
+            description = "Returns relevant engineering context for a project and engineering intent"
+    )
+    public String getEngineeringContext(
+            String projectSlug,
+            String intent,
+            List<String> files,
+            @Nullable UUID storyId,
+            McpSyncRequestContext requestContext
     ) {
+        var principal = principalProvider.currentPrincipal(requestContext)
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        if (principal.bearerToken() == null || principal.bearerToken().isBlank()) {
+            throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
+        }
         EngineeringContext engineeringContext =
-                devlogProjectContextClient.getEngineeringContext(
+                devlogProjectContextClient.getEngineeringContextAuthenticated(
                         projectSlug,
                         intent,
                         files,
-                        storyId
+                        storyId,
+                        principal.bearerToken()
                 );
 
         return objectMapper.writeValueAsString(engineeringContext);

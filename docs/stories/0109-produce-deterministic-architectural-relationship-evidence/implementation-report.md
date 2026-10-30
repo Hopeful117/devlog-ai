@@ -24,7 +24,7 @@ BRANCH = main
 PROJECT_ID = f3d56247-aada-4a76-982b-e6802c0b309c
 INTENT = architecture-overview-v2
 PROVIDER = openai
-MODEL = gpt-4.1-mini
+MODEL = gpt-5.6-luna
 PROMPT_CHANGED_BY_STORY_0109 = NO
 ```
 
@@ -292,7 +292,7 @@ FULL_BACKEND_SUITE = 1084 passed, 0 failed, 0 errors, 0 skipped
 ### Controlled production benchmark
 
 The runtime was rebuilt and recreated with the same project, intent,
-`gpt-4.1-mini` model, prompt template, selection rules, context budgets and
+`gpt-5.6-luna` model, prompt template, selection rules, context budgets and
 trusted-knowledge baseline. Each run selected the same material relationship
 Fact `from=backend,to=ai-engine`. Each execution made two model calls: the
 initial no-delta response was rejected and one corrective retry was performed.
@@ -423,7 +423,7 @@ Stable benchmark controls:
 
 ```text
 provider = openai
-model = gpt-4.1-mini
+model = gpt-5.6-luna
 intent = architecture-overview-v2
 prompt = unchanged
 corrective retry = unchanged
@@ -562,7 +562,7 @@ Stable benchmark controls:
 
 ```text
 provider = openai
-model = gpt-4.1-mini
+model = gpt-5.6-luna
 intent = architecture-overview-v2
 prompt = unchanged (123,657 chars initial; 125,341 chars retry)
 corrective retry = relationship-aware, classification-aware, target-aware

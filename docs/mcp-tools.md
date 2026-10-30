@@ -14,7 +14,28 @@ arguments : projectSlug*, intent*
 retour    : EngineeringContext (project, evidence[], metadata)
 ```
 
-## `analyze_story_context`
+## Story Context Agent v1 (canonical)
+
+The canonical runtime route is the versioned asynchronous protocol:
+
+```text
+submit_task -> callback -> get_snapshot -> result
+```
+
+MCP tools:
+
+```text
+story_context_agent_get_projection
+story_context_agent_submit_task
+story_context_agent_callback
+story_context_agent_get_snapshot_authenticated
+```
+
+The high-level `devlog_story_agent` consumer orchestrates the same protocol and
+must be preferred by runtime validation. It must not call the legacy
+`/api/v1/projects/{projectSlug}/story-agent` route.
+
+## `analyze_story_context` (legacy compatibility)
 
 Analyse le contexte d'une Engineering Story pour les phases Discuss/Plan et
 retourne le résultat structuré et persisté de l'analyse.
@@ -23,6 +44,10 @@ retourne le résultat structuré et persisté de l'analyse.
 arguments : projectSlug*, storyId*, intent*, question*, files, guidance
 retour    : StoryContextAnalysisResult
 ```
+
+This tool and the legacy REST routes remain compatibility surfaces only. They
+are not canonical runtime entry points and must not be selected when the v1
+Story Context Agent protocol is available.
 
 ## `search_project_history` *(Story 0090)*
 

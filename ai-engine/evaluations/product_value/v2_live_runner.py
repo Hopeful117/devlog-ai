@@ -648,7 +648,7 @@ def _preflight(args: argparse.Namespace, settings: Settings) -> tuple[dict[str, 
     questions = build_frozen_causal_questions(benchmark)
     if sum(len(items) for items in questions.values()) != 11:
         raise RuntimeError("QUESTION_COUNT_MISMATCH")
-    if settings.llm_provider != "openai" or settings.llm_model != "gpt-4.1-mini" or not settings.llm_api_key:
+    if settings.llm_provider != "openai" or settings.llm_model != "gpt-5.6-luna" or not settings.llm_api_key:
         raise RuntimeError("FROZEN_PROVIDER_CONFIGURATION_MISMATCH")
     if sum(expected_assessment_slots(benchmark, REPETITIONS).values()) != 33:
         raise RuntimeError("ASSESSMENT_SLOT_COUNT_MISMATCH")

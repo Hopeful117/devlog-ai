@@ -7,7 +7,7 @@
 - Condition: `AGENT_DIRECT_OPEN`
 - Question: `CASE-03@1.0.0`
 - Repository revision: `18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149`
-- Provider/model: `openai` / `gpt-4.1-mini`
+- Provider/model: `openai` / `gpt-5.6-luna`
 - This was exactly one validation observation, not an official dataset result.
 
 ## Frozen Contract

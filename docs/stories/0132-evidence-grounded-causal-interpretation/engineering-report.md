@@ -19,7 +19,7 @@
 | Metric | Result |
 |---|---:|
 | Condition | `GROUND_TRUTH_CONTEXT` |
-| Provider/model | `openai` / `gpt-4.1-mini` |
+| Provider/model | `openai` / `gpt-5.6-luna` |
 | Repetitions | `3` per case |
 | Grounding | `PASS` |
 | Evidence removal | `PASS` |

@@ -8,6 +8,7 @@ import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAgentCal
 import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAgentCallbackAuthenticator;
 import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAgentMetrics;
 import com.hopeful117.devlogai.storycontextanalysis.service.AuthorizedStoryContextSnapshotReader;
+import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAnalysisQueryService;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipalResolver;
 import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.AnalyzeStoryContextUseCase;
@@ -39,6 +40,7 @@ public class StoryContextAgentProtocolController {
     private final AuthorizedStoryContextSnapshotReader snapshotReader;
     private final AuthenticatedPrincipalResolver principalResolver;
     private final StoryAgentFollowUpService followUpService;
+    private final StoryContextAnalysisQueryService analysisQueryService;
 
     @Autowired
     public StoryContextAgentProtocolController(
@@ -50,7 +52,8 @@ public class StoryContextAgentProtocolController {
             ObjectMapper objectMapper,
             AuthorizedStoryContextSnapshotReader snapshotReader,
             AuthenticatedPrincipalResolver principalResolver,
-            StoryAgentFollowUpService followUpService) {
+            StoryAgentFollowUpService followUpService,
+            StoryContextAnalysisQueryService analysisQueryService) {
         this.analyzeStoryContextUseCase = analyzeStoryContextUseCase;
         this.callbackFacade = callbackFacade;
         this.aiTaskService = aiTaskService;
@@ -60,6 +63,7 @@ public class StoryContextAgentProtocolController {
         this.snapshotReader = snapshotReader;
         this.principalResolver = principalResolver;
         this.followUpService = followUpService;
+        this.analysisQueryService = analysisQueryService;
     }
 
     /** Compatibility constructor for callback-only unit tests. */
@@ -73,7 +77,7 @@ public class StoryContextAgentProtocolController {
             AuthorizedStoryContextSnapshotReader snapshotReader,
             AuthenticatedPrincipalResolver principalResolver) {
         this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator,
-                metrics, objectMapper, snapshotReader, principalResolver, null);
+                metrics, objectMapper, snapshotReader, principalResolver, null, null);
     }
 
     /** Compatibility constructor for callback-only unit tests. */
@@ -85,7 +89,7 @@ public class StoryContextAgentProtocolController {
             StoryContextAgentMetrics metrics,
             ObjectMapper objectMapper) {
         this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator,
-                metrics, objectMapper, null, null, null);
+                metrics, objectMapper, null, null, null, null);
     }
 
     @GetMapping("/projects/{projectSlug}/context")
@@ -156,6 +160,22 @@ public class StoryContextAgentProtocolController {
             var principal = principalResolver.resolve(servletRequest)
                     .orElseThrow(UnauthenticatedPrincipalException::new);
             return ResponseEntity.ok(snapshotReader.readStoryContextSnapshot(principal, aiTaskId));
+        });
+    }
+
+    @GetMapping("/tasks/{aiTaskId}/result")
+    public ResponseEntity<com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse> result(
+            @PathVariable UUID aiTaskId, HttpServletRequest servletRequest) {
+        return metrics.time("result", () -> {
+            metrics.request("result");
+            if (analysisQueryService == null || principalResolver == null) {
+                throw new UnauthenticatedPrincipalException();
+            }
+            principalResolver.resolve(servletRequest)
+                    .orElseThrow(UnauthenticatedPrincipalException::new);
+            return analysisQueryService.findResponseByAiTaskId(aiTaskId)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
         });
     }
 

@@ -31,7 +31,7 @@ explicit blocked conditions:
 - `ground-truth-context-2026-09-15.json`: complete evidence-only context built
   from the pinned Trading OS Git revision; mechanical leakage validation passed.
 - `interpreter-capture-partial-2026-09-15.json`: 24 real OpenAI interpretation
-  calls using `gpt-4.1-mini`, covering three repetitions for each case in the
+  calls using `gpt-5.6-luna`, covering three repetitions for each case in the
   DevLog and Ground-Truth conditions.
 - `interpreter-metrics-partial-2026-09-15.json`: deterministic scoring of those
   two executed conditions.

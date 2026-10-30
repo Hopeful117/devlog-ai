@@ -64,7 +64,7 @@ OpenAI can be enabled explicitly:
 
 ```bash
 LLM_PROVIDER=openai \
-LLM_MODEL=gpt-4.1-mini \
+LLM_MODEL=gpt-5.6-luna \
 LLM_API_KEY=... \
 uvicorn app.main:app --reload
 ```

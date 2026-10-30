@@ -14,7 +14,7 @@ from evaluations.product_value.v3_structured_output import (
 def _payload() -> dict:
     return {
         "id": "resp-test",
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5.6-luna",
         "status": "completed",
         "output": [{"type": "message", "content": [{"type": "output_text", "text": "payload"}]}],
     }
@@ -45,7 +45,7 @@ def test_provider_confidence_maps_to_internal_default_rationale():
             "contextDigest": "a" * 64,
             "promptVersion": "prompt-v1",
             "provider": "openai",
-            "modelIdentifier": "gpt-4.1-mini",
+            "modelIdentifier": "gpt-5.6-luna",
             "promptContentDigest": "b" * 64,
             "intentId": "engineering-story-context-analysis",
             "intentVersion": "v1",

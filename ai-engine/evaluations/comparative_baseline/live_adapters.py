@@ -38,7 +38,7 @@ from .collection_runtime import (
 from .infrastructure import assignment_matrix, load_manifest
 
 
-FROZEN_REPOSITORY_REVISION = "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+FROZEN_REPOSITORY_REVISION = "a6d3d118f87aed995ce326d1bb50e1ce9a084a31"
 COMPARATIVE_GROUNDING_CONTRACT_VERSION = "story0135-comparative-grounding-1.0.0"
 COMPARATIVE_SCORING_PROJECTION_VERSION = "story0135-comparative-scoring-projection-1.0.0"
 COMPARATIVE_JAVA_BRIDGE_VERSION = "story0135-comparative-java-evidence-bridge-1.0.0"
@@ -298,7 +298,7 @@ class FrozenDevlogContextAdapter:
 class OpenAIProviderTransport:
     """Responses API transport with no SDK retries and no persisted API key."""
 
-    def __init__(self, *, api_key: str, model: str = "gpt-4.1-mini", timeout_seconds: float = NATIVE_PROVIDER_TIMEOUT_SECONDS, client: Any | None = None):
+    def __init__(self, *, api_key: str, model: str = "gpt-5.6-luna", timeout_seconds: float = NATIVE_PROVIDER_TIMEOUT_SECONDS, client: Any | None = None):
         if not api_key or not isinstance(api_key, str):
             raise RuntimeContractError("LLM_API_KEY is required for the live provider")
         self.model = model
@@ -799,7 +799,7 @@ class LivePreflight:
     provider_constructed: bool = False
 
     def assert_ready(self) -> None:
-        if self.provider != "openai" or self.model != "gpt-4.1-mini":
+        if self.provider != "openai" or self.model != "gpt-5.6-luna":
             raise RuntimeContractError("live provider configuration is not frozen")
         if self.repository_revision != FROZEN_REPOSITORY_REVISION:
             raise RuntimeContractError("live repository revision is not frozen")
@@ -924,7 +924,7 @@ def build_live_runtime(
     values = os.environ if environment is None else environment
     live_preflight(repository=repository, grounding=grounding, pilot_storage=pilot_storage, environment=values)
     api_key = values.get("LLM_API_KEY")
-    transport = OpenAIProviderTransport(api_key=api_key or "", model="gpt-4.1-mini", timeout_seconds=NATIVE_PROVIDER_TIMEOUT_SECONDS)
+    transport = OpenAIProviderTransport(api_key=api_key or "", model="gpt-5.6-luna", timeout_seconds=NATIVE_PROVIDER_TIMEOUT_SECONDS)
     manifest = load_manifest()
     context_adapter = FrozenDevlogContextAdapter(repository)
     contexts = {question["questionId"]: context_adapter.build(question) for question in manifest["questions"]}
@@ -933,7 +933,7 @@ def build_live_runtime(
 
     return CollectionRuntime(
         transport,
-        configuration=RuntimeConfiguration(provider="openai", model="gpt-4.1-mini", timeout_seconds=int(NATIVE_PROVIDER_TIMEOUT_SECONDS), sdk_version="openai>=2.0,<3.0"),
+        configuration=RuntimeConfiguration(provider="openai", model="gpt-5.6-luna", timeout_seconds=int(NATIVE_PROVIDER_TIMEOUT_SECONDS), sdk_version="openai>=2.0,<3.0"),
         manifest=manifest,
         grounding=grounding,
         devlog_contexts=contexts,

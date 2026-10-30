@@ -19,6 +19,7 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
+@Deprecated(forRemoval = false)
 public class DevLogStoryAgentController {
     private final DevLogStoryAgentService devLogStoryAgentService;
     private final AuthenticatedPrincipalResolver principalResolver;

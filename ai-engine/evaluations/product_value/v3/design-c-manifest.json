@@ -15,7 +15,7 @@
   },
   "executionConfiguration": {
     "revision": "story0132-v3-design-c-execution-config-1.2.1",
-    "digest": "b47bb5205d7757b3998ebdb2aa88f85989fb7f23a5bd921767d8fe0c46aaa2cf",
+    "digest": "abfaa273b030bd70c33340849b998f4b0179902a852a823216ff192398df6b20",
     "maxOutputTokens": 2500,
     "maximumTotalAttemptsPerSlot": 2,
     "timeoutSeconds": 90,
@@ -25,7 +25,7 @@
     "tools": "NOT_CONFIGURED",
     "reasoning": "NOT_CONFIGURED",
     "provider": "openai",
-    "model": "gpt-4.1-mini",
+    "model": "gpt-5.6-luna",
     "openaiSdkMaxRetries": 0,
     "providerAdapterMaxRetries": 0,
     "technicalRetryMax": 1,

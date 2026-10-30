@@ -335,6 +335,11 @@ class AnalyzeStoryContextUseCaseTest {
         assertEquals("Which component owns polling?",
                 ((Map<?, ?>) prepared.projection().get("request")).get("question"));
         assertEquals(prepared.projection().get("request"), prepared.projection().get("requestEcho"));
+        assertEquals("Which component owns polling?",
+                ((Map<?, ?>) prepared.projection().get("requestEcho")).get("question"));
+        assertEquals("Which component owns polling?",
+                ((Map<?, ?>) prepared.projection().get("scope")).get("question"));
+        assertEquals(INTENT_ID, ((Map<?, ?>) prepared.projection().get("request")).get("intent"));
         assertEquals("story-context-agent-projection/v2", prepared.projection().get("contractVersion"));
         verify(engineeringContextFacade).getCanonicalEngineeringContext(
                 PROJECT_SLUG, INTENT_ID, List.of(), storyId, "Which component owns polling?");

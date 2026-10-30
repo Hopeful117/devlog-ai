@@ -39,7 +39,7 @@ The attempt is isolated under the non-baseline `live-pilot` namespace.
 | Runtime digest | `a3211f44aad4633ca1d725b7a48506a6dd8725ab96becf182e867f1794e80edd` |
 | Instrumentation | `comparative-v4-instrumentation-3.0.0` |
 | Typed repository schema | `comparative-v4-typed-repository-tools-2.0.0` |
-| Provider/model | `openai / gpt-4.1-mini` |
+| Provider/model | `openai / gpt-5.6-luna` |
 | Output policy | `finalOutputTokens=32768`, `intermediateOutputTokens=32768` |
 | Provider retries | `0` |
 
@@ -69,7 +69,7 @@ The live transport preflight also passed after loading `.env`:
 
 ```text
 provider = openai
-model = gpt-4.1-mini
+model = gpt-5.6-luna
 repositoryRevision = 18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149
 pilotStorageConfigured = true
 ```

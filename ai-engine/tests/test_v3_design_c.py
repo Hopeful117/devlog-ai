@@ -20,7 +20,7 @@ from evaluations.repository_paths import TRADING_OS_REPOSITORY
 
 ROOT = Path(__file__).resolve().parents[2]
 TRADING_OS = TRADING_OS_REPOSITORY
-REVISION = "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+REVISION = "a6d3d118f87aed995ce326d1bb50e1ce9a084a31"
 
 
 def test_design_c_identities_are_frozen_and_distinct():
@@ -153,7 +153,7 @@ def test_offline_inputs_are_bounded_and_labels_are_not_provider_visible():
     rendered = render_smoke_inputs()
     assert set(rendered) == {"CASE-01", "CASE-03", "CASE-04"}
     assert rendered["CASE-01"]["providerVisibleEvidenceItems"] == 4
-    assert rendered["CASE-01"]["providerVisibleEvidenceBytes"] == 32401
+    assert rendered["CASE-01"]["providerVisibleEvidenceBytes"] == 32423
     for item in rendered.values():
         assert "DIRECT_REQUIRED" not in item["prompt"]["userMessage"]
         assert "SUPPORTING_REQUIRED" not in item["prompt"]["userMessage"]

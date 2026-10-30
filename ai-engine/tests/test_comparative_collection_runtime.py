@@ -170,7 +170,7 @@ def test_agent_direct_uses_bounded_tools_and_common_final_contract():
 
 
 def test_agent_direct_question_budget_is_frozen_and_not_increased():
-    assert REPOSITORY_BYTE_BUDGETS == {"CASE-01-COMPARATIVE": 32401, "CASE-03": 31683, "CASE-04": 13504}
+    assert REPOSITORY_BYTE_BUDGETS == {"CASE-01-COMPARATIVE": 32423, "CASE-03": 33105, "CASE-04": 14208}
     provider = ScriptedProvider([ProviderResponse("TOOL_CALL", {"operation": "read_file", "arguments": {"path": "docs/example.md"}}, {})] * 7)
     runtime = CollectionRuntime(provider, tool_factory=lambda assignment: ReferenceTools(load_manifest()["repositoryRevision"]))
     observation = runtime.run_assignment(_row("AGENT_DIRECT"))

@@ -45,7 +45,13 @@ class DevLogStoryAgentControllerTest {
                 .andExpect(jsonPath("$.result").isEmpty())
                 .andExpect(jsonPath("$.diagnostics.status").value("PROCESSING"));
 
-        verify(service).execute(any(), any());
+        var request = org.mockito.ArgumentCaptor.forClass(
+                com.hopeful117.devlogai.storycontextanalysis.usecase.DevLogStoryAgentRequest.class);
+        verify(service).execute(request.capture(), any());
+        org.assertj.core.api.Assertions.assertThat(request.getValue().intent())
+                .isEqualTo("engineering-story-context-analysis");
+        org.assertj.core.api.Assertions.assertThat(request.getValue().question())
+                .isEqualTo("Which controller changed?");
     }
 
     @Test

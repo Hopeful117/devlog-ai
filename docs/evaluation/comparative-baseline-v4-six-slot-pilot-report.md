@@ -28,7 +28,7 @@ The attempt is isolated under `LIVE_PILOT` storage and is not baseline eligible.
 | Execution configuration hash | `74dfdcd2b06ea38d124d51b88cbc57f62b504d907f4cd793d1a77387e619fad2` |
 | Pilot-plan identity | `5fb719dea51b3debde68b546c1de59ab52030f0e8d76a9a5c483228f30bddeef` |
 | Repository revision | `18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149` |
-| Provider/model | `openai / gpt-4.1-mini` |
+| Provider/model | `openai / gpt-5.6-luna` |
 | Recovery policy | `NATURAL_MODEL_RECOVERY` |
 | Safety ceilings | `12 / 12 / 12 / 120s / 65536 bytes` |
 

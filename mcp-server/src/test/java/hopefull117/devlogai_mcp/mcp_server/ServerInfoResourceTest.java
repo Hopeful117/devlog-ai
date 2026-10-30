@@ -34,9 +34,9 @@ class ServerInfoResourceTest {
                 "get_engineering_context",
                 "search_project_history",
                 "story_context_agent_callback",
-                "story_context_agent_follow_up",
+                "story_context_agent_follow_up_authenticated",
                 "story_context_agent_get_projection",
-                "story_context_agent_get_snapshot",
+                "story_context_agent_get_snapshot_authenticated",
                 "story_context_agent_submit_task");
         assertThat(values(result.path("tools"), "description"))
                 .allSatisfy(description -> assertThat(description).isNotBlank());

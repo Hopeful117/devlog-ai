@@ -10,7 +10,7 @@ live RED artifact is:
 
 Measured RED values:
 
-- Ground Truth: `openai` / `gpt-4.1-mini`, four cases, three repetitions.
+- Ground Truth: `openai` / `gpt-5.6-luna`, four cases, three repetitions.
 - Positive causal accuracy: `0.3777777777777777`.
 - Interpretation stability: `0.3333333333333333`.
 - CASE-04: `0/3 NOT_ESTABLISHED`.

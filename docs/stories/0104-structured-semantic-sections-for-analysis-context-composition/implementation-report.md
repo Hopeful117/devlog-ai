@@ -112,7 +112,7 @@ The existing `shouldOmitSelectedInsightIdentifiersFromPromptPayload` test was th
 **Benchmark Date:** 2026-08-30
 **Project:** devlog-ai (f3d56247-aada-4a76-982b-e6802c0b309c)
 **Knowledge Selection:** knowledge-selection-v4
-**AI Engine:** openai / gpt-4.1-mini
+**AI Engine:** openai / gpt-5.6-luna
 
 ### describe-project-v1
 

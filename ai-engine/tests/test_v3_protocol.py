@@ -141,7 +141,7 @@ def test_v3_provider_configuration_is_manifest_authority():
         manifest,
         environment={
             "LLM_PROVIDER": "openai",
-            "LLM_MODEL": "gpt-4.1-mini",
+            "LLM_MODEL": "gpt-5.6-luna",
             "LLM_MAX_OUTPUT_TOKENS": "3000",
             "LLM_MAX_RETRIES": "0",
             "LLM_TIMEOUT_SECONDS": "90",
@@ -187,7 +187,7 @@ def test_v3_provider_construction_uses_frozen_retry_and_generation_configuration
         environment={"LLM_MAX_RETRIES": "0", "LLM_MAX_OUTPUT_TOKENS": "3000"},
     )
 
-    assert provider.model_identifier == "gpt-4.1-mini"
+    assert provider.model_identifier == "gpt-5.6-luna"
     assert provider._max_output_tokens == 3000
     assert provider._max_retries == 0
     assert provider._client.max_retries == 0

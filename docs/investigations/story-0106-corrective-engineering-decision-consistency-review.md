@@ -58,7 +58,7 @@ This means the benchmark results reflect baseline behavior, not corrective behav
 
 - Canonical project: `f3d56247-aada-4a76-982b-e6802c0b309c` (devlog-ai)
 - Intent: `analyze-engineering-decision-v1`
-- Model: `gpt-4.1-mini`
+- Model: `gpt-5.6-luna`
 - Provider: `openai`
 - Analysis type: `ARCHITECTURE_REVIEW`
 - Raw results: `/tmp/decision_benchmark_results.json`
@@ -468,7 +468,7 @@ The most significant finding is that the corrective prompt changes are **not dep
 
 ### Model Nondeterminism
 
-Even with corrective prompts deployed, `gpt-4.1-mini` may still emit technology-presence decisions due to nondeterminism. The corrective prompt reduces the probability but cannot guarantee elimination without temperature/seed control.
+Even with corrective prompts deployed, `gpt-5.6-luna` may still emit technology-presence decisions due to nondeterminism. The corrective prompt reduces the probability but cannot guarantee elimination without temperature/seed control.
 
 ### Evidence Density Effect
 
@@ -565,9 +565,9 @@ Verified corrective rules in `_decision_strategy()`:
 
 | Run | Analysis ID | Status | Model |
 |---|---|---|---|
-| 1 | `4e30fe52-3362-4d2f-8e92-ed7b9919b8af` | COMPLETED | gpt-4.1-mini |
-| 2 | `bff570db-55d2-468c-8193-440ebe7cfb2c` | COMPLETED | gpt-4.1-mini |
-| 3 | `dbd42f7f-d97f-49e8-bbe2-f236ea4ad1d1` | COMPLETED | gpt-4.1-mini |
+| 1 | `4e30fe52-3362-4d2f-8e92-ed7b9919b8af` | COMPLETED | gpt-5.6-luna |
+| 2 | `bff570db-55d2-468c-8193-440ebe7cfb2c` | COMPLETED | gpt-5.6-luna |
+| 3 | `dbd42f7f-d97f-49e8-bbe2-f236ea4ad1d1` | COMPLETED | gpt-5.6-luna |
 
 ### Fresh Run 1 — Proposal-by-Proposal Classification
 

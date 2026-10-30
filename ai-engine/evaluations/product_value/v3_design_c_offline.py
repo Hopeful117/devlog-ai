@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[3]
 TRADING_OS = TRADING_OS_REPOSITORY
 BENCHMARK_PATH = ROOT / "docs/stories/0130-devlog-product-value-parity-investigation/evaluation/benchmark-suite-v1.json"
 ORACLE_PATH = ROOT / "docs/stories/0131-devlog-product-value-evaluation-harness/evaluation/oracle-freeze-v1.json"
-REVISION = "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+REVISION = "a6d3d118f87aed995ce326d1bb50e1ce9a084a31"
 
 
 def render_smoke_inputs() -> dict[str, Any]:
@@ -89,7 +89,7 @@ def render_smoke_inputs() -> dict[str, Any]:
 def _provenance() -> CausalProviderProvenance:
     return CausalProviderProvenance(
         contextDigest="a" * 64, promptVersion="story0132-v3-design-c-prompt-v1",
-        provider="openai", modelIdentifier="gpt-4.1-mini", promptContentDigest="b" * 64,
+        provider="openai", modelIdentifier="gpt-5.6-luna", promptContentDigest="b" * 64,
         intentId="engineering-story-context-causal-v2", intentVersion="v1",
     )
 

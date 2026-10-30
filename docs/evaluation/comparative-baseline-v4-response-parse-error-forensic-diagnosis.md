@@ -78,7 +78,7 @@ Ledger and manifest checks:
   and RAW output hash.
 - The final ledger summary reports one `AGENT_DIRECT_OPEN` and one
   `PROVIDER_FAILURE`, with no duplicates, missing IDs, or unexpected IDs.
-- Both manifests bind `openai` / `gpt-4.1-mini`, repository revision
+- Both manifests bind `openai` / `gpt-5.6-luna`, repository revision
   `18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149`, runtime 4.0.0, and typed schema
   2.0.0.
 - The targeted manifest is the older compact manifest shape; the final manifest
@@ -258,7 +258,7 @@ evaluation, or persistence hashing was reached as a failure boundary.
 | Artifact wrapper SHA | PERSISTED | Distinct; recomputes |
 | RAW output SHA | PERSISTED | Same and recomputes for both raw payloads |
 | DERIVED projection SHA/link | PERSISTED | Distinct projections; links recompute |
-| Provider/model | PERSISTED | `openai` / `gpt-4.1-mini` |
+| Provider/model | PERSISTED | `openai` / `gpt-5.6-luna` |
 | Runtime/schema/experiment identities | PERSISTED | Same frozen identities |
 | Repository revision | PERSISTED | Same revision |
 | Failure category/phase/type/message | PERSISTED | Exact bounded diagnostic |

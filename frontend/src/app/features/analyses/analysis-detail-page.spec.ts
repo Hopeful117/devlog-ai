@@ -115,7 +115,7 @@ describe('AnalysisDetailPage', () => {
           promptRequestId: 'request-id',
           promptVersion: 'architecture-overview-prompt-v1',
           provider: 'openai',
-          modelIdentifier: 'gpt-4.1-mini',
+          modelIdentifier: 'gpt-5.6-luna',
           promptContentDigest: 'abc',
           contextDigest: 'def',
           selectedKnowledgeSnapshot: null,
@@ -219,7 +219,7 @@ describe('AnalysisDetailPage', () => {
     fixture.detectChanges();
     await vi.advanceTimersByTimeAsync(0);
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('gpt-4.1-mini');
+    expect(fixture.nativeElement.textContent).toContain('gpt-5.6-luna');
     expect(fixture.nativeElement.textContent).toContain('<script>alert(1)</script>');
     expect(fixture.nativeElement.querySelector('script')).toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain('LLM_API_KEY');

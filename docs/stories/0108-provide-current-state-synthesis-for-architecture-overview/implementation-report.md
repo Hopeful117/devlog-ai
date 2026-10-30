@@ -80,7 +80,7 @@ Repository evidence: `mvn help:effective-pom` shows no checkstyle, spotbugs, pmd
 PROJECT_ID = f3d56247-aada-4a76-982b-e6802c0b309c
 REPOSITORY = https://github.com/Hopeful117/devlog-ai
 PROVIDER = openai
-MODEL = gpt-4.1-mini
+MODEL = gpt-5.6-luna
 TEMPERATURE = PROVIDER_DEFAULT
 TOP_P = PROVIDER_DEFAULT
 SEED = PROVIDER_DEFAULT
@@ -117,7 +117,7 @@ durationSeconds = 16
 promptVersion = architecture-overview-prompt-v2
 promptDigest = 46e1a706bd08d8a30ee3aefefac5dde90f31659f4348e0e1f3b3e4fb5646e7d6
 provider = openai
-model = gpt-4.1-mini
+model = gpt-5.6-luna
 VALID_PATH_MODEL_CALL_COUNT = 1
 CORRECTION_RETRY = NO
 synthesis = YES
@@ -164,7 +164,7 @@ durationSeconds = 18
 promptVersion = architecture-overview-prompt-v2
 promptDigest = a6ea96bc07f3d66fed78d393921e004bcdceed36314b4401b7c1a94099ed3d43
 provider = openai
-model = gpt-4.1-mini
+model = gpt-5.6-luna
 VALID_PATH_MODEL_CALL_COUNT = 1
 CORRECTION_RETRY = NO
 synthesis = YES
@@ -211,7 +211,7 @@ durationSeconds = 49
 promptVersion = architecture-overview-prompt-v2
 promptDigest = 4b3205bb740803d91a6a7a4910e33c011cb1b70761cfdb94f5da28d245a20f42
 provider = openai
-model = gpt-4.1-mini
+model = gpt-5.6-luna
 VALID_PATH_MODEL_CALL_COUNT = 1
 CORRECTION_RETRY = NO
 synthesis = YES
@@ -575,7 +575,7 @@ Full implementation and benchmark evidence is recorded in
 Story 0109 resolved the original relationship-evidence gap, and the subsequent
 edge-aware validator correction resolved the endpoint-co-occurrence false
 negative. The remaining product-quality failure is downstream:
-`gpt-4.1-mini` entered the corrective path in all three controlled runs but
+`gpt-5.6-luna` entered the corrective path in all three controlled runs but
 produced two incorrectly typed `NEW` deltas and one invalid no-delta retry
 result. The blocker is no longer missing relationship evidence.
 
@@ -601,7 +601,7 @@ evidence are recorded in Story 0109's implementation report.
 
 The implicit Python `NEW` fallback was removed and explicit classification became
 mandatory. Deterministic validation passed (AI Engine 119/119; backend 1085/1085),
-but the isolated three-run `gpt-4.1-mini` benchmark did not improve product output:
+but the isolated three-run `gpt-5.6-luna` benchmark did not improve product output:
 
 ```text
 RUN_1 = ACCEPTABLE, explicit NEW, incorrect delta

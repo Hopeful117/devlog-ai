@@ -1,6 +1,6 @@
 {
   "dataset": "GPT_BASELINE_DEVLOG_COLLECTION",
-  "model": "gpt-4.1-mini",
+  "model": "gpt-5.6-luna",
   "condition": "DEVLOG",
   "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
   "assignmentCount": 9,

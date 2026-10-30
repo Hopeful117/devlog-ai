@@ -360,7 +360,7 @@ def test_representative_artifacts_have_future_data_science_join_fields():
     assert required.issubset(observation)
     assert observation["visibleContextBytes"] == len("captured direct evidence".encode())
     assert observation["repositoryBytesInspected"] == 0
-    assert REPOSITORY_BYTE_BUDGETS["CASE-03"] == 31683
+    assert REPOSITORY_BYTE_BUDGETS["CASE-03"] == 33105
 
     direct_row = next(row for row in assignment_matrix() if row["questionId"] == "CASE-03" and row["condition"] == "AGENT_DIRECT")
     direct = CollectionRuntime(DryRunProvider(), tool_factory=lambda assignment: DryRunTools(assignment)).run_assignment(direct_row)

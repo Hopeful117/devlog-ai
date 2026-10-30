@@ -73,7 +73,7 @@ def test_manifest_freezes_three_questions_and_eighteen_assignments():
     assignments = assignment_matrix(manifest)
     assert len(assignments) == 18
     assert {(item["questionId"], item["condition"], item["repetition"]) for item in assignments}.__len__() == 18
-    assert manifest_identity(manifest)["repositoryRevision"] == "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149"
+    assert manifest_identity(manifest)["repositoryRevision"] == "a6d3d118f87aed995ce326d1bb50e1ce9a084a31"
 
 
 def test_question_identities_and_case01_adaptation_are_frozen():

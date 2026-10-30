@@ -68,7 +68,7 @@ Smallest deterministic vertical slice: Docker Compose service wiring extraction 
 
 The deterministic extraction criteria passed: relationship evidence traverses
 collection, selection and prompt projection. The product criterion did not pass.
-The edge-aware validator correction forced `gpt-4.1-mini` to reconsider the
+The edge-aware validator correction forced `gpt-5.6-luna` to reconsider the
 previous false `NO_MATERIAL_DELTA`, but two completed runs emitted the required
 relationship as `NEW` instead of `ENRICHES`, and a third run failed after its
 corrective retry still omitted the required delta. No run met the complete

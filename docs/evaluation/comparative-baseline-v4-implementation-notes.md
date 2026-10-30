@@ -53,7 +53,7 @@ Do not execute until the manifest ceilings, provider configuration, repository
 path, grounding bridge, and collection authorization have been human-approved:
 
 ```bash
-LLM_PROVIDER=openai LLM_MODEL=gpt-4.1-mini LLM_API_KEY=<approved-key> \
+LLM_PROVIDER=openai LLM_MODEL=gpt-5.6-luna LLM_API_KEY=<approved-key> \
 python -m evaluations.comparative_baseline_v4.collect \
   --repository <pinned-repository> \
   --run-id <new-v4-run-id> \

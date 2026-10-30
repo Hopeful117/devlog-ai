@@ -17,14 +17,19 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Supplier;
 
 /** Thin MCP adapter for the bounded, read-only DevLog Story Agent capability. */
 @Component
 @Slf4j
 public class DevLogStoryAgentTool {
     private static final String STORY_CONTEXT_ANALYSIS_INTENT = "engineering-story-context-analysis";
-    private static final long DEFAULT_POLL_TIMEOUT_MS = 25_000L;
-    private static final long MAX_POLL_TIMEOUT_MS = 29_000L;
+    private static final long DEFAULT_POLL_TIMEOUT_MS = 29_000L;
+    private static final long MAX_POLL_TIMEOUT_MS = 90_000L;
     private static final long DEFAULT_POLL_INTERVAL_MS = 2_000L;
 
     private final DevlogProjectContextClient client;
@@ -41,11 +46,11 @@ public class DevLogStoryAgentTool {
     public DevLogStoryAgentTool(
             DevlogProjectContextClient client,
             ObjectMapper objectMapper,
-            @Value("${devlog.story-agent.poll.timeout-ms:25000}") long pollTimeoutMs,
+            @Value("${devlog.story-agent.poll.timeout-ms:29000}") long pollTimeoutMs,
             @Value("${devlog.story-agent.poll.interval-ms:2000}") long pollIntervalMs,
             McpAuthenticatedPrincipalProvider principalProvider) {
         if (pollTimeoutMs < 0 || pollTimeoutMs > MAX_POLL_TIMEOUT_MS || pollIntervalMs < 0) {
-            throw new IllegalArgumentException("Story Agent polling timeout must be between 0 and 29000 ms");
+            throw new IllegalArgumentException("Story Agent polling timeout must be between 0 and 90000 ms");
         }
         this.client = client;
         this.objectMapper = objectMapper;
@@ -63,12 +68,12 @@ public class DevLogStoryAgentTool {
             @Nullable String idempotencyKey) {
         var principal = principalProvider.currentPrincipal()
                 .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
-        return execute(projectSlug, storyId, intent, null, files, guidance, idempotencyKey, principal.bearerToken());
+        return execute(projectSlug, storyId, intent, null, files, guidance, idempotencyKey, principal);
     }
 
     @McpTool(
             name = "devlog_story_agent",
-            description = "Runs one bounded, read-only DevLog Story Agent execution and returns its structured result or execution diagnostics.")
+            description = "Runs one bounded, read-only DevLog Story Agent execution through the canonical Story Context Agent v1 protocol and returns its structured result or execution diagnostics.")
     public String execute(
             @McpArg(description = "DevLog project slug", required = true) String projectSlug,
             @McpArg(description = "Optional Engineering Story UUID", required = false) @Nullable UUID storyId,
@@ -82,7 +87,7 @@ public class DevLogStoryAgentTool {
         var principal = principalProvider.currentPrincipal(requestContext)
                 .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
         return execute(projectSlug, storyId, intent, question, files, guidance, idempotencyKey,
-                principal.bearerToken());
+                principal);
     }
 
     private String execute(
@@ -93,26 +98,35 @@ public class DevLogStoryAgentTool {
             @Nullable List<String> files,
             @Nullable Map<String, Object> guidance,
             @Nullable String idempotencyKey,
-            String bearerToken) {
+            McpAuthenticatedPrincipalProvider.McpPrincipal principal) {
+        String bearerToken = principal.bearerToken();
         if (bearerToken == null || bearerToken.isBlank()) {
             throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
         }
         Map<String, Object> execution;
         try {
             String effectiveQuestion = question == null || question.isBlank() ? intent : question;
-            execution = client.executeStoryAgent(
+            Map<String, Object> effectiveGuidance = guidance == null
+                    ? new LinkedHashMap<>()
+                    : new LinkedHashMap<>(guidance);
+            effectiveGuidance.putIfAbsent("focus", effectiveQuestion);
+            if (!STORY_CONTEXT_ANALYSIS_INTENT.equals(intent)) {
+                effectiveGuidance.put("callerIntent", intent);
+            }
+            execution = client.submitStoryContextAgentTask(
                     projectSlug,
-                    idempotencyKey,
+                    storyId,
                     bearerToken,
-                    new DevlogProjectContextClient.StoryAgentRequest(
-                            storyId, STORY_CONTEXT_ANALYSIS_INTENT, effectiveQuestion, files, guidance));
+                    idempotencyKey,
+                    new DevlogProjectContextClient.SubmitRequest(
+                            STORY_CONTEXT_ANALYSIS_INTENT, files, effectiveGuidance));
         } catch (RuntimeException exception) {
             log.error("Story Agent backend submission failed projectSlug={} storyId={} hasQuestion={} fileCount={} hasGuidance={} hasIdempotencyKey={}",
                     projectSlug, storyId, question != null, files == null ? 0 : files.size(),
                     guidance != null && !guidance.isEmpty(), idempotencyKey != null, exception);
             throw exception;
         }
-        execution = awaitTerminalExecution(execution, bearerToken);
+        execution = awaitTerminalExecution(execution, principal);
         try {
             return objectMapper.writeValueAsString(execution);
         } catch (Exception exception) {
@@ -122,7 +136,8 @@ public class DevLogStoryAgentTool {
 
     private Map<String, Object> awaitTerminalExecution(
             Map<String, Object> initialExecution,
-            String bearerToken) {
+            McpAuthenticatedPrincipalProvider.McpPrincipal principal) {
+        String bearerToken = principal.bearerToken();
         String initialStatus = stringValue(initialExecution.get("status"));
         if (isTerminal(initialStatus)) {
             return initialExecution;
@@ -137,16 +152,26 @@ public class DevLogStoryAgentTool {
                 break;
             }
 
-            DevlogProjectContextClient.AiTaskStatusResponse taskStatus =
-                    client.getAiTaskStatusAuthenticated(taskId, bearerToken);
+            Map<String, Object> taskStatus;
+            try {
+                taskStatus = callUntil(deadline,
+                        () -> client.getStoryContextAgentSnapshot(taskId, principal.principalId(),
+                                principal.kind().name(), principal.authenticationSource(), bearerToken));
+            } catch (DeadlineExceededException exception) {
+                break;
+            }
             latestExecution = executionWithStatus(latestExecution, taskStatus);
-            if ("FAILED".equals(taskStatus.status())) {
+            if ("FAILED".equals(stringValue(taskStatus.get("status")))) {
                 return latestExecution;
             }
-            if ("COMPLETED".equals(taskStatus.status())) {
+            if ("COMPLETED".equals(stringValue(taskStatus.get("status")))) {
                 try {
+                    StoryContextAnalysisResponse analysis = callUntil(deadline,
+                            () -> client.getStoryContextAgentResultAuthenticated(taskId, bearerToken));
                     return completedExecution(latestExecution, taskStatus,
-                            client.getStoryContextAnalysisAuthenticated(taskId, bearerToken));
+                            analysis);
+                } catch (DeadlineExceededException exception) {
+                    break;
                 } catch (RuntimeException exception) {
                     log.warn("Completed Story Agent task {} has no readable result", taskId, exception);
                     return completedWithoutResult(latestExecution, taskId, exception);
@@ -162,6 +187,40 @@ public class DevLogStoryAgentTool {
                 "lastKnownStatus", lastKnownStatus,
                 "aiTaskId", taskId.toString()));
         return latestExecution;
+    }
+
+    private <T> T callUntil(long deadline, Supplier<T> operation) {
+        long remainingNanos = deadline - System.nanoTime();
+        if (remainingNanos <= 0) {
+            throw new DeadlineExceededException();
+        }
+
+        FutureTask<T> task = new FutureTask<>(operation::get);
+        Thread worker = Thread.ofVirtual().start(task);
+        try {
+            return task.get(remainingNanos, TimeUnit.NANOSECONDS);
+        } catch (TimeoutException exception) {
+            task.cancel(true);
+            worker.interrupt();
+            throw new DeadlineExceededException();
+        } catch (InterruptedException exception) {
+            task.cancel(true);
+            worker.interrupt();
+            Thread.currentThread().interrupt();
+            throw new DeadlineExceededException();
+        } catch (ExecutionException exception) {
+            Throwable cause = exception.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw new IllegalStateException("Story Agent polling failed", cause);
+        }
+    }
+
+    private static final class DeadlineExceededException extends RuntimeException {
     }
 
     private Map<String, Object> completedWithoutResult(
@@ -196,18 +255,20 @@ public class DevLogStoryAgentTool {
 
     private Map<String, Object> executionWithStatus(
             Map<String, Object> previous,
-            DevlogProjectContextClient.AiTaskStatusResponse taskStatus) {
+            Map<String, Object> taskStatus) {
         Map<String, Object> execution = new LinkedHashMap<>(previous);
-        execution.put("status", taskStatus.status());
-        execution.put("aiTaskId", taskStatus.id());
-        execution.put("snapshotId", taskStatus.id());
+        String status = stringValue(taskStatus.get("status"));
+        Object id = taskStatus.get("id");
+        execution.put("status", status);
+        execution.put("aiTaskId", id);
+        execution.put("snapshotId", id);
         Map<String, Object> diagnostics = new LinkedHashMap<>();
-        diagnostics.put("status", taskStatus.status());
-        if (taskStatus.failureCode() != null) {
-            diagnostics.put("failureCode", taskStatus.failureCode());
+        diagnostics.put("status", status);
+        if (taskStatus.get("failureCode") != null) {
+            diagnostics.put("failureCode", taskStatus.get("failureCode"));
         }
-        if (taskStatus.failureMessage() != null) {
-            diagnostics.put("failureMessage", taskStatus.failureMessage());
+        if (taskStatus.get("failureMessage") != null) {
+            diagnostics.put("failureMessage", taskStatus.get("failureMessage"));
         }
         execution.put("diagnostics", diagnostics);
         return execution;
@@ -215,27 +276,29 @@ public class DevLogStoryAgentTool {
 
     private Map<String, Object> completedExecution(
             Map<String, Object> execution,
-            DevlogProjectContextClient.AiTaskStatusResponse taskStatus,
+            Map<String, Object> taskStatus,
             StoryContextAnalysisResponse analysis) {
         Map<String, Object> completed = new LinkedHashMap<>(execution);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("analysis", analysis);
-        if (taskStatus.contextDigest() != null) {
-            result.put("contextDigest", taskStatus.contextDigest());
+        if (taskStatus.get("contextDigest") != null) {
+            result.put("contextDigest", taskStatus.get("contextDigest"));
         }
-        if (taskStatus.projectionDigest() != null) {
-            result.put("projectionDigest", taskStatus.projectionDigest());
+        if (taskStatus.get("projectionDigest") != null) {
+            result.put("projectionDigest", taskStatus.get("projectionDigest"));
         }
-        putIfPresent(result, taskStatus.contextSnapshot(), "scope");
-        putIfPresent(result, taskStatus.contextSnapshot(), "freshness");
-        putIfPresent(result, taskStatus.contextSnapshot(), "accounting");
+        if (taskStatus.get("contextSnapshot") instanceof Map<?, ?> contextSnapshot) {
+            putIfPresent(result, contextSnapshot, "scope");
+            putIfPresent(result, contextSnapshot, "freshness");
+            putIfPresent(result, contextSnapshot, "accounting");
+        }
         completed.put("status", "COMPLETED");
         completed.put("result", result);
         completed.put("diagnostics", Map.of("status", "COMPLETED"));
         return completed;
     }
 
-    private void putIfPresent(Map<String, Object> target, Map<String, Object> source, String key) {
+    private void putIfPresent(Map<String, Object> target, Map<?, ?> source, String key) {
         if (source != null && source.get(key) != null) {
             target.put(key, source.get(key));
         }

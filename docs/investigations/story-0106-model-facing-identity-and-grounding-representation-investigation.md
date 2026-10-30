@@ -51,7 +51,7 @@ After replacing 48 analysis-local UUIDs with sequential placeholders per run, th
 
 ### What the frozen replay proves
 
-When the EXACT SAME PromptRequest (including all volatile UUIDs) is replayed 5 times against `gpt-4.1-mini`, the result is 100% clean (5/5 ADR proposals, 0 technology-only). This confirms that the model's behavior on identical input — including volatile UUIDs — is stable.
+When the EXACT SAME PromptRequest (including all volatile UUIDs) is replayed 5 times against `gpt-5.6-luna`, the result is 100% clean (5/5 ADR proposals, 0 technology-only). This confirms that the model's behavior on identical input — including volatile UUIDs — is stable.
 
 ### Bottom line
 

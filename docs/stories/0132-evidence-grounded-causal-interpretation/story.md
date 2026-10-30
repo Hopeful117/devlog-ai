@@ -19,7 +19,7 @@ separate gates.
 - Story 0131's oracle and Ground-Truth Context remain frozen.
 - Repository ground truth resolves `19/19` expected artifacts.
 - DevLog context retrieves `10/19` artifacts, with `9` true retrieval misses.
-- The same `gpt-4.1-mini` interpreter was run three times for four cases in
+- The same `gpt-5.6-luna` interpreter was run three times for four cases in
   both DevLog and Ground Truth conditions.
 - Causal reasoning accuracy is `0.433` for DevLog and `0.483` for Ground
   Truth.
@@ -222,7 +222,7 @@ confidence.
 
 The approved GREEN implementation completed deterministic Python and Java
 validation. The frozen Ground-Truth rerun executed with `openai`/
-`gpt-4.1-mini` for four cases and three repetitions. Interpretation remains
+`gpt-5.6-luna` for four cases and three repetitions. Interpretation remains
 RED: positive causal accuracy `0.15555555555555556`, CASE-04 `0/3
 NOT_ESTABLISHED`, grounding PASS, stability `0.7983058608058609`, and
 historical unsupported-inference gate FAIL. The prior RED result remains

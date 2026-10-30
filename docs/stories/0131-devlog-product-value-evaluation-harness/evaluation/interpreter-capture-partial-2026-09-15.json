@@ -3,7 +3,7 @@
   "status": "PARTIAL_INTERPRETER_CAPTURE",
   "capturedAt": "2026-09-15T17:29:40.040849+00:00",
   "provider": "openai",
-  "model": "gpt-4.1-mini",
+  "model": "gpt-5.6-luna",
   "settings": {
     "max_output_tokens": 2000,
     "temperature": "provider_default"
@@ -13952,7 +13952,7 @@
       ],
       "metadata": {
         "provider": "openai",
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5.6-luna",
         "settings": {
           "max_output_tokens": 2000,
           "temperature": "provider_default"
@@ -15668,7 +15668,7 @@
       ],
       "metadata": {
         "provider": "openai",
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5.6-luna",
         "settings": {
           "max_output_tokens": 2000,
           "temperature": "provider_default"

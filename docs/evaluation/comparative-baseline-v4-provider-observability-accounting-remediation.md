@@ -12,7 +12,7 @@ The unresolved provider behavior remains unresolved:
 ```text
 six V4 typed tools
 + strict V4 structured output
-+ gpt-4.1-mini
++ gpt-5.6-luna
 ```
 
 This Story only makes the provider boundary observable and economically
@@ -182,8 +182,8 @@ through provider failure attribution and the RAW `providerAttempts` record:
   "providerResponseDiagnostics": {
     "providerResponseId": "...",
     "providerRequestId": "...",
-    "requestedModel": "gpt-4.1-mini",
-    "resolvedProviderModel": "gpt-4.1-mini-2025-04-14",
+    "requestedModel": "gpt-5.6-luna",
+    "resolvedProviderModel": "gpt-5.6-luna",
     "providerResponseStatus": "incomplete",
     "providerIncompleteReason": "max_output_tokens",
     "maxOutputTokens": 32768,
@@ -432,7 +432,7 @@ validation, or official collection was modified by this Story.
 - A: `NO`; no benchmark observations were executed.
 - B: `NO`; no live provider calls were executed.
 - C: `NO`; official collection was not executed.
-- D: `NO`; `gpt-4.1-mini` was unchanged.
+- D: `NO`; `gpt-5.6-luna` was unchanged.
 - E: `NO`; `max_output_tokens=32768` was unchanged.
 - F: `NO`; prompts were unchanged.
 - G: `NO`; typed repository tools were unchanged.
@@ -474,7 +474,7 @@ validation, or official collection was modified by this Story.
 ## 26. Unresolved Provider Behavior
 
 The provider behavior associated with six V4 typed tools plus strict V4
-structured output on `gpt-4.1-mini` remains experimentally unresolved. This
+structured output on `gpt-5.6-luna` remains experimentally unresolved. This
 Story does not claim to fix it and does not change the experiment to avoid it.
 
 ## 27. Exact Next Human Decision

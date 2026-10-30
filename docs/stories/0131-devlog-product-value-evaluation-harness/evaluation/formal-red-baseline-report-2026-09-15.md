@@ -7,7 +7,7 @@
 The frozen oracle and real Ground-Truth Context passed their preconditions. The
 same OpenAI interpreter was executed for DevLog and Ground Truth: four
 cases, three repetitions per condition, 24 model calls total, using
-`gpt-4.1-mini`. The formal three-condition RED run remains blocked because the
+`gpt-5.6-luna`. The formal three-condition RED run remains blocked because the
 Direct Repository condition has no comparable agent/tool execution capture.
 
 ## Preconditions
@@ -18,8 +18,8 @@ Direct Repository condition has no comparable agent/tool execution capture.
 | Oracle | `HUMAN_APPROVED / FROZEN` |
 | Ground-Truth Context leakage | `PASS` |
 | Direct Repository condition | `BLOCKED - NO COMPARABLE AGENT CAPTURE` |
-| DevLog Context condition | `EXECUTED - OPENAI / gpt-4.1-mini / 12 runs` |
-| Ground-Truth Context condition | `EXECUTED - OPENAI / gpt-4.1-mini / 12 runs` |
+| DevLog Context condition | `EXECUTED - OPENAI / gpt-5.6-luna / 12 runs` |
+| Ground-Truth Context condition | `EXECUTED - OPENAI / gpt-5.6-luna / 12 runs` |
 | Formal RED execution | `NO` |
 
 ## Comparison matrix

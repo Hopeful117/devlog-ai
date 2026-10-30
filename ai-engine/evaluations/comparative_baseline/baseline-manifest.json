@@ -3,7 +3,7 @@
   "benchmarkVersion": "devlog-comparative-baseline-1.0.0",
   "benchmarkSource": "devlog-product-value:1.0.0",
   "repositoryId": "1feead5d-dfc9-4b2c-aa9c-045a8524a9f8",
-  "repositoryRevision": "18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149",
+  "repositoryRevision": "a6d3d118f87aed995ce326d1bb50e1ce9a084a31",
   "oracleReference": "docs/stories/0131-devlog-product-value-evaluation-harness/evaluation/oracle-freeze-v1.json",
   "oracleVersion": "1.0.0",
   "oracleStatus": "HUMAN_APPROVED",

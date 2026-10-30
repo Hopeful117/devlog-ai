@@ -98,8 +98,8 @@ def test_instrumentation_identity_is_new_but_frozen_semantics_are_unchanged():
     identity = v4_experiment_identity(safety=_ceilings())
     pilot = v4_pilot_identity(safety=_ceilings())
     assert v4_runtime_contract_identity()["identityVersion"] == "comparative-v4-live-runtime-contract-5.1.0"
-    assert identity["sha256"] == "9b45c5d2a7c6d87a612eda7f4eea694d90af7c55e4106d7b8767adc8806cea13"
-    assert pilot["sha256"] == "211bae21fbfcaadbe49f1faf6e5edb9729dfff926962aee823ae0a111fe2e0ad"
+    assert identity["sha256"] == "fc92f401a96b8570038eb449f755642d41a7fe23d6caac1de2282141b2aba630"
+    assert pilot["sha256"] == "cbfc363a0857f91aea1ef6080856ba13b94e46f13aa39d397e7868c5e33de5af"
     assert identity["sha256"] != "01b42a88a6b94311fd912b38dbfaa4a4ceed975502cab11e80d527f1dfdad7f6"
 
 
