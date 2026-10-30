@@ -1,0 +1,34 @@
+- generic [ref=e3]:
+  - img "ChatGPT" [ref=e4]
+  - generic [ref=e13]:
+    - generic [ref=e15]:
+      - img "Logo OpenAI" [ref=e17]
+      - img "Logo DevLog AI" [ref=e25]
+    - heading "Se connecter à DevLog AI avec ChatGPT" [level=1] [ref=e26]
+    - generic [ref=e27]: Choisissez un compte pour vous connecter à ChatGPT
+  - group [ref=e28]:
+    - form "Se connecter à DevLog AI avec ChatGPT" [ref=e29]:
+      - generic [ref=e30]:
+        - list [ref=e31]:
+          - listitem [ref=e32]:
+            - generic [ref=e34]:
+              - button "Sélectionner un compte Ludovic Brot ludovic.brot@gmail.com" [ref=e35] [cursor=pointer]:
+                - generic [ref=e38]:
+                  - generic [ref=e39]: Sélectionner un compte
+                  - generic [ref=e40]: Ludovic Brot
+                  - generic [ref=e41]: ludovic.brot@gmail.com
+              - 'button "Supprimer le compte : ludovic.brot@gmail.com" [ref=e44] [cursor=pointer]'
+        - generic [ref=e48]: OU
+        - generic [ref=e52]:
+          - link "Utiliser un autre compte" [ref=e54] [cursor=pointer]:
+            - /url: /log-in-or-create-account
+          - link "Créer un compte" [ref=e56] [cursor=pointer]:
+            - /url: /create-account
+        - generic [ref=e57]: En continuant, vous autorisez ChatGPT à communiquer à DevLog AI des informations de base sur votre profil, telles que votre nom et votre adresse e-mail, afin de vous connecter.
+        - generic [ref=e58]: Utilisez ChatGPT pour vous connecter uniquement aux applications et aux sites dont vous avez vérifié la fiabilité.
+  - generic [ref=e61]:
+    - link "Conditions d’utilisation" [ref=e62] [cursor=pointer]:
+      - /url: https://openai.com/policies/terms-of-use
+    - generic [ref=e63]: "|"
+    - link "Politique de confidentialité" [ref=e64] [cursor=pointer]:
+      - /url: https://openai.com/policies/privacy-policy

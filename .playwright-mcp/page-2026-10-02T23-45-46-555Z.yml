@@ -1,0 +1,83 @@
+- generic [ref=f3e3]:
+  - navigation [ref=f3e5]:
+    - link "Trading OS" [ref=f3e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f3e8]:
+      - link "Dashboard" [ref=f3e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f3e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f3e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f3e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f3e13] [cursor=pointer]
+  - generic [ref=f3e14]:
+    - navigation [ref=f3e16]:
+      - generic [ref=f3e17]:
+        - link "Dashboard" [ref=f3e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f3e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f3e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f3e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f3e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f3e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f3e24]:
+        - generic [ref=f3e25]: AI Engine
+        - generic [ref=f3e26]: ● Online
+    - main [ref=f3e27]:
+      - generic [ref=f3e1007]:
+        - generic [ref=f3e1008]:
+          - generic [ref=f3e1009]:
+            - heading "Positions ouvertes" [level=1] [ref=f3e1010]
+            - paragraph [ref=f3e1011]: Suivi en temps réel de vos positions broker
+          - generic [ref=f3e1012]:
+            - generic [ref=f3e1013]: Compte
+            - combobox "Compte" [ref=f3e1014]:
+              - option "kraken account" [selected]
+              - option "Story 0067 PAPER Validation"
+        - generic [ref=f3e1015]: 1 position(s) ouverte(s)
+        - article [ref=f3e1017]:
+          - generic [ref=f3e1018]:
+            - generic [ref=f3e1019]: TBTC/USD
+            - generic [ref=f3e1020]: Short
+          - generic [ref=f3e1021]:
+            - generic [ref=f3e1022]:
+              - generic [ref=f3e1023]: Quantité
+              - generic [ref=f3e1024]: "0.001"
+            - generic [ref=f3e1025]:
+              - generic [ref=f3e1026]: Prix d'entrée
+              - generic [ref=f3e1027]: 81,203.40
+            - generic [ref=f3e1028]:
+              - generic [ref=f3e1029]: Prix courant
+              - generic [ref=f3e1030]: 83,967.50
+          - generic [ref=f3e1032]:
+            - generic [ref=f3e1033]: "-$2.76"
+            - generic [ref=f3e1034]: "-3.40 %"
+          - generic [ref=f3e1035]:
+            - generic [ref=f3e1036]:
+              - generic [ref=f3e1037]: Stop Loss
+              - generic [ref=f3e1038]: 82,000.00
+            - generic [ref=f3e1039]:
+              - generic [ref=f3e1040]: Take Profit
+              - generic [ref=f3e1041]: 79,000.00
+            - generic [ref=f3e1042]: Protégé
+          - generic [ref=f3e1043]:
+            - generic [ref=f3e1044]:
+              - generic [ref=f3e1045]: Exposition
+              - generic [ref=f3e1046]: $83.97
+            - generic [ref=f3e1047]:
+              - generic [ref=f3e1048]: Risque
+              - generic [ref=f3e1049]: $0.80 · 0.01 %
+            - generic [ref=f3e1050]:
+              - generic [ref=f3e1051]: Ouverte depuis
+              - generic [ref=f3e1052]: 10/3/26, 1:45 AM
+            - generic [ref=f3e1053]:
+              - generic [ref=f3e1054]: Prix à
+              - generic [ref=f3e1055]: 1:45:21 AM
+          - button "Fermer l'exposition" [ref=f3e1057] [cursor=pointer]

@@ -4,6 +4,9 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.DevLogStoryAgentExecution;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.DevLogStoryAgentRequest;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.DevLogStoryAgentService;
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipalResolver;
+import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -18,12 +21,16 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class DevLogStoryAgentController {
     private final DevLogStoryAgentService devLogStoryAgentService;
+    private final AuthenticatedPrincipalResolver principalResolver;
 
     @PostMapping("/api/v1/projects/{projectSlug}/story-agent")
     public ResponseEntity<DevLogStoryAgentExecution> agentRequest(
             @PathVariable String projectSlug,
             @Valid @RequestBody AgentRequest payload,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            HttpServletRequest servletRequest) {
+        var principal = principalResolver.resolve(servletRequest)
+                .orElseThrow(UnauthenticatedPrincipalException::new);
         DevLogStoryAgentRequest request = new DevLogStoryAgentRequest(
                 projectSlug,
                 payload.storyId(),
@@ -34,7 +41,7 @@ public class DevLogStoryAgentController {
                 idempotencyKey
         );
 
-        DevLogStoryAgentExecution execution = devLogStoryAgentService.execute(request);
+        DevLogStoryAgentExecution execution = devLogStoryAgentService.execute(request, principal);
         if (execution.status() == AiTaskStatus.SUBMITTED || execution.status() == AiTaskStatus.PROCESSING) {
             return ResponseEntity.accepted().body(execution);
         }

@@ -1,0 +1,35 @@
+{
+  "realm": "devlog",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "devlog-core",
+      "name": "DevLog Core",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "devlog-core-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "devlog-core",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ],
+      "redirectUris": ["http://localhost/*"],
+      "webOrigins": ["http://localhost"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {"name": "PROJECT_READER"},
+      {"name": "PROJECT_OWNER"}
+    ]
+  }
+}

@@ -105,12 +105,16 @@ public class StoryContextAgentProtocolController {
             @PathVariable String projectSlug,
             @Valid @RequestBody SubmitRequest request,
             @RequestParam(required = false) UUID storyId,
-            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            HttpServletRequest servletRequest) {
         return metrics.time("submit", () -> {
             metrics.request("submit");
+            var principal = principalResolver.resolve(servletRequest)
+                    .orElseThrow(UnauthenticatedPrincipalException::new);
             List<String> files = request.files() == null ? List.of() : request.files();
             UUID aiTaskId = analyzeStoryContextUseCase.execute(
-                    projectSlug, storyId, request.intent(), files, request.guidance(), idempotencyKey);
+                    projectSlug, storyId, request.intent(), files, request.guidance(), idempotencyKey,
+                    principal, "chatgpt");
             AiTaskResponse task = aiTaskService.getById(aiTaskId);
             return ResponseEntity.accepted().body(SubmitResponse.from(task, task.contextSnapshot()));
         });

@@ -104,6 +104,7 @@ class EngineeringDecisionGenerationService:
             self._provider.model_identifier,
         )
         await self._callback_client.send_result(
+            submission.ai_task_id,
             submission.correlation_id,
             AiTaskResultRequest(
                 correlation_id=submission.correlation_id,
@@ -151,6 +152,7 @@ class EngineeringDecisionGenerationService:
         traces: InteractionTraceCollector | None = None,
     ) -> None:
         await self._callback_client.send_result(
+            submission.ai_task_id,
             submission.correlation_id,
             AiTaskResultRequest(
                 correlation_id=submission.correlation_id,

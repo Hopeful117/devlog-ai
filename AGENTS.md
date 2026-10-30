@@ -279,7 +279,7 @@ npm run build             # Production build
 docker compose up --build -d
 
 # With OpenAI provider
-LLM_PROVIDER=openai LLM_MODEL=gpt-4.1-mini LLM_API_KEY=<key> docker compose up --build -d
+LLM_PROVIDER=openai LLM_MODEL=gpt-5.6-luna LLM_API_KEY=<key> docker compose up --build -d
 
 # View logs
 docker compose logs -f backend ai-engine

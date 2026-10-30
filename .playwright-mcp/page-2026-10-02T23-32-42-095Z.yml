@@ -1,0 +1,70 @@
+- generic [ref=f2e3]:
+  - navigation [ref=f2e5]:
+    - link "Trading OS" [ref=f2e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f2e8]:
+      - link "Dashboard" [ref=f2e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f2e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f2e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f2e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f2e13] [cursor=pointer]
+  - generic [ref=f2e14]:
+    - navigation [ref=f2e16]:
+      - generic [ref=f2e17]:
+        - link "Dashboard" [ref=f2e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f2e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f2e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [active] [ref=f2e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f2e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f2e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f2e24]:
+        - generic [ref=f2e25]: AI Engine
+        - generic [ref=f2e26]: ● Online
+    - main [ref=f2e27]:
+      - generic [ref=f2e760]:
+        - generic [ref=f2e761]:
+          - generic [ref=f2e762]:
+            - heading "Opportunities" [level=1] [ref=f2e763]
+            - paragraph [ref=f2e764]: Active Market Intelligence opportunities
+          - button "Refresh" [ref=f2e765] [cursor=pointer]
+        - generic [ref=f2e767]:
+          - generic [ref=f2e768]:
+            - heading "Market scan" [level=2] [ref=f2e769]
+            - paragraph [ref=f2e770]: Choose the markets Market Intelligence should analyze now.
+          - generic [ref=f2e771]:
+            - generic [ref=f2e772]:
+              - generic [ref=f2e773]: Account
+              - combobox "Account" [ref=f2e774]:
+                - option "Select an account" [disabled]
+                - option "kraken account"
+                - option "Story 0067 PAPER Validation" [selected]
+            - generic [ref=f2e775]:
+              - generic [ref=f2e776]: Provenance / context
+              - textbox "Provenance / context Does not influence scope, eligibility, or ranking." [ref=f2e777]:
+                - /placeholder: Optional context for this scan
+              - generic [ref=f2e778]: Does not influence scope, eligibility, or ranking.
+          - group "Scan scope" [ref=f2e779]:
+            - generic [ref=f2e781] [cursor=pointer]:
+              - radio "Specific markets Choose one or more catalogue markets." [ref=f2e782]
+              - generic [ref=f2e783]:
+                - strong [ref=f2e784]: Specific markets
+                - text: Choose one or more catalogue markets.
+            - generic [ref=f2e785] [cursor=pointer]:
+              - radio "All eligible markets Ask the backend to resolve the full catalogue." [ref=f2e786]
+              - generic [ref=f2e787]:
+                - strong [ref=f2e788]: All eligible markets
+                - text: Ask the backend to resolve the full catalogue.
+          - button "Run market scan" [disabled] [ref=f2e789]
+        - generic [ref=f2e790]:
+          - heading "No active trading opportunities right now" [level=2] [ref=f2e791]
+          - paragraph [ref=f2e792]: Market Intelligence has not produced any active opportunity yet.

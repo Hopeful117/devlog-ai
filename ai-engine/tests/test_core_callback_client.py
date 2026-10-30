@@ -11,13 +11,14 @@ from app.schemas.ai_task_result import AiProposalResult, AiTaskResultRequest
 
 @pytest.mark.asyncio
 async def test_callback_client_posts_result_to_core() -> None:
+    ai_task_id = uuid4()
     correlation_id = uuid4()
     external_job_id = str(uuid4())
 
     async def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         assert request.url.path == (
-            f"/api/v1/ai/tasks/{correlation_id}/result"
+             f"/api/v1/story-context-agent/tasks/{ai_task_id}/callback"
         )
         payload = await request.aread()
         assert str(correlation_id).encode() in payload
@@ -51,10 +52,11 @@ async def test_callback_client_posts_result_to_core() -> None:
     )
     client = CoreCallbackClient(
         "http://core.test",
+        callback_secret="test-secret",
         transport=httpx.MockTransport(handler),
     )
 
-    acknowledgement = await client.send_result(correlation_id, result)
+    acknowledgement = await client.send_result(ai_task_id, correlation_id, result)
 
     assert acknowledgement.acknowledged is True
     assert acknowledgement.task_status == "COMPLETED"
@@ -110,6 +112,7 @@ async def test_callback_retries_not_ready_then_succeeds_with_same_payload() -> N
 
     client = CoreCallbackClient(
         "http://core.test",
+        callback_secret="test-secret",
         transport=httpx.MockTransport(handler),
         max_attempts=5,
         initial_delay_ms=100,
@@ -118,6 +121,7 @@ async def test_callback_retries_not_ready_then_succeeds_with_same_payload() -> N
     )
 
     result = await client.send_result(
+        uuid4(),
         correlation_id,
         callback_result(correlation_id),
     )
@@ -152,6 +156,7 @@ async def test_callback_reports_bounded_error_after_retry_exhaustion() -> None:
 
     client = CoreCallbackClient(
         "http://core.test",
+        callback_secret="test-secret",
         transport=httpx.MockTransport(handler),
         max_attempts=5,
         initial_delay_ms=100,
@@ -160,7 +165,7 @@ async def test_callback_reports_bounded_error_after_retry_exhaustion() -> None:
     )
 
     with pytest.raises(CoreCallbackError) as raised:
-        await client.send_result(correlation_id, callback_result(correlation_id))
+        await client.send_result(uuid4(), correlation_id, callback_result(correlation_id))
 
     message = str(raised.value)
     assert attempts == 5
@@ -184,13 +189,14 @@ async def test_callback_does_not_retry_contract_errors(status_code: int) -> None
 
     client = CoreCallbackClient(
         "http://core.test",
+        callback_secret="test-secret",
         transport=httpx.MockTransport(handler),
         max_attempts=5,
         sleep=lambda _: pytest.fail("sleep must not be called"),
     )
 
     with pytest.raises(CoreCallbackError):
-        await client.send_result(correlation_id, callback_result(correlation_id))
+        await client.send_result(uuid4(), correlation_id, callback_result(correlation_id))
 
     assert attempts == 1
 
@@ -213,12 +219,13 @@ async def test_callback_does_not_retry_terminal_conflict() -> None:
 
     client = CoreCallbackClient(
         "http://core.test",
+        callback_secret="test-secret",
         transport=httpx.MockTransport(handler),
         max_attempts=5,
     )
 
     with pytest.raises(CoreCallbackError):
-        await client.send_result(correlation_id, callback_result(correlation_id))
+        await client.send_result(uuid4(), correlation_id, callback_result(correlation_id))
 
     assert attempts == 1
 
@@ -234,10 +241,11 @@ async def test_callback_rejects_mismatched_identifier_without_http_call() -> Non
 
     client = CoreCallbackClient(
         "http://core.test",
+        callback_secret="test-secret",
         transport=httpx.MockTransport(handler),
     )
 
     with pytest.raises(ValueError):
-        await client.send_result(uuid4(), callback_result(uuid4()))
+        await client.send_result(uuid4(), uuid4(), callback_result(uuid4()))
 
     assert calls == 0

@@ -3,6 +3,8 @@ package com.hopeful117.devlogai.storycontextanalysis.controller;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.DevLogStoryAgentExecution;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.DevLogStoryAgentService;
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
+import com.hopeful117.devlogai.authorization.PrincipalKind;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,9 +26,9 @@ class DevLogStoryAgentControllerTest {
     void bindsStructuredBodyAndIdempotencyHeader() throws Exception {
         DevLogStoryAgentService service = mock(DevLogStoryAgentService.class);
         UUID taskId = UUID.randomUUID();
-        when(service.execute(any())).thenReturn(new DevLogStoryAgentExecution(
+        when(service.execute(any(), any())).thenReturn(new DevLogStoryAgentExecution(
                 AiTaskStatus.PROCESSING, taskId, taskId, Map.of(), Map.of("status", "PROCESSING")));
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(new DevLogStoryAgentController(service)).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(service)).build();
 
         mvc.perform(post("/api/v1/projects/devlog-ai/story-agent")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -43,13 +45,13 @@ class DevLogStoryAgentControllerTest {
                 .andExpect(jsonPath("$.result").isEmpty())
                 .andExpect(jsonPath("$.diagnostics.status").value("PROCESSING"));
 
-        verify(service).execute(any());
+        verify(service).execute(any(), any());
     }
 
     @Test
     void rejectsMissingRequiredBodyFields() throws Exception {
         DevLogStoryAgentService service = mock(DevLogStoryAgentService.class);
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(new DevLogStoryAgentController(service)).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(service)).build();
 
         mvc.perform(post("/api/v1/projects/devlog-ai/story-agent")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -61,9 +63,9 @@ class DevLogStoryAgentControllerTest {
     void defaultsOptionalFilesToAnEmptyList() throws Exception {
         DevLogStoryAgentService service = mock(DevLogStoryAgentService.class);
         UUID taskId = UUID.randomUUID();
-        when(service.execute(any())).thenReturn(new DevLogStoryAgentExecution(
+        when(service.execute(any(), any())).thenReturn(new DevLogStoryAgentExecution(
                 AiTaskStatus.PROCESSING, taskId, taskId, Map.of(), Map.of("status", "PROCESSING")));
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(new DevLogStoryAgentController(service)).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(service)).build();
 
         mvc.perform(post("/api/v1/projects/devlog-ai/story-agent")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -73,7 +75,7 @@ class DevLogStoryAgentControllerTest {
 
         var request = org.mockito.ArgumentCaptor.forClass(
                 com.hopeful117.devlogai.storycontextanalysis.usecase.DevLogStoryAgentRequest.class);
-        verify(service).execute(request.capture());
+        verify(service).execute(request.capture(), any());
         org.assertj.core.api.Assertions.assertThat(request.getValue().files()).isEmpty();
         org.assertj.core.api.Assertions.assertThat(request.getValue().storyId()).isNull();
     }
@@ -82,9 +84,9 @@ class DevLogStoryAgentControllerTest {
     void usesIntentAsQuestionWhenQuestionIsOmitted() throws Exception {
         DevLogStoryAgentService service = mock(DevLogStoryAgentService.class);
         UUID taskId = UUID.randomUUID();
-        when(service.execute(any())).thenReturn(new DevLogStoryAgentExecution(
+        when(service.execute(any(), any())).thenReturn(new DevLogStoryAgentExecution(
                 AiTaskStatus.PROCESSING, taskId, taskId, Map.of(), Map.of("status", "PROCESSING")));
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(new DevLogStoryAgentController(service)).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(service)).build();
 
         mvc.perform(post("/api/v1/projects/trading-os/story-agent")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -93,7 +95,7 @@ class DevLogStoryAgentControllerTest {
 
         var request = org.mockito.ArgumentCaptor.forClass(
                 com.hopeful117.devlogai.storycontextanalysis.usecase.DevLogStoryAgentRequest.class);
-        verify(service).execute(request.capture());
+        verify(service).execute(request.capture(), any());
         org.assertj.core.api.Assertions.assertThat(request.getValue().question())
                 .isEqualTo("Investigate Trading OS");
     }
@@ -102,11 +104,11 @@ class DevLogStoryAgentControllerTest {
     void returnsFailureDiagnosticsAsStructuredAgentResponse() throws Exception {
         DevLogStoryAgentService service = mock(DevLogStoryAgentService.class);
         UUID taskId = UUID.randomUUID();
-        when(service.execute(any())).thenReturn(new DevLogStoryAgentExecution(
+        when(service.execute(any(), any())).thenReturn(new DevLogStoryAgentExecution(
                 AiTaskStatus.FAILED, taskId, taskId, Map.of(),
                 Map.of("status", "FAILED", "failureCode", "INVALID_LLM_OUTPUT",
                         "failureMessage", "The generated output was invalid")));
-        MockMvc mvc = MockMvcBuilders.standaloneSetup(new DevLogStoryAgentController(service)).build();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller(service)).build();
 
         mvc.perform(post("/api/v1/projects/devlog-ai/story-agent")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -120,5 +122,10 @@ class DevLogStoryAgentControllerTest {
                 .andExpect(jsonPath("$.diagnostics.failureCode").value("INVALID_LLM_OUTPUT"))
                 .andExpect(jsonPath("$.diagnostics.failureMessage")
                         .value("The generated output was invalid"));
+    }
+
+    private static DevLogStoryAgentController controller(DevLogStoryAgentService service) {
+        return new DevLogStoryAgentController(service, request -> java.util.Optional.of(
+                new AuthenticatedPrincipal("principal-1", PrincipalKind.HUMAN, "issuer")));
     }
 }

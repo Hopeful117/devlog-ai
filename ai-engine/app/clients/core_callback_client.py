@@ -1,6 +1,11 @@
 import asyncio
 from collections.abc import Awaitable, Callable
+import hashlib
+import hmac
+import json
 import logging
+import secrets
+import time
 from typing import Any
 from uuid import UUID
 
@@ -23,6 +28,7 @@ class CoreCallbackClient:
         self,
         base_url: str,
         *,
+        callback_secret: str,
         transport: httpx.AsyncBaseTransport | None = None,
         timeout: float = 5.0,
         max_attempts: int = 5,
@@ -35,6 +41,9 @@ class CoreCallbackClient:
         if initial_delay_ms < 0 or max_delay_ms < initial_delay_ms:
             raise ValueError("callback retry delays are invalid")
         self._base_url = base_url
+        if not callback_secret:
+            raise ValueError("callback_secret must not be blank")
+        self._callback_secret = callback_secret.encode("utf-8")
         self._transport = transport
         self._timeout = timeout
         self._max_attempts = max_attempts
@@ -44,6 +53,7 @@ class CoreCallbackClient:
 
     async def send_result(
         self,
+        ai_task_id: UUID,
         correlation_id: UUID,
         result: AiTaskResultRequest,
     ) -> AiTaskResultAcknowledgement:
@@ -51,6 +61,17 @@ class CoreCallbackClient:
             raise ValueError("Path and payload correlation identifiers must match")
 
         payload = result.model_dump(mode="json", by_alias=True, exclude_none=True)
+        body = json.dumps(
+            payload, ensure_ascii=False, separators=(",", ":")
+        ).encode("utf-8")
+        path = f"/api/v1/story-context-agent/tasks/{ai_task_id}/callback"
+        signature = hmac.new(
+            self._callback_secret,
+            (
+                "POST\n" + path + "\n"
+            ).encode("utf-8") + body,
+            hashlib.sha256,
+        ).hexdigest()
         logger = logging.getLogger(__name__)
         logger.info(
             "Sending AI task result callback",
@@ -67,9 +88,12 @@ class CoreCallbackClient:
         ) as client:
             for attempt in range(1, self._max_attempts + 1):
                 response = await client.post(
-                    f"/api/v1/ai/tasks/{correlation_id}/result",
-                    json=payload,
-                    headers={CORRELATION_HEADER: correlation_id_context.get()},
+                    path,
+                    content=body,
+                    headers={
+                        CORRELATION_HEADER: correlation_id_context.get(),
+                        "X-SCA-Signature": f"sha256={signature}",
+                    },
                 )
                 if response.is_success:
                     logger.info(

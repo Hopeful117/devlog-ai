@@ -1,0 +1,51 @@
+- generic [ref=f2e3]:
+  - navigation [ref=f2e5]:
+    - link "Trading OS" [ref=f2e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f2e8]:
+      - link "Dashboard" [ref=f2e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f2e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f2e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [active] [ref=f2e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f2e13] [cursor=pointer]
+  - generic [ref=f2e14]:
+    - navigation [ref=f2e16]:
+      - generic [ref=f2e17]:
+        - link "Dashboard" [ref=f2e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f2e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f2e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f2e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f2e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f2e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f2e24]:
+        - generic [ref=f2e25]: AI Engine
+        - generic [ref=f2e26]: ● Online
+    - main [ref=f2e27]:
+      - generic [ref=f2e146]:
+        - generic [ref=f2e148]:
+          - generic [ref=f2e149]: Decision context
+          - heading "Market Decision Workspace" [level=1] [ref=f2e150]
+          - paragraph [ref=f2e151]: Select an account first. Available markets depend on that trading context.
+        - region [ref=f2e152]:
+          - generic [ref=f2e153]:
+            - generic [ref=f2e154]:
+              - generic [ref=f2e155]: Step 1
+              - heading "Trading account" [level=2] [ref=f2e156]
+            - button "Refresh" [ref=f2e157] [cursor=pointer]
+          - generic [ref=f2e158]:
+            - generic [ref=f2e159]: Account
+            - combobox "Account" [ref=f2e160]:
+              - option "Select an account"
+              - option "kraken account · EUR"
+              - option "Story 0067 PAPER Validation · USD" [selected]
+        - paragraph [ref=f2e165]: Resolving available markets for this account...

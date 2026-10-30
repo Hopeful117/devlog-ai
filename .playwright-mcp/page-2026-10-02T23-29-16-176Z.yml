@@ -1,0 +1,113 @@
+- generic [ref=f2e3]:
+  - navigation [ref=f2e5]:
+    - link "Trading OS" [ref=f2e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f2e8]:
+      - link "Dashboard" [ref=f2e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f2e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f2e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f2e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f2e13] [cursor=pointer]
+  - generic [ref=f2e14]:
+    - navigation [ref=f2e16]:
+      - generic [ref=f2e17]:
+        - link "Dashboard" [ref=f2e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f2e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f2e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f2e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f2e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f2e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f2e24]:
+        - generic [ref=f2e25]: AI Engine
+        - generic [ref=f2e26]: ● Online
+    - main [ref=f2e27]:
+      - generic [ref=f2e28]:
+        - heading "Accounts" [level=1] [ref=f2e29]
+        - generic [ref=f2e30]:
+          - generic [ref=f2e31]:
+            - paragraph [ref=f2e32]: Broker connection
+            - heading "Connecter Kraken" [level=2] [ref=f2e33]
+            - paragraph [ref=f2e34]: Les credentials sont transmis une seule fois et ne pourront pas être relus.
+          - generic [ref=f2e35]:
+            - generic [ref=f2e36]:
+              - text: Nom d’affichage
+              - textbox "Nom d’affichage" [ref=f2e37]
+            - generic [ref=f2e38]:
+              - text: Mode d’exécution
+              - combobox "Mode d’exécution" [ref=f2e39]:
+                - option "LIVE" [selected]
+                - option "PAPER"
+            - generic [ref=f2e88]:
+              - text: API key
+              - textbox "API key" [ref=f2e89]
+            - generic [ref=f2e90]:
+              - text: API secret
+              - textbox "API secret" [ref=f2e91]
+            - button "Connecter le compte LIVE" [ref=f2e92] [cursor=pointer]
+          - status [ref=f2e93]: Compte PAPER créé. Le capital initial est disponible pour le trading simulé.
+        - generic [ref=f2e45]:
+          - heading "Connexions broker" [level=2] [ref=f2e46]
+          - article [ref=f2e94]:
+            - strong [ref=f2e95]: Story 0067 PAPER Validation
+            - generic [ref=f2e96]: KRAKEN
+            - generic [ref=f2e97]: PAPER
+            - generic [ref=f2e98]: CREATED
+          - article [ref=f2e99]:
+            - strong [ref=f2e100]: Kraken Read Only
+            - generic [ref=f2e101]: KRAKEN
+            - generic [ref=f2e102]: LIVE
+            - generic [ref=f2e103]: CONNECTED
+        - heading "Comptes de trading synchronisés" [level=2] [ref=f2e47]
+        - button "Synchroniser Kraken" [ref=f2e48] [cursor=pointer]
+        - generic [ref=f2e54]:
+          - generic [ref=f2e105]:
+            - heading "kraken account" [level=2] [ref=f2e107]
+            - generic [ref=f2e108]:
+              - paragraph [ref=f2e109]:
+                - text: "Currency :"
+                - strong [ref=f2e110]: EUR
+              - heading "Balances" [level=3] [ref=f2e111]
+              - generic [ref=f2e112]:
+                - generic [ref=f2e113]: SOL
+                - generic [ref=f2e114]: "0"
+              - generic [ref=f2e115]:
+                - generic [ref=f2e116]: ZEUR
+                - generic [ref=f2e117]: "0"
+              - generic [ref=f2e118]:
+                - generic [ref=f2e119]: USDG
+                - generic [ref=f2e120]: "0.5"
+              - generic [ref=f2e121]:
+                - generic [ref=f2e122]: XETH
+                - generic [ref=f2e123]: "0.03"
+              - generic [ref=f2e124]:
+                - generic [ref=f2e125]: XXBT
+                - generic [ref=f2e126]: "0"
+              - generic [ref=f2e127]:
+                - generic [ref=f2e128]: PEPE
+                - generic [ref=f2e129]: "172717.62"
+          - generic [ref=f2e131]:
+            - heading "Story 0067 PAPER Validation" [level=2] [ref=f2e133]
+            - generic [ref=f2e134]:
+              - paragraph [ref=f2e135]:
+                - text: "Currency :"
+                - strong [ref=f2e136]: USD
+              - paragraph [ref=f2e137]:
+                - text: "Risk profile :"
+                - strong [ref=f2e138]: 0a10c7e2-9d1e-4f5a-b6c8-123456789043 v1.0.0
+              - paragraph [ref=f2e139]:
+                - text: "Trade planning profile :"
+                - strong [ref=f2e140]: 115a0394-49fe-43a7-af79-6e09f980f8d5 v1
+              - heading "Balances" [level=3] [ref=f2e141]
+              - generic [ref=f2e142]:
+                - generic [ref=f2e143]: USD
+                - generic [ref=f2e144]: "10000"

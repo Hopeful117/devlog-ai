@@ -8,6 +8,9 @@ import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;
+import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
+import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.LinkedHashMap;
@@ -20,31 +23,35 @@ import java.util.UUID;
 @Slf4j
 public class DevLogStoryAgentTool {
     private static final String STORY_CONTEXT_ANALYSIS_INTENT = "engineering-story-context-analysis";
-    private static final long DEFAULT_POLL_TIMEOUT_MS = 120_000L;
+    private static final long DEFAULT_POLL_TIMEOUT_MS = 25_000L;
+    private static final long MAX_POLL_TIMEOUT_MS = 29_000L;
     private static final long DEFAULT_POLL_INTERVAL_MS = 2_000L;
 
     private final DevlogProjectContextClient client;
     private final ObjectMapper objectMapper;
     private final long pollTimeoutMs;
     private final long pollIntervalMs;
+    private final McpAuthenticatedPrincipalProvider principalProvider;
 
     public DevLogStoryAgentTool(DevlogProjectContextClient client, ObjectMapper objectMapper) {
-        this(client, objectMapper, DEFAULT_POLL_TIMEOUT_MS, DEFAULT_POLL_INTERVAL_MS);
+        this(client, objectMapper, DEFAULT_POLL_TIMEOUT_MS, DEFAULT_POLL_INTERVAL_MS, () -> java.util.Optional.empty());
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public DevLogStoryAgentTool(
             DevlogProjectContextClient client,
             ObjectMapper objectMapper,
-            @Value("${devlog.story-agent.poll.timeout-ms:120000}") long pollTimeoutMs,
-            @Value("${devlog.story-agent.poll.interval-ms:2000}") long pollIntervalMs) {
-        if (pollTimeoutMs < 0 || pollIntervalMs < 0) {
-            throw new IllegalArgumentException("Story Agent polling bounds must be non-negative");
+            @Value("${devlog.story-agent.poll.timeout-ms:25000}") long pollTimeoutMs,
+            @Value("${devlog.story-agent.poll.interval-ms:2000}") long pollIntervalMs,
+            McpAuthenticatedPrincipalProvider principalProvider) {
+        if (pollTimeoutMs < 0 || pollTimeoutMs > MAX_POLL_TIMEOUT_MS || pollIntervalMs < 0) {
+            throw new IllegalArgumentException("Story Agent polling timeout must be between 0 and 29000 ms");
         }
         this.client = client;
         this.objectMapper = objectMapper;
         this.pollTimeoutMs = pollTimeoutMs;
         this.pollIntervalMs = pollIntervalMs;
+        this.principalProvider = principalProvider;
     }
 
     public String execute(
@@ -54,7 +61,9 @@ public class DevLogStoryAgentTool {
             @Nullable List<String> files,
             @Nullable Map<String, Object> guidance,
             @Nullable String idempotencyKey) {
-        return execute(projectSlug, storyId, intent, null, files, guidance, idempotencyKey);
+        var principal = principalProvider.currentPrincipal()
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        return execute(projectSlug, storyId, intent, null, files, guidance, idempotencyKey, principal.bearerToken());
     }
 
     @McpTool(
@@ -68,13 +77,33 @@ public class DevLogStoryAgentTool {
             @Nullable String question,
             @McpArg(description = "Optional repository file paths", required = false) @Nullable List<String> files,
             @McpArg(description = "Optional human guidance", required = false) @Nullable Map<String, Object> guidance,
-            @McpArg(description = "Optional idempotency key", required = false) @Nullable String idempotencyKey) {
+            @McpArg(description = "Optional idempotency key", required = false) @Nullable String idempotencyKey,
+            McpSyncRequestContext requestContext) {
+        var principal = principalProvider.currentPrincipal(requestContext)
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        return execute(projectSlug, storyId, intent, question, files, guidance, idempotencyKey,
+                principal.bearerToken());
+    }
+
+    private String execute(
+            String projectSlug,
+            @Nullable UUID storyId,
+            String intent,
+            @Nullable String question,
+            @Nullable List<String> files,
+            @Nullable Map<String, Object> guidance,
+            @Nullable String idempotencyKey,
+            String bearerToken) {
+        if (bearerToken == null || bearerToken.isBlank()) {
+            throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
+        }
         Map<String, Object> execution;
         try {
             String effectiveQuestion = question == null || question.isBlank() ? intent : question;
             execution = client.executeStoryAgent(
                     projectSlug,
                     idempotencyKey,
+                    bearerToken,
                     new DevlogProjectContextClient.StoryAgentRequest(
                             storyId, STORY_CONTEXT_ANALYSIS_INTENT, effectiveQuestion, files, guidance));
         } catch (RuntimeException exception) {
@@ -83,7 +112,7 @@ public class DevLogStoryAgentTool {
                     guidance != null && !guidance.isEmpty(), idempotencyKey != null, exception);
             throw exception;
         }
-        execution = awaitTerminalExecution(execution);
+        execution = awaitTerminalExecution(execution, bearerToken);
         try {
             return objectMapper.writeValueAsString(execution);
         } catch (Exception exception) {
@@ -91,7 +120,9 @@ public class DevLogStoryAgentTool {
         }
     }
 
-    private Map<String, Object> awaitTerminalExecution(Map<String, Object> initialExecution) {
+    private Map<String, Object> awaitTerminalExecution(
+            Map<String, Object> initialExecution,
+            String bearerToken) {
         String initialStatus = stringValue(initialExecution.get("status"));
         if (isTerminal(initialStatus)) {
             return initialExecution;
@@ -106,7 +137,8 @@ public class DevLogStoryAgentTool {
                 break;
             }
 
-            DevlogProjectContextClient.AiTaskStatusResponse taskStatus = client.getAiTaskStatus(taskId);
+            DevlogProjectContextClient.AiTaskStatusResponse taskStatus =
+                    client.getAiTaskStatusAuthenticated(taskId, bearerToken);
             latestExecution = executionWithStatus(latestExecution, taskStatus);
             if ("FAILED".equals(taskStatus.status())) {
                 return latestExecution;
@@ -114,7 +146,7 @@ public class DevLogStoryAgentTool {
             if ("COMPLETED".equals(taskStatus.status())) {
                 try {
                     return completedExecution(latestExecution, taskStatus,
-                            client.getStoryContextAnalysis(taskId));
+                            client.getStoryContextAnalysisAuthenticated(taskId, bearerToken));
                 } catch (RuntimeException exception) {
                     log.warn("Completed Story Agent task {} has no readable result", taskId, exception);
                     return completedWithoutResult(latestExecution, taskId, exception);
@@ -126,6 +158,7 @@ public class DevLogStoryAgentTool {
         latestExecution.put("status", "TIMED_OUT");
         latestExecution.put("diagnostics", Map.of(
                 "status", "TIMED_OUT",
+                "code", "POLL_TIMEOUT",
                 "lastKnownStatus", lastKnownStatus,
                 "aiTaskId", taskId.toString()));
         return latestExecution;

@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysis
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -58,5 +59,18 @@ class StoryContextResultValidatorTest {
 
         assertThrows(IllegalStateException.class, () -> StoryContextResultValidator.validateImplementationPreparation(
                 preparation, Set.of("docker-compose.yml.bak")));
+    }
+
+    @Test
+    void acceptsAffectedPathWhenTheAuthorizedContractCarriesTheResource() {
+        var preparation = new StoryContextAnalysisResult.ImplementationPreparation(
+                List.of(new StoryContextAnalysisResult.ImplementationFile(
+                         "mcp-server/src/main/java/Tool.java", "Evidence-backed file",
+                        List.of(new EvidenceRef("evidence-1", null)))),
+                List.of(), List.of());
+
+        assertDoesNotThrow(() -> StoryContextResultValidator.validateImplementationPreparation(
+                preparation, Set.of("evidence-1"),
+                Map.of("evidence-1", "mcp-server/src/main/java/Tool.java")));
     }
 }

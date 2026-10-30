@@ -23,11 +23,11 @@ class StoryContextAgentProtocolToolTest {
     void snapshotAdapterForwardsAuthenticatedPrincipalWithoutApplyingPolicy() {
         DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
         UUID snapshotId = UUID.randomUUID();
-        when(client.getStoryContextAgentSnapshot(snapshotId, "human-1", "HUMAN", "test"))
+        when(client.getStoryContextAgentSnapshot(snapshotId, "human-1", "HUMAN", "test", "Bearer test"))
                 .thenReturn(Map.of("id", snapshotId.toString()));
         McpAuthenticatedPrincipalProvider principalProvider = () -> Optional.of(
                 new McpAuthenticatedPrincipalProvider.McpPrincipal("human-1",
-                        McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN, "test"));
+                        McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN, "test", "Bearer test"));
         ResourceSupport resourceSupport = mock(ResourceSupport.class);
         when(resourceSupport.getAuthorizedSnapshot(any(), any())).thenAnswer(invocation ->
                 ((Supplier<String>) invocation.getArgument(0)).get());
@@ -38,7 +38,7 @@ class StoryContextAgentProtocolToolTest {
         String result = tool.getSnapshot(snapshotId);
 
         assertTrue(result.contains(snapshotId.toString()));
-        verify(client).getStoryContextAgentSnapshot(snapshotId, "human-1", "HUMAN", "test");
+        verify(client).getStoryContextAgentSnapshot(snapshotId, "human-1", "HUMAN", "test", "Bearer test");
     }
 
     @Test

@@ -1,0 +1,573 @@
+{
+  "protocolVersion": "story-0158-specificity/v1",
+  "scoringMethod": "agent-proposed final before/after measurement; not human Story acceptance",
+  "beforeCaptureDirectory": "/tmp/opencode/story0158-live/",
+  "afterCaptureDirectory": "/tmp/opencode/story0158-live-final2/",
+  "assessments": [
+    {
+      "scenarioId": "0158-broad-question",
+      "repetition": 1,
+      "condition": "STORY_AGENT",
+      "captureDigest": "4220f2ddf1a4bea1419896ae444023660dc21c4854170b16673f9351669885da",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-broad-question",
+      "repetition": 2,
+      "condition": "STORY_AGENT",
+      "captureDigest": "88a2a50fb6b40ebf11f14e28b374667430af6db2bebb31ba19bcb87361af6a60",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-broad-question",
+      "repetition": 3,
+      "condition": "STORY_AGENT",
+      "captureDigest": "15aaba1de983de0bf4aa41f43cc0cf0f05aff1aa0e3aade42a2878e4fe5a5eee",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-broad-question",
+      "repetition": 1,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "cca8e577157a2f1963a44a856cd1eeec34460a389389397d15098975de6dbec4",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 1,
+        "specificity": 1,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [
+        "decision:ae47a47d-65fa-4a30-810c-f114b37755bd",
+        "insight:233f1361-98ac-4109-85f1-6fade4d875da",
+        "insight:3414459c-56b5-4bdc-bb96-904ad68f0a77",
+        "insight:64b855e4-bfc5-4134-a5fe-6baa38c5a3b3",
+        "insight:963bc7a4-095b-4139-a25d-e595d080f7cf",
+        "insight:b5da58ff-40b5-4690-9da3-9ecba9a5f271",
+        "notes:bbe9ce8a-3c3e-4020-b4bc-eb7eb21d8117"
+      ],
+      "unknownEvidenceReferences": ["cited references do not match the scenario evidence contract"],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-broad-question",
+      "repetition": 2,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "811cf9f3a20b735d4f505eead664b7cbcf996bc5283def30bfce905c3f2d0b21",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 1,
+        "specificity": 1,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [
+        "challenge:c89e75e5-6461-4f78-a787-fac7bacae463",
+        "decision:ae47a47d-65fa-4a30-810c-f114b37755bd",
+        "story:4486c0e7-5c31-45dd-bb7c-7dbbe6d62060",
+        "story:5a5b249e-89ea-48f0-b27a-2a63ca79c17c"
+      ],
+      "unknownEvidenceReferences": ["cited references do not match the scenario evidence contract"],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-broad-question",
+      "repetition": 3,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "e32f3baa98e20848e3258ed37abbe0a350d18abf13e685d07bf409e7e2c93313",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 1,
+        "specificity": 1,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": ["cited references do not match the scenario evidence contract"],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-targeted-component",
+      "repetition": 1,
+      "condition": "STORY_AGENT",
+      "captureDigest": "a0c89f9e58e72beb45d1f1cabca511c98552c426fb6af941ac93ae148f446e79",
+      "questionRepeated": false,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": ["analysis:47b8a0a0-9914-3b3a-933d-10104b4e10b5"],
+      "unknownEvidenceReferences": [],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-targeted-component",
+      "repetition": 2,
+      "condition": "STORY_AGENT",
+      "captureDigest": "241dc9bdb240f2b5fc561404463572f00bf301c68d46e3061312bafebc84dd80",
+      "questionRepeated": false,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": ["analysis:47b8a0a0-9914-3b3a-933d-10104b4e10b5"],
+      "unknownEvidenceReferences": [],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-targeted-component",
+      "repetition": 3,
+      "condition": "STORY_AGENT",
+      "captureDigest": "a60287167cd27d19dfdd52dea5aa2b937cb278eb777b7250966c097a6381aa3b",
+      "questionRepeated": false,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": ["analysis:47b8a0a0-9914-3b3a-933d-10104b4e10b5"],
+      "unknownEvidenceReferences": [],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-targeted-component",
+      "repetition": 1,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "9d852000e1d04cf7be3e28dc10fee58a97f35769a6d5a8d42428bba403ac822c",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 1,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 1,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": ["analysis:47b8a0a0-9914-3b3a-933d-10104b4e10b5"],
+      "unknownEvidenceReferences": [],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": false,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-targeted-component",
+      "repetition": 2,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "933fc02f72f47fdfe28a619f4e30688d23540f84de80284a5c821d7a434e1c8b",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": ["analysis:47b8a0a0-9914-3b3a-933d-10104b4e10b5"],
+      "unknownEvidenceReferences": [],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-targeted-component",
+      "repetition": 3,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "d10efe943f080b43e18e83402a65ada8d01e909babbc898b28a8aec12e497ed9",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": ["analysis:47b8a0a0-9914-3b3a-933d-10104b4e10b5"],
+      "unknownEvidenceReferences": [],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-insufficient-evidence",
+      "repetition": 1,
+      "condition": "STORY_AGENT",
+      "captureDigest": "35e1e9fea28b019a218bf27f024534a7ba3e5131d05fe226d7e794755f594792",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 1,
+        "specificity": 1,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 1
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": true
+    },
+    {
+      "scenarioId": "0158-insufficient-evidence",
+      "repetition": 2,
+      "condition": "STORY_AGENT",
+      "captureDigest": "db70c90a6bd6007f902b0efe442db9485dc010c502d93207c62d262f40642d22",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 1,
+        "specificity": 1,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 1
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": true
+    },
+    {
+      "scenarioId": "0158-insufficient-evidence",
+      "repetition": 3,
+      "condition": "STORY_AGENT",
+      "captureDigest": "8974c2812356938c6d8a8bab49e78e1510b0d2dc71f8ed0ea2e2d3dbf8c135ad",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 1,
+        "specificity": 1,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 2,
+        "nextStepUtility": 1
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": true,
+      "nextStepGrounded": true
+    },
+    {
+      "scenarioId": "0158-insufficient-evidence",
+      "repetition": 1,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "86d86e3982fd0c561ebd8a0e1570a822dedd9fe93eeca519c53b576f9059df99",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 1,
+        "specificity": 1,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 0,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 1,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": false,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-insufficient-evidence",
+      "repetition": 2,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "4757007df7641624cde48e83262040b2ba3ec21f40cb719e6660191aa8a439a3",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 1,
+        "specificity": 1,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 0,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 1,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": false,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-insufficient-evidence",
+      "repetition": 3,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "b68b04089f7d87681e66962cccd2b003b33c697ceeacbc3baea72a3ce44804aa",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 1,
+        "specificity": 1,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 0,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 1,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": false,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-truncated-context",
+      "repetition": 1,
+      "condition": "STORY_AGENT",
+      "captureDigest": "1b51c6a74d4d820871d04712fadb3018eca5936163b2d456df7d1aaf865bfde4",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 0,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": false,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-truncated-context",
+      "repetition": 2,
+      "condition": "STORY_AGENT",
+      "captureDigest": "6078c207c9b6d9a17efe6868b6fdd40cf1faad1544b9123adebde22f656984c7",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 0,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": false,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-truncated-context",
+      "repetition": 3,
+      "condition": "STORY_AGENT",
+      "captureDigest": "92eb525e90457b02fec77168b8ab475b382ddd836a94bf07a797188a792ab247",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 2,
+        "evidenceCoverage": 0,
+        "genericUsefulness": 1,
+        "abstention": 0,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": false,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-truncated-context",
+      "repetition": 1,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "2dc21fb0045091f83e48597df16b22a0a8ba04fcf9e461e85d23228be3c1b5bb",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 1,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 0,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": false,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-truncated-context",
+      "repetition": 2,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "732bfe17586a6bf38635d493a8149b2a97b2c3b2d2dde94ecaab20e89889093e",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 1,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 0,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": false,
+      "nextStepGrounded": false
+    },
+    {
+      "scenarioId": "0158-truncated-context",
+      "repetition": 3,
+      "condition": "MCP_BASELINE",
+      "captureDigest": "dad35edd5b1ab4ca0767da1e9dceea8f385f0dec2073544dda7639d6732fe29d",
+      "questionRepeated": true,
+      "dimensions": {
+        "relevance": 2,
+        "specificity": 1,
+        "evidenceCoverage": 2,
+        "genericUsefulness": 1,
+        "abstention": 0,
+        "nextStepUtility": 0
+      },
+      "citedEvidence": [],
+      "unknownEvidenceReferences": [
+        "captured reference is not in scenario evidence contract"
+      ],
+      "fabricatedRelations": 0,
+      "scopeViolation": false,
+      "trustViolation": false,
+      "abstentionCorrect": false,
+      "nextStepGrounded": false
+    }
+  ]
+}

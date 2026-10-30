@@ -50,7 +50,7 @@ class EngineeringEventGenerationService:
             confidence=p.confidence, supporting_fact_ids=p.supporting_fact_ids,
             supporting_observation_ids=p.supporting_observation_ids,
             evidence_references=p.evidence_references) for p in output.proposals]
-        await self.callback.send_result(submission.correlation_id,
+        await self.callback.send_result(submission.ai_task_id, submission.correlation_id,
             AiTaskResultRequest(correlation_id=submission.correlation_id,
                 external_job_id=str(external_job_id), status=AiTaskResultStatus.COMPLETED,
                 completed_at=datetime.now(timezone.utc), proposals=proposals, error=None,
@@ -89,7 +89,7 @@ class EngineeringEventGenerationService:
                 f"{sorted(unknown)}")
 
     async def _failure(self, submission, job_id, code, error, prompt, traces=None):
-        await self.callback.send_result(submission.correlation_id,
+        await self.callback.send_result(submission.ai_task_id, submission.correlation_id,
             AiTaskResultRequest(correlation_id=submission.correlation_id, external_job_id=str(job_id),
                 status=AiTaskResultStatus.FAILED, completed_at=datetime.now(timezone.utc), proposals=[],
                 error=AiTaskResultError(code=code, message=(str(error) or code)[:5000]),

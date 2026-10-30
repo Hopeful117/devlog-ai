@@ -7,6 +7,7 @@ WORKDIR /app
 
 RUN groupadd --system devlog \
     && useradd --system --gid devlog --home-dir /app devlog
+RUN mkdir -p /data && chown -R devlog:devlog /data
 
 COPY pyproject.toml README.md ./
 COPY app/ app/

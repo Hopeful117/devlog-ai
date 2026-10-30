@@ -1,0 +1,32 @@
+- generic [ref=e3]:
+  - img "ChatGPT" [ref=e4]
+  - heading "Bienvenue à nouveau" [level=1] [ref=e14]
+  - group [ref=e15]:
+    - form "Choisir une option de connexion" [ref=e16]:
+      - generic [ref=e20]:
+        - generic: Adresse e-mail
+        - textbox "Adresse e-mail" [active] [ref=e21]
+      - generic [ref=e23]:
+        - button "Continuer" [ref=e25] [cursor=pointer]
+        - generic [ref=e26]:
+          - text: Vous n’avez pas encore de compte ?
+          - link "Inscrivez-vous" [ref=e27] [cursor=pointer]:
+            - /url: /create-account
+        - generic [ref=e28]: OU
+        - generic [ref=e32]:
+          - button [ref=e34] [cursor=pointer]:
+            - img "Logo Google" [ref=e37]
+            - text: Continuer avec Google
+          - button [ref=e51] [cursor=pointer]:
+            - img "Logo Apple" [ref=e54]
+            - text: Continuer avec Apple
+          - button [ref=e59] [cursor=pointer]:
+            - img "Logo Microsoft" [ref=e62]
+            - text: Continuer avec Microsoft
+          - button [ref=e68] [cursor=pointer]
+  - generic [ref=e73]:
+    - link "Conditions d’utilisation" [ref=e74] [cursor=pointer]:
+      - /url: https://openai.com/policies/terms-of-use
+    - generic [ref=e75]: "|"
+    - link "Politique de confidentialité" [ref=e76] [cursor=pointer]:
+      - /url: https://openai.com/policies/privacy-policy

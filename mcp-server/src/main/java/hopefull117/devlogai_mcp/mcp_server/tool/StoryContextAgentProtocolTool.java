@@ -7,6 +7,7 @@ import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
+import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -41,8 +42,13 @@ public class StoryContextAgentProtocolTool {
             @McpArg(description = "Optional Engineering Story UUID", required = false) UUID storyId,
             @McpArg(description = "Optional repository file paths", required = false) List<String> files,
             @McpArg(description = "Intent identifier", required = true) String intent,
-            @McpArg(description = "Optional human guidance", required = false) Map<String, Object> guidance) {
+            @McpArg(description = "Optional human guidance", required = false) Map<String, Object> guidance,
+            McpSyncRequestContext requestContext) {
+        var principal = principalProvider.currentPrincipal(requestContext)
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        requireBearer(principal);
         return write(client.submitStoryContextAgentTask(projectSlug, storyId,
+                principal.bearerToken(),
                 new DevlogProjectContextClient.SubmitRequest(intent, files, guidance)));
     }
 
@@ -55,31 +61,53 @@ public class StoryContextAgentProtocolTool {
         return write(client.callbackStoryContextAgentTask(aiTaskId, signature, request));
     }
 
-    @McpTool(name = "story_context_agent_get_snapshot",
-            description = "Read the immutable Story Context Agent task snapshot and status")
     public String getSnapshot(
             @McpArg(description = "AI task and snapshot UUID", required = true) UUID aiTaskId) {
-        var principal = principalProvider.currentPrincipal()
+        return getSnapshot(aiTaskId, null);
+    }
+
+    @McpTool(name = "story_context_agent_get_snapshot_authenticated",
+            description = "Read an authorized Story Context Agent snapshot using the MCP bearer token")
+    public String getSnapshot(
+            @McpArg(description = "AI task and snapshot UUID", required = true) UUID aiTaskId,
+            McpSyncRequestContext requestContext) {
+        var principal = principalProvider.currentPrincipal(requestContext)
                 .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        requireBearer(principal);
         return resourceSupport.getAuthorizedSnapshot(
                 () -> write(client.getStoryContextAgentSnapshot(aiTaskId, principal.principalId(),
-                        principal.kind().name(), principal.authenticationSource())),
+                        principal.kind().name(), principal.authenticationSource(), principal.bearerToken())),
                 "Story Context snapshot '%s' not found".formatted(aiTaskId));
     }
 
-    @McpTool(name = "story_context_agent_follow_up",
-            description = "Submit one bounded follow-up question against an authorized Story Context snapshot")
     public String followUp(
             @McpArg(description = "Initial Story Context snapshot UUID", required = true) UUID snapshotId,
             @McpArg(description = "Bounded follow-up question", required = true) String question,
             @McpArg(description = "Optional bounded guidance", required = false) Map<String, Object> guidance) {
-        var principal = principalProvider.currentPrincipal()
+        return followUp(snapshotId, question, guidance, null);
+    }
+
+    @McpTool(name = "story_context_agent_follow_up_authenticated",
+            description = "Submit an authorized follow-up using the MCP bearer token")
+    public String followUp(
+            @McpArg(description = "Initial Story Context snapshot UUID", required = true) UUID snapshotId,
+            @McpArg(description = "Bounded follow-up question", required = true) String question,
+            @McpArg(description = "Optional bounded guidance", required = false) Map<String, Object> guidance,
+            McpSyncRequestContext requestContext) {
+        var principal = principalProvider.currentPrincipal(requestContext)
                 .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        requireBearer(principal);
         return resourceSupport.submitAuthorizedSnapshot(
                 () -> write(client.submitStoryContextAgentFollowUp(snapshotId, principal.principalId(),
-                        principal.kind().name(), principal.authenticationSource(),
+                        principal.kind().name(), principal.authenticationSource(), principal.bearerToken(),
                         new DevlogProjectContextClient.FollowUpRequest(question, guidance))),
                 "Story Context snapshot '%s' not found".formatted(snapshotId));
+    }
+
+    private void requireBearer(McpAuthenticatedPrincipalProvider.McpPrincipal principal) {
+        if (principal.bearerToken() == null || principal.bearerToken().isBlank()) {
+            throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
+        }
     }
 
     private String write(Object value) {

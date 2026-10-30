@@ -43,7 +43,10 @@ services:
       AI_ENGINE_BASE_URL: http://ai-engine:8000
       AI_ENGINE_CONNECT_TIMEOUT: ${AI_ENGINE_CONNECT_TIMEOUT:-2s}
       AI_ENGINE_READ_TIMEOUT: ${AI_ENGINE_READ_TIMEOUT:-100s}
+      DEVLOG_SERVICE_AUTH_SECRET: ${DEVLOG_SERVICE_AUTH_SECRET:-}
       DEVICE_BASE_URL: ${DEVICE_BASE_URL:-http://127.0.0.1:65535}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/devlog}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-devlog-core}
 
       SERVER_PORT: 8080
 
@@ -68,11 +71,18 @@ services:
       dockerfile: Dockerfile
     container_name: devlog-ai-engine
     restart: unless-stopped
+    user: root
+    command: ["/bin/sh", "-c", "chown -R devlog:devlog /data && exec su devlog -s /bin/sh -c 'uvicorn app.main:app --host 0.0.0.0 --port 8000'"]
 
     environment:
       LLM_PROVIDER: ${LLM_PROVIDER:-mock}
-      LLM_MODEL: ${LLM_MODEL:-gpt-4.1-mini}
+      LLM_MODEL: ${LLM_MODEL:-gpt-5.6-luna}
       LLM_API_KEY: ${LLM_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_WORKSPACE_ID: ${ANTHROPIC_WORKSPACE_ID:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-90}
       LLM_MAX_OUTPUT_TOKENS: ${LLM_MAX_OUTPUT_TOKENS:-2000}
       LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-2}
@@ -83,11 +93,31 @@ services:
       CORE_CALLBACK_MAX_ATTEMPTS: ${CORE_CALLBACK_MAX_ATTEMPTS:-5}
       CORE_CALLBACK_INITIAL_DELAY_MS: ${CORE_CALLBACK_INITIAL_DELAY_MS:-100}
       CORE_CALLBACK_MAX_DELAY_MS: ${CORE_CALLBACK_MAX_DELAY_MS:-1000}
+      DEVLOG_SERVICE_AUTH_SECRET: ${DEVLOG_SERVICE_AUTH_SECRET:-}
+      DEVLOG_BINDING_STORE_PATH: ${DEVLOG_BINDING_STORE_PATH:-/data/ai-bindings.sqlite3}
+      DEVLOG_CREDENTIAL_STORE_PATH: ${DEVLOG_CREDENTIAL_STORE_PATH:-/data/ai-credentials.sqlite3}
+      DEVLOG_CREDENTIAL_ENCRYPTION_KEY: ${DEVLOG_CREDENTIAL_ENCRYPTION_KEY:-}
+      CHATGPT_OAUTH_ENABLED: ${CHATGPT_OAUTH_ENABLED:-false}
+      CHATGPT_AGENT_NAME: ${CHATGPT_AGENT_NAME:-DevLog AI}
+      CHATGPT_EXT_AGENT_HOST_ID: ${CHATGPT_EXT_AGENT_HOST_ID:-}
+      CHATGPT_AUTHORIZATION_ENDPOINT: ${CHATGPT_AUTHORIZATION_ENDPOINT:-https://auth.openai.com/api/accounts/authorize}
+      CHATGPT_TOKEN_ENDPOINT: ${CHATGPT_TOKEN_ENDPOINT:-https://auth.openai.com/api/accounts/oauth/token}
+      CHATGPT_RESPONSES_ENDPOINT: ${CHATGPT_RESPONSES_ENDPOINT:-https://api.openai.com/v1/responses}
+      CHATGPT_REDIRECT_URI: ${CHATGPT_REDIRECT_URI:-http://127.0.0.1:18081/api/v1/auth/chatgpt/callback}
+      CHATGPT_SCOPES: ${CHATGPT_SCOPES:-openid profile email offline_access resource.invoke chatgpt.tokens.use.direct}
+      CHATGPT_RESOURCE: ${CHATGPT_RESOURCE:-https://api.openai.com/v1}
+      CHATGPT_ISSUER: ${CHATGPT_ISSUER:-https://auth.openai.com}
+      CHATGPT_JWKS_URL: ${CHATGPT_JWKS_URL:-https://auth.openai.com/.well-known/jwks.json}
+      CHATGPT_OAUTH_STORE_PATH: ${CHATGPT_OAUTH_STORE_PATH:-/data/ai-oauth.sqlite3}
+      CHATGPT_OAUTH_TRANSACTION_TTL_SECONDS: ${CHATGPT_OAUTH_TRANSACTION_TTL_SECONDS:-300}
 
       LOG_LEVEL: ${AI_ENGINE_LOG_LEVEL:-INFO}
 
     ports:
       - "${AI_ENGINE_PORT:-18081}:8000"
+
+    volumes:
+      - devlog-ai-bindings:/data
 
     healthcheck:
       test:
@@ -127,6 +157,20 @@ services:
       retries: 10
       start_period: 5s
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: devlog-keycloak
+    command: start-dev --import-realm
+    restart: unless-stopped
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    ports:
+      - "${KEYCLOAK_PORT:-18084}:8080"
+    volumes:
+      - ./docker/keycloak:/opt/keycloak/data/import:ro
+
 volumes:
   devlog-postgres-data:
   devlog-workspaces:
+  devlog-ai-bindings:

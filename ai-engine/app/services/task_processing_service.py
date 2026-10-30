@@ -52,6 +52,7 @@ class AiTaskProcessingService:
             return
 
         await self._callback_client.send_result(
+            submission.ai_task_id,
             submission.correlation_id,
             AiTaskResultRequest(
                 correlation_id=submission.correlation_id,

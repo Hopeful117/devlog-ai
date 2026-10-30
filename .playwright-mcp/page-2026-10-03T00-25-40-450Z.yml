@@ -1,0 +1,88 @@
+- generic [ref=f9e3]:
+  - navigation [ref=f9e5]:
+    - link "Trading OS" [ref=f9e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f9e8]:
+      - link "Dashboard" [ref=f9e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f9e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f9e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f9e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f9e13] [cursor=pointer]
+  - generic [ref=f9e14]:
+    - navigation [ref=f9e16]:
+      - generic [ref=f9e17]:
+        - link "Dashboard" [ref=f9e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f9e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f9e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [active] [ref=f9e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f9e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f9e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f9e24]:
+        - generic [ref=f9e25]: AI Engine
+        - generic [ref=f9e26]: ● Online
+    - main [ref=f9e27]:
+      - generic [ref=f9e107140]:
+        - generic [ref=f9e107141]:
+          - generic [ref=f9e107142]:
+            - heading "Opportunities" [level=1] [ref=f9e107143]
+            - paragraph [ref=f9e107144]: Active Market Intelligence opportunities
+          - button "Refresh" [ref=f9e107145] [cursor=pointer]
+        - generic [ref=f9e107147]:
+          - generic [ref=f9e107148]:
+            - heading "Market scan" [level=2] [ref=f9e107149]
+            - paragraph [ref=f9e107150]: Choose the markets Market Intelligence should analyze now.
+          - generic [ref=f9e107151]:
+            - generic [ref=f9e107152]:
+              - generic [ref=f9e107153]: Account
+              - combobox "Account" [ref=f9e107154]:
+                - option "Select an account" [disabled]
+                - option "kraken account"
+                - option "Story 0067 PAPER Validation" [selected]
+            - generic [ref=f9e107155]:
+              - generic [ref=f9e107156]: Provenance / context
+              - textbox "Provenance / context Does not influence scope, eligibility, or ranking." [ref=f9e107157]:
+                - /placeholder: Optional context for this scan
+              - generic [ref=f9e107158]: Does not influence scope, eligibility, or ranking.
+          - group "Scan scope" [ref=f9e107159]:
+            - generic [ref=f9e107161] [cursor=pointer]:
+              - radio "Specific markets Choose one or more catalogue markets." [ref=f9e107162]
+              - generic [ref=f9e107163]:
+                - strong [ref=f9e107164]: Specific markets
+                - text: Choose one or more catalogue markets.
+            - generic [ref=f9e107165] [cursor=pointer]:
+              - radio "All eligible markets Ask the backend to resolve the full catalogue." [ref=f9e107166]
+              - generic [ref=f9e107167]:
+                - strong [ref=f9e107168]: All eligible markets
+                - text: Ask the backend to resolve the full catalogue.
+          - button "Run market scan" [disabled] [ref=f9e107169]
+        - table [ref=f9e107171]:
+          - rowgroup [ref=f9e107172]:
+            - row [ref=f9e107173]:
+              - columnheader "Instrument" [ref=f9e107174]
+              - columnheader "Direction" [ref=f9e107175]
+              - columnheader "Type" [ref=f9e107176]
+              - columnheader "Timeframe" [ref=f9e107177]
+              - columnheader "Score" [ref=f9e107178]
+              - columnheader "Ref. price" [ref=f9e107179]
+              - columnheader "Valid until" [ref=f9e107180]
+              - columnheader "Rationale" [ref=f9e107181]
+          - rowgroup [ref=f9e107182]:
+            - row [ref=f9e107183] [cursor=pointer]:
+              - cell "TBTC/EUR" [ref=f9e107184]
+              - cell "SHORT" [ref=f9e107185]
+              - cell "POSITIONAL" [ref=f9e107187]
+              - cell "m15" [ref=f9e107188]
+              - cell "100" [ref=f9e107189]
+              - cell "71,190.00" [ref=f9e107190]
+              - cell "Oct 3, 02:45" [ref=f9e107191]
+              - cell "Legacy OHLC Trend" [ref=f9e107192]

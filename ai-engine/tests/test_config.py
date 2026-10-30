@@ -25,6 +25,28 @@ def test_settings_default_llm_timeout(monkeypatch) -> None:
     assert settings.llm_timeout_seconds == 90.0
 
 
+def test_chatgpt_defaults_match_open_source_flow(monkeypatch) -> None:
+    for name in (
+        "CHATGPT_AUTHORIZATION_ENDPOINT",
+        "CHATGPT_TOKEN_ENDPOINT",
+        "CHATGPT_RESOURCE",
+        "CHATGPT_ISSUER",
+        "CHATGPT_SCOPES",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    settings = Settings.from_environment()
+
+    assert settings.chatgpt_authorization_endpoint == "https://auth.openai.com/api/accounts/authorize"
+    assert settings.chatgpt_token_endpoint == "https://auth.openai.com/api/accounts/oauth/token"
+    assert settings.chatgpt_resource == "https://api.openai.com/v1"
+    assert settings.chatgpt_issuer == "https://auth.openai.com"
+    assert settings.chatgpt_jwks_url == "https://auth.openai.com/.well-known/jwks.json"
+    assert settings.chatgpt_scopes == (
+        "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"
+    )
+
+
 def test_settings_default_max_retries(monkeypatch) -> None:
     monkeypatch.delenv("LLM_MAX_RETRIES", raising=False)
 
@@ -49,3 +71,71 @@ def test_settings_reject_negative_max_retries(monkeypatch) -> None:
         assert False, "Should have raised ValueError"
     except ValueError as e:
         assert "LLM_MAX_RETRIES" in str(e)
+
+
+def test_gemini_settings_prefer_google_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("LLM_API_KEY", "openai-key")
+    monkeypatch.setenv("GOOGLE_API_KEY", "google-key")
+
+    settings = Settings.from_environment()
+
+    assert settings.llm_provider == "gemini"
+    assert settings.llm_api_key == "google-key"
+
+
+def test_settings_reject_gemini_without_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+
+    try:
+        Settings.from_environment()
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "LLM_API_KEY" in str(e)
+
+
+def test_anthropic_settings_prefer_dedicated_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("LLM_API_KEY", "fallback-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-key")
+
+    settings = Settings.from_environment()
+
+    assert settings.llm_provider == "anthropic"
+    assert settings.llm_api_key == "anthropic-key"
+
+
+def test_settings_reject_anthropic_without_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    try:
+        Settings.from_environment()
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "LLM_API_KEY" in str(e)
+
+
+def test_anthropic_settings_read_workspace_id(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-key")
+    monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", "wrkspc_test")
+
+    settings = Settings.from_environment()
+
+    assert settings.anthropic_workspace_id == "wrkspc_test"
+
+
+def test_openrouter_settings_prefer_dedicated_api_key(monkeypatch) -> None:
+    monkeypatch.setenv("LLM_PROVIDER", "openrouter")
+    monkeypatch.setenv("LLM_API_KEY", "fallback-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "openrouter-key")
+
+    settings = Settings.from_environment()
+
+    assert settings.llm_provider == "openrouter"
+    assert settings.llm_api_key == "openrouter-key"

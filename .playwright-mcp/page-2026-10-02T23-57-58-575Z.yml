@@ -1,0 +1,83 @@
+- generic [ref=f7e3]:
+  - navigation [ref=f7e5]:
+    - link "Trading OS" [ref=f7e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f7e8]:
+      - link "Dashboard" [ref=f7e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f7e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f7e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f7e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f7e13] [cursor=pointer]
+  - generic [ref=f7e14]:
+    - navigation [ref=f7e16]:
+      - generic [ref=f7e17]:
+        - link "Dashboard" [ref=f7e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f7e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f7e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f7e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f7e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f7e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f7e24]:
+        - generic [ref=f7e25]: AI Engine
+        - generic [ref=f7e26]: ● Online
+    - main [ref=f7e27]:
+      - generic [ref=f7e29]:
+        - generic [ref=f7e31]:
+          - generic [ref=f7e32]: Decision context
+          - heading "Market Decision Workspace" [level=1] [ref=f7e33]
+          - paragraph [ref=f7e34]: Select an account first. Available markets depend on that trading context.
+        - region [ref=f7e35]:
+          - generic [ref=f7e36]:
+            - generic [ref=f7e37]:
+              - generic [ref=f7e38]: Step 1
+              - heading "Trading account" [level=2] [ref=f7e39]
+            - button "Refresh" [ref=f7e40] [cursor=pointer]
+          - generic [ref=f7e44]:
+            - generic [ref=f7e45]: Account
+            - combobox "Account" [ref=f7e46]:
+              - option "Select an account" [selected]
+              - option "kraken account · EUR"
+              - option "Story 0067 PAPER Validation · USD"
+        - generic [ref=f7e47]:
+          - article [ref=f7e48]:
+            - generic [ref=f7e49]: Selected account
+            - heading "Story 0067 PAPER Validation" [level=2] [ref=f7e50]
+            - generic [ref=f7e51]:
+              - generic [ref=f7e52]:
+                - term [ref=f7e53]: Currency
+                - definition [ref=f7e54]: USD
+              - generic [ref=f7e55]:
+                - term [ref=f7e56]: Risk profile
+                - definition [ref=f7e57]: 1.0.0
+              - generic [ref=f7e58]:
+                - term [ref=f7e59]: Planning profile
+                - definition [ref=f7e60]: "1"
+          - article [ref=f7e61]:
+            - generic [ref=f7e62]:
+              - generic [ref=f7e63]:
+                - generic [ref=f7e64]: Step 2
+                - heading "Choose a market" [level=2] [ref=f7e65]
+              - generic [ref=f7e66]: 1361 eligible
+            - generic [ref=f7e67]:
+              - searchbox "Search available markets" [ref=f7e68]
+              - generic [ref=f7e69]: Type at least 2 characters to search 1361 markets.
+            - generic [ref=f7e70]:
+              - strong [ref=f7e71]: Search when you know what to inspect
+              - generic [ref=f7e72]: The full market catalogue stays out of the way until you filter it.
+        - button "Backend decision Unavailable markets 97 hidden" [ref=f7e74] [cursor=pointer]:
+          - generic [ref=f7e75]:
+            - generic [ref=f7e76]: Backend decision
+            - strong [ref=f7e77]: Unavailable markets
+          - generic [ref=f7e78]:
+            - text: 97 hidden
+            - generic [aria-hidden] [ref=f7e79]: +

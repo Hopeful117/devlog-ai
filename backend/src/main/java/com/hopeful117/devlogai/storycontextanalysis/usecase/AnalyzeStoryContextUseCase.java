@@ -8,6 +8,7 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
@@ -96,6 +97,15 @@ public class AnalyzeStoryContextUseCase {
             String projectSlug, UUID storyId, String requestedIntent, List<String> files,
             Map<String, Object> guidance, String idempotencyKey
     ) {
+        return execute(projectSlug, storyId, requestedIntent, files, guidance, idempotencyKey, null, null);
+    }
+
+    @Transactional
+    public UUID execute(
+            String projectSlug, UUID storyId, String requestedIntent, List<String> files,
+            Map<String, Object> guidance, String idempotencyKey,
+            AuthenticatedPrincipal principal, String provider
+    ) {
         Project project = projectRepository.findBySlug(projectSlug)
                 .orElseThrow(() -> new EntityNotFoundException("Project", projectSlug));
         EngineeringStory story = storyId == null ? null : storyRepository.findById(storyId)
@@ -117,13 +127,19 @@ public class AnalyzeStoryContextUseCase {
         }
 
         return submitPrepared(
-                prepare(projectSlug, storyId, requestedIntent, files), guidance, identity);
+                prepare(projectSlug, storyId, requestedIntent, files), guidance, identity, principal, provider);
     }
 
     /** Submits a previously prepared context without reconstructing or selecting it again. */
     @Transactional
     public UUID executePrepared(
             PreparedStoryContext prepared, Map<String, Object> guidance, String idempotencyKey) {
+        return executePrepared(prepared, guidance, idempotencyKey, null, null);
+    }
+
+    public UUID executePrepared(
+            PreparedStoryContext prepared, Map<String, Object> guidance, String idempotencyKey,
+            AuthenticatedPrincipal principal, String provider) {
         SubmissionIdentity identity = submissionIdentity(
                 prepared.projectSlug(), prepared.storyId(), prepared.intent(), prepared.files(),
                 prepared.question(), guidance, idempotencyKey);
@@ -132,13 +148,19 @@ public class AnalyzeStoryContextUseCase {
             return existingSubmission.get();
         }
 
-        return submitPrepared(prepared, guidance, identity);
+        return submitPrepared(prepared, guidance, identity, principal, provider);
     }
 
     private UUID submitPrepared(
             PreparedStoryContext prepared, Map<String, Object> guidance, SubmissionIdentity identity) {
+        return submitPrepared(prepared, guidance, identity, null, null);
+    }
+
+    private UUID submitPrepared(
+            PreparedStoryContext prepared, Map<String, Object> guidance, SubmissionIdentity identity,
+            AuthenticatedPrincipal principal, String provider) {
         return submissionService.submit(
-                prepared, guidance, identity.submissionDigest(), identity.idempotencyKeyHash());
+                prepared, guidance, identity.submissionDigest(), identity.idempotencyKeyHash(), principal, provider);
     }
 
     private SubmissionIdentity submissionIdentity(

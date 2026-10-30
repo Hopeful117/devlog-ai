@@ -1,0 +1,71 @@
+- generic [ref=f8e3]:
+  - navigation [ref=f8e5]:
+    - link "Trading OS" [ref=f8e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f8e8]:
+      - link "Dashboard" [ref=f8e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f8e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f8e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f8e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f8e13] [cursor=pointer]
+  - generic [ref=f8e14]:
+    - navigation [ref=f8e16]:
+      - generic [ref=f8e17]:
+        - link "Dashboard" [ref=f8e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f8e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f8e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f8e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f8e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f8e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f8e24]:
+        - generic [ref=f8e25]: AI Engine
+        - generic [ref=f8e26]: ● Online
+    - main [ref=f8e27]:
+      - generic [ref=f8e29]:
+        - generic [ref=f8e31]:
+          - heading "Markets" [level=1] [ref=f8e32]
+          - paragraph [ref=f8e33]: Available trading markets
+        - generic [ref=f8e35]:
+          - generic [ref=f8e36]:
+            - generic [ref=f8e37]: Search markets
+            - generic [aria-hidden]: ⌕
+            - searchbox "Search markets" [active] [ref=f8e38]: TBTC
+            - button "Clear market search" [ref=f8e10256] [cursor=pointer]: ×
+          - button "Refresh" [ref=f8e39] [cursor=pointer]
+        - table [ref=f8e41]:
+          - rowgroup [ref=f8e42]:
+            - row [ref=f8e43]:
+              - columnheader "Symbol" [ref=f8e44]
+              - columnheader "Provider" [ref=f8e45]
+              - columnheader "Base" [ref=f8e46]
+              - columnheader "Quote" [ref=f8e47]
+              - columnheader "Status" [ref=f8e48]
+          - rowgroup [ref=f8e49]:
+            - row [ref=f8e7512] [cursor=pointer]:
+              - cell "TBTC/EUR" [ref=f8e7513]
+              - cell "KRAKEN" [ref=f8e7514]
+              - cell "TBTC" [ref=f8e7515]
+              - cell "EUR" [ref=f8e7516]
+              - cell "OPEN" [ref=f8e7517]
+            - row [ref=f8e7519] [cursor=pointer]:
+              - cell "TBTC/USD" [ref=f8e7520]
+              - cell "KRAKEN" [ref=f8e7521]
+              - cell "TBTC" [ref=f8e7522]
+              - cell "USD" [ref=f8e7523]
+              - cell "OPEN" [ref=f8e7524]
+            - row [ref=f8e7533] [cursor=pointer]:
+              - cell "TBTC/XBT" [ref=f8e7534]
+              - cell "KRAKEN" [ref=f8e7535]
+              - cell "TBTC" [ref=f8e7536]
+              - cell "XBT" [ref=f8e7537]
+              - cell "OPEN" [ref=f8e7538]

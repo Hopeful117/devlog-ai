@@ -7,6 +7,10 @@ Description-Content-Type: text/markdown
 Requires-Dist: fastapi[standard]<1.0,>=0.116
 Requires-Dist: httpx<1.0,>=0.28
 Requires-Dist: openai<3.0,>=2.0
+Requires-Dist: google-genai<2.0,>=1.33
+Requires-Dist: anthropic<2.0,>=0.75
+Requires-Dist: cryptography<47,>=43
+Requires-Dist: PyJWT[crypto]<3,>=2.9
 Provides-Extra: dev
 Requires-Dist: pytest<10.0,>=8.0; extra == "dev"
 Requires-Dist: pytest-asyncio<2.0,>=0.24; extra == "dev"

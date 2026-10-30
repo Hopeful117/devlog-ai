@@ -3,6 +3,8 @@ package com.hopeful117.devlogai.storycontextanalysis.usecase;
 import com.hopeful117.devlogai.ai.task.dto.response.AiTaskResponse;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
+import com.hopeful117.devlogai.authorization.PrincipalKind;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse;
 import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAnalysisQueryService;
 import org.junit.jupiter.api.Test;
@@ -41,11 +43,11 @@ class DevLogStoryAgentServiceTest {
                 "engineering-story-context-analysis", List.of("README.md"), "question"))
                 .thenReturn(mock(PreparedStoryContext.class));
         when(analyzeStoryContextUseCase.executePrepared(any(),
-                eq(Map.of("focus", "question")), eq("key")))
+                eq(Map.of("focus", "question")), eq("key"), any(), eq("chatgpt")))
                 .thenReturn(taskId);
         when(aiTaskService.getById(taskId)).thenReturn(task(taskId, AiTaskStatus.PROCESSING));
 
-        DevLogStoryAgentExecution execution = service().execute(request);
+        DevLogStoryAgentExecution execution = service().execute(request, principal());
 
         assertEquals(AiTaskStatus.PROCESSING, execution.status());
         assertEquals(Map.of(), execution.result());
@@ -53,7 +55,7 @@ class DevLogStoryAgentServiceTest {
         verify(analyzeStoryContextUseCase).prepare("project", null,
                 "engineering-story-context-analysis", List.of("README.md"), "question");
         verify(analyzeStoryContextUseCase).executePrepared(any(),
-                eq(Map.of("focus", "question")), eq("key"));
+                eq(Map.of("focus", "question")), eq("key"), eq(principal()), eq("chatgpt"));
         verifyNoInteractions(analysisQueryService);
     }
 
@@ -65,12 +67,12 @@ class DevLogStoryAgentServiceTest {
                 eq("engineering-story-context-analysis"), any(), eq("question")))
                 .thenReturn(mock(PreparedStoryContext.class));
         when(analyzeStoryContextUseCase.executePrepared(any(),
-                eq(Map.of("focus", "question")), any())).thenReturn(taskId);
+                eq(Map.of("focus", "question")), any(), any(), eq("chatgpt"))).thenReturn(taskId);
         when(aiTaskService.getById(taskId)).thenReturn(task);
         when(analysisQueryService.findResponseByAiTaskId(taskId))
                 .thenReturn(java.util.Optional.of(new StoryContextAnalysisResponse(null, Map.of())));
 
-        DevLogStoryAgentExecution execution = service().execute(request());
+        DevLogStoryAgentExecution execution = service().execute(request(), principal());
 
         assertTrue(execution.result().containsKey("analysis"));
         assertEquals("context", execution.result().get("contextDigest"));
@@ -84,6 +86,10 @@ class DevLogStoryAgentServiceTest {
 
     private static DevLogStoryAgentRequest request() {
         return new DevLogStoryAgentRequest("project", null, "engineering-story-context-analysis", "question", List.of("README.md"), Map.of(), "key");
+    }
+
+    private static AuthenticatedPrincipal principal() {
+        return new AuthenticatedPrincipal("principal-1", PrincipalKind.HUMAN, "issuer");
     }
 
     private static AiTaskResponse task(UUID id, AiTaskStatus status) {

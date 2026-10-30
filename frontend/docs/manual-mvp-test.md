@@ -42,7 +42,7 @@ Put the following values in a local ignored environment source; never commit the
 
 ```text
 LLM_PROVIDER=openai
-LLM_MODEL=gpt-4.1-mini
+LLM_MODEL=gpt-5.6-luna
 LLM_API_KEY=<your key>
 LLM_TIMEOUT_SECONDS=30
 LLM_MAX_OUTPUT_TOKENS=2000

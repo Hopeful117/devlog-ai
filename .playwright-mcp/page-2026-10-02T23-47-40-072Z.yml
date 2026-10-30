@@ -1,0 +1,58 @@
+- generic [ref=f4e3]:
+  - navigation [ref=f4e5]:
+    - link "Trading OS" [ref=f4e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f4e8]:
+      - link "Dashboard" [ref=f4e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f4e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f4e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f4e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f4e13] [cursor=pointer]
+  - generic [ref=f4e14]:
+    - navigation [ref=f4e16]:
+      - generic [ref=f4e17]:
+        - link "Dashboard" [ref=f4e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f4e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f4e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f4e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f4e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f4e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f4e24]:
+        - generic [ref=f4e25]: AI Engine
+        - generic [ref=f4e26]: ● Online
+    - main [ref=f4e27]:
+      - generic [ref=f4e93]:
+        - generic [ref=f4e95]:
+          - paragraph [ref=f4e96]: Trading record
+          - heading "Trade history" [level=1] [ref=f4e97]
+          - paragraph [ref=f4e98]: Review your executions and return to the related decision when available.
+        - region "Execution history" [ref=f4e99]:
+          - article [ref=f4e100]:
+            - generic [ref=f4e101]:
+              - generic [ref=f4e102]:
+                - heading "Execution 1fe176dc" [level=2] [ref=f4e103]
+                - paragraph [ref=f4e104]: Updated Oct 3, 2026, 1:46:42 AM
+              - generic [ref=f4e105]: Terminée
+            - generic [ref=f4e114]:
+              - paragraph [ref=f4e115]: Trade Plan continuity is unavailable for this execution.
+              - generic [ref=f4e116]:
+                - generic [ref=f4e117]: "Broker status: FILLED"
+                - generic [ref=f4e118]: "Filled: 0.001"
+                - generic [ref=f4e119]: "Average price: 83,967.00"
+          - article [ref=f4e107]:
+            - generic [ref=f4e108]:
+              - generic [ref=f4e109]:
+                - heading "Execution 93e7b5c1" [level=2] [ref=f4e110]
+                - paragraph [ref=f4e111]: Updated Oct 3, 2026, 1:45:21 AM
+              - generic [ref=f4e112]: Terminée
+            - button "View execution context" [ref=f4e113] [cursor=pointer]

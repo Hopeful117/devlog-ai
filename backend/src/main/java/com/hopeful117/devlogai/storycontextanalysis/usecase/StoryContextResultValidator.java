@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.contracts.engineeringcontext.EvidenceRef;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
 
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Set;
 
 /** Coordinates authoritative validation of the structured Story Context result. */
@@ -18,6 +19,7 @@ public final class StoryContextResultValidator {
                 : Map.of();
 
         Set<String> allowedRefSet = AnalyzeStoryContextUseCase.allowedGroundingReferences(groundingContract, task);
+        Map<String, String> resourceByReference = groundingResources(groundingContract);
         String expectedDigest = task.getContextDigest();
         String actualDigest = result.provenance().contextDigest();
         if (expectedDigest != null && !expectedDigest.equals(actualDigest)) {
@@ -30,7 +32,7 @@ public final class StoryContextResultValidator {
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.historicalContext(), allowedRefSet, true);
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.constraintFindings(), allowedRefSet, false);
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.impactedComponentFindings(), allowedRefSet, true);
-        validateImplementationPreparation(result.implementationPreparation(), allowedRefSet);
+        validateImplementationPreparation(result.implementationPreparation(), allowedRefSet, resourceByReference);
 
         if ("V2".equals(groundingContract.get("causalContractVersion"))) {
             result = AnalyzeStoryContextUseCase.validateV2CausalAssessment(result, task, groundingContract);
@@ -62,12 +64,22 @@ public final class StoryContextResultValidator {
     static void validateImplementationPreparation(
             StoryContextAnalysisResult.ImplementationPreparation preparation,
             Set<String> allowedRefSet) {
+        validateImplementationPreparation(preparation, allowedRefSet, Map.of());
+    }
+
+    static void validateImplementationPreparation(
+            StoryContextAnalysisResult.ImplementationPreparation preparation,
+            Set<String> allowedRefSet,
+            Map<String, String> resourceByReference) {
         for (StoryContextAnalysisResult.ImplementationFile item : preparation.affectedFiles()) {
             validatePreparationEvidence(item.evidenceReferences(), allowedRefSet, "affected file " + item.path());
             boolean supported = item.evidenceReferences().stream().anyMatch(reference ->
                     item.path().equals(reference.reference())
                             || item.path().equals(reference.resource())
-                            || (reference.resource() != null && reference.resource().endsWith("/" + item.path())));
+                            || (reference.resource() != null && reference.resource().endsWith("/" + item.path()))
+                            || item.path().equals(resourceByReference.get(reference.reference()))
+                            || (resourceByReference.get(reference.reference()) != null
+                            && resourceByReference.get(reference.reference()).endsWith("/" + item.path())));
             if (!supported) {
                 throw new IllegalStateException("Affected file is not supported by cited evidence: " + item.path());
             }
@@ -78,6 +90,21 @@ public final class StoryContextResultValidator {
         for (StoryContextAnalysisResult.ImplementationTestPlanItem item : preparation.testPlan()) {
             validatePreparationEvidence(item.evidenceReferences(), allowedRefSet, "test plan " + item.target());
         }
+    }
+
+    private static Map<String, String> groundingResources(Map<String, Object> groundingContract) {
+        Map<String, String> resources = new LinkedHashMap<>();
+        Object raw = groundingContract.get("allowedGroundingReferences");
+        if (!(raw instanceof Iterable<?> entries)) return resources;
+        for (Object entry : entries) {
+            if (!(entry instanceof Map<?, ?> map)) continue;
+            Object reference = map.get("ref");
+            Object resource = map.get("resource");
+            if (reference instanceof String ref && resource instanceof String path && !path.isBlank()) {
+                resources.put(ref, path);
+            }
+        }
+        return resources;
     }
 
     private static void validatePreparationEvidence(
