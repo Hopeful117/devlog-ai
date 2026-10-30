@@ -2,7 +2,7 @@
 
 ## Statut
 
-PROPOSED - design materialized; implementation not authorized.
+IMPLEMENTED - independent review passed; pending human acceptance.
 
 ## Objectif produit
 
