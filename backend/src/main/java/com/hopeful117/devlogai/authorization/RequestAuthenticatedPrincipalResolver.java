@@ -44,6 +44,9 @@ public class RequestAuthenticatedPrincipalResolver implements AuthenticatedPrinc
                     || authentication instanceof AnonymousAuthenticationToken) {
                 return Optional.empty();
             }
+            if (issuer.isBlank()) {
+                return Optional.empty();
+            }
             if (authentication instanceof JwtAuthenticationToken jwtAuthenticationToken) {
                 String principalId = jwtAuthenticationToken.getName();
                 if (principalId == null || principalId.isBlank()) {
