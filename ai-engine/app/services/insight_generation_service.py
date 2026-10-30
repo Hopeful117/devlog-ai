@@ -180,6 +180,7 @@ class InsightGenerationService:
             self._provider.model_identifier, len(prompt.user_message), synthesis is not None,
         )
         await self._callback_client.send_result(
+            submission.ai_task_id,
             submission.correlation_id,
             AiTaskResultRequest(
                 correlation_id=submission.correlation_id,
@@ -777,6 +778,7 @@ class InsightGenerationService:
         traces: InteractionTraceCollector | None = None,
     ) -> None:
         await self._callback_client.send_result(
+            submission.ai_task_id,
             submission.correlation_id,
             AiTaskResultRequest(
                 correlation_id=submission.correlation_id,

@@ -181,7 +181,7 @@ To use OpenAI:
 
 ```bash
 LLM_PROVIDER=openai \
-LLM_MODEL=gpt-4.1-mini \
+LLM_MODEL=gpt-5.6-luna \
 LLM_API_KEY=<api-key> \
 docker compose up --build -d
 ```
@@ -191,7 +191,7 @@ Main settings:
 | Variable                     | Default        | Purpose                             |
 | ---------------------------- | -------------- | ----------------------------------- |
 | `LLM_PROVIDER`               | `mock`         | `mock` or `openai`                  |
-| `LLM_MODEL`                  | `gpt-4.1-mini` | Model used by the OpenAI provider   |
+| `LLM_MODEL`                  | `gpt-5.6-luna` | Model used by the OpenAI provider   |
 | `LLM_API_KEY`                | empty          | Required when `LLM_PROVIDER=openai` |
 | `LLM_TIMEOUT_SECONDS`        | `30`           | LLM request timeout                 |
 | `LLM_MAX_OUTPUT_TOKENS`      | `2000`         | Maximum structured output size      |

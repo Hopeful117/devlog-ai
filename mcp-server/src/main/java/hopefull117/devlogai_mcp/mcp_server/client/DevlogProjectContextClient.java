@@ -43,9 +43,21 @@ public interface DevlogProjectContextClient {
             @PathVariable UUID aiTaskId
     );
 
+    @GetExchange("/ai/tasks/{aiTaskId}/story-context-analysis")
+    StoryContextAnalysisResponse getStoryContextAnalysisAuthenticated(
+            @PathVariable UUID aiTaskId,
+            @RequestHeader("Authorization") String authorization
+    );
+
     @GetExchange("/ai-tasks/{aiTaskId}")
     AiTaskStatusResponse getAiTaskStatus(
             @PathVariable UUID aiTaskId
+    );
+
+    @GetExchange("/ai-tasks/{aiTaskId}")
+    AiTaskStatusResponse getAiTaskStatusAuthenticated(
+            @PathVariable UUID aiTaskId,
+            @RequestHeader("Authorization") String authorization
     );
 
     @GetExchange("/story-context-agent/projects/{projectSlug}/context")
@@ -60,6 +72,7 @@ public interface DevlogProjectContextClient {
     Map<String, Object> submitStoryContextAgentTask(
             @PathVariable String projectSlug,
             @RequestParam(value = "storyId", required = false) UUID storyId,
+            @RequestHeader("Authorization") String authorization,
             @RequestBody SubmitRequest request
     );
 
@@ -75,7 +88,8 @@ public interface DevlogProjectContextClient {
             @PathVariable UUID aiTaskId,
             @RequestHeader("X-DevLog-Principal-Id") String principalId,
             @RequestHeader("X-DevLog-Principal-Kind") String principalKind,
-            @RequestHeader("X-DevLog-Authentication-Source") String authenticationSource);
+            @RequestHeader("X-DevLog-Authentication-Source") String authenticationSource,
+            @RequestHeader("Authorization") String authorization);
 
     @PostExchange("/story-context-agent/snapshots/{snapshotId}/follow-up")
     Map<String, Object> submitStoryContextAgentFollowUp(
@@ -83,12 +97,14 @@ public interface DevlogProjectContextClient {
             @RequestHeader("X-DevLog-Principal-Id") String principalId,
             @RequestHeader("X-DevLog-Principal-Kind") String principalKind,
             @RequestHeader("X-DevLog-Authentication-Source") String authenticationSource,
+            @RequestHeader("Authorization") String authorization,
             @RequestBody FollowUpRequest request);
 
     @PostExchange("/projects/{projectSlug}/story-agent")
     Map<String, Object> executeStoryAgent(
             @PathVariable String projectSlug,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader("Authorization") String authorization,
             @RequestBody StoryAgentRequest request
     );
 

@@ -1,0 +1,81 @@
+- generic [ref=f3e3]:
+  - navigation [ref=f3e5]:
+    - link "Trading OS" [ref=f3e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f3e8]:
+      - link "Dashboard" [ref=f3e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f3e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f3e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f3e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f3e13] [cursor=pointer]
+  - generic [ref=f3e14]:
+    - navigation [ref=f3e16]:
+      - generic [ref=f3e17]:
+        - link "Dashboard" [ref=f3e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f3e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f3e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f3e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f3e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f3e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f3e24]:
+        - generic [ref=f3e25]: AI Engine
+        - generic [ref=f3e26]: ● Online
+    - main [ref=f3e27]:
+      - article [ref=f3e871]:
+        - generic [ref=f3e872]:
+          - generic [ref=f3e873]:
+            - heading "TBTC/USD — SHORT" [level=1] [ref=f3e874]
+            - paragraph [ref=f3e875]:
+              - text: "Status:"
+              - generic [ref=f3e876]: PROPOSED
+          - generic [ref=f3e877]:
+            - generic [ref=f3e878]: SHORT
+            - generic [ref=f3e879]: MARKET
+        - generic [ref=f3e880]:
+          - generic [ref=f3e881]: Entry price
+          - generic [ref=f3e883]:
+            - generic [ref=f3e884]: Stop loss
+            - generic [ref=f3e885]: 82,000.00
+          - generic [ref=f3e886]:
+            - generic [ref=f3e887]: Take profits
+            - generic [ref=f3e888]: 79,000.00
+          - generic [ref=f3e889]:
+            - generic [ref=f3e890]: Quantity
+            - generic [ref=f3e891]: "0.0010"
+          - generic [ref=f3e892]:
+            - generic [ref=f3e893]: Notional
+            - generic [ref=f3e894]: "81.20"
+          - generic [ref=f3e895]:
+            - generic [ref=f3e896]: Risk
+            - generic [ref=f3e897]: "0.80"
+          - generic [ref=f3e898]:
+            - generic [ref=f3e899]: Risk/Reward
+            - generic [ref=f3e900]: 2.8R
+          - generic [ref=f3e901]:
+            - generic [ref=f3e902]: Expires
+            - generic [ref=f3e903]: Oct 3, 02:42
+        - generic [ref=f3e904]:
+          - heading "Thesis" [level=2] [ref=f3e905]
+          - paragraph [ref=f3e906]: E2E PAPER test using the observed short Legacy OHLC opportunity while preserving Trend Context and Risk boundaries.
+        - generic [ref=f3e907]:
+          - heading "Confirmation conditions" [level=2] [ref=f3e908]
+          - list [ref=f3e909]:
+            - listitem [ref=f3e910]: Price remains below the reference price.
+            - listitem [ref=f3e911]: Short setup remains eligible in the PAPER workflow.
+          - heading "Invalidation conditions" [level=2] [ref=f3e912]
+          - list [ref=f3e913]:
+            - listitem [ref=f3e914]: Trend Context invalidation is confirmed.
+            - listitem [ref=f3e915]: Price reaches 82000.
+        - generic [ref=f3e916]:
+          - button "Reject" [ref=f3e917] [cursor=pointer]
+          - button "Accept Plan" [ref=f3e918] [cursor=pointer]

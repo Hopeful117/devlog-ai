@@ -120,6 +120,7 @@ class StoryContextAnalysisGenerationService:
 
         follow_up = self._is_follow_up(submission)
         await self._callback_client.send_result(
+            submission.ai_task_id,
             submission.correlation_id,
             AiTaskResultRequest(
                 correlation_id=submission.correlation_id,
@@ -477,6 +478,7 @@ class StoryContextAnalysisGenerationService:
         traces: InteractionTraceCollector | None = None,
     ) -> None:
         await self._callback_client.send_result(
+            submission.ai_task_id,
             submission.correlation_id,
             AiTaskResultRequest(
                 correlation_id=submission.correlation_id,

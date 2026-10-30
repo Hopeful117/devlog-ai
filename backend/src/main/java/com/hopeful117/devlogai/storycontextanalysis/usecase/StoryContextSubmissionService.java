@@ -8,6 +8,10 @@ import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBinding;
+import com.hopeful117.devlogai.aicredentialbinding.service.AiCredentialBindingService;
+import com.hopeful117.devlogai.aicredentialbinding.service.AiEngineBindingClient;
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
@@ -20,7 +24,7 @@ import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -33,7 +37,6 @@ import java.util.UUID;
 
 /** Creates the immutable Core snapshot and submits the prepared task to the AI engine. */
 @Service
-@RequiredArgsConstructor
 public class StoryContextSubmissionService {
     private static final String INTENT_VERSION = "v1";
 
@@ -44,10 +47,44 @@ public class StoryContextSubmissionService {
     private final AnalysisRepository analysisRepository;
     private final ObjectMapper objectMapper;
     private final StoryContextDigestService digestService;
+    private final AiCredentialBindingService credentialBindingService;
+    private final AiEngineBindingClient aiEngineBindingClient;
+
+    @Autowired
+    public StoryContextSubmissionService(
+            IntentCatalog intentCatalog, AiTaskService aiTaskService, AIEngineClient aiEngineClient,
+            AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
+            StoryContextDigestService digestService, AiCredentialBindingService credentialBindingService,
+            AiEngineBindingClient aiEngineBindingClient) {
+        this.intentCatalog = intentCatalog;
+        this.aiTaskService = aiTaskService;
+        this.aiEngineClient = aiEngineClient;
+        this.aiTaskRepository = aiTaskRepository;
+        this.analysisRepository = analysisRepository;
+        this.objectMapper = objectMapper;
+        this.digestService = digestService;
+        this.credentialBindingService = credentialBindingService;
+        this.aiEngineBindingClient = aiEngineBindingClient;
+    }
+
+    public StoryContextSubmissionService(
+            IntentCatalog intentCatalog, AiTaskService aiTaskService, AIEngineClient aiEngineClient,
+            AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
+            StoryContextDigestService digestService) {
+        this(intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository,
+                objectMapper, digestService, null, null);
+    }
 
     @Transactional
     public UUID submit(PreparedStoryContext prepared, Map<String, Object> guidance,
                        String submissionDigest, String idempotencyKeyHash) {
+        return submit(prepared, guidance, submissionDigest, idempotencyKeyHash, null, null);
+    }
+
+    @Transactional
+    public UUID submit(PreparedStoryContext prepared, Map<String, Object> guidance,
+                       String submissionDigest, String idempotencyKeyHash,
+                       AuthenticatedPrincipal principal, String provider) {
         String projectSlug = prepared.projectSlug();
         UUID storyId = prepared.storyId();
         String requestedIntent = prepared.intent();
@@ -87,6 +124,13 @@ public class StoryContextSubmissionService {
         task.setContextSnapshot(snapshot);
         aiTaskRepository.save(task);
         aiTaskRepository.flush();
+        if ("chatgpt".equals(provider)) {
+            if (principal == null) {
+                throw new IllegalStateException("authenticated principal is required for ChatGPT Story Agent execution");
+            }
+            AiCredentialBinding binding = credentialBindingService.issue(principal, task.getId(), provider);
+            aiEngineBindingClient.register(binding);
+        }
         aiTaskService.submit(task.getId(), new SubmitAiTaskRequest(null));
 
         Map<String, Object> metadata = new LinkedHashMap<>();

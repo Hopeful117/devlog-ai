@@ -60,7 +60,7 @@ class CaptureCallback:
     def __init__(self) -> None:
         self.result: Any = None
 
-    async def send_result(self, _correlation_id: Any, result: Any) -> None:
+    async def send_result(self, _ai_task_id: Any, _correlation_id: Any, result: Any) -> None:
         self.result = result
 
 

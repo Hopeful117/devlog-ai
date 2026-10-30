@@ -1,6 +1,10 @@
 fastapi[standard]<1.0,>=0.116
 httpx<1.0,>=0.28
 openai<3.0,>=2.0
+google-genai<2.0,>=1.33
+anthropic<2.0,>=0.75
+cryptography<47,>=43
+PyJWT[crypto]<3,>=2.9
 
 [dev]
 pytest<10.0,>=8.0

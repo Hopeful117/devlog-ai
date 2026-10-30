@@ -1,0 +1,616 @@
+- generic [ref=f9e3]:
+  - navigation [ref=f9e5]:
+    - link "Trading OS" [ref=f9e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f9e8]:
+      - link "Dashboard" [ref=f9e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f9e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f9e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f9e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f9e13] [cursor=pointer]
+  - generic [ref=f9e14]:
+    - navigation [ref=f9e16]:
+      - generic [ref=f9e17]:
+        - link "Dashboard" [ref=f9e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f9e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f9e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f9e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f9e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f9e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f9e24]:
+        - generic [ref=f9e25]: AI Engine
+        - generic [ref=f9e26]: ● Online
+    - main [ref=f9e27]:
+      - generic [ref=f9e108714]:
+        - generic [ref=f9e108716]:
+          - generic [ref=f9e108717]: Decision context
+          - heading "Market Decision Workspace" [level=1] [ref=f9e108718]
+          - paragraph [ref=f9e108719]: Select an account first. Available markets depend on that trading context.
+        - region [ref=f9e108720]:
+          - generic [ref=f9e108721]:
+            - generic [ref=f9e108722]:
+              - generic [ref=f9e108723]: Step 1
+              - heading "Trading account" [level=2] [ref=f9e108724]
+            - button "Refresh" [ref=f9e108725] [cursor=pointer]
+          - generic [ref=f9e108726]:
+            - generic [ref=f9e108727]: Account
+            - combobox "Account" [ref=f9e108728]:
+              - option "Select an account"
+              - option "kraken account · EUR"
+              - option "Story 0067 PAPER Validation · USD" [selected]
+        - generic [ref=f9e108734]:
+          - article [ref=f9e108735]:
+            - generic [ref=f9e108736]: Selected account
+            - heading "Story 0067 PAPER Validation" [level=2] [ref=f9e108737]
+            - generic [ref=f9e108738]:
+              - generic [ref=f9e108739]:
+                - term [ref=f9e108740]: Currency
+                - definition [ref=f9e108741]: USD
+              - generic [ref=f9e108742]:
+                - term [ref=f9e108743]: Risk profile
+                - definition [ref=f9e108744]: 1.0.0
+              - generic [ref=f9e108745]:
+                - term [ref=f9e108746]: Planning profile
+                - definition [ref=f9e108747]: "1"
+          - article [ref=f9e108748]:
+            - generic [ref=f9e108749]:
+              - generic [ref=f9e108750]:
+                - generic [ref=f9e108751]: Step 2
+                - heading "Choose a market" [level=2] [ref=f9e108752]
+              - generic [ref=f9e108753]: 1361 eligible
+            - generic [ref=f9e108754]:
+              - searchbox "Search available markets" [ref=f9e108755]: PEPE
+              - generic [ref=f9e108756]: Type at least 2 characters to search 1361 markets.
+            - generic [ref=f9e108757]:
+              - button "PEPE/AUD KRAKEN" [ref=f9e108758] [cursor=pointer]:
+                - strong [ref=f9e108759]: PEPE/AUD
+                - generic [ref=f9e108760]: KRAKEN
+              - button "PEPE/CAD KRAKEN" [ref=f9e108761] [cursor=pointer]:
+                - strong [ref=f9e108762]: PEPE/CAD
+                - generic [ref=f9e108763]: KRAKEN
+              - button "PEPE/EUR KRAKEN" [ref=f9e108764] [cursor=pointer]:
+                - strong [ref=f9e108765]: PEPE/EUR
+                - generic [ref=f9e108766]: KRAKEN
+              - button "PEPE/GBP KRAKEN" [ref=f9e108767] [cursor=pointer]:
+                - strong [ref=f9e108768]: PEPE/GBP
+                - generic [ref=f9e108769]: KRAKEN
+              - button "PEPE/USD KRAKEN" [active] [ref=f9e108770] [cursor=pointer]:
+                - strong [ref=f9e108771]: PEPE/USD
+                - generic [ref=f9e108772]: KRAKEN
+              - button "PEPECOIN/USD KRAKEN" [ref=f9e108773] [cursor=pointer]:
+                - strong [ref=f9e108774]: PEPECOIN/USD
+                - generic [ref=f9e108775]: KRAKEN
+        - button "Backend decision Unavailable markets 97 hidden" [ref=f9e108777] [cursor=pointer]:
+          - generic [ref=f9e108778]:
+            - generic [ref=f9e108779]: Backend decision
+            - strong [ref=f9e108780]: Unavailable markets
+          - generic [ref=f9e108781]:
+            - text: 97 hidden
+            - generic [aria-hidden] [ref=f9e108782]: +
+        - generic [ref=f9e108783]:
+          - generic [ref=f9e108784]:
+            - generic [ref=f9e108785]:
+              - generic [ref=f9e108786]: Step 3 · Account-scoped market
+              - text: KRAKEN
+              - heading "PEPE/USD" [level=2] [ref=f9e108787]
+              - paragraph [ref=f9e108788]: PEPE / USD
+            - generic [ref=f9e108789]:
+              - generic [ref=f9e108790]: OPEN
+              - generic [ref=f9e108791]: State updated 1:57:34 AM
+          - generic [ref=f9e108792]:
+            - generic [ref=f9e108794]:
+              - generic [ref=f9e108795]: Analytical evidence
+              - heading "Trend Context" [level=3] [ref=f9e108796]
+            - paragraph [ref=f9e108797]: Loading deterministic Trend Context...
+          - region [ref=f9e108798]:
+            - generic [ref=f9e108799]:
+              - generic [ref=f9e108800]: Trading actions
+              - heading "Prepare a discretionary proposal" [level=3] [ref=f9e108801]
+              - paragraph [ref=f9e108802]: Keep the market context visible while describing a MANUAL Trade Plan.
+            - button "Prepare manual trade" [ref=f9e108803] [cursor=pointer]
+          - region [ref=f9e108804]:
+            - generic [ref=f9e108805]:
+              - generic [ref=f9e108806]:
+                - generic [ref=f9e108807]: Live market
+                - heading "Ticker" [level=3] [ref=f9e108808]
+              - generic [ref=f9e108809]: LIVE
+            - generic [ref=f9e108810]:
+              - article [ref=f9e108811]:
+                - generic [ref=f9e108812]: Last price
+                - strong [ref=f9e108813]: "0.000004271"
+                - generic [ref=f9e108814]: 2:26:38 AM
+              - article [ref=f9e108815]:
+                - generic [ref=f9e108816]: Bid
+                - strong [ref=f9e108817]: "0.000004272"
+              - article [ref=f9e108818]:
+                - generic [ref=f9e108819]: Ask
+                - strong [ref=f9e108820]: "0.000004274"
+              - article [ref=f9e108821]:
+                - generic [ref=f9e108822]: Spread
+                - strong [ref=f9e108823]: "2.0000000000001503e-9"
+              - article [ref=f9e108824]:
+                - generic [ref=f9e108825]: Volume
+                - strong [ref=f9e108826]: "1123987267597.2876"
+          - region [ref=f9e108827]:
+            - generic [ref=f9e108828]:
+              - generic [ref=f9e108829]:
+                - generic [ref=f9e108830]: Price history
+                - heading "Market chart" [level=3] [ref=f9e108831]
+              - generic [ref=f9e108832]:
+                - button "1m" [ref=f9e108833] [cursor=pointer]
+                - button "5m" [ref=f9e108834] [cursor=pointer]
+                - button "15m" [ref=f9e108835] [cursor=pointer]
+                - button "30m" [ref=f9e108836] [cursor=pointer]
+                - button "1h" [ref=f9e108837] [cursor=pointer]
+                - button "4h" [ref=f9e108838] [cursor=pointer]
+                - button "1d" [ref=f9e108839] [cursor=pointer]
+              - generic [ref=f9e108840]: UNAVAILABLE
+            - generic "Market candlestick chart" [ref=f9e108843]:
+              - table [ref=f9e108845]:
+                - row [ref=f9e108846]:
+                  - cell
+                  - cell [ref=f9e108847]:
+                    - link "Charting by TradingView" [ref=f9e108851] [cursor=pointer]:
+                      - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/decision-workspace
+                  - cell [ref=f9e108856]
+                - row [ref=f9e108860]:
+                  - cell
+                  - cell [ref=f9e108861]
+                  - cell [ref=f9e108865]
+          - generic [ref=f9e108868]:
+            - region [ref=f9e108869]:
+              - generic [ref=f9e108870]:
+                - heading "Order book" [level=3] [ref=f9e108871]
+                - generic "Order-book depth" [ref=f9e108872]:
+                  - button "10 levels" [ref=f9e108873] [cursor=pointer]
+                  - button "25 levels" [ref=f9e108874] [cursor=pointer]
+                - generic [ref=f9e108875]: LIVE
+              - region "Live order book" [ref=f9e108877]:
+                - generic [ref=f9e108878]:
+                  - generic [ref=f9e108879]:
+                    - text: Spread
+                    - strong [ref=f9e108880]: "2e-9"
+                  - generic [ref=f9e108881]:
+                    - text: Bid volume
+                    - strong [ref=f9e108882]: "16742948376.22775"
+                  - generic [ref=f9e108883]:
+                    - text: Ask volume
+                    - strong [ref=f9e108884]: "15863364637.45368"
+                  - generic [ref=f9e108885]:
+                    - text: Bid imbalance
+                    - strong [ref=f9e108886]: 51.3%
+                - generic [ref=f9e108887]:
+                  - heading "Asks" [level=3] [ref=f9e108888]
+                  - generic [aria-hidden] [ref=f9e108889]:
+                    - generic [ref=f9e108890]: Price
+                    - generic [ref=f9e108891]: Quantity
+                    - generic [ref=f9e108892]: Total
+                  - generic [ref=f9e108893]:
+                    - generic [ref=f9e108894]: "0.000004274"
+                    - generic [ref=f9e108895]: "203324186.63224"
+                    - generic [ref=f9e108896]: "869.00757367"
+                  - generic [ref=f9e108897]:
+                    - generic [ref=f9e108898]: "0.000004275"
+                    - generic [ref=f9e108899]: "268086168.66147"
+                    - generic [ref=f9e108900]: 1,146.06837103
+                  - generic [ref=f9e108901]:
+                    - generic [ref=f9e108902]: "0.000004276"
+                    - generic [ref=f9e108903]: "1386889182.48745"
+                    - generic [ref=f9e108904]: 5,930.33814432
+                  - generic [ref=f9e108905]:
+                    - generic [ref=f9e108906]: "0.000004277"
+                    - generic [ref=f9e108907]: "2216204166.28541"
+                    - generic [ref=f9e108908]: 9,478.7052192
+                  - generic [ref=f9e108909]:
+                    - generic [ref=f9e108910]: "0.000004278"
+                    - generic [ref=f9e108911]: "727418851.70561"
+                    - generic [ref=f9e108912]: 3,111.8978476
+                  - generic [ref=f9e108913]:
+                    - generic [ref=f9e108914]: "0.000004279"
+                    - generic [ref=f9e108915]: "4623799720.17219"
+                    - generic [ref=f9e108916]: 19,785.23900262
+                  - generic [ref=f9e108917]:
+                    - generic [ref=f9e108918]: "0.00000428"
+                    - generic [ref=f9e108919]: "324342752.91364"
+                    - generic [ref=f9e108920]: 1,388.18698247
+                  - generic [ref=f9e108921]:
+                    - generic [ref=f9e108922]: "0.000004281"
+                    - generic [ref=f9e108923]: "3230857654.04584"
+                    - generic [ref=f9e108924]: 13,831.30161697
+                  - generic [ref=f9e108925]:
+                    - generic [ref=f9e108926]: "0.000004282"
+                    - generic [ref=f9e108927]: "2140398596.9566"
+                    - generic [ref=f9e108928]: 9,165.18679217
+                  - generic [ref=f9e108929]:
+                    - generic [ref=f9e108930]: "0.000004283"
+                    - generic [ref=f9e108931]: "742043357.59323"
+                    - generic [ref=f9e108932]: 3,178.17170057
+                - generic [ref=f9e108933]:
+                  - generic [ref=f9e108934]: Best bid 0.000004272
+                  - strong [ref=f9e108935]: "2e-9"
+                  - generic [ref=f9e108936]: Best ask 0.000004274
+                - generic [ref=f9e108937]:
+                  - heading "Bids" [level=3] [ref=f9e108938]
+                  - generic [aria-hidden] [ref=f9e108939]:
+                    - generic [ref=f9e108940]: Price
+                    - generic [ref=f9e108941]: Quantity
+                    - generic [ref=f9e108942]: Total
+                  - generic [ref=f9e108943]:
+                    - generic [ref=f9e108944]: "0.000004272"
+                    - generic [ref=f9e108945]: "625866611.48"
+                    - generic [ref=f9e108946]: 2,673.70216424
+                  - generic [ref=f9e108947]:
+                    - generic [ref=f9e108948]: "0.000004271"
+                    - generic [ref=f9e108949]: "1706810530.8057"
+                    - generic [ref=f9e108950]: 7,289.78777707
+                  - generic [ref=f9e108951]:
+                    - generic [ref=f9e108952]: "0.00000427"
+                    - generic [ref=f9e108953]: "1876911352.22922"
+                    - generic [ref=f9e108954]: 8,014.41147402
+                  - generic [ref=f9e108955]:
+                    - generic [ref=f9e108956]: "0.000004269"
+                    - generic [ref=f9e108957]: "2661820671.23862"
+                    - generic [ref=f9e108958]: 11,363.31244552
+                  - generic [ref=f9e108959]:
+                    - generic [ref=f9e108960]: "0.000004268"
+                    - generic [ref=f9e108961]: "3767997175.79662"
+                    - generic [ref=f9e108962]: 16,081.8119463
+                  - generic [ref=f9e108963]:
+                    - generic [ref=f9e108964]: "0.000004267"
+                    - generic [ref=f9e108965]: "27843700"
+                    - generic [ref=f9e108966]: "118.8090679"
+                  - generic [ref=f9e108967]:
+                    - generic [ref=f9e108968]: "0.000004266"
+                    - generic [ref=f9e108969]: "3352014790.74337"
+                    - generic [ref=f9e108970]: 14,299.69509731
+                  - generic [ref=f9e108971]:
+                    - generic [ref=f9e108972]: "0.000004265"
+                    - generic [ref=f9e108973]: "1206002090.06"
+                    - generic [ref=f9e108974]: 5,143.59891411
+                  - generic [ref=f9e108975]:
+                    - generic [ref=f9e108976]: "0.000004264"
+                    - generic [ref=f9e108977]: "27843700"
+                    - generic [ref=f9e108978]: "118.7255368"
+                  - generic [ref=f9e108979]:
+                    - generic [ref=f9e108980]: "0.000004263"
+                    - generic [ref=f9e108981]: "1489837753.87422"
+                    - generic [ref=f9e108982]: 6,351.17834477
+            - region [ref=f9e108983]:
+              - generic [ref=f9e108984]:
+                - heading "Recent trades" [level=3] [ref=f9e108985]
+                - generic [ref=f9e108986]: LIVE
+              - region "Recent executed trades" [ref=f9e108988]:
+                - generic [aria-hidden] [ref=f9e108989]:
+                  - generic [ref=f9e108990]: Time
+                  - generic [ref=f9e108991]: Side
+                  - generic [ref=f9e108992]: Price
+                  - generic [ref=f9e108993]: Quantity
+                  - generic [ref=f9e108994]: Notional
+                - generic [ref=f9e108995]:
+                  - time [ref=f9e108996]: 2:25:57 AM
+                  - generic [ref=f9e108997]: SELL
+                  - generic [ref=f9e108998]: "0.000004271"
+                  - generic [ref=f9e108999]: "467672"
+                  - generic [ref=f9e109000]: "1.99742711"
+                - generic [ref=f9e109001]:
+                  - time [ref=f9e109002]: 2:25:53 AM
+                  - generic [ref=f9e109003]: SELL
+                  - generic [ref=f9e109004]: "0.000004271"
+                  - generic [ref=f9e109005]: "294424"
+                  - generic [ref=f9e109006]: "1.2574849"
+                - generic [ref=f9e109007]:
+                  - time [ref=f9e109008]: 2:25:24 AM
+                  - generic [ref=f9e109009]: SELL
+                  - generic [ref=f9e109010]: "0.000004274"
+                  - generic [ref=f9e109011]: "27843700"
+                  - generic [ref=f9e109012]: "119.0039738"
+                - generic [ref=f9e109013]:
+                  - time [ref=f9e109014]: 2:24:53 AM
+                  - generic [ref=f9e109015]: SELL
+                  - generic [ref=f9e109016]: "0.000004276"
+                  - generic [ref=f9e109017]: "27843700"
+                  - generic [ref=f9e109018]: "119.0596612"
+                - generic [ref=f9e109019]:
+                  - time [ref=f9e109020]: 2:24:40 AM
+                  - generic [ref=f9e109021]: SELL
+                  - generic [ref=f9e109022]: "0.000004274"
+                  - generic [ref=f9e109023]: "736568"
+                  - generic [ref=f9e109024]: "3.14809163"
+                - generic [ref=f9e109025]:
+                  - time [ref=f9e109026]: 2:23:49 AM
+                  - generic [ref=f9e109027]: SELL
+                  - generic [ref=f9e109028]: "0.000004275"
+                  - generic [ref=f9e109029]: "27843700"
+                  - generic [ref=f9e109030]: "119.0318175"
+                - generic [ref=f9e109031]:
+                  - time [ref=f9e109032]: 2:23:42 AM
+                  - generic [ref=f9e109033]: BUY
+                  - generic [ref=f9e109034]: "0.000004278"
+                  - generic [ref=f9e109035]: "1500000"
+                  - generic [ref=f9e109036]: "6.417"
+                - generic [ref=f9e109037]:
+                  - time [ref=f9e109038]: 2:23:35 AM
+                  - generic [ref=f9e109039]: BUY
+                  - generic [ref=f9e109040]: "0.000004278"
+                  - generic [ref=f9e109041]: "295019.87"
+                  - generic [ref=f9e109042]: "1.262095"
+                - generic [ref=f9e109043]:
+                  - time [ref=f9e109044]: 2:22:35 AM
+                  - generic [ref=f9e109045]: BUY
+                  - generic [ref=f9e109046]: "0.000004272"
+                  - generic [ref=f9e109047]: "40000000"
+                  - generic [ref=f9e109048]: "170.88"
+                - generic [ref=f9e109049]:
+                  - time [ref=f9e109050]: 2:22:35 AM
+                  - generic [ref=f9e109051]: BUY
+                  - generic [ref=f9e109052]: "0.000004272"
+                  - generic [ref=f9e109053]: "27843700"
+                  - generic [ref=f9e109054]: "118.9482864"
+                - generic [ref=f9e109055]:
+                  - time [ref=f9e109056]: 2:22:30 AM
+                  - generic [ref=f9e109057]: BUY
+                  - generic [ref=f9e109058]: "0.000004271"
+                  - generic [ref=f9e109059]: "27843700"
+                  - generic [ref=f9e109060]: "118.9204427"
+                - generic [ref=f9e109061]:
+                  - time [ref=f9e109062]: 2:22:29 AM
+                  - generic [ref=f9e109063]: SELL
+                  - generic [ref=f9e109064]: "0.00000427"
+                  - generic [ref=f9e109065]: "468988"
+                  - generic [ref=f9e109066]: "2.00257876"
+                - generic [ref=f9e109067]:
+                  - time [ref=f9e109068]: 2:22:18 AM
+                  - generic [ref=f9e109069]: BUY
+                  - generic [ref=f9e109070]: "0.000004269"
+                  - generic [ref=f9e109071]: "17458223.15987"
+                  - generic [ref=f9e109072]: "74.52915467"
+                - generic [ref=f9e109073]:
+                  - time [ref=f9e109074]: 2:22:10 AM
+                  - generic [ref=f9e109075]: SELL
+                  - generic [ref=f9e109076]: "0.000004266"
+                  - generic [ref=f9e109077]: "27843700"
+                  - generic [ref=f9e109078]: "118.7812242"
+                - generic [ref=f9e109079]:
+                  - time [ref=f9e109080]: 2:22:10 AM
+                  - generic [ref=f9e109081]: BUY
+                  - generic [ref=f9e109082]: "0.000004267"
+                  - generic [ref=f9e109083]: "27843700"
+                  - generic [ref=f9e109084]: "118.8090679"
+                - generic [ref=f9e109085]:
+                  - time [ref=f9e109086]: 2:22:10 AM
+                  - generic [ref=f9e109087]: BUY
+                  - generic [ref=f9e109088]: "0.000004268"
+                  - generic [ref=f9e109089]: "17910132.86451"
+                  - generic [ref=f9e109090]: "76.44044707"
+                - generic [ref=f9e109091]:
+                  - time [ref=f9e109092]: 2:21:59 AM
+                  - generic [ref=f9e109093]: BUY
+                  - generic [ref=f9e109094]: "0.000004267"
+                  - generic [ref=f9e109095]: "27843700"
+                  - generic [ref=f9e109096]: "118.8090679"
+                - generic [ref=f9e109097]:
+                  - time [ref=f9e109098]: 2:21:59 AM
+                  - generic [ref=f9e109099]: BUY
+                  - generic [ref=f9e109100]: "0.000004267"
+                  - generic [ref=f9e109101]: "25527396.34318"
+                  - generic [ref=f9e109102]: "108.9254002"
+                - generic [ref=f9e109103]:
+                  - time [ref=f9e109104]: 2:21:57 AM
+                  - generic [ref=f9e109105]: SELL
+                  - generic [ref=f9e109106]: "0.000004266"
+                  - generic [ref=f9e109107]: "26774968.981"
+                  - generic [ref=f9e109108]: "114.22201767"
+                - generic [ref=f9e109109]:
+                  - time [ref=f9e109110]: 2:21:56 AM
+                  - generic [ref=f9e109111]: BUY
+                  - generic [ref=f9e109112]: "0.000004266"
+                  - generic [ref=f9e109113]: "27843700"
+                  - generic [ref=f9e109114]: "118.7812242"
+                - generic [ref=f9e109115]:
+                  - time [ref=f9e109116]: 2:21:56 AM
+                  - generic [ref=f9e109117]: SELL
+                  - generic [ref=f9e109118]: "0.000004265"
+                  - generic [ref=f9e109119]: "27843700"
+                  - generic [ref=f9e109120]: "118.7533805"
+                - generic [ref=f9e109121]:
+                  - time [ref=f9e109122]: 2:21:49 AM
+                  - generic [ref=f9e109123]: SELL
+                  - generic [ref=f9e109124]: "0.000004264"
+                  - generic [ref=f9e109125]: "20795091.453"
+                  - generic [ref=f9e109126]: "88.67026996"
+                - generic [ref=f9e109127]:
+                  - time [ref=f9e109128]: 2:21:49 AM
+                  - generic [ref=f9e109129]: BUY
+                  - generic [ref=f9e109130]: "0.000004265"
+                  - generic [ref=f9e109131]: "27843700"
+                  - generic [ref=f9e109132]: "118.7533805"
+                - generic [ref=f9e109133]:
+                  - time [ref=f9e109134]: 2:21:41 AM
+                  - generic [ref=f9e109135]: SELL
+                  - generic [ref=f9e109136]: "0.000004262"
+                  - generic [ref=f9e109137]: "16366296.967"
+                  - generic [ref=f9e109138]: "69.75315767"
+                - generic [ref=f9e109139]:
+                  - time [ref=f9e109140]: 2:21:37 AM
+                  - generic [ref=f9e109141]: SELL
+                  - generic [ref=f9e109142]: "0.000004264"
+                  - generic [ref=f9e109143]: "15621695.953"
+                  - generic [ref=f9e109144]: "66.61091154"
+                - generic [ref=f9e109145]:
+                  - time [ref=f9e109146]: 2:21:37 AM
+                  - generic [ref=f9e109147]: BUY
+                  - generic [ref=f9e109148]: "0.000004265"
+                  - generic [ref=f9e109149]: "27843700"
+                  - generic [ref=f9e109150]: "118.7533805"
+                - generic [ref=f9e109151]:
+                  - time [ref=f9e109152]: 2:21:30 AM
+                  - generic [ref=f9e109153]: SELL
+                  - generic [ref=f9e109154]: "0.000004262"
+                  - generic [ref=f9e109155]: "12119556.542"
+                  - generic [ref=f9e109156]: "51.65354998"
+                - generic [ref=f9e109157]:
+                  - time [ref=f9e109158]: 2:21:24 AM
+                  - generic [ref=f9e109159]: SELL
+                  - generic [ref=f9e109160]: "0.000004262"
+                  - generic [ref=f9e109161]: "13929056.255"
+                  - generic [ref=f9e109162]: "59.36563776"
+                - generic [ref=f9e109163]:
+                  - time [ref=f9e109164]: 2:21:22 AM
+                  - generic [ref=f9e109165]: SELL
+                  - generic [ref=f9e109166]: "0.000004263"
+                  - generic [ref=f9e109167]: "12425303.026"
+                  - generic [ref=f9e109168]: "52.9690668"
+                - generic [ref=f9e109169]:
+                  - time [ref=f9e109170]: 2:21:19 AM
+                  - generic [ref=f9e109171]: SELL
+                  - generic [ref=f9e109172]: "0.000004265"
+                  - generic [ref=f9e109173]: "14374304.589"
+                  - generic [ref=f9e109174]: "61.30640907"
+                - generic [ref=f9e109175]:
+                  - time [ref=f9e109176]: 2:21:01 AM
+                  - generic [ref=f9e109177]: BUY
+                  - generic [ref=f9e109178]: "0.000004264"
+                  - generic [ref=f9e109179]: "175891181.988"
+                  - generic [ref=f9e109180]: "750.00"
+                - generic [ref=f9e109181]:
+                  - time [ref=f9e109182]: 2:20:53 AM
+                  - generic [ref=f9e109183]: BUY
+                  - generic [ref=f9e109184]: "0.000004264"
+                  - generic [ref=f9e109185]: "27843700"
+                  - generic [ref=f9e109186]: "118.7255368"
+                - generic [ref=f9e109187]:
+                  - time [ref=f9e109188]: 2:20:43 AM
+                  - generic [ref=f9e109189]: BUY
+                  - generic [ref=f9e109190]: "0.000004264"
+                  - generic [ref=f9e109191]: "27843700"
+                  - generic [ref=f9e109192]: "118.7255368"
+                - generic [ref=f9e109193]:
+                  - time [ref=f9e109194]: 2:20:17 AM
+                  - generic [ref=f9e109195]: SELL
+                  - generic [ref=f9e109196]: "0.000004264"
+                  - generic [ref=f9e109197]: "7439608"
+                  - generic [ref=f9e109198]: "31.72248851"
+                - generic [ref=f9e109199]:
+                  - time [ref=f9e109200]: 2:20:09 AM
+                  - generic [ref=f9e109201]: BUY
+                  - generic [ref=f9e109202]: "0.000004265"
+                  - generic [ref=f9e109203]: "27843700"
+                  - generic [ref=f9e109204]: "118.7533805"
+                - generic [ref=f9e109205]:
+                  - time [ref=f9e109206]: 2:19:35 AM
+                  - generic [ref=f9e109207]: SELL
+                  - generic [ref=f9e109208]: "0.000004259"
+                  - generic [ref=f9e109209]: "23479690.06809"
+                  - generic [ref=f9e109210]: "100.00"
+                - generic [ref=f9e109211]:
+                  - time [ref=f9e109212]: 2:19:33 AM
+                  - generic [ref=f9e109213]: BUY
+                  - generic [ref=f9e109214]: "0.000004261"
+                  - generic [ref=f9e109215]: "27843700"
+                  - generic [ref=f9e109216]: "118.6420057"
+                - generic [ref=f9e109217]:
+                  - time [ref=f9e109218]: 2:19:33 AM
+                  - generic [ref=f9e109219]: BUY
+                  - generic [ref=f9e109220]: "0.000004263"
+                  - generic [ref=f9e109221]: "27843700"
+                  - generic [ref=f9e109222]: "118.6976931"
+                - generic [ref=f9e109223]:
+                  - time [ref=f9e109224]: 2:19:22 AM
+                  - generic [ref=f9e109225]: BUY
+                  - generic [ref=f9e109226]: "0.000004266"
+                  - generic [ref=f9e109227]: "11518987.34"
+                  - generic [ref=f9e109228]: "49.13999999"
+                - generic [ref=f9e109229]:
+                  - time [ref=f9e109230]: 2:19:16 AM
+                  - generic [ref=f9e109231]: BUY
+                  - generic [ref=f9e109232]: "0.000004266"
+                  - generic [ref=f9e109233]: "27843700"
+                  - generic [ref=f9e109234]: "118.7812242"
+                - generic [ref=f9e109235]:
+                  - time [ref=f9e109236]: 2:18:41 AM
+                  - generic [ref=f9e109237]: SELL
+                  - generic [ref=f9e109238]: "0.000004262"
+                  - generic [ref=f9e109239]: "500382"
+                  - generic [ref=f9e109240]: "2.13262808"
+                - generic [ref=f9e109241]:
+                  - time [ref=f9e109242]: 2:18:14 AM
+                  - generic [ref=f9e109243]: SELL
+                  - generic [ref=f9e109244]: "0.000004264"
+                  - generic [ref=f9e109245]: "348647.53"
+                  - generic [ref=f9e109246]: "1.48663307"
+                - generic [ref=f9e109247]:
+                  - time [ref=f9e109248]: 2:16:59 AM
+                  - generic [ref=f9e109249]: BUY
+                  - generic [ref=f9e109250]: "0.000004271"
+                  - generic [ref=f9e109251]: "27843700"
+                  - generic [ref=f9e109252]: "118.9204427"
+                - generic [ref=f9e109253]:
+                  - time [ref=f9e109254]: 2:16:59 AM
+                  - generic [ref=f9e109255]: BUY
+                  - generic [ref=f9e109256]: "0.000004271"
+                  - generic [ref=f9e109257]: "29267150.55022"
+                  - generic [ref=f9e109258]: "125.00"
+                - generic [ref=f9e109259]:
+                  - time [ref=f9e109260]: 2:16:50 AM
+                  - generic [ref=f9e109261]: SELL
+                  - generic [ref=f9e109262]: "0.000004267"
+                  - generic [ref=f9e109263]: "936633"
+                  - generic [ref=f9e109264]: "3.99661301"
+                - generic [ref=f9e109265]:
+                  - time [ref=f9e109266]: 2:16:31 AM
+                  - generic [ref=f9e109267]: SELL
+                  - generic [ref=f9e109268]: "0.000004267"
+                  - generic [ref=f9e109269]: "70307007.26505"
+                  - generic [ref=f9e109270]: "300.00"
+                - generic [ref=f9e109271]:
+                  - time [ref=f9e109272]: 2:16:09 AM
+                  - generic [ref=f9e109273]: SELL
+                  - generic [ref=f9e109274]: "0.000004266"
+                  - generic [ref=f9e109275]: "736995"
+                  - generic [ref=f9e109276]: "3.14402067"
+                - generic [ref=f9e109277]:
+                  - time [ref=f9e109278]: 2:16:08 AM
+                  - generic [ref=f9e109279]: SELL
+                  - generic [ref=f9e109280]: "0.000004266"
+                  - generic [ref=f9e109281]: "440645"
+                  - generic [ref=f9e109282]: "1.87979157"
+                - generic [ref=f9e109283]:
+                  - time [ref=f9e109284]: 2:15:15 AM
+                  - generic [ref=f9e109285]: BUY
+                  - generic [ref=f9e109286]: "0.000004261"
+                  - generic [ref=f9e109287]: "296010.32"
+                  - generic [ref=f9e109288]: "1.26129997"
+                - generic [ref=f9e109289]:
+                  - time [ref=f9e109290]: 2:15:13 AM
+                  - generic [ref=f9e109291]: BUY
+                  - generic [ref=f9e109292]: "0.000004261"
+                  - generic [ref=f9e109293]: "783877.02"
+                  - generic [ref=f9e109294]: "3.34009998"
+          - region [ref=f9e109295]:
+            - heading "Market information" [level=3] [ref=f9e109297]
+            - generic [ref=f9e109298]:
+              - article [ref=f9e109299]:
+                - generic [ref=f9e109300]: Minimum order size
+                - strong [ref=f9e109301]: "1500000"
+              - article [ref=f9e109302]:
+                - generic [ref=f9e109303]: Minimum cost
+                - strong [ref=f9e109304]: "0.5"
+              - article [ref=f9e109305]:
+                - generic [ref=f9e109306]: Tick size
+                - strong [ref=f9e109307]: "0"
+              - article [ref=f9e109308]:
+                - generic [ref=f9e109309]: Quantity precision
+                - strong [ref=f9e109310]: "5"
+              - article [ref=f9e109311]:
+                - generic [ref=f9e109312]: Price precision
+                - strong [ref=f9e109313]: "9"

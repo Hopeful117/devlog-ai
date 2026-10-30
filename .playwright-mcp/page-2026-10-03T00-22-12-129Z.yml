@@ -1,0 +1,109 @@
+- generic [ref=f9e3]:
+  - navigation [ref=f9e5]:
+    - link "Trading OS" [ref=f9e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f9e8]:
+      - link "Dashboard" [ref=f9e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f9e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f9e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f9e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f9e13] [cursor=pointer]
+  - generic [ref=f9e14]:
+    - navigation [ref=f9e16]:
+      - generic [ref=f9e17]:
+        - link "Dashboard" [ref=f9e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f9e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f9e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f9e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f9e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f9e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f9e24]:
+        - generic [ref=f9e25]: AI Engine
+        - generic [ref=f9e26]: ● Online
+    - main [ref=f9e27]:
+      - generic [ref=f9e42447]:
+        - link "← Back to markets" [ref=f9e42448] [cursor=pointer]:
+          - /url: /markets
+        - generic [ref=f9e42449]:
+          - generic [ref=f9e42450]:
+            - text: KRAKEN
+            - heading "WBTC/XBT" [level=1] [ref=f9e42451]
+            - paragraph [ref=f9e42452]: WBTC / XBT
+          - generic [ref=f9e42453]: OPEN
+        - main [ref=f9e42454]:
+          - region [ref=f9e42455]:
+            - generic [ref=f9e42456]:
+              - generic [ref=f9e42457]:
+                - text: Live market
+                - heading "Ticker" [level=2] [ref=f9e42458]
+              - text: TICKER
+            - paragraph [ref=f9e42460]: Waiting for live market data...
+          - region [ref=f9e42461]:
+            - generic [ref=f9e42462]:
+              - generic [ref=f9e42463]:
+                - text: Price history
+                - heading "Market chart" [level=2] [ref=f9e42464]
+              - generic [ref=f9e42465]:
+                - button "1m" [ref=f9e42466] [cursor=pointer]
+                - button "5m" [ref=f9e42467] [cursor=pointer]
+                - button "15m" [ref=f9e42468] [cursor=pointer]
+                - button "30m" [ref=f9e42469] [cursor=pointer]
+                - button "1h" [ref=f9e42470] [cursor=pointer]
+                - button "4h" [ref=f9e42471] [cursor=pointer]
+                - button "1d" [ref=f9e42472] [cursor=pointer]
+            - generic "Market candlestick chart" [ref=f9e42475]:
+              - table [ref=f9e42477]:
+                - row [ref=f9e42478]:
+                  - cell
+                  - cell [ref=f9e42479]:
+                    - link "Charting by TradingView" [ref=f9e42483] [cursor=pointer]:
+                      - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/markets/cd19fca8-f631-45b6-be81-6ac1ca62e6c0
+                  - cell [ref=f9e42488]
+                - row [ref=f9e42492]:
+                  - cell
+                  - cell [ref=f9e42493]
+                  - cell [ref=f9e42497]
+          - generic [ref=f9e42500]:
+            - region [ref=f9e42501]:
+              - generic [ref=f9e42502]:
+                - heading "Order book" [level=2] [ref=f9e42504]
+                - generic "Order-book depth" [ref=f9e42505]:
+                  - button "10 levels" [ref=f9e42506] [cursor=pointer]
+                  - button "25 levels" [ref=f9e42507] [cursor=pointer]
+              - paragraph [ref=f9e42509]: Waiting for the initial order-book snapshot...
+            - region [ref=f9e42510]:
+              - generic [ref=f9e42511]:
+                - heading "Recent trades" [level=2] [ref=f9e42513]
+                - text: TRADES
+              - paragraph [ref=f9e42515]: Waiting for recent trades...
+          - region [ref=f9e42516]:
+            - heading "Market information" [level=2] [ref=f9e42519]
+            - generic [ref=f9e42520]:
+              - article [ref=f9e42521]:
+                - text: Minimum order size
+                - strong [ref=f9e42522]: "0"
+              - article [ref=f9e42523]:
+                - text: Minimum cost
+                - strong [ref=f9e42524]: "0"
+              - article [ref=f9e42525]:
+                - text: Tick size
+                - strong [ref=f9e42526]: "0"
+              - article [ref=f9e42527]:
+                - text: Quantity precision
+                - strong [ref=f9e42528]: "8"
+              - article [ref=f9e42529]:
+                - text: Price precision
+                - strong [ref=f9e42530]: "5"
+              - article [ref=f9e42531]:
+                - text: Last market-state update
+                - strong [ref=f9e42532]: 10/3/26, 1:57 AM

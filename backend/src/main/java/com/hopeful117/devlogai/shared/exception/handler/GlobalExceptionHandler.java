@@ -13,6 +13,7 @@ import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.exception.InvalidParameterException;
 import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
+import com.hopeful117.devlogai.aicredentialbinding.service.CredentialAssociationVerificationException;
 import com.hopeful117.devlogai.shared.logging.CorrelationIdFilter;
 import com.hopeful117.devlogai.shared.response.ApiErrorCode;
 import com.hopeful117.devlogai.shared.response.ApiErrorResponse;
@@ -41,6 +42,13 @@ public class GlobalExceptionHandler {
             UnauthenticatedPrincipalException exception, HttpServletRequest request) {
         return response(HttpStatus.UNAUTHORIZED, ApiErrorCode.UNAUTHENTICATED,
                 "Authentication is required.", request);
+    }
+
+    @ExceptionHandler(CredentialAssociationVerificationException.class)
+    public ResponseEntity<ApiErrorResponse> credentialAssociationVerification(
+            CredentialAssociationVerificationException exception, HttpServletRequest request) {
+        return response(HttpStatus.UNAUTHORIZED, ApiErrorCode.UNAUTHENTICATED,
+                "AI credential association could not be verified.", request);
     }
 
     @ExceptionHandler(SourceRevisionUnavailableException.class)

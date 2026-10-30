@@ -1,0 +1,331 @@
+- generic [ref=f8e3]:
+  - navigation [ref=f8e5]:
+    - link "Trading OS" [ref=f8e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f8e8]:
+      - link "Dashboard" [ref=f8e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f8e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f8e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f8e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f8e13] [cursor=pointer]
+  - generic [ref=f8e14]:
+    - navigation [ref=f8e16]:
+      - generic [ref=f8e17]:
+        - link "Dashboard" [ref=f8e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f8e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f8e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f8e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f8e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f8e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f8e24]:
+        - generic [ref=f8e25]: AI Engine
+        - generic [ref=f8e26]: ● Online
+    - main [ref=f8e27]:
+      - generic [ref=f8e12208]:
+        - generic [ref=f8e12210]:
+          - generic [ref=f8e12211]: Decision context
+          - heading "Market Decision Workspace" [level=1] [ref=f8e12212]
+          - paragraph [ref=f8e12213]: Select an account first. Available markets depend on that trading context.
+        - region [ref=f8e12214]:
+          - generic [ref=f8e12215]:
+            - generic [ref=f8e12216]:
+              - generic [ref=f8e12217]: Step 1
+              - heading "Trading account" [level=2] [ref=f8e12218]
+            - button "Refresh" [ref=f8e12219] [cursor=pointer]
+          - generic [ref=f8e12220]:
+            - generic [ref=f8e12221]: Account
+            - combobox "Account" [ref=f8e12222]:
+              - option "Select an account"
+              - option "kraken account · EUR"
+              - option "Story 0067 PAPER Validation · USD" [selected]
+        - generic [ref=f8e12228]:
+          - article [ref=f8e12229]:
+            - generic [ref=f8e12230]: Selected account
+            - heading "Story 0067 PAPER Validation" [level=2] [ref=f8e12231]
+            - generic [ref=f8e12232]:
+              - generic [ref=f8e12233]:
+                - term [ref=f8e12234]: Currency
+                - definition [ref=f8e12235]: USD
+              - generic [ref=f8e12236]:
+                - term [ref=f8e12237]: Risk profile
+                - definition [ref=f8e12238]: 1.0.0
+              - generic [ref=f8e12239]:
+                - term [ref=f8e12240]: Planning profile
+                - definition [ref=f8e12241]: "1"
+          - article [ref=f8e12242]:
+            - generic [ref=f8e12243]:
+              - generic [ref=f8e12244]:
+                - generic [ref=f8e12245]: Step 2
+                - heading "Choose a market" [level=2] [ref=f8e12246]
+              - generic [ref=f8e12247]: 1361 eligible
+            - generic [ref=f8e12248]:
+              - searchbox "Search available markets" [ref=f8e12249]: TBTC
+              - generic [ref=f8e12250]: Type at least 2 characters to search 1361 markets.
+            - generic [ref=f8e12261]:
+              - button "TBTC/EUR KRAKEN" [active] [ref=f8e12262] [cursor=pointer]:
+                - strong [ref=f8e12263]: TBTC/EUR
+                - generic [ref=f8e12264]: KRAKEN
+              - button "TBTC/USD KRAKEN" [ref=f8e12265] [cursor=pointer]:
+                - strong [ref=f8e12266]: TBTC/USD
+                - generic [ref=f8e12267]: KRAKEN
+              - button "TBTC/XBT KRAKEN" [ref=f8e12268] [cursor=pointer]:
+                - strong [ref=f8e12269]: TBTC/XBT
+                - generic [ref=f8e12270]: KRAKEN
+        - button "Backend decision Unavailable markets 97 hidden" [ref=f8e12255] [cursor=pointer]:
+          - generic [ref=f8e12256]:
+            - generic [ref=f8e12257]: Backend decision
+            - strong [ref=f8e12258]: Unavailable markets
+          - generic [ref=f8e12259]:
+            - text: 97 hidden
+            - generic [aria-hidden] [ref=f8e12260]: +
+        - generic [ref=f8e12271]:
+          - generic [ref=f8e12272]:
+            - generic [ref=f8e12273]:
+              - generic [ref=f8e12274]: Step 3 · Account-scoped market
+              - text: KRAKEN
+              - heading "TBTC/EUR" [level=2] [ref=f8e12275]
+              - paragraph [ref=f8e12276]: TBTC / EUR
+            - generic [ref=f8e12277]:
+              - generic [ref=f8e12278]: OPEN
+              - generic [ref=f8e12279]: State updated 1:57:34 AM
+          - generic [ref=f8e12280]:
+            - generic [ref=f8e12282]:
+              - generic [ref=f8e12283]: Analytical evidence
+              - heading "Trend Context" [level=3] [ref=f8e12284]
+            - paragraph [ref=f8e12285]: Loading deterministic Trend Context...
+          - region [ref=f8e12286]:
+            - generic [ref=f8e12287]:
+              - generic [ref=f8e12288]: Trading actions
+              - heading "Prepare a discretionary proposal" [level=3] [ref=f8e12289]
+              - paragraph [ref=f8e12290]: Keep the market context visible while describing a MANUAL Trade Plan.
+            - button "Prepare manual trade" [ref=f8e12291] [cursor=pointer]
+          - region [ref=f8e12292]:
+            - generic [ref=f8e12293]:
+              - generic [ref=f8e12294]:
+                - generic [ref=f8e12295]: Live market
+                - heading "Ticker" [level=3] [ref=f8e12296]
+              - generic [ref=f8e12297]: LIVE
+            - generic [ref=f8e12298]:
+              - article [ref=f8e12299]:
+                - generic [ref=f8e12300]: Last price
+                - strong [ref=f8e12301]: "71190"
+                - generic [ref=f8e12302]: 2:05:58 AM
+              - article [ref=f8e12303]:
+                - generic [ref=f8e12304]: Bid
+                - strong [ref=f8e12305]: "71121.4"
+              - article [ref=f8e12306]:
+                - generic [ref=f8e12307]: Ask
+                - strong [ref=f8e12308]: "77185.3"
+              - article [ref=f8e12309]:
+                - generic [ref=f8e12310]: Spread
+                - strong [ref=f8e12311]: "6063.900000000009"
+              - article [ref=f8e12312]:
+                - generic [ref=f8e12313]: Volume
+                - strong [ref=f8e12314]: "0.00245478"
+          - region [ref=f8e12315]:
+            - generic [ref=f8e12316]:
+              - generic [ref=f8e12317]:
+                - generic [ref=f8e12318]: Price history
+                - heading "Market chart" [level=3] [ref=f8e12319]
+              - generic [ref=f8e12320]:
+                - button "1m" [ref=f8e12321] [cursor=pointer]
+                - button "5m" [ref=f8e12322] [cursor=pointer]
+                - button "15m" [ref=f8e12323] [cursor=pointer]
+                - button "30m" [ref=f8e12324] [cursor=pointer]
+                - button "1h" [ref=f8e12325] [cursor=pointer]
+                - button "4h" [ref=f8e12326] [cursor=pointer]
+                - button "1d" [ref=f8e12327] [cursor=pointer]
+              - generic [ref=f8e12328]: LIVE
+            - generic "Market candlestick chart" [ref=f8e12331]:
+              - table [ref=f8e12333]:
+                - row [ref=f8e12334]:
+                  - cell
+                  - cell [ref=f8e12335]:
+                    - link "Charting by TradingView" [ref=f8e12339] [cursor=pointer]:
+                      - /url: https://www.tradingview.com/?utm_medium=lwc-link&utm_campaign=lwc-chart&utm_source=localhost/decision-workspace
+                  - cell [ref=f8e12344]
+                - row [ref=f8e12348]:
+                  - cell
+                  - cell [ref=f8e12349]
+                  - cell [ref=f8e12353]
+          - generic [ref=f8e12356]:
+            - region [ref=f8e12357]:
+              - generic [ref=f8e12358]:
+                - heading "Order book" [level=3] [ref=f8e12359]
+                - generic "Order-book depth" [ref=f8e12360]:
+                  - button "10 levels" [ref=f8e12361] [cursor=pointer]
+                  - button "25 levels" [ref=f8e12362] [cursor=pointer]
+                - generic [ref=f8e12363]: LIVE
+              - region "Live order book" [ref=f8e12365]:
+                - generic [ref=f8e12366]:
+                  - generic [ref=f8e12367]:
+                    - text: Spread
+                    - strong [ref=f8e12368]: "6063.9"
+                  - generic [ref=f8e12369]:
+                    - text: Bid volume
+                    - strong [ref=f8e12370]: "0.06910271"
+                  - generic [ref=f8e12371]:
+                    - text: Ask volume
+                    - strong [ref=f8e12372]: "0.03382753"
+                  - generic [ref=f8e12373]:
+                    - text: Bid imbalance
+                    - strong [ref=f8e12374]: 67.1%
+                - generic [ref=f8e12375]:
+                  - heading "Asks" [level=3] [ref=f8e12376]
+                  - generic [aria-hidden] [ref=f8e12377]:
+                    - generic [ref=f8e12378]: Price
+                    - generic [ref=f8e12379]: Quantity
+                    - generic [ref=f8e12380]: Total
+                  - generic [ref=f8e12381]:
+                    - generic [ref=f8e12382]: "77185.3"
+                    - generic [ref=f8e12383]: "0.012"
+                    - generic [ref=f8e12384]: "926.2236"
+                  - generic [ref=f8e12385]:
+                    - generic [ref=f8e12386]: "77867.3"
+                    - generic [ref=f8e12387]: "0.00128423"
+                    - generic [ref=f8e12388]: "99.99952268"
+                  - generic [ref=f8e12389]:
+                    - generic [ref=f8e12390]: "79399.1"
+                    - generic [ref=f8e12391]: "0.00159422"
+                    - generic [ref=f8e12392]: "126.5796332"
+                  - generic [ref=f8e12393]:
+                    - generic [ref=f8e12394]: "80249.7"
+                    - generic [ref=f8e12395]: "0.00368059"
+                    - generic [ref=f8e12396]: "295.36624332"
+                  - generic [ref=f8e12397]:
+                    - generic [ref=f8e12398]: "81368.8"
+                    - generic [ref=f8e12399]: "0.00157901"
+                    - generic [ref=f8e12400]: "128.48214889"
+                  - generic [ref=f8e12401]:
+                    - generic [ref=f8e12402]: "82972.5"
+                    - generic [ref=f8e12403]: "0.00156732"
+                    - generic [ref=f8e12404]: "130.0444587"
+                  - generic [ref=f8e12405]:
+                    - generic [ref=f8e12406]: "82972.6"
+                    - generic [ref=f8e12407]: "0.00361565"
+                    - generic [ref=f8e12408]: "299.99988119"
+                  - generic [ref=f8e12409]:
+                    - generic [ref=f8e12410]: "86331.7"
+                    - generic [ref=f8e12411]: "0.00347497"
+                    - generic [ref=f8e12412]: "300.00006755"
+                  - generic [ref=f8e12413]:
+                    - generic [ref=f8e12414]: "88152.8"
+                    - generic [ref=f8e12415]: "0.00170159"
+                    - generic [ref=f8e12416]: "149.99992295"
+                  - generic [ref=f8e12417]:
+                    - generic [ref=f8e12418]: "90091.5"
+                    - generic [ref=f8e12419]: "0.00332995"
+                    - generic [ref=f8e12420]: "300.00019042"
+                - generic [ref=f8e12421]:
+                  - generic [ref=f8e12422]: Best bid 71121.4
+                  - strong [ref=f8e12423]: "6063.9"
+                  - generic [ref=f8e12424]: Best ask 77185.3
+                - generic [ref=f8e12425]:
+                  - heading "Bids" [level=3] [ref=f8e12426]
+                  - generic [aria-hidden] [ref=f8e12427]:
+                    - generic [ref=f8e12428]: Price
+                    - generic [ref=f8e12429]: Quantity
+                    - generic [ref=f8e12430]: Total
+                  - generic [ref=f8e12431]:
+                    - generic [ref=f8e12432]: "71121.4"
+                    - generic [ref=f8e12433]: "0.00823874"
+                    - generic [ref=f8e12434]: "585.95072304"
+                  - generic [ref=f8e12435]:
+                    - generic [ref=f8e12436]: "71121.3"
+                    - generic [ref=f8e12437]: "0.00249886"
+                    - generic [ref=f8e12438]: "177.72217172"
+                  - generic [ref=f8e12439]:
+                    - generic [ref=f8e12440]: "71121.2"
+                    - generic [ref=f8e12441]: "0.00421815"
+                    - generic [ref=f8e12442]: "299.99988978"
+                  - generic [ref=f8e12443]:
+                    - generic [ref=f8e12444]: "69850.6"
+                    - generic [ref=f8e12445]: "0.01431626"
+                    - generic [ref=f8e12446]: "999.99935076"
+                  - generic [ref=f8e12447]:
+                    - generic [ref=f8e12448]: "68380.7"
+                    - generic [ref=f8e12449]: "0.00321423"
+                    - generic [ref=f8e12450]: "219.79129736"
+                  - generic [ref=f8e12451]:
+                    - generic [ref=f8e12452]: "68120.4"
+                    - generic [ref=f8e12453]: "0.00014679"
+                    - generic [ref=f8e12454]: "9.99939352"
+                  - generic [ref=f8e12455]:
+                    - generic [ref=f8e12456]: "66832.2"
+                    - generic [ref=f8e12457]: "0.00014962"
+                    - generic [ref=f8e12458]: "9.99943376"
+                  - generic [ref=f8e12459]:
+                    - generic [ref=f8e12460]: "65615.3"
+                    - generic [ref=f8e12461]: "0.03157066"
+                    - generic [ref=f8e12462]: 2,071.5183271
+                  - generic [ref=f8e12463]:
+                    - generic [ref=f8e12464]: "65420.4"
+                    - generic [ref=f8e12465]: "0.00015285"
+                    - generic [ref=f8e12466]: "9.99950814"
+                  - generic [ref=f8e12467]:
+                    - generic [ref=f8e12468]: "64002.8"
+                    - generic [ref=f8e12469]: "0.00459655"
+                    - generic [ref=f8e12470]: "294.19207034"
+            - region [ref=f8e12471]:
+              - generic [ref=f8e12472]:
+                - heading "Recent trades" [level=3] [ref=f8e12473]
+                - generic [ref=f8e12474]: LIVE
+              - region "Recent executed trades" [ref=f8e12476]:
+                - generic [aria-hidden] [ref=f8e12477]:
+                  - generic [ref=f8e12478]: Time
+                  - generic [ref=f8e12479]: Side
+                  - generic [ref=f8e12480]: Price
+                  - generic [ref=f8e12481]: Quantity
+                  - generic [ref=f8e12482]: Notional
+                - generic [ref=f8e12483]:
+                  - time [ref=f8e12484]: 8:44:18 PM
+                  - generic [ref=f8e12485]: SELL
+                  - generic [ref=f8e12486]: "71190"
+                  - generic [ref=f8e12487]: "0.00012"
+                  - generic [ref=f8e12488]: "8.5428"
+                - generic [ref=f8e12489]:
+                  - time [ref=f8e12490]: 8:44:13 PM
+                  - generic [ref=f8e12491]: SELL
+                  - generic [ref=f8e12492]: "71189.4"
+                  - generic [ref=f8e12493]: "0.00173478"
+                  - generic [ref=f8e12494]: "123.49794733"
+                - generic [ref=f8e12495]:
+                  - time [ref=f8e12496]: 10:36:03 AM
+                  - generic [ref=f8e12497]: BUY
+                  - generic [ref=f8e12498]: "75522.2"
+                  - generic [ref=f8e12499]: "0.0005352"
+                  - generic [ref=f8e12500]: "40.41948144"
+                - generic [ref=f8e12501]:
+                  - time [ref=f8e12502]: 10:36:03 AM
+                  - generic [ref=f8e12503]: BUY
+                  - generic [ref=f8e12504]: "75522.3"
+                  - generic [ref=f8e12505]: "0.0000648"
+                  - generic [ref=f8e12506]: "4.89384504"
+          - region [ref=f8e12507]:
+            - heading "Market information" [level=3] [ref=f8e12509]
+            - generic [ref=f8e12510]:
+              - article [ref=f8e12511]:
+                - generic [ref=f8e12512]: Minimum order size
+                - strong [ref=f8e12513]: "0"
+              - article [ref=f8e12514]:
+                - generic [ref=f8e12515]: Minimum cost
+                - strong [ref=f8e12516]: "0.45"
+              - article [ref=f8e12517]:
+                - generic [ref=f8e12518]: Tick size
+                - strong [ref=f8e12519]: "0.1"
+              - article [ref=f8e12520]:
+                - generic [ref=f8e12521]: Quantity precision
+                - strong [ref=f8e12522]: "8"
+              - article [ref=f8e12523]:
+                - generic [ref=f8e12524]: Price precision
+                - strong [ref=f8e12525]: "1"

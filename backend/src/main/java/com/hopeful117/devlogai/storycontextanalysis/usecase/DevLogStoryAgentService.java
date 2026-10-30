@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.storycontextanalysis.usecase;
 import com.hopeful117.devlogai.ai.task.dto.response.AiTaskResponse;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAnalysisQueryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.util.Map;
 public class DevLogStoryAgentService implements DevLogStoryAgent {
 
     private static final String STORY_CONTEXT_ANALYSIS_INTENT = "engineering-story-context-analysis";
+    private static final String CHATGPT_PROVIDER = "chatgpt";
 
     private final AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
     private final AiTaskService aiTaskService;
@@ -28,6 +30,13 @@ public class DevLogStoryAgentService implements DevLogStoryAgent {
 
     @Override
     public DevLogStoryAgentExecution execute(DevLogStoryAgentRequest request) {
+        throw new IllegalStateException("authenticated principal is required for Story Agent execution");
+    }
+
+    public DevLogStoryAgentExecution execute(DevLogStoryAgentRequest request, AuthenticatedPrincipal principal) {
+        if (principal == null) {
+            throw new IllegalArgumentException("authenticated principal is required");
+        }
         if (!STORY_CONTEXT_ANALYSIS_INTENT.equals(request.intent())) {
             throw new IllegalArgumentException("Unsupported Story Agent intent: " + request.intent());
         }
@@ -41,7 +50,7 @@ public class DevLogStoryAgentService implements DevLogStoryAgent {
         var taskId = analyzeStoryContextUseCase.executePrepared(
                 prepared,
                 guidance,
-                request.idempotencyKey());
+                request.idempotencyKey(), principal, CHATGPT_PROVIDER);
 
         AiTaskResponse task = aiTaskService.getById(taskId);
         if (task.id() == null || !taskId.equals(task.id())) {

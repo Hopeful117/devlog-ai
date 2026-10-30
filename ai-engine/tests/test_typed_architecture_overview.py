@@ -304,7 +304,7 @@ class RecordingCallback:
     def __init__(self) -> None:
         self.results: list[object] = []
 
-    async def send_result(self, correlation_id: object, result: object) -> object:
+    async def send_result(self, ai_task_id: object, correlation_id: object, result: object) -> object:
         self.results.append(result)
         return object()
 

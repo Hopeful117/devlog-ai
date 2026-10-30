@@ -1,0 +1,54 @@
+- generic [ref=f3e3]:
+  - navigation [ref=f3e5]:
+    - link "Trading OS" [ref=f3e7] [cursor=pointer]:
+      - /url: /
+    - generic [ref=f3e8]:
+      - link "Dashboard" [ref=f3e9] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Accounts" [ref=f3e10] [cursor=pointer]:
+        - /url: /accounts
+      - link "Markets" [ref=f3e11] [cursor=pointer]:
+        - /url: /markets
+      - link "Decision Workspace" [ref=f3e12] [cursor=pointer]:
+        - /url: /decision-workspace
+      - button "Logout" [ref=f3e13] [cursor=pointer]
+  - generic [ref=f3e14]:
+    - navigation [ref=f3e16]:
+      - generic [ref=f3e17]:
+        - link "Dashboard" [ref=f3e18] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Accounts" [ref=f3e19] [cursor=pointer]:
+          - /url: /accounts
+        - link "Markets" [ref=f3e20] [cursor=pointer]:
+          - /url: /markets
+        - link "Opportunities" [ref=f3e21] [cursor=pointer]:
+          - /url: /opportunities
+        - link "Positions" [ref=f3e22] [cursor=pointer]:
+          - /url: /positions
+        - link "Trade history" [ref=f3e23] [cursor=pointer]:
+          - /url: /analytics
+      - generic [ref=f3e24]:
+        - generic [ref=f3e25]: AI Engine
+        - generic [ref=f3e26]: ● Online
+    - main [ref=f3e27]:
+      - article [ref=f3e919]:
+        - generic [ref=f3e921]:
+          - heading "TBTC/USD — SHORT" [level=1] [ref=f3e922]
+          - paragraph [ref=f3e923]:
+            - text: "Status:"
+            - generic [ref=f3e924]: ACCEPTED
+        - generic [ref=f3e925]:
+          - generic [ref=f3e926]: Entry price
+          - generic [ref=f3e928]:
+            - generic [ref=f3e929]: Stop loss
+            - generic [ref=f3e930]: 82,000.00
+          - generic [ref=f3e931]:
+            - generic [ref=f3e932]: Take profits
+            - generic [ref=f3e933]: 79,000.00
+          - generic [ref=f3e934]:
+            - generic [ref=f3e935]: Risk/Reward
+            - generic [ref=f3e936]: 2.8R
+        - generic [ref=f3e937]:
+          - heading "Thesis" [level=2] [ref=f3e938]
+          - paragraph [ref=f3e939]: E2E PAPER test using the observed short Legacy OHLC opportunity while preserving Trend Context and Risk boundaries.
+        - button "Evaluate Risk" [ref=f3e941] [cursor=pointer]
