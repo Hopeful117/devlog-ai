@@ -87,7 +87,23 @@ transaction. After the provider callback, the AI Engine returns a one-time
 completion code; an authenticated Core principal must submit that code to
 complete the association. Core then redeems and acknowledges the completion
 using replay-protected service authentication. OAuth tokens and authorization
-codes never enter the URL or callback.
+ codes never enter the URL or callback.
+
+Anthropic API-key enrollment is a separate flow at `POST /api/v1/auth/api-key/enroll`.
+Core creates a short-lived HMAC-signed intent from
+`POST /api/v1/ai/configuration/api-key/anthropic/start`; the client posts the key directly to
+the AI Engine with that intent and then sends only the returned opaque handle to Core's
+completion endpoint. The AI Engine performs one bounded Anthropic validation call, stores the
+key as an encrypted `API_KEY` credential, and never returns or logs the key. A handle is
+unusable without a Core-issued task binding. Replacing or revoking an association invalidates
+the old handle and future bindings; there is no fallback to OAuth or `ANTHROPIC_API_KEY` for a
+configured user association. Set `DEVLOG_CREDENTIAL_ENCRYPTION_KEY` and
+`DEVLOG_SERVICE_AUTH_SECRET`; credentials are stored in the SQLite file configured by
+`DEVLOG_CREDENTIAL_STORE_PATH`.
+
+Set `ANTHROPIC_USER_CREDENTIALS=true` for task execution that must resolve the
+user-configured Anthropic credential through the Core-issued binding. This mode fails closed
+when the binding or association is absent and does not use the process-level API key.
 
 The HTTP acknowledgement remains `202 Accepted`. V1 processing uses FastAPI
 in-process background tasks and then sends the ADR-020 callback. This executor

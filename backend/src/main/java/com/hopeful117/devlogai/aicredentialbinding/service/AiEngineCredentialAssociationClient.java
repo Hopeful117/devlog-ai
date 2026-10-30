@@ -13,6 +13,8 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashMap;
+import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 import com.hopeful117.devlogai.aicredentialbinding.model.AiCredentialAssociationState;
 
 @Component
@@ -23,6 +25,7 @@ public class AiEngineCredentialAssociationClient {
     private static final String COMPLETION_REDEEM_PATH = "/api/v1/auth/chatgpt/completion/redeem";
     private static final String COMPLETION_ACK_PATH = "/api/v1/auth/chatgpt/completion/ack";
     private static final String COMPLETION_COMPENSATE_PATH = "/api/v1/auth/chatgpt/completion/compensate";
+    private static final String API_KEY_COMPENSATE_PATH = "/api/v1/auth/api-key/compensate";
 
     @Qualifier("aiEngineRestClient")
     private final RestClient restClient;
@@ -35,10 +38,12 @@ public class AiEngineCredentialAssociationClient {
         if (serviceSecret == null || serviceSecret.isBlank()) {
             throw new IllegalStateException("AI Engine service authentication is not configured");
         }
-        Map<String, Object> payload = Map.of(
-                "credentialHandle", association.getCredentialHandle(),
-                "provider", association.getProvider(),
-                "subject", association.getChatgptSubject());
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("credentialHandle", association.getCredentialHandle());
+        payload.put("provider", association.getProvider());
+        payload.put("authenticationMethod", association.getAuthenticationMethod() == null
+                ? AiAuthenticationMethod.OAUTH.name() : association.getAuthenticationMethod().name());
+        if (association.getChatgptSubject() != null) payload.put("subject", association.getChatgptSubject());
         byte[] body;
         try {
             body = objectMapper.writeValueAsBytes(payload);
@@ -75,6 +80,19 @@ public class AiEngineCredentialAssociationClient {
                 "provider", provider));
     }
 
+    public void verifyApiKeyEnrollment(UUID intentId, String credentialHandle, String principalBinding) {
+        Map<String, String> payload = new HashMap<>();
+        payload.put("credentialHandle", credentialHandle);
+        payload.put("provider", "anthropic");
+        payload.put("authenticationMethod", AiAuthenticationMethod.API_KEY.name());
+        payload.put("intentId", intentId.toString());
+        payload.put("principalBinding", principalBinding);
+        Map<?, ?> response = request(VERIFY_PATH, payload);
+        if (!Boolean.TRUE.equals(response.get("verified"))) {
+            throw new CredentialAssociationVerificationException();
+        }
+    }
+
     public OAuthCompletion redeemCompletion(String intentId, String completionCode) {
         Map<?, ?> response = request(COMPLETION_REDEEM_PATH, Map.of(
                 "intentId", intentId,
@@ -100,6 +118,10 @@ public class AiEngineCredentialAssociationClient {
         request(COMPLETION_COMPENSATE_PATH, Map.of(
                 "intentId", intentId,
                 "completionCode", completionCode));
+    }
+
+    public void compensateApiKey(String credentialHandle) {
+        request(API_KEY_COMPENSATE_PATH, Map.of("credentialHandle", credentialHandle));
     }
 
     private Map<?, ?> request(String path, Map<String, String> payload) {

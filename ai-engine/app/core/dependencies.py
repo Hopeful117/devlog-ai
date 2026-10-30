@@ -59,7 +59,7 @@ def build_llm_provider(settings: Settings) -> LlmProvider:
             max_retries=settings.llm_max_retries,
         )
     if settings.llm_provider == "anthropic":
-        if settings.llm_api_key is None:
+        if settings.llm_api_key is None and not settings.anthropic_user_credentials:
             raise ValueError("An Anthropic API key is required for the Anthropic provider")
         return AnthropicLlmProvider(
             api_key=settings.llm_api_key,
@@ -68,6 +68,7 @@ def build_llm_provider(settings: Settings) -> LlmProvider:
             max_output_tokens=settings.llm_max_output_tokens,
             max_retries=settings.llm_max_retries,
             workspace_id=settings.anthropic_workspace_id,
+            resolver=get_credential_resolver() if settings.anthropic_user_credentials else None,
         )
     if settings.llm_provider == "openrouter":
         if settings.llm_api_key is None:

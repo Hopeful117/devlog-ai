@@ -14,6 +14,7 @@ import lombok.Setter;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 
 @Entity
 @Table(name = "oauth_connection_intents")
@@ -30,6 +31,10 @@ public class OAuthConnectionIntent {
 
     @Column(nullable = false, length = 100)
     private String provider;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "authentication_method", nullable = false, length = 32)
+    private AiAuthenticationMethod authenticationMethod;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

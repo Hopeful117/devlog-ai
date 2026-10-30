@@ -50,6 +50,7 @@ public class OAuthConnectionIntentService {
         OAuthConnectionIntent intent = new OAuthConnectionIntent();
         intent.setPrincipalId(principal.principalId());
         intent.setProvider(PRODUCT_PROVIDER);
+        intent.setAuthenticationMethod(com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod.OAUTH);
         intent.setCreatedAt(now);
         intent.setExpiresAt(now.plus(intentTtl));
         intent = repository.save(intent);
@@ -77,6 +78,9 @@ public class OAuthConnectionIntentService {
         }
         Instant now = clock.instant();
         if (!PRODUCT_PROVIDER.equals(intent.getProvider())
+                || (intent.getAuthenticationMethod() != null
+                && intent.getAuthenticationMethod()
+                != com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod.OAUTH)
                 || (intent.getConsumedAt() == null && !now.isBefore(intent.getExpiresAt()))) {
             throw new IllegalStateException("OAuth connection intent is not valid");
         }

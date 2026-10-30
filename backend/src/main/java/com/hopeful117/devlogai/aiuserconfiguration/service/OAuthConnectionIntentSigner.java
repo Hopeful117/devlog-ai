@@ -22,6 +22,23 @@ public final class OAuthConnectionIntentSigner {
         }
     }
 
+    public static String sign(String secret, UUID intentId, String provider, long expiresAt,
+                              String principalBinding, String authenticationMethod) {
+        return sign(secret, intentId, provider, 0L, expiresAt, principalBinding, authenticationMethod);
+    }
+
+    public static String sign(String secret, UUID intentId, String provider, long issuedAt, long expiresAt,
+                              String principalBinding, String authenticationMethod) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(requireSecret(secret).getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return HexFormat.of().formatHex(mac.doFinal(canonicalWithMethod(intentId, provider, expiresAt, principalBinding,
+                    authenticationMethod, issuedAt)));
+        } catch (Exception exception) {
+            throw new IllegalStateException("unable to sign OAuth connection intent", exception);
+        }
+    }
+
     public static boolean isValid(String secret, UUID intentId, String provider, long expiresAt,
                                   String principalId, String signature) {
         if (signature == null || !signature.matches("[0-9a-fA-F]{64}")) return false;
@@ -52,6 +69,16 @@ public final class OAuthConnectionIntentSigner {
             throw new IllegalArgumentException("OAuth connection intent data is incomplete");
         }
         return (intentId + "\n" + provider + "\n" + expiresAt + "\n" + principalId)
+                .getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static byte[] canonicalWithMethod(UUID intentId, String provider, long expiresAt, String principalId,
+                                               String authenticationMethod, long issuedAt) {
+        if (authenticationMethod == null || authenticationMethod.isBlank()) {
+            throw new IllegalArgumentException("authentication method is incomplete");
+        }
+        return (intentId + "\n" + provider + "\n" + authenticationMethod + "\n" + issuedAt + "\n"
+                + expiresAt + "\n" + principalId)
                 .getBytes(StandardCharsets.UTF_8);
     }
 
