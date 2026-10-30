@@ -2,6 +2,7 @@ from uuid import UUID
 
 from app.security.credential_store import EncryptedCredentialStore, StoredCredential
 from app.services.binding_registry import BindingRegistry
+from app.services.provider_identity import engine_provider
 
 
 class ProviderCredentialResolver:
@@ -12,10 +13,12 @@ class ProviderCredentialResolver:
         self._credentials = credentials
 
     def resolve(self, binding_id: UUID, task_id: UUID, provider: str) -> StoredCredential:
+        provider = engine_provider(provider)
         handle = self._bindings.resolve(binding_id, task_id, provider)
         return self._credentials.get(handle, provider)
 
     def resolve_for_task(self, task_id: UUID, provider: str) -> StoredCredential:
+        provider = engine_provider(provider)
         handle = self._bindings.resolve_for_task(task_id, provider)
         return self._credentials.get(handle, provider)
 

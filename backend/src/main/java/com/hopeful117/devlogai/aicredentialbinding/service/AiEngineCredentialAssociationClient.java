@@ -13,11 +13,16 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.util.Map;
 import java.util.UUID;
+import com.hopeful117.devlogai.aicredentialbinding.model.AiCredentialAssociationState;
 
 @Component
 @RequiredArgsConstructor
 public class AiEngineCredentialAssociationClient {
     private static final String VERIFY_PATH = "/api/v1/ai/bindings/credentials/verify";
+    private static final String REVOKE_PATH = "/api/v1/ai/bindings/credentials/revoke";
+    private static final String COMPLETION_REDEEM_PATH = "/api/v1/auth/chatgpt/completion/redeem";
+    private static final String COMPLETION_ACK_PATH = "/api/v1/auth/chatgpt/completion/ack";
+    private static final String COMPLETION_COMPENSATE_PATH = "/api/v1/auth/chatgpt/completion/compensate";
 
     @Qualifier("aiEngineRestClient")
     private final RestClient restClient;
@@ -26,7 +31,7 @@ public class AiEngineCredentialAssociationClient {
     @Value("${devlog.service-auth.secret:}")
     private String serviceSecret;
 
-    public void verify(AiCredentialAssociation association) {
+    public VerificationResult verify(AiCredentialAssociation association) {
         if (serviceSecret == null || serviceSecret.isBlank()) {
             throw new IllegalStateException("AI Engine service authentication is not configured");
         }
@@ -55,5 +60,74 @@ public class AiEngineCredentialAssociationClient {
         if (!Boolean.TRUE.equals(response == null ? null : response.get("verified"))) {
             throw new CredentialAssociationVerificationException();
         }
+        String state = response.get("state") instanceof String value ? value : "IDENTITY_AUTHORIZED";
+        String scopes = response.get("scopes") instanceof String value ? value : "";
+        try {
+            return new VerificationResult(AiCredentialAssociationState.valueOf(state), scopes);
+        } catch (IllegalArgumentException exception) {
+            throw new CredentialAssociationVerificationException();
+        }
     }
+
+    public void revoke(String credentialHandle, String provider) {
+        request(REVOKE_PATH, Map.of(
+                "credentialHandle", credentialHandle,
+                "provider", provider));
+    }
+
+    public OAuthCompletion redeemCompletion(String intentId, String completionCode) {
+        Map<?, ?> response = request(COMPLETION_REDEEM_PATH, Map.of(
+                "intentId", intentId,
+                "completionCode", completionCode));
+        try {
+            return new OAuthCompletion(
+                    (String) response.get("credentialHandle"),
+                    (String) response.get("subject"),
+                    (String) response.get("scopes"),
+                    (String) response.get("clientId"));
+        } catch (RuntimeException exception) {
+            throw new CredentialAssociationVerificationException();
+        }
+    }
+
+    public void acknowledgeCompletion(String intentId, String completionCode) {
+        request(COMPLETION_ACK_PATH, Map.of(
+                "intentId", intentId,
+                "completionCode", completionCode));
+    }
+
+    public void compensateCompletion(String intentId, String completionCode) {
+        request(COMPLETION_COMPENSATE_PATH, Map.of(
+                "intentId", intentId,
+                "completionCode", completionCode));
+    }
+
+    private Map<?, ?> request(String path, Map<String, String> payload) {
+        if (serviceSecret == null || serviceSecret.isBlank()) {
+            throw new IllegalStateException("AI Engine service authentication is not configured");
+        }
+        byte[] body;
+        try {
+            body = objectMapper.writeValueAsBytes(payload);
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("unable to serialize AI Engine request", exception);
+        }
+        Map<String, String> headers = new AiEngineBindingRequestSigner(serviceSecret)
+                .sign("POST", path, body, clock.instant().getEpochSecond(),
+                        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+        try {
+            Map<?, ?> response = restClient.post().uri(path)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .headers(httpHeaders -> headers.forEach(httpHeaders::set))
+                    .body(body).retrieve().body(Map.class);
+            return response == null ? Map.of() : response;
+        } catch (RestClientResponseException exception) {
+            throw new CredentialAssociationVerificationException();
+        }
+    }
+
+    public record VerificationResult(AiCredentialAssociationState state, String grantedScopes) { }
+
+    public record OAuthCompletion(String credentialHandle, String subject,
+                                  String scopes, String clientId) { }
 }

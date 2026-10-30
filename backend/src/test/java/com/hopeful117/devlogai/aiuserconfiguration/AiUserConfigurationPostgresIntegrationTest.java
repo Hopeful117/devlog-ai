@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.hopeful117.devlogai.aicredentialbinding.repository.AiCredentialRevocationOutboxRepository;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -25,6 +26,9 @@ class AiUserConfigurationPostgresIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private AiCredentialRevocationOutboxRepository revocationOutbox;
+
     @Test
     void migrationPersistsOnlyNonSecretConfigurationAndEnforcesOneRowPerPrincipal() {
         UUID id = UUID.randomUUID();
@@ -35,8 +39,8 @@ class AiUserConfigurationPostgresIntegrationTest {
                 "select allowed_parameters from ai_user_configurations where id = ?",
                 String.class, id)).isEqualTo("{}");
         assertThat(jdbc.queryForObject(
-                "select version from flyway_schema_history where success order by installed_rank desc limit 1",
-                String.class)).isEqualTo("61");
+                 "select version from flyway_schema_history where success order by installed_rank desc limit 1",
+                 String.class)).isEqualTo("65");
         assertThat(jdbc.queryForObject("""
                 select count(*) from information_schema.columns
                 where table_name = 'ai_user_configurations'
@@ -49,6 +53,38 @@ class AiUserConfigurationPostgresIntegrationTest {
         assertThatThrownBy(() -> insert(UUID.randomUUID(), "principal-" + UUID.randomUUID(),
                 "{\"parameter\":\"value\"}"))
                 .hasMessageContaining("ck_ai_user_configuration_parameters_empty");
+    }
+
+    @Test
+    void migrationCreatesOAuthIntentAndBindingRuntimeState() {
+        assertThat(jdbc.queryForObject("""
+                select count(*) from information_schema.tables
+                where table_schema = 'public' and table_name = 'oauth_connection_intents'
+                """, Integer.class)).isEqualTo(1);
+
+        UUID actionId = UUID.randomUUID();
+        assertThat(revocationOutbox.enqueueIfAbsent(actionId, "dedupe-handle", "chatgpt",
+                OffsetDateTime.now().toInstant())).isEqualTo(1);
+        assertThat(revocationOutbox.enqueueIfAbsent(UUID.randomUUID(), "dedupe-handle", "chatgpt",
+                OffsetDateTime.now().toInstant())).isZero();
+        assertThat(jdbc.queryForObject("""
+                select count(*) from ai_credential_revocation_outbox
+                where credential_handle = 'dedupe-handle' and provider = 'chatgpt'
+                """, Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                select count(*) from information_schema.columns
+                where table_name = 'oauth_connection_intents'
+                  and column_name in ('principal_id', 'provider', 'expires_at', 'consumed_at', 'completion_code')
+                """, Integer.class)).isEqualTo(5);
+        assertThat(jdbc.queryForObject("""
+                select count(*) from information_schema.columns
+                where table_name = 'ai_credential_bindings'
+                  and column_name in ('status', 'revoked_at', 'revocation_reason')
+                """, Integer.class)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("""
+                select count(*) from information_schema.tables
+                where table_schema = 'public' and table_name = 'ai_credential_revocation_outbox'
+                """, Integer.class)).isEqualTo(1);
     }
 
     private void insert(UUID id, String principal, String parameters) {

@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.aicredentialbinding.entity;
 
 import jakarta.persistence.*;
+import com.hopeful117.devlogai.aicredentialbinding.model.AiCredentialAssociationState;
 import lombok.*;
 
 import java.time.Instant;
@@ -31,6 +32,13 @@ public class AiCredentialAssociation {
 
     @Column(nullable = false, length = 100)
     private String provider;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private AiCredentialAssociationState state;
+
+    @Column(name = "granted_scopes", nullable = false, length = 1000)
+    private String grantedScopes;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

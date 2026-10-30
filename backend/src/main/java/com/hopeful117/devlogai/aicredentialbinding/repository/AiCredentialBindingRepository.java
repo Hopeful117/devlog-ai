@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface AiCredentialBindingRepository extends JpaRepository<AiCredentialBinding, UUID> {
@@ -16,6 +17,10 @@ public interface AiCredentialBindingRepository extends JpaRepository<AiCredentia
             + "join fetch binding.aiTask task join fetch task.analysis analysis "
             + "join fetch analysis.project project where binding.id = :id")
     Optional<AiCredentialBinding> findByIdForUpdate(@Param("id") UUID id);
+
+    List<AiCredentialBinding> findAllByCredentialHandleAndStatus(
+            String credentialHandle,
+            com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBindingStatus status);
 
     boolean existsByAiTaskIdAndProviderAndStatus(
             UUID aiTaskId, String provider,

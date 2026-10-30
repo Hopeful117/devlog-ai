@@ -10,4 +10,6 @@ public interface AiCredentialAssociationService {
     AiCredentialAssociation require(AuthenticatedPrincipal principal, String provider);
 
     void revoke(AuthenticatedPrincipal principal, String provider);
+
+    void revokeByCredentialHandle(String credentialHandle, String provider);
 }

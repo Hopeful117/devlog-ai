@@ -1,7 +1,8 @@
 from functools import lru_cache
+from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
@@ -10,20 +11,23 @@ from app.schemas.binding import (
     BindingRegistrationResponse,
     CredentialAssociationVerificationRequest,
     CredentialAssociationVerificationResponse,
+    CredentialRevocationRequest,
 )
 from app.security.credential_store import CredentialStoreError, EncryptedCredentialStore
 from app.security.service_auth import HmacServiceAuthenticator, ServiceAuthenticationError
 from app.services.binding_registry import BindingRegistry
+from app.services.provider_identity import engine_provider
 
 router = APIRouter(prefix="/ai/bindings", tags=["ai-bindings"])
 
 
 def get_authenticator() -> HmacServiceAuthenticator | None:
     settings = get_settings()
-    if not settings.service_auth_secret:
+    secret = settings.service_auth_secret or settings.sca_callback_secret
+    if not secret:
         return None
     return HmacServiceAuthenticator(
-        settings.service_auth_secret,
+        secret,
         max_clock_skew_seconds=settings.service_auth_max_clock_skew_seconds,
     )
 
@@ -43,6 +47,7 @@ async def register_binding(
         return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             content={"code": "SERVICE_AUTHENTICATION_UNAVAILABLE"})
     raw_body = await request.body()
+    credential = None
     try:
         authenticator.verify(
             method=request.method,
@@ -78,9 +83,46 @@ async def verify_credential_association(
         payload = CredentialAssociationVerificationRequest.model_validate_json(raw_body)
         credential = EncryptedCredentialStore(
             get_settings().credential_store_path, get_settings().credential_encryption_key
-        ).get(payload.credential_handle, payload.provider)
+        ).get(payload.credential_handle, engine_provider(payload.provider))
         verified = credential.subject == payload.subject
     except (ServiceAuthenticationError, ValueError, CredentialStoreError):
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED,
                             content={"code": "INVALID_CREDENTIAL_ASSOCIATION"})
-    return CredentialAssociationVerificationResponse(verified=verified)
+    if credential is None:
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED,
+                            content={"code": "INVALID_CREDENTIAL_ASSOCIATION"})
+    expired = credential.access_token_expires_at is not None \
+        and credential.access_token_expires_at <= datetime.now(timezone.utc)
+    state = "PLAN_USAGE_AUTHORIZED" if verified and not expired and required_scopes(credential.scopes) \
+        else "REAUTH_REQUIRED" if verified else "REVOKED"
+    return CredentialAssociationVerificationResponse(
+        verified=verified, state=state, scopes=credential.scopes if verified else ""
+    )
+
+
+@router.post("/credentials/revoke", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+async def revoke_credential(
+        request: Request,
+        authenticator: Annotated[HmacServiceAuthenticator | None, Depends(get_authenticator)],
+) -> Response | JSONResponse:
+    if authenticator is None:
+        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            content={"code": "SERVICE_AUTHENTICATION_UNAVAILABLE"})
+    raw_body = await request.body()
+    try:
+        authenticator.verify(method=request.method, path=request.url.path, body=raw_body,
+                             headers=request.headers)
+        payload = CredentialRevocationRequest.model_validate_json(raw_body)
+        credential_store = EncryptedCredentialStore(
+            get_settings().credential_store_path, get_settings().credential_encryption_key
+        )
+        credential_store.delete(payload.credential_handle)
+        get_binding_registry().revoke_credential(payload.credential_handle)
+    except (ServiceAuthenticationError, ValueError, CredentialStoreError):
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED,
+                            content={"code": "INVALID_SERVICE_AUTHENTICATION"})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def required_scopes(scopes: str) -> bool:
+    return {"resource.invoke", "chatgpt.tokens.use.direct"}.issubset(set(scopes.split()))

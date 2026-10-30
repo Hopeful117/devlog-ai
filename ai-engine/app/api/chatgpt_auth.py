@@ -1,12 +1,15 @@
 import secrets
+import json
 from functools import lru_cache
 
-from fastapi import APIRouter, Cookie, Depends, Query, Response, status
+from fastapi import APIRouter, Cookie, Depends, Query, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.core.config import get_settings
 from app.security.credential_store import CredentialStoreError, EncryptedCredentialStore
 from app.services.chatgpt_oauth import ChatGptOAuthService, OAuthError, OAuthSessionStore
+from app.api.bindings import get_authenticator
+from app.security.service_auth import HmacServiceAuthenticator, ServiceAuthenticationError
 
 router = APIRouter(prefix="/auth/chatgpt", tags=["chatgpt-auth"])
 SESSION_COOKIE = "devlog_oauth_session"
@@ -28,10 +31,16 @@ def session_id(cookie: str | None) -> str:
 
 
 @router.get("/start")
-async def start(response: Response, devlog_oauth_session: str | None = Cookie(default=None)):
+async def start(response: Response, intentId: str | None = Query(default=None),
+                intentProvider: str | None = Query(default=None),
+                intentExpiresAt: int | None = Query(default=None),
+                intentPrincipalId: str | None = Query(default=None),
+                intentSignature: str | None = Query(default=None),
+                devlog_oauth_session: str | None = Cookie(default=None)):
     current = session_id(devlog_oauth_session)
     try:
-        location = get_oauth_service().start(current)
+        location = get_oauth_service().start(current, intentId, intentProvider,
+                                             intentExpiresAt, intentSignature, intentPrincipalId)
     except (OAuthError, CredentialStoreError, OSError):
         return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                             content={"code": "CHATGPT_AUTHORIZATION_UNAVAILABLE"})
@@ -63,6 +72,72 @@ async def callback(
         return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST,
                             content={"code": "CHATGPT_AUTHORIZATION_FAILED"})
     return {"status": result}
+
+
+@router.post("/completion/redeem")
+async def redeem_completion(
+        request: Request,
+        authenticator: HmacServiceAuthenticator | None = Depends(get_authenticator),
+):
+    if authenticator is None:
+        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            content={"code": "SERVICE_AUTHENTICATION_UNAVAILABLE"})
+    raw_body = await request.body()
+    try:
+        authenticator.verify(method=request.method, path=request.url.path, body=raw_body,
+                             headers=request.headers)
+        payload = json.loads(raw_body)
+        result = get_oauth_service().redeem_completion(
+            str(payload["intentId"]), str(payload["completionCode"])
+        )
+    except (ServiceAuthenticationError, OAuthError, KeyError, ValueError):
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED,
+                            content={"code": "INVALID_OAUTH_COMPLETION"})
+    return result
+
+
+@router.post("/completion/ack", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+async def acknowledge_completion(
+        request: Request,
+        authenticator: HmacServiceAuthenticator | None = Depends(get_authenticator),
+) -> Response | JSONResponse:
+    if authenticator is None:
+        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            content={"code": "SERVICE_AUTHENTICATION_UNAVAILABLE"})
+    raw_body = await request.body()
+    try:
+        authenticator.verify(method=request.method, path=request.url.path, body=raw_body,
+                             headers=request.headers)
+        payload = json.loads(raw_body)
+        get_oauth_service().acknowledge_completion(
+            str(payload["intentId"]), str(payload["completionCode"])
+        )
+    except (ServiceAuthenticationError, OAuthError, KeyError, ValueError):
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED,
+                            content={"code": "INVALID_OAUTH_COMPLETION"})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/completion/compensate", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+async def compensate_completion(
+        request: Request,
+        authenticator: HmacServiceAuthenticator | None = Depends(get_authenticator),
+) -> Response | JSONResponse:
+    if authenticator is None:
+        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            content={"code": "SERVICE_AUTHENTICATION_UNAVAILABLE"})
+    raw_body = await request.body()
+    try:
+        authenticator.verify(method=request.method, path=request.url.path, body=raw_body,
+                             headers=request.headers)
+        payload = json.loads(raw_body)
+        get_oauth_service().compensate_completion(
+            str(payload["intentId"]), str(payload["completionCode"])
+        )
+    except (ServiceAuthenticationError, OAuthError, KeyError, ValueError):
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED,
+                            content={"code": "INVALID_OAUTH_COMPLETION"})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/status")
