@@ -115,7 +115,7 @@ For each run, the investigation captured:
 Provider observed at runtime:
 
 - `provider = openai`
-- `modelIdentifier = gpt-4.1-mini`
+- `modelIdentifier = gpt-5.6-luna`
 
 ## 7. Current Context Inventory
 

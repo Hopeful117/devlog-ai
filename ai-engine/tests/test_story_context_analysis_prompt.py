@@ -72,6 +72,8 @@ def test_question_aware_projection_is_presented_as_primary_prompt_objective() ->
     )
 
     assert "QUESTION\nWhich evidence explains the polling behavior?" in prompt.user_message
+    assert "INTENT\nID: engineering-story-context-analysis" in prompt.user_message
+    assert "QUESTION\nengineering-story-context-analysis" not in prompt.user_message
     assert "Answer the QUESTION before providing broader context" in prompt.user_message
     assert "question-specific evidence" in prompt.user_message
     assert "first sentence of objectiveUnderstanding.summary" in prompt.user_message

@@ -464,7 +464,7 @@ adapter technical retry count
 semantic retry = DISABLED
 ```
 
-The Design C evidence supports using `openai`/`gpt-4.1-mini` as a candidate
+The Design C evidence supports using `openai`/`gpt-5.6-luna` as a candidate
 common provider/model and supports a `90` second request timeout, but the
 implementation Story must freeze the actual execution identity before calls.
 Provider-default temperature/top-p are not silently accepted; they must be

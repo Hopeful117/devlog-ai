@@ -7,7 +7,7 @@ frozen V4 treatment, run a benchmark observation, execute official collection,
 retry a diagnostic cell, execute a repository tool, or change any identity.
 
 Two new provider calls were authorized and executed with the exact current V4
-typed tool schemas, `gpt-4.1-mini`, `max_output_tokens=32768`, SDK retries set to
+typed tool schemas, `gpt-5.6-luna`, `max_output_tokens=32768`, SDK retries set to
 zero, and the same diagnostic prompt:
 
 | Cell | Tools | Strict structured output | Result |
@@ -44,8 +44,8 @@ Frozen provider configuration:
 
 ```text
 provider = openai
-model = gpt-4.1-mini
-resolved model = gpt-4.1-mini-2025-04-14
+model = gpt-5.6-luna
+resolved model = gpt-5.6-luna
 max_output_tokens = 32768
 providerMaxRetries = 0
 ```
@@ -90,7 +90,7 @@ Relevant documented behavior:
 - Tool-call and other non-visible generated structure can contribute to output
   usage, but the public response does not reveal the provider's internal
   allocation decision.
-- The GPT-4.1 Mini model documentation lists a maximum output of `32768` and
+- The gpt-5.6-luna model documentation lists a maximum output of `32768` and
   supports Responses API function calling.
 
 Installed SDK:
@@ -302,7 +302,7 @@ before collection.
 | Candidate | Classification |
 |---|---|
 | Actual generated output consumed all 32768 tokens | Unsupported by these responses; usage is explicit zero |
-| Hidden reasoning exhaustion | Unsupported; GPT-4.1 Mini is documented as non-reasoning and the provider exposes no such cause here |
+| Hidden reasoning exhaustion | Unsupported; gpt-5.6-luna is documented as non-reasoning and the provider exposes no such cause here |
 | Strict structured output is the sole cause | Refuted by six-tool/non-strict failure |
 | Six tools are the sole necessary cause | Not established; one-tool/strict also fails |
 | Current V4 request shape has provider-side incomplete behavior | Supported and reproducible |

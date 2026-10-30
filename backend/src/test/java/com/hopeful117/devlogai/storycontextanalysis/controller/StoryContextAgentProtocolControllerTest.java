@@ -103,6 +103,21 @@ class StoryContextAgentProtocolControllerTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void resultWithoutAuthenticatedRequestPrincipalReturnsUnauthorized() throws Exception {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new StoryContextAgentProtocolController(
+                mock(AnalyzeStoryContextUseCase.class), mock(StoryContextAgentCallbackFacade.class),
+                mock(AiTaskService.class), new StoryContextAgentCallbackAuthenticator("secret"),
+                new StoryContextAgentMetrics(registry), new ObjectMapper(),
+                mock(com.hopeful117.devlogai.storycontextanalysis.service.AuthorizedStoryContextSnapshotReader.class),
+                new com.hopeful117.devlogai.authorization.RequestAuthenticatedPrincipalResolver()))
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
+
+        mvc.perform(get("/api/v1/story-context-agent/tasks/{id}/result", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
     private String sign(String path, String body) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
         mac.init(new SecretKeySpec("secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));

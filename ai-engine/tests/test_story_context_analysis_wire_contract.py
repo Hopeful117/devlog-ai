@@ -22,7 +22,7 @@ def _result() -> StoryContextAnalysisResult:
             "contextDigest": "a" * 64,
             "promptVersion": "prompt-v1",
             "provider": "openai",
-            "modelIdentifier": "gpt-4.1-mini",
+            "modelIdentifier": "gpt-5.6-luna",
             "promptContentDigest": "b" * 64,
             "intentId": "engineering-story-context-analysis",
             "intentVersion": "v1",

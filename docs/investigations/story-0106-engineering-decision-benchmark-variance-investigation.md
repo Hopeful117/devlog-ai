@@ -68,7 +68,7 @@ Observed Story 0106 engineering-decision results:
 - intent ID and version
 - analysis type
 - provider: `openai`
-- model: `gpt-4.1-mini`
+- model: `gpt-5.6-luna`
 - system prompt text
 - output schema
 - `selectedInsights` semantic content
@@ -131,7 +131,7 @@ The prompts are not byte-identical, but no meaningful difference was found in th
 From runtime code and Docker configuration:
 
 - provider: `openai`
-- model: `gpt-4.1-mini`
+- model: `gpt-5.6-luna`
 - max output tokens: `2000`
 - retries: `2`
 - response format: OpenAI `responses.parse()` with structured Pydantic model

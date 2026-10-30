@@ -15,7 +15,7 @@
 - Benchmark: `devlog-comparative-baseline-1.0.0`
 - Oracle: `1.0.0`, human-approved
 - Repository revision: `18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149`
-- Provider/model: `openai` / `gpt-4.1-mini`
+- Provider/model: `openai` / `gpt-5.6-luna`
 
 ## Preflight
 

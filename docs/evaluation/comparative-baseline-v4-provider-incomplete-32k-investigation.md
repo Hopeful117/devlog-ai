@@ -8,7 +8,7 @@ another benchmark observation, retry CASE-04, or run official collection.
 The exact V4 request path proves that the benchmark request passed:
 
 ```text
-model = gpt-4.1-mini
+model = gpt-5.6-luna
 max_output_tokens = 32768
 six typed repository tools
 strict JSON Schema response format
@@ -84,10 +84,10 @@ No benchmark RAW, DERIVED, ledger, report, or historical identity was changed.
 
 All sources were accessed on `2026-09-18` and are official OpenAI sources.
 
-### S1: GPT-4.1 Mini model page
+### S1: gpt-5.6-luna model page
 
-- Source: <https://developers.openai.com/api/docs/models/gpt-4.1-mini>
-- Behavior: model ID `gpt-4.1-mini`; context window `1,047,576`; maximum output `32,768`; no reasoning step; Responses API and function calling supported.
+- Source: <https://developers.openai.com/api/docs/models/gpt-5.6-luna>
+- Behavior: model ID `gpt-5.6-luna`; context window `1,047,576`; maximum output `32,768`; no reasoning step; Responses API and function calling supported.
 - Implication: `32768` remains the documented maximum for the exact requested model alias.
 
 ### S2: Responses `create` reference
@@ -117,7 +117,7 @@ All sources were accessed on `2026-09-18` and are official OpenAI sources.
 ### S6: Reasoning guide
 
 - Source: <https://developers.openai.com/api/docs/guides/reasoning>
-- Behavior: reasoning-model responses can become incomplete at `max_output_tokens`, potentially before visible output; the frozen GPT-4.1 Mini model page says the frozen model has no reasoning step.
+- Behavior: reasoning-model responses can become incomplete at `max_output_tokens`, potentially before visible output; the frozen gpt-5.6-luna model page says the frozen model has no reasoning step.
 - Implication: do not label this event as hidden reasoning exhaustion. The exact provider-side allocation remains undocumented.
 
 ## 4. Installed SDK
@@ -166,7 +166,7 @@ Sanitized reconstruction of the failed first request:
 
 | Request field | Effective value |
 |---|---|
-| `model` | `gpt-4.1-mini` |
+| `model` | `gpt-5.6-luna` |
 | `instructions` | fixed DIRECT instruction, 102 UTF-8 bytes |
 | `input` | one serialized user message containing CASE-04 question |
 | `tools` | six typed function tools |
@@ -192,7 +192,7 @@ sanitized canonical request representation = 4738 bytes
 ```
 
 These byte counts are canonical JSON measurements, not provider tokenizer
-counts. No reliable local GPT-4.1 Mini request tokenizer was used.
+counts. No reliable local gpt-5.6-luna request tokenizer was used.
 
 The six tool names are exactly:
 
@@ -316,8 +316,8 @@ Provider micro-calls: `3` total, within the authorized maximum of `3`.
 ### Call 1: one trivial function tool
 
 ```text
-requested model = gpt-4.1-mini
-returned model = gpt-4.1-mini-2025-04-14
+requested model = gpt-5.6-luna
+returned model = gpt-5.6-luna
 max_output_tokens = 32768
 status = completed
 output item = function_call / completed
@@ -334,8 +334,8 @@ ceiling.
 ### Call 2: six V4 tools plus strict V4 JSON Schema
 
 ```text
-requested model = gpt-4.1-mini
-returned model = gpt-4.1-mini-2025-04-14
+requested model = gpt-5.6-luna
+returned model = gpt-5.6-luna
 max_output_tokens = 32768
 tool count = 6
 status = incomplete
@@ -352,8 +352,8 @@ repository interaction.
 ### Call 3: strict V4 JSON Schema without tools
 
 ```text
-requested model = gpt-4.1-mini
-returned model = gpt-4.1-mini-2025-04-14
+requested model = gpt-5.6-luna
+returned model = gpt-5.6-luna
 max_output_tokens = 32768
 tool count = 0
 status = completed
@@ -455,7 +455,7 @@ These are impact analyses only. No identity values were computed or changed.
 - This does not authorize another benchmark observation or official collection.
 - Runtime 5 must continue to treat incomplete responses as non-answers.
 - The missing diagnostic and accounting data should be remediated before relying on incomplete-response resource analysis.
-- No claim is made that `gpt-4.1-mini` internally reasoned, consumed 32768 tokens, or generated a partial tool call.
+- No claim is made that `gpt-5.6-luna` internally reasoned, consumed 32768 tokens, or generated a partial tool call.
 
 ## 14. Mandatory Answers A-Z
 
@@ -463,7 +463,7 @@ These are impact analyses only. No identity values were computed or changed.
 - B: `NO` benchmark retry/second observation.
 - C: `NO` official collection.
 - D: `2.54.0`.
-- E: `gpt-4.1-mini` was sent; isolated responses resolved to `gpt-4.1-mini-2025-04-14`.
+- E: `gpt-5.6-luna` was sent; isolated responses resolved to `gpt-5.6-luna`.
 - F: `32768`, proven by manifest, runtime selection, adapter kwargs, and micro-call response echo.
 - G: `YES`; official model documentation lists `32,768` maximum output tokens.
 - H: `NOT_PERSISTED` in the benchmark artifact; micro-call 2 exposed a usage object with zero token values.

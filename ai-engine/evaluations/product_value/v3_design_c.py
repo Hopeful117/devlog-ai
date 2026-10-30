@@ -336,7 +336,7 @@ def provider_visible_evidence(items: list[dict[str, Any]]) -> list[dict[str, Any
 
 def build_causal_prompt(
     *, question: dict[str, Any], visible_items: list[dict[str, Any]],
-    context_digest: str, provider: str = "openai", model: str = "gpt-4.1-mini",
+    context_digest: str, provider: str = "openai", model: str = "gpt-5.6-luna",
 ) -> dict[str, Any]:
     schema = provider_schema()
     system = (
@@ -397,7 +397,7 @@ def execution_configuration_identity() -> dict[str, str]:
     configuration = {
         "revision": DESIGN_C_EXECUTION_REVISION,
         "provider": "openai",
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5.6-luna",
         "maxOutputTokens": 2500,
         "providerSchemaRevision": DESIGN_C_SCHEMA_REVISION,
         "providerSchemaDigest": provider_schema_identity()["digest"],

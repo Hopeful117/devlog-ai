@@ -27,7 +27,7 @@ The frozen assets were reused:
 questions = CASE-01-COMPARATIVE, CASE-03, CASE-04
 question version = 1.0.0
 repository revision = 18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149
-model requested for DEVLOG = gpt-4.1-mini
+model requested for DEVLOG = gpt-5.6-luna
 oracle/evaluator contracts = existing comparative assets
 ```
 
@@ -56,7 +56,7 @@ condition = DEVLOG
 questionId = CASE-04
 questionVersion = 1.0.0
 executionStatus = COMPLETED
-model = gpt-4.1-mini
+model = gpt-5.6-luna
 repositoryRevision = 18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149
 providerTransportAttempts = 1
 inputTokens = 3993
@@ -189,7 +189,7 @@ DIRECT runtime = OpenCode 1.18.31 default-agent fallback
 ```
 
 The pre-existing frozen comparative assets were not modified. The V4 official
-runner was not used because its frozen manifest is pinned to `gpt-4.1-mini` and
+runner was not used because its frozen manifest is pinned to `gpt-5.6-luna` and
 its provider runtime is not the approved OpenCode DIRECT treatment. The
 existing frozen DEVLOG context/evaluator assets were retained for future use.
 
@@ -277,7 +277,7 @@ independent cells: CASE-01-COMPARATIVE, CASE-03, and CASE-04, for DEVLOG and
 DIRECT, repetitions r1 through r3.
 
 At the time of the harness correction, collection status was `NOT_STARTED`.
-The repository's available historical runner was an OpenAI `gpt-4.1-mini` V4
+The repository's available historical runner was an OpenAI `gpt-5.6-luna` V4
 runner, not the locked OpenCode `1.18.31` / `openai/gpt-5.6-luna` DIRECT
 treatment. Invoking that runner would have changed the experimental condition,
 so no observation was fabricated or automatically substituted. The separate
@@ -421,10 +421,10 @@ support a universal quality claim: both conditions made the same CASE-01 error,
 and all 18 answers failed the strict structural contract. Human review remains
 required before product correction or rerun.
 
-## GPT-4.1-mini Model-Effect Collection
+## gpt-5.6-luna Model-Effect Collection
 
 The additional model-effect collection contains exactly nine sequential
-`DEVLOG_BASELINE_MODEL` observations using `gpt-4.1-mini`. It reused the
+`DEVLOG_BASELINE_MODEL` observations using `gpt-5.6-luna`. It reused the
 persisted historical `exactInput` projections for the frozen DevLog context;
 the context digests, projection revisions, evidence counts, question versions,
 and repository revision were verified before execution. OpenCode was not
@@ -435,7 +435,7 @@ six timeout diagnostics. Those artifacts are retained separately and excluded
 from the final model-effect dataset. The final nine-slot collection used the
 historical 90-second provider timeout and completed all nine slots.
 
-| Dimension | GPT-4.1-mini + DEVLOG | Luna + DEVLOG |
+| Dimension | gpt-5.6-luna + DEVLOG | Luna + DEVLOG |
 |---|---:|---:|
 | Semantic conclusion correct / evaluable | 9 / 9 | 6 / 9 |
 | Causal reasoning correct / evaluable | 9 / 9 | 6 / 9 |
@@ -443,7 +443,7 @@ historical 90-second provider timeout and completed all nine slots.
 | Overclaim `YES` / 9 | 0 / 9 | 0 / 9 |
 | Correct abstentions / applicable negative cases | 3 / 3 | 3 / 3 |
 
-GPT-4.1-mini established CASE-01 in all three repetitions, while Luna
+gpt-5.6-luna established CASE-01 in all three repetitions, while Luna
 returned the incorrect `NOT_ESTABLISHED` conclusion in all three. Both models
 were correct on CASE-03 and CASE-04 under the offline semantic rubric. The
 observed model effect is therefore material on this frozen sample, especially

@@ -57,7 +57,7 @@ async def test_no_retry_on_success():
     ))
     provider = OpenAiLlmProvider(
         api_key="test-key",
-        model="gpt-4.1-mini",
+        model="gpt-5.6-luna",
         timeout_seconds=90,
         max_output_tokens=2000,
         max_retries=2,
@@ -79,7 +79,7 @@ async def test_retry_on_timeout():
     client.responses.parse = AsyncMock(side_effect=error)
     provider = OpenAiLlmProvider(
         api_key="test-key",
-        model="gpt-4.1-mini",
+        model="gpt-5.6-luna",
         timeout_seconds=90,
         max_output_tokens=2000,
         max_retries=2,
@@ -102,7 +102,7 @@ async def test_no_retry_on_validation_error():
     client.responses.parse = AsyncMock(side_effect=ValueError("bad output"))
     provider = OpenAiLlmProvider(
         api_key="test-key",
-        model="gpt-4.1-mini",
+        model="gpt-5.6-luna",
         timeout_seconds=90,
         max_output_tokens=2000,
         max_retries=2,
@@ -129,7 +129,7 @@ async def test_retry_on_429():
     client.responses.parse = AsyncMock(side_effect=error)
     provider = OpenAiLlmProvider(
         api_key="test-key",
-        model="gpt-4.1-mini",
+        model="gpt-5.6-luna",
         timeout_seconds=90,
         max_output_tokens=2000,
         max_retries=1,
@@ -156,7 +156,7 @@ async def test_no_retry_on_400():
     client.responses.parse = AsyncMock(side_effect=error)
     provider = OpenAiLlmProvider(
         api_key="test-key",
-        model="gpt-4.1-mini",
+        model="gpt-5.6-luna",
         timeout_seconds=90,
         max_output_tokens=2000,
         max_retries=2,

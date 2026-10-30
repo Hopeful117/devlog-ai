@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-Five frozen replays of the exact same corrective PromptRequest against `gpt-4.1-mini` produced **5/5 clean results**. Every replay emitted exactly 1 proposal — the ADR documentation decision — with zero technology-presence decisions, zero generic rationale, and zero unsupported causality.
+Five frozen replays of the exact same corrective PromptRequest against `gpt-5.6-luna` produced **5/5 clean results**. Every replay emitted exactly 1 proposal — the ADR documentation decision — with zero technology-presence decisions, zero generic rationale, and zero unsupported causality.
 
 ```
 CLEAN_REPLAY_RATE = 100%
@@ -38,7 +38,7 @@ DETERMINISTIC INFORMATION CONSTRUCTION (confirmed by prior investigation)
      PROBABILISTIC INTERPRETATION
 ────────────────────────────────────────
                     ↓
-                  LLM (gpt-4.1-mini)
+                  LLM (gpt-5.6-luna)
 ```
 
 This investigation isolates only the probabilistic interpretation boundary by freezing everything before it.
@@ -110,7 +110,7 @@ All 7 corrective rules verified in running container:
 
 ```
 PROVIDER = openai
-MODEL = gpt-4.1-mini
+MODEL = gpt-5.6-luna
 TEMPERATURE = PROVIDER_DEFAULT (not explicitly set in code)
 TOP_P = PROVIDER_DEFAULT (not explicitly set in code)
 SEED = NONE (not configured)
@@ -335,7 +335,7 @@ With truly frozen input:
 - **Same system message**: CONFIRMED (hash `241dbe6e...`)
 - **Same user message**: CONFIRMED (hash `24255f0e...`)
 - **Same output schema**: CONFIRMED (hash `d5f8d31...`)
-- **Same provider/model**: CONFIRMED (openai/gpt-4.1-mini)
+- **Same provider/model**: CONFIRMED (openai/gpt-5.6-luna)
 - **Same generation config**: CONFIRMED (no temperature/seed set)
 
 Result: **Zero variance across 5 replays.** All outputs are semantically identical (ADR decision only, strong evidence, no technology-only).

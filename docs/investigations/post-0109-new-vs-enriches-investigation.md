@@ -41,7 +41,7 @@ missing-target problem. It is a combination of three defects or limitations:
 3. **Context-salience limitation:** the exact relationship appears once inside
    an initial prompt of about 123.7k characters. The same target and unrelated
    knowledge are repeated across several overlapping projections. With the
-   production context, `gpt-4.1-mini` produced two `NEW` repairs and one second
+   production context, `gpt-5.6-luna` produced two `NEW` repairs and one second
    no-delta answer. With a minimal context containing the same Fact,
    Observation, trusted Insight and unchanged prompt template/model, it produced
    valid `ENRICHES` proposals in 5/5 executions.
@@ -315,12 +315,12 @@ prompt.
 
 | Model | Context | Attempts | Valid structured outputs | `ENRICHES` | exact target | `NEW` | no delta |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| `gpt-4.1-mini` | minimal | 5 | 5 | 5 | 5 | 0 | 0 |
-| `gpt-4.1` | minimal | 5 | 5 | 5 | 5 | 0 | 0 |
-| `gpt-4.1-mini` | production benchmark | 3 | 2 | 0 | 0 | 2 | 1 |
-| `gpt-4.1` | full run-1 snapshot | 1 attempted | 0 | — | — | — | — |
+| `gpt-5.6-luna` | minimal | 5 | 5 | 5 | 5 | 0 | 0 |
+| `gpt-5.6-luna` | minimal | 5 | 5 | 5 | 5 | 0 | 0 |
+| `gpt-5.6-luna` | production benchmark | 3 | 2 | 0 | 0 | 2 | 1 |
+| `gpt-5.6-luna` | full run-1 snapshot | 1 attempted | 0 | — | — | — | — |
 
-The full-context `gpt-4.1` comparison was attempted through the same provider but
+The full-context `gpt-5.6-luna` comparison was attempted through the same provider but
 was rejected before generation by the model-specific 30,000 tokens/minute limit:
 41,778 tokens were requested. It was not retried and is not counted as a model
 classification result.
@@ -344,7 +344,7 @@ by itself guarantee a STRONG product result.
 ### 7.1 Supported causal findings
 
 1. **Model incapacity is rejected as the primary cause.** The same
-   `gpt-4.1-mini` classified and targeted correctly in 5/5 minimal runs.
+   `gpt-5.6-luna` classified and targeted correctly in 5/5 minimal runs.
 2. **Missing target representation is rejected.** The exact trusted UUID is in
    `existingArchitectureKnowledge`, passes both Python and Java membership
    checks, and occurs ten times in the full prompt.

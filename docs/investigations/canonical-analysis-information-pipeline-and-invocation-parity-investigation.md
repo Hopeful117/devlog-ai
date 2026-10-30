@@ -233,7 +233,7 @@ The `4/1/1` pattern (Run 1: 4 proposals, Runs 2-3: 1 proposal each) is caused by
 
 1. **LLM nondeterminism** — The same prompt with the same (or similar) input data produces different outputs across runs
 2. **Knowledge selection variance** — Minor differences in selected knowledge may tip the LLM's emission gate decision at the margin
-3. **Temperature non-zero** — `gpt-4.1-mini` with default temperature introduces randomness
+3. **Temperature non-zero** — `gpt-5.6-luna` with default temperature introduces randomness
 
 ### 8.2 What the Variance Is NOT Caused By
 

@@ -61,7 +61,7 @@ def build() -> dict[str, Any]:
                 "questionId": observation["assignment"]["questionId"],
                 "condition": "DEVLOG_BASELINE_MODEL",
                 "repetition": observation["assignment"]["repetition"],
-                "model": "gpt-4.1-mini",
+                "model": "gpt-5.6-luna",
                 "formatContract": {
                     "structuralValid": observation["structuralValid"] == "YES",
                     "groundingContractValid": observation["groundingValid"] == "YES",

@@ -20,13 +20,13 @@ benchmark.
 |---|---|---|
 | Context selection | `story0132-v3-design-c-context-selection-1.0.0` | `de3d7236b83f752c68347c9a3bf03ec2f97c15f8869ba170c9b83ecdad1dbf90` |
 | Provider schema | `story0132-v3-design-c-causal-provider-schema-1.0.1` | `6b291e77e1708b0bc3a745869544f8ba9215389d469811e1205b9cd3e129dd24` |
-| Execution configuration | `story0132-v3-design-c-execution-config-1.2.1` | `b47bb5205d7757b3998ebdb2aa88f85989fb7f23a5bd921767d8fe0c46aaa2cf` |
+| Execution configuration | `story0132-v3-design-c-execution-config-1.2.1` | `abfaa273b030bd70c33340849b998f4b0179902a852a823216ff192398df6b20` |
 
 ```text
 MAPPING_HASH = 67474f09e41c07899c8c7117754b21e794f285380ffd50675e701a0a3c2c40c0
 MAX_OUTPUT_TOKENS = 2500
 PROVIDER = openai
-MODEL = gpt-4.1-mini
+MODEL = gpt-5.6-luna
 SEMANTIC_RETRY = DISABLED
 TECHNICAL_RETRY_MAX = 1
 ```

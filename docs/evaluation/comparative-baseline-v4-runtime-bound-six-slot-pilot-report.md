@@ -18,7 +18,7 @@ runtime contract digest: 6966a5b77d5f4f9469f5a556e9dad66ba82580d637d465947d230a5
 execution configuration: 74dfdcd2b06ea38d124d51b88cbc57f62b504d907f4cd793d1a77387e619fad2
 pilot plan: c8b3201897e823f4817a107add1a0846b24b1b94e745df0004d40934900b46a2
 repository revision: 18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149
-provider/model: openai / gpt-4.1-mini
+provider/model: openai / gpt-5.6-luna
 ```
 
 Preflight passed before the first provider call. All identities, benchmark,

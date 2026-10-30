@@ -77,7 +77,7 @@ execution configuration hash is:
 
 The manifest remains bound to repository revision
 `18f9d99751ee0da3c56a6f5d75aecb5ddb8fc149`, provider `openai`, and model
-`gpt-4.1-mini`.
+`gpt-5.6-luna`.
 
 ## Pilot Assignment Plan
 

@@ -32,7 +32,7 @@ Frozen treatment verified from the current manifest:
 
 ```text
 provider = openai
-model = gpt-4.1-mini
+model = gpt-5.6-luna
 finalOutputTokens = 32768
 intermediateOutputTokens = 32768
 providerMaxRetries = 0
@@ -60,7 +60,7 @@ providerCalls = 0
 networkCalls = 0
 deterministicReplay = READY
 provider = openai
-model = gpt-4.1-mini
+model = gpt-5.6-luna
 secret configured = YES, not printed or persisted
 ```
 
@@ -93,8 +93,8 @@ The provider received the frozen first-turn DIRECT request and returned before
 the first usable tool call:
 
 ```text
-requested model = gpt-4.1-mini
-resolved model = gpt-4.1-mini-2025-04-14
+requested model = gpt-5.6-luna
+resolved model = gpt-5.6-luna
 max_output_tokens = 32768
 status = incomplete
 incomplete reason = max_output_tokens
@@ -174,8 +174,8 @@ responseBearingModelTurn = false
 usage = {inputTokens: 0, outputTokens: 0, totalTokens: 0}
 providerResponseId = resp_041839fa5cb4d609006aad347451bc87d28db2bb8698dfe820
 providerRequestId = req_0c4bd524b5864a599c344ea4eec947ab
-requestedModel = gpt-4.1-mini
-resolvedProviderModel = gpt-4.1-mini-2025-04-14
+requestedModel = gpt-5.6-luna
+resolvedProviderModel = gpt-5.6-luna
 providerResponseStatus = incomplete
 providerIncompleteReason = max_output_tokens
 maxOutputTokens = 32768
@@ -247,7 +247,7 @@ The post-remediation validation reproduced:
 ```text
 six V4 typed tools
 + strict V4 structured output
-+ gpt-4.1-mini
++ gpt-5.6-luna
     -> incomplete / max_output_tokens
     -> outputItemCount = 0
     -> provider usage = 0/0/0

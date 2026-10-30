@@ -26,7 +26,7 @@ answer. It is not a comparative quality or efficiency estimate.
 - Instrumentation: `comparative-v4-instrumentation-2.0.0`.
 - Benchmark: `devlog-comparative-baseline-1.0.0`.
 - Oracle: `1.0.0`, frozen.
-- Provider/model: `openai` / `gpt-4.1-mini`.
+- Provider/model: `openai` / `gpt-5.6-luna`.
 - Policy: `NATURAL_COMPLETION_WITH_EMERGENCY_RUNAWAY_GUARD`.
 - Preflight: `PASS`; natural completion active, historical 12-operation ceiling
   inactive, resource equalization inactive, benchmark/oracle/conditions/Policy

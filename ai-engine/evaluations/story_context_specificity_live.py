@@ -9,37 +9,24 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
-import time
 from pathlib import Path
 from typing import Any
-from urllib.request import Request, urlopen
 
 
 INTENT = "engineering-story-context-analysis"
 DEFAULT_PROJECT = "devlog-ai"
 DEFAULT_MCP_JAR = Path(__file__).parents[2] / "mcp-server/target/mcp-server-0.0.1-SNAPSHOT.jar"
+DEFAULT_MCP_LAUNCHER = Path.home() / ".config/opencode/devlog-mcp-start.sh"
 DEFAULT_OUTPUT = Path("/tmp/opencode/story0158-live")
 
 
-def rest_json(
-    method: str,
-    url: str,
-    payload: dict[str, Any] | None = None,
-    headers: dict[str, str] | None = None,
-) -> dict[str, Any]:
-    body = None if payload is None else json.dumps(payload).encode()
-    request_headers = {"Content-Type": "application/json"}
-    request_headers.update(headers or {})
-    request = Request(url, data=body, method=method, headers=request_headers)
-    with urlopen(request, timeout=180) as response:
-        return json.loads(response.read())
-
-
 class McpClient:
-    def __init__(self, jar: Path):
+    def __init__(self, jar: Path, launcher: Path | None = None):
+        command = [str(launcher)] if launcher is not None else ["java", "-jar", str(jar)]
         self.process = subprocess.Popen(
-            ["java", "-jar", str(jar)],
+            command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -125,23 +112,23 @@ print(response.output_text)
     return completed.stdout.strip()
 
 
-def story_agent_run(project: str, question: str, files: list[str], repetition: int) -> dict[str, Any]:
+def story_agent_run(mcp: McpClient, project: str, question: str, files: list[str], repetition: int) -> dict[str, Any]:
     key = f"story-0158-live-{repetition}-{abs(hash((question, tuple(files))))}"
-    execution = rest_json("POST", f"http://localhost:18080/api/v1/projects/{project}/story-agent", {
+    execution = mcp.tool("devlog_story_agent", {
+        "projectSlug": project,
         "storyId": None,
         "intent": INTENT,
         "question": question,
         "files": files,
         "guidance": {},
-    }, {"Idempotency-Key": key})
-    task_id = execution.get("aiTaskId")
-    for _ in range(90):
-        status = rest_json("GET", f"http://localhost:18080/api/v1/ai-tasks/{task_id}")
-        if status.get("status") in {"COMPLETED", "FAILED"}:
-            break
-        time.sleep(2)
-    result = rest_json("GET", f"http://localhost:18080/api/v1/ai/tasks/{task_id}/story-context-analysis")
-    return {"execution": execution, "status": status, "result": result, "idempotencyKey": key}
+        "idempotencyKey": key,
+    })
+    return {
+        "execution": execution,
+        "status": execution,
+        "result": execution.get("result", {}),
+        "idempotencyKey": key,
+    }
 
 
 def capture_envelope(
@@ -179,6 +166,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", default=DEFAULT_PROJECT)
     parser.add_argument("--mcp-jar", type=Path, default=DEFAULT_MCP_JAR)
+    parser.add_argument(
+        "--mcp-launcher",
+        type=Path,
+        default=Path(os.environ["DEVLOG_MCP_LAUNCHER"])
+        if os.environ.get("DEVLOG_MCP_LAUNCHER")
+        else (DEFAULT_MCP_LAUNCHER if DEFAULT_MCP_LAUNCHER.is_file() else None),
+        help="Local MCP launcher that provisions authentication; defaults to the OpenCode launcher when present.",
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--baseline-only", action="store_true")
@@ -188,7 +183,7 @@ def main() -> int:
     scenarios = json.loads((Path(__file__).parent / "scenarios/story-0158-specificity-v1/manifest.json").read_text())[
         "scenarios"
     ]
-    mcp = McpClient(args.mcp_jar)
+    mcp = McpClient(args.mcp_jar, args.mcp_launcher)
     try:
         for scenario in scenarios:
             for repetition in range(1, args.repetitions + 1):
@@ -196,7 +191,7 @@ def main() -> int:
                 question = scenario["question"]
                 files = scenario.get("files", [])
                 if not args.baseline_only:
-                    treatment = story_agent_run(args.project, question, files, repetition)
+                    treatment = story_agent_run(mcp, args.project, question, files, repetition)
                     if (
                         treatment["execution"].get("status") != "COMPLETED"
                         or treatment["status"].get("status") != "COMPLETED"

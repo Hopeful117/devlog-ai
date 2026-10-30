@@ -31,8 +31,8 @@ def test_devlog_adapter_preserves_case01_projection_identity(monkeypatch, tmp_pa
         {"reference": f"ref-{index}", "content": "x" * 8100, "sourceType": "DOCUMENT", "contentByteLength": 8100}
         for index in range(4)
     ]
-    items[-1]["content"] += "x"
-    items[-1]["contentByteLength"] += 1
+    items[-1]["content"] += "x" * 23
+    items[-1]["contentByteLength"] += 23
 
     monkeypatch.setattr("evaluations.product_value.v3_design_c.context_selection_identity", lambda: identity)
     monkeypatch.setattr("evaluations.product_value.v3_design_c.projection_digest", lambda _case: "b" * 64)
@@ -42,7 +42,7 @@ def test_devlog_adapter_preserves_case01_projection_identity(monkeypatch, tmp_pa
     context = live_adapters.FrozenDevlogContextAdapter(tmp_path).build(question)
 
     assert context.question_id == "CASE-01-COMPARATIVE"
-    assert context.evidence_bytes == 32401
+    assert context.evidence_bytes == 32423
     assert len(context.evidence) == 4
     assert context.context_digest == "a" * 64
     assert context.projection_revision == "CASE-01:" + "b" * 64
@@ -92,7 +92,7 @@ def test_pinned_repository_search_rejects_malformed_output(monkeypatch, tmp_path
 
 def test_live_preflight_requires_explicit_core_grounding(monkeypatch, tmp_path):
     monkeypatch.setattr(live_adapters, "PinnedGitRepositoryTools", lambda *_args, **_kwargs: object())
-    environment = {"LLM_PROVIDER": "openai", "LLM_MODEL": "gpt-4.1-mini", "LLM_API_KEY": "test-key"}
+    environment = {"LLM_PROVIDER": "openai", "LLM_MODEL": "gpt-5.6-luna", "LLM_API_KEY": "test-key"}
     pilot = live_adapters.PilotStorage(tmp_path / "pilot", "run", tmp_path / "official")
     with pytest.raises(RuntimeContractError, match="approved comparative"):
         live_adapters.live_preflight(repository=tmp_path, grounding=None, environment=environment)
@@ -103,7 +103,7 @@ def test_live_preflight_requires_explicit_core_grounding(monkeypatch, tmp_path):
 def test_live_preflight_requires_pilot_storage(monkeypatch, tmp_path):
     monkeypatch.setattr(live_adapters, "PinnedGitRepositoryTools", lambda *_args, **_kwargs: object())
     grounding = object.__new__(live_adapters.ComparativeJavaGroundingAuthority)
-    environment = {"LLM_PROVIDER": "openai", "LLM_MODEL": "gpt-4.1-mini", "LLM_API_KEY": "test-key"}
+    environment = {"LLM_PROVIDER": "openai", "LLM_MODEL": "gpt-5.6-luna", "LLM_API_KEY": "test-key"}
     with pytest.raises(RuntimeContractError, match="isolated pilot storage"):
         live_adapters.live_preflight(repository=tmp_path, grounding=grounding, environment=environment)
 
@@ -471,7 +471,7 @@ def test_incomplete_diagnostics_preserve_usage_and_bounded_output_items_without_
         output_text = None
         usage = Usage()
         id = "resp-incomplete"
-        model = "gpt-4.1-mini-2025-04-14"
+        model = "gpt-5.6-luna"
         status = "incomplete"
         _request_id = "req-incomplete"
         incomplete_details = Details()

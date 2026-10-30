@@ -346,7 +346,7 @@ already conducted controlled experiments. Key findings:
 ## Experiment A: Minimal Context + Current Grounding
 
 ```text
-MODEL = gpt-4.1-mini
+MODEL = gpt-5.6-luna
 CONTEXT = minimal (same Intent, same Fact, same Observation, same target Insight)
 RETRIES = 5
 
@@ -362,7 +362,7 @@ RESULTS:
 ## Experiment B: Stronger Model + Minimal Context
 
 ```text
-MODEL = gpt-4.1
+MODEL = gpt-5.6-luna
 CONTEXT = minimal
 RETRIES = 5
 
@@ -378,7 +378,7 @@ RESULTS:
 ## Experiment C: Full Production Context
 
 ```text
-MODEL = gpt-4.1-mini
+MODEL = gpt-5.6-luna
 CONTEXT = full production
 RETRIES = 3
 
@@ -454,7 +454,7 @@ content, not trusted knowledge leakage.
 ```text
 ASSESSMENT = PARTIAL (tertiary factor)
 
-Both gpt-4.1-mini and gpt-4.1 produce "runtime relationship" or "runtime
+Both gpt-5.6-luna and gpt-5.6-luna produce "runtime relationship" or "runtime
 wiring" phrases even in minimal experiments with current grounding. This
 suggests the model has an inherent tendency to convert declarative
 relationships into plausible runtime semantics.
@@ -584,7 +584,7 @@ PR = NOT PERFORMED
 ## Experimental Setup
 
 ```text
-MODEL = gpt-4.1-mini
+MODEL = gpt-5.6-luna
 RUNS_PER_EXPERIMENT = 5
 EXPERIMENT_DIR = /tmp/opencode/experiments
 API_KEY_SOURCE = .env (LLM_API_KEY)

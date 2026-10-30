@@ -224,7 +224,7 @@
   },
   "humanUtility": "NOT_YET_ESTABLISHED",
   "interpretationStability": 0.7983058608058609,
-  "model": "gpt-4.1-mini",
+  "model": "gpt-5.6-luna",
   "modelChanged": false,
   "oracleChanged": false,
   "provider": "openai",
@@ -234,7 +234,7 @@
   "runs": [
     {
       "caseId": "CASE-01",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -413,7 +413,7 @@
     },
     {
       "caseId": "CASE-01",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -616,7 +616,7 @@
     },
     {
       "caseId": "CASE-01",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -845,7 +845,7 @@
     },
     {
       "caseId": "CASE-02",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -953,7 +953,7 @@
     },
     {
       "caseId": "CASE-02",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -1046,7 +1046,7 @@
     },
     {
       "caseId": "CASE-02",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -1185,7 +1185,7 @@
     },
     {
       "caseId": "CASE-03",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -1290,7 +1290,7 @@
     },
     {
       "caseId": "CASE-03",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -1381,7 +1381,7 @@
     },
     {
       "caseId": "CASE-03",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -1477,7 +1477,7 @@
     },
     {
       "caseId": "CASE-04",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -1553,7 +1553,7 @@
     },
     {
       "caseId": "CASE-04",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {
@@ -1622,7 +1622,7 @@
     },
     {
       "caseId": "CASE-04",
-      "model": "gpt-4.1-mini",
+      "model": "gpt-5.6-luna",
       "productionResult": {
         "causalClaims": [
           {

@@ -53,7 +53,7 @@ Provider configuration:
 
 ```text
 V3_PROVIDER = openai
-V3_MODEL = gpt-4.1-mini
+V3_MODEL = gpt-5.6-luna
 MAX_OUTPUT_TOKENS = 2000
 OPENAI_SDK_MAX_RETRIES = 0
 PROVIDER_ADAPTER_MAX_RETRIES = 0

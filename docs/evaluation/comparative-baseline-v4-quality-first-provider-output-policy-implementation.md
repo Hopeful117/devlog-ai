@@ -63,7 +63,7 @@ Verified by deterministic tests:
 | Runtime digest | `a3211f44aad4633ca1d725b7a48506a6dd8725ab96becf182e867f1794e80edd`, unchanged |
 | Instrumentation | `comparative-v4-instrumentation-3.0.0`, unchanged |
 | Typed repository schema | `comparative-v4-typed-repository-tools-2.0.0`, unchanged |
-| Provider/model | `openai` / `gpt-4.1-mini`, unchanged |
+| Provider/model | `openai` / `gpt-5.6-luna`, unchanged |
 | Retry policy | `providerMaxRetries=0`, unchanged |
 | Runtime-5 incomplete handling | unchanged; incomplete responses are not parsed, retried, repaired, or continued |
 | Policy A malformed tool handling | unchanged |

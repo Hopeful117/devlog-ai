@@ -87,7 +87,7 @@ Results:
 Provider/model remained:
 
 - `openai`
-- `gpt-4.1-mini`
+- `gpt-5.6-luna`
 
 ### describe-project-v1
 

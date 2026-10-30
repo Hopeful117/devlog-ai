@@ -124,7 +124,7 @@
         "groundingContract": "comparative-v4-deterministic-grounding-1.0.0",
         "instrumentation": "comparative-v4-instrumentation-4.0.0",
         "manifest": "comparative-baseline-v4-3.0.0",
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5.6-luna",
         "oracleSha256": "3c5ca08879ec19ccb442da5e25fabe7a005a8ab429ba3a6b21d29aa8e57f9303",
         "projectionContract": "comparative-v4-deterministic-projection-4.0.0",
         "protocol": "comparative-baseline-v4-3.0.0",

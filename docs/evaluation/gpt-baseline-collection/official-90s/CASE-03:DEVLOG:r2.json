@@ -114,7 +114,7 @@
         "groundingContract": "comparative-v4-deterministic-grounding-1.0.0",
         "instrumentation": "comparative-v4-instrumentation-4.0.0",
         "manifest": "comparative-baseline-v4-3.0.0",
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5.6-luna",
         "oracleSha256": "3c5ca08879ec19ccb442da5e25fabe7a005a8ab429ba3a6b21d29aa8e57f9303",
         "projectionContract": "comparative-v4-deterministic-projection-4.0.0",
         "protocol": "comparative-baseline-v4-3.0.0",
@@ -263,8 +263,8 @@
             "providerResponseId": "resp_040baa5d2833e4dc006aad663d94ec87d2b6c80385709df121",
             "providerResponseReceived": true,
             "providerResponseStatus": "completed",
-            "requestedModel": "gpt-4.1-mini",
-            "resolvedProviderModel": "gpt-4.1-mini-2025-04-14",
+            "requestedModel": "gpt-5.6-luna",
+            "resolvedProviderModel": "gpt-5.6-luna",
             "transportAttempted": true
           },
           "providerResponseReceived": true,
@@ -297,7 +297,7 @@
           "max_output_tokens": 32768,
           "max_tool_calls": null,
           "metadata": {},
-          "model": "gpt-4.1-mini-2025-04-14",
+          "model": "gpt-5.6-luna",
           "moderation": null,
           "object": "response",
           "output": [
