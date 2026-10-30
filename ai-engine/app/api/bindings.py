@@ -1,5 +1,6 @@
 from functools import lru_cache
 from datetime import datetime, timezone
+import sqlite3
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
@@ -84,7 +85,29 @@ async def verify_credential_association(
         credential = EncryptedCredentialStore(
             get_settings().credential_store_path, get_settings().credential_encryption_key
         ).get(payload.credential_handle, engine_provider(payload.provider))
-        verified = credential.subject == payload.subject
+        expected_kind = {
+            "API_KEY": "API_KEY",
+            "OAUTH": "OAUTH",
+        }.get(payload.authentication_method)
+        if expected_kind is None:
+            raise ValueError("unsupported authentication method")
+        if expected_kind == "API_KEY":
+            if payload.intent_id is not None or payload.principal_binding:
+                if payload.intent_id is None or not payload.principal_binding:
+                    raise ValueError("API-key enrollment context is incomplete")
+                with sqlite3.connect(get_settings().binding_store_path) as connection:
+                    bound = connection.execute(
+                        "SELECT 1 FROM api_key_credential_intents "
+                        "WHERE handle = ? AND intent_id = ? AND principal_binding = ?",
+                        (payload.credential_handle, str(payload.intent_id), payload.principal_binding),
+                    ).fetchone()
+                if bound is None:
+                    raise ValueError("credential is not bound to enrollment intent")
+        verified = credential.kind == expected_kind and (
+            credential.subject is None
+            if expected_kind == "API_KEY"
+            else credential.subject == payload.subject
+        )
     except (ServiceAuthenticationError, ValueError, CredentialStoreError):
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED,
                             content={"code": "INVALID_CREDENTIAL_ASSOCIATION"})
@@ -93,7 +116,8 @@ async def verify_credential_association(
                             content={"code": "INVALID_CREDENTIAL_ASSOCIATION"})
     expired = credential.access_token_expires_at is not None \
         and credential.access_token_expires_at <= datetime.now(timezone.utc)
-    state = "PLAN_USAGE_AUTHORIZED" if verified and not expired and required_scopes(credential.scopes) \
+    usable = expected_kind == "API_KEY" or required_scopes(credential.scopes)
+    state = "PLAN_USAGE_AUTHORIZED" if verified and not expired and usable \
         else "REAUTH_REQUIRED" if verified else "REVOKED"
     return CredentialAssociationVerificationResponse(
         verified=verified, state=state, scopes=credential.scopes if verified else ""

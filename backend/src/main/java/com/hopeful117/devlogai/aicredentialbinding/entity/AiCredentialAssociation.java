@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.aicredentialbinding.entity;
 
 import jakarta.persistence.*;
 import com.hopeful117.devlogai.aicredentialbinding.model.AiCredentialAssociationState;
+import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 import lombok.*;
 
 import java.time.Instant;
@@ -24,8 +25,12 @@ public class AiCredentialAssociation {
     @Column(name = "principal_id", nullable = false, length = 255)
     private String principalId;
 
-    @Column(name = "chatgpt_subject", nullable = false, length = 255)
+    @Column(name = "chatgpt_subject", length = 255)
     private String chatgptSubject;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "authentication_method", nullable = false, length = 32)
+    private AiAuthenticationMethod authenticationMethod;
 
     @Column(name = "credential_handle", nullable = false, length = 255)
     private String credentialHandle;

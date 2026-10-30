@@ -47,6 +47,12 @@ public class AiCredentialAssociationController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/anthropic")
+    public ResponseEntity<Void> revokeAnthropic(@AuthenticationPrincipal Jwt jwt) {
+        service.revoke(authenticatedPrincipal(jwt), "anthropic");
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/revoked")
     public ResponseEntity<Void> revoked(HttpServletRequest request,
                                         @RequestHeader(value = "X-DevLog-Service-Signature", required = false) String signature,

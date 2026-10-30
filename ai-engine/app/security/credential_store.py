@@ -24,6 +24,7 @@ class StoredCredential:
     client_id: str | None = None
     subject: str | None = None
     id_token: str | None = None
+    kind: str = "OAUTH"
 
 
 class EncryptedCredentialStore:
@@ -64,10 +65,16 @@ class EncryptedCredentialStore:
                     )
                 except sqlite3.OperationalError:
                     pass
+            try:
+                connection.execute("ALTER TABLE provider_credentials ADD COLUMN credential_kind TEXT NOT NULL DEFAULT 'OAUTH'")
+            except sqlite3.OperationalError:
+                pass
 
     def put(self, credential: StoredCredential) -> None:
         if not credential.handle or not credential.provider or not credential.access_token:
             raise CredentialStoreError("credential metadata is incomplete")
+        if credential.kind not in {"OAUTH", "API_KEY"}:
+            raise CredentialStoreError("credential kind is invalid")
         import secrets
 
         nonce = secrets.token_bytes(12)
@@ -90,8 +97,8 @@ class EncryptedCredentialStore:
                 """
                 INSERT INTO provider_credentials
                 (handle, provider, access_token, refresh_token, access_token_expires_at,
-                 scopes, client_id, subject, id_token, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 scopes, client_id, subject, id_token, credential_kind, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(handle) DO UPDATE SET
                   provider=excluded.provider,
                   access_token=excluded.access_token,
@@ -100,12 +107,14 @@ class EncryptedCredentialStore:
                   scopes=excluded.scopes,
                   client_id=excluded.client_id,
                   subject=excluded.subject,
-                  id_token=excluded.id_token
+                  id_token=excluded.id_token,
+                  credential_kind=excluded.credential_kind
                 """,
                 (credential.handle, credential.provider, access, refresh,
                  credential.access_token_expires_at.isoformat()
                  if credential.access_token_expires_at else None,
-                  credential.scopes, credential.client_id, credential.subject, id_token,
+                   credential.scopes, credential.client_id, credential.subject, id_token,
+                   credential.kind,
                  datetime.now(timezone.utc).isoformat()),
             )
 
@@ -113,7 +122,7 @@ class EncryptedCredentialStore:
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT provider, access_token, refresh_token, access_token_expires_at, scopes, "
-                "client_id, subject, id_token "
+                "client_id, subject, id_token, credential_kind "
                 "FROM provider_credentials WHERE handle = ? AND provider = ?",
                 (handle, provider),
             ).fetchone()
@@ -135,6 +144,7 @@ class EncryptedCredentialStore:
             client_id=row[5],
             subject=row[6],
             id_token=id_token,
+            kind=row[8] or "OAUTH",
         )
 
     def delete(self, handle: str) -> None:
@@ -154,6 +164,7 @@ class EncryptedCredentialStore:
             client_id=current.client_id,
             subject=current.subject,
             id_token=current.id_token,
+            kind=current.kind,
         ))
 
     def _decrypt(self, handle: str, value: bytes) -> str:

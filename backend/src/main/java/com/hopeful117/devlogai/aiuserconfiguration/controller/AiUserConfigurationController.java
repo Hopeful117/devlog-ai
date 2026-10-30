@@ -50,7 +50,7 @@ public class AiUserConfigurationController {
         var principal = principalResolver.resolve(request)
                 .orElseThrow(UnauthenticatedPrincipalException::new);
         var configuration = service.find(principal);
-        var association = configuration.filter(value -> value.getAuthenticationMethod() == AiAuthenticationMethod.OAUTH)
+        var association = configuration.filter(value -> value.getAuthenticationMethod() != AiAuthenticationMethod.NONE)
                 .flatMap(value -> findAssociation(principal, value.getProvider()));
         var state = associationService == null ? service.state(configuration) : service.state(configuration, association);
         return ResponseEntity.ok(ConfigurationResponse.from(configuration, state));

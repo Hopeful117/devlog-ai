@@ -24,7 +24,10 @@ class BindingRegistrationResponse(ContractModel):
 class CredentialAssociationVerificationRequest(ContractModel):
     credential_handle: str = Field(alias="credentialHandle", min_length=1, max_length=255)
     provider: str = Field(min_length=1, max_length=100)
-    subject: str = Field(min_length=1, max_length=255)
+    subject: str | None = Field(default=None, max_length=255)
+    authentication_method: str = Field(alias="authenticationMethod", default="OAUTH")
+    intent_id: UUID | None = Field(alias="intentId", default=None)
+    principal_binding: str | None = Field(alias="principalBinding", default=None, max_length=255)
 
 
 class CredentialAssociationVerificationResponse(ContractModel):

@@ -8,6 +8,7 @@ import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBindingSta
 import com.hopeful117.devlogai.aicredentialbinding.model.AiCredentialAssociationState;
 import com.hopeful117.devlogai.aicredentialbinding.model.AiProviderIdentity;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
+import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,8 +31,17 @@ public class AiCredentialAssociationServiceImpl implements AiCredentialAssociati
     @Transactional
     public AiCredentialAssociation associate(AuthenticatedPrincipal principal, String chatgptSubject,
                                              String credentialHandle, String provider) {
+        return associate(principal, chatgptSubject, credentialHandle, provider, AiAuthenticationMethod.OAUTH);
+    }
+
+    @Override
+    @Transactional
+    public AiCredentialAssociation associate(AuthenticatedPrincipal principal, String chatgptSubject,
+                                             String credentialHandle, String provider,
+                                             AiAuthenticationMethod authenticationMethod) {
         requirePrincipal(principal);
-        requireValue(chatgptSubject, "chatgptSubject");
+        if (authenticationMethod == null) throw new IllegalArgumentException("authenticationMethod is required");
+        if (authenticationMethod == AiAuthenticationMethod.OAUTH) requireValue(chatgptSubject, "chatgptSubject");
         requireValue(credentialHandle, "credentialHandle");
         requireValue(provider, "provider");
         String engineProvider = AiProviderIdentity.engineProvider(provider);
@@ -42,6 +52,7 @@ public class AiCredentialAssociationServiceImpl implements AiCredentialAssociati
         String previousHandle = association.getCredentialHandle();
         association.setPrincipalId(principal.principalId());
         association.setChatgptSubject(chatgptSubject);
+        association.setAuthenticationMethod(authenticationMethod);
         association.setCredentialHandle(credentialHandle);
         association.setProvider(engineProvider);
         if (association.getCreatedAt() == null) association.setCreatedAt(now);
@@ -95,6 +106,14 @@ public class AiCredentialAssociationServiceImpl implements AiCredentialAssociati
                     association.setUpdatedAt(clock.instant());
                     repository.save(association);
                 });
+    }
+
+    @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void scheduleRevocation(String credentialHandle, String provider) {
+        requireValue(credentialHandle, "credentialHandle");
+        requireValue(provider, "provider");
+        enqueueRevocation(credentialHandle, AiProviderIdentity.engineProvider(provider));
     }
 
     private void requirePrincipal(AuthenticatedPrincipal principal) {

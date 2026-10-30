@@ -40,7 +40,7 @@ class AiUserConfigurationPostgresIntegrationTest {
                 String.class, id)).isEqualTo("{}");
         assertThat(jdbc.queryForObject(
                  "select version from flyway_schema_history where success order by installed_rank desc limit 1",
-                 String.class)).isEqualTo("65");
+                 String.class)).isEqualTo("67");
         assertThat(jdbc.queryForObject("""
                 select count(*) from information_schema.columns
                 where table_name = 'ai_user_configurations'

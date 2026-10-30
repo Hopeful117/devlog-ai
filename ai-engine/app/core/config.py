@@ -9,6 +9,7 @@ class Settings:
     llm_model: str = "gpt-5.6-luna"
     llm_api_key: str | None = None
     anthropic_workspace_id: str | None = None
+    anthropic_user_credentials: bool = False
     llm_timeout_seconds: float = 90.0
     llm_max_output_tokens: int = 2_000
     llm_max_retries: int = 2
@@ -58,6 +59,7 @@ class Settings:
             llm_model=os.getenv("LLM_MODEL", "gpt-5.6-luna"),
             llm_api_key=llm_api_key,
             anthropic_workspace_id=os.getenv("ANTHROPIC_WORKSPACE_ID") or None,
+            anthropic_user_credentials=os.getenv("ANTHROPIC_USER_CREDENTIALS", "false").lower() == "true",
             llm_timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "90")),
             llm_max_output_tokens=int(
                 os.getenv("LLM_MAX_OUTPUT_TOKENS", "2000")
@@ -125,8 +127,10 @@ class Settings:
     def validate(self) -> None:
         if self.llm_provider not in {"mock", "openai", "openai_chatgpt", "gemini", "anthropic", "openrouter"}:
             raise ValueError("LLM_PROVIDER must be 'mock', 'openai', 'openai_chatgpt', 'gemini', 'anthropic', or 'openrouter'")
-        if self.llm_provider in {"openai", "gemini", "anthropic", "openrouter"} and not self.llm_api_key:
+        if self.llm_provider in {"openai", "gemini", "openrouter"} and not self.llm_api_key:
             raise ValueError(f"LLM_API_KEY is required when LLM_PROVIDER={self.llm_provider}")
+        if self.llm_provider == "anthropic" and not self.llm_api_key and not self.anthropic_user_credentials:
+            raise ValueError("LLM_API_KEY is required when LLM_PROVIDER=anthropic")
         if self.llm_provider == "openai_chatgpt" and not self.chatgpt_oauth_enabled:
             raise ValueError("CHATGPT_OAUTH_ENABLED must be true when LLM_PROVIDER=openai_chatgpt")
         if self.llm_timeout_seconds <= 0:
