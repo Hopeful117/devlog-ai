@@ -159,6 +159,13 @@ du Repository Analysis puis de l'Implementation Plan est requise avant toute
 modification de code de production. Aucune validation live ne doit etre lancee
 avant configuration humaine des credentials et de la redirect URI.
 
+## Reconciliation documentaire
+
+Le statut `CLOSED - implemented, validated, and delivered` constate la
+livraison de la Story dans le repository. Il ne constitue pas a lui seul une
+approbation humaine de l'ADR-072, dont le statut `Proposed` reste donc
+inchangé jusqu'a une decision architecturale explicite.
+
 ## References
 
 - [ADR-006](../../decisions/ADR-006.md)

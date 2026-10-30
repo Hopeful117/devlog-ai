@@ -112,9 +112,16 @@ fourni par un client public n’est jamais suffisant sans validation Core.
 
 ## Regle de gouvernance
 
-Cette Story n’autorise ni l’usage d’un token OAuth par Core, ni une delegation
+Cette Story n'autorise ni l'usage d'un token OAuth par Core, ni une delegation
 implicite par metadata. Story 0160 ne peut pas etre declaree complete tant que
-la liaison securisee definie ici n’est pas implementee et testee.
+la liaison securisee definie ici n'est pas implementee et testee.
+
+## Reconciliation documentaire
+
+Le statut `CLOSED - implemented, validated, and delivered` constate la
+livraison de la Story dans le repository. Il ne constitue pas a lui seul une
+approbation humaine de l'ADR-073, dont le statut `Proposed` reste donc
+inchangé jusqu'a une decision architecturale explicite.
 
 ## References
 
