@@ -113,7 +113,8 @@ def get_task_processing_service() -> AiTaskProcessingService:
         callback_client=callback_client,
     )
     return AiTaskProcessingService(
-        insight_service, callback_client, event_service, decision_service, story_context_analysis_service
+        insight_service, callback_client, event_service, decision_service,
+        story_context_analysis_service, get_binding_registry()
     )
 
 

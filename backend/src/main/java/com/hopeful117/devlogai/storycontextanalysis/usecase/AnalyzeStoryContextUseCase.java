@@ -151,6 +151,12 @@ public class AnalyzeStoryContextUseCase {
         return submitPrepared(prepared, guidance, identity, principal, provider);
     }
 
+    public UUID executePrepared(
+            PreparedStoryContext prepared, Map<String, Object> guidance, String idempotencyKey,
+            AuthenticatedPrincipal principal) {
+        return executePrepared(prepared, guidance, idempotencyKey, principal, null);
+    }
+
     private UUID submitPrepared(
             PreparedStoryContext prepared, Map<String, Object> guidance, SubmissionIdentity identity) {
         return submitPrepared(prepared, guidance, identity, null, null);

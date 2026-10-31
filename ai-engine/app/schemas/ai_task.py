@@ -68,6 +68,10 @@ class PromptRequest(ContractModel):
     context_digest: str | None = Field(default=None, alias="contextDigest")
     selection_digest: str | None = Field(default=None, alias="selectionDigest")
     projection_digest: str | None = Field(default=None, alias="projectionDigest")
+    credential_binding_id: UUID | None = Field(default=None, alias="credentialBindingId")
+    provider: str | None = Field(default=None, min_length=1, max_length=100)
+    model_identifier: str | None = Field(default=None, alias="modelIdentifier",
+                                          min_length=1, max_length=255)
 
     @model_validator(mode="after")
     def validate_capability_identities(self):

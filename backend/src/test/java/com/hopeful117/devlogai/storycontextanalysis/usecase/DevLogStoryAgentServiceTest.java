@@ -43,7 +43,7 @@ class DevLogStoryAgentServiceTest {
                 "engineering-story-context-analysis", List.of("README.md"), "question"))
                 .thenReturn(mock(PreparedStoryContext.class));
         when(analyzeStoryContextUseCase.executePrepared(any(),
-                eq(Map.of("focus", "question")), eq("key"), any(), eq("chatgpt")))
+                eq(Map.of("focus", "question")), eq("key"), any()))
                 .thenReturn(taskId);
         when(aiTaskService.getById(taskId)).thenReturn(task(taskId, AiTaskStatus.PROCESSING));
 
@@ -55,7 +55,7 @@ class DevLogStoryAgentServiceTest {
         verify(analyzeStoryContextUseCase).prepare("project", null,
                 "engineering-story-context-analysis", List.of("README.md"), "question");
         verify(analyzeStoryContextUseCase).executePrepared(any(),
-                eq(Map.of("focus", "question")), eq("key"), eq(principal()), eq("chatgpt"));
+                eq(Map.of("focus", "question")), eq("key"), eq(principal()));
         verifyNoInteractions(analysisQueryService);
     }
 
@@ -67,7 +67,7 @@ class DevLogStoryAgentServiceTest {
                 eq("engineering-story-context-analysis"), any(), eq("question")))
                 .thenReturn(mock(PreparedStoryContext.class));
         when(analyzeStoryContextUseCase.executePrepared(any(),
-                eq(Map.of("focus", "question")), any(), any(), eq("chatgpt"))).thenReturn(taskId);
+                eq(Map.of("focus", "question")), any(), any())).thenReturn(taskId);
         when(aiTaskService.getById(taskId)).thenReturn(task);
         when(analysisQueryService.findResponseByAiTaskId(taskId))
                 .thenReturn(java.util.Optional.of(new StoryContextAnalysisResponse(null, Map.of())));

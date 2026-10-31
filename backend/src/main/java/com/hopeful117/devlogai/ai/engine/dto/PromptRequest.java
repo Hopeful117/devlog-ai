@@ -24,7 +24,10 @@ public record PromptRequest(
         Map<String, Object> metadata,
         String contextDigest,
         String selectionDigest,
-        String projectionDigest
+        String projectionDigest,
+        UUID credentialBindingId,
+        String provider,
+        String modelIdentifier
 ) {
     public PromptRequest(UUID requestId, UUID correlationId, UUID analysisId, UUID aiTaskId,
                          AiTaskType taskType, IntentDefinition intent, UserGuidance userGuidance,
@@ -33,7 +36,17 @@ public record PromptRequest(
         this(requestId, correlationId, analysisId, aiTaskId, taskType, intent, userGuidance,
                 selectedKnowledge, expectedOutputContract, groundingContract, metadata,
                 string(metadata, "contextDigest"), string(metadata, "selectionDigest"),
-                string(metadata, "projectionDigest"));
+                string(metadata, "projectionDigest"), null, null, null);
+    }
+
+    public PromptRequest(UUID requestId, UUID correlationId, UUID analysisId, UUID aiTaskId,
+                         AiTaskType taskType, IntentDefinition intent, UserGuidance userGuidance,
+                         Map<String, Object> selectedKnowledge, Map<String, Object> expectedOutputContract,
+                         Map<String, Object> groundingContract, Map<String, Object> metadata,
+                         String contextDigest, String selectionDigest, String projectionDigest) {
+        this(requestId, correlationId, analysisId, aiTaskId, taskType, intent, userGuidance,
+                selectedKnowledge, expectedOutputContract, groundingContract, metadata,
+                contextDigest, selectionDigest, projectionDigest, null, null, null);
     }
     private static String string(Map<String, Object> map, String key) {
         Object value = map == null ? null : map.get(key);

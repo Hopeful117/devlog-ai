@@ -68,6 +68,10 @@ class StoryContextAnalysisGenerationService:
         self._prompt_builder = prompt_builder
         self._callback_client = callback_client
 
+    @property
+    def provider(self) -> LlmProvider:
+        return self._provider
+
     async def process(
         self,
         submission: AiTaskSubmissionRequest,

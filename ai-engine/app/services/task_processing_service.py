@@ -10,6 +10,8 @@ from app.services.insight_generation_service import InsightGenerationService
 from app.services.engineering_event_generation_service import EngineeringEventGenerationService
 from app.services.decision_generation_service import EngineeringDecisionGenerationService
 from app.services.story_context_analysis_generation_service import StoryContextAnalysisGenerationService
+from app.services.binding_registry import BindingRegistry
+from app.services.provider_identity import engine_provider
 
 
 class AiTaskProcessingService:
@@ -20,18 +22,22 @@ class AiTaskProcessingService:
         engineering_event_service: EngineeringEventGenerationService | None = None,
         decision_generation_service: EngineeringDecisionGenerationService | None = None,
         story_context_analysis_service: StoryContextAnalysisGenerationService | None = None,
+        binding_registry: BindingRegistry | None = None,
     ) -> None:
         self._insight_generation_service = insight_generation_service
         self._callback_client = callback_client
         self._engineering_event_service = engineering_event_service
         self._decision_generation_service = decision_generation_service
         self._story_context_analysis_service = story_context_analysis_service
+        self._binding_registry = binding_registry
 
     async def process(
         self,
         submission: AiTaskSubmissionRequest,
         external_job_id: UUID,
     ) -> None:
+        if submission.task_type == AiTaskType.STORY_CONTEXT_ANALYSIS:
+            self.authorize_submission(submission)
         if submission.task_type == AiTaskType.INSIGHT_GENERATION:
             await self._insight_generation_service.process(
                 submission,
@@ -69,3 +75,20 @@ class AiTaskProcessingService:
                 ),
             ),
         )
+
+    def authorize_submission(self, submission: AiTaskSubmissionRequest) -> None:
+        """Reject Story Agent work unless Core supplied the exact task binding."""
+        if self._binding_registry is None or submission.credential_binding_id is None:
+            raise ValueError("Core-issued credential binding is required")
+        if submission.provider is None or submission.model_identifier is None:
+            raise ValueError("Core-authorized provider and model are required")
+        provider = engine_provider(submission.provider)
+        self._binding_registry.resolve(
+            submission.credential_binding_id, submission.ai_task_id, provider
+        )
+        configured_provider = getattr(self._story_context_analysis_service, "provider", None)
+        if configured_provider is not None:
+            if engine_provider(configured_provider.provider_name) != provider:
+                raise ValueError("Core-authorized provider does not match the configured provider")
+            if configured_provider.model_identifier != submission.model_identifier:
+                raise ValueError("Core-authorized model does not match the configured provider")
