@@ -24,6 +24,29 @@
       ],
       "redirectUris": ["http://localhost/*"],
       "webOrigins": ["http://localhost"]
+    },
+    {
+      "clientId": "devlog-mcp-opencode",
+      "name": "DevLog MCP OpenCode Agent",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "protocolMappers": [
+        {
+          "name": "devlog-core-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "devlog-core",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "roles": {

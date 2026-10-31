@@ -43,6 +43,45 @@ def make_service(tmp_path, enabled=True, callback_attempts=5):
     )
 
 
+@pytest.mark.asyncio
+async def test_refresh_if_expired_replaces_access_token(tmp_path):
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {"access_token": "refreshed", "expires_in": 3600}
+
+    class Client:
+        async def post(self, url, data):
+            assert url == "https://auth.example/token"
+            assert data["grant_type"] == "refresh_token"
+            return Response()
+
+    service = make_service(tmp_path)
+    service._http_client = Client()
+    service._credentials.put(StoredCredential(
+        "chatgpt-expired", "chatgpt", "old", "refresh", datetime.now(timezone.utc) - timedelta(seconds=1),
+        "resource.invoke chatgpt.tokens.use.direct", "client-id", "subject",
+    ))
+
+    refreshed = await service.refresh_if_expired("chatgpt-expired")
+
+    assert refreshed.access_token == "refreshed"
+    assert refreshed.refresh_token == "refresh"
+
+
+@pytest.mark.asyncio
+async def test_refresh_if_expired_requires_reauthorization_without_refresh_token(tmp_path):
+    service = make_service(tmp_path)
+    service._credentials.put(StoredCredential(
+        "chatgpt-expired", "chatgpt", "old", None, datetime.now(timezone.utc) - timedelta(seconds=1),
+        "resource.invoke chatgpt.tokens.use.direct", "client-id", "subject",
+    ))
+
+    with pytest.raises(OAuthError, match="requires reauthorization"):
+        await service.refresh_if_expired("chatgpt-expired")
+
+
 def test_oauth_transaction_can_be_released_after_a_failed_exchange(tmp_path):
     service = make_service(tmp_path)
     transaction = OAuthTransaction(

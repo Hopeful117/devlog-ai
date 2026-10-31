@@ -118,16 +118,35 @@ class OpenAiChatGptProvider:
                         data_lines.append(line[5:].strip())
                     elif not line and data_lines:
                         data = json.loads("\n".join(data_lines))
-                        if event_type == "response.output_text.delta":
+                        received_type = event_type or data.get("type")
+                        if received_type == "response.output_text.delta":
                             chunks.append(data.get("delta", ""))
-                        elif event_type in {"response.failed", "response.incomplete", "error"}:
-                            raise ChatGptProviderError("ChatGPT response did not complete")
-                        elif event_type == "response.completed":
+                        elif received_type in {"response.failed", "response.incomplete", "error"}:
+                            raise ChatGptProviderError(
+                                self._incomplete_response_message(received_type, data)
+                            )
+                        elif received_type == "response.completed":
                             completed = True
                         event_type, data_lines = None, []
         if not completed:
             raise ChatGptProviderError("ChatGPT response did not complete")
         return "".join(chunks)
+
+    @staticmethod
+    def _incomplete_response_message(event_type: str, data: dict) -> str:
+        """Return bounded terminal diagnostics without exposing provider content."""
+        response = data.get("response") if isinstance(data.get("response"), dict) else data
+        details = response.get("incomplete_details") if isinstance(response, dict) else None
+        reason = details.get("reason") if isinstance(details, dict) else None
+        if isinstance(reason, str) and reason:
+            reason = re.sub(r"[^A-Za-z0-9_.-]", "_", reason)[:80]
+            return f"ChatGPT response did not complete ({event_type}; reason={reason})"
+        error = response.get("error") if isinstance(response, dict) else None
+        code = error.get("code") if isinstance(error, dict) else None
+        if isinstance(code, str) and code:
+            code = re.sub(r"[^A-Za-z0-9_.-]", "_", code)[:80]
+            return f"ChatGPT response did not complete ({event_type}; code={code})"
+        return f"ChatGPT response did not complete ({event_type})"
 
     @staticmethod
     def _provider_error_message(status_code: int, response: httpx.Response) -> str:

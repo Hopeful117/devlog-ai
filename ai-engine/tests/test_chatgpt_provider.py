@@ -68,6 +68,35 @@ async def test_stream_requires_completed_event(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_stream_reports_bounded_incomplete_reason(monkeypatch):
+    class IncompleteResponse(StreamResponse):
+        async def aiter_lines(self):
+            for line in (
+                'data: {"type":"response.incomplete","response":{"incomplete_details":{"reason":"max_output_tokens"}}}',
+                "",
+            ):
+                yield line
+
+    class IncompleteContext(StreamContext):
+        async def __aenter__(self):
+            return IncompleteResponse()
+
+    class IncompleteClient(FakeClient):
+        def stream(self, method, url, *, headers, json):
+            return IncompleteContext()
+
+    monkeypatch.setattr("app.providers.chatgpt.httpx.AsyncClient", IncompleteClient)
+    provider = OpenAiChatGptProvider(
+        resolver=None, endpoint="https://api.openai.com/v1/responses",
+        model="test", timeout_seconds=1, token_endpoint=None,
+        client_id=None, resource=None, max_output_tokens=2000,
+    )
+
+    with pytest.raises(ChatGptProviderError, match="reason=max_output_tokens"):
+        await provider._stream("fixture-token", {"store": False})
+
+
+@pytest.mark.asyncio
 async def test_provider_uses_core_authorized_model_and_output_limit(monkeypatch):
     captured: dict[str, object] = {}
 

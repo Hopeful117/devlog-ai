@@ -21,15 +21,45 @@ import java.util.Optional;
 @Component
 public class RequestAuthenticatedPrincipalResolver implements AuthenticatedPrincipalResolver {
     private final String issuer;
+    private final String mcpActorClientId;
+    private final String mcpAgentPrincipalId;
+    private final String delegationAudience;
+    private final McpDelegationGrantService delegationService;
 
     public RequestAuthenticatedPrincipalResolver() {
-        this.issuer = "";
+        this("", "", "", "devlog-mcp", null);
+    }
+
+    public RequestAuthenticatedPrincipalResolver(
+            String issuer) {
+        this(issuer, "", "", "devlog-mcp", null);
+    }
+
+    public RequestAuthenticatedPrincipalResolver(
+            String issuer, String mcpActorClientId, String delegationAudience,
+            McpDelegationGrantService delegationService) {
+        this(issuer, mcpActorClientId, "", delegationAudience, delegationService, true);
     }
 
     @Autowired
     public RequestAuthenticatedPrincipalResolver(
-            @Value("${devlog.security.oidc.issuer-uri:}") String issuer) {
+            @Value("${devlog.security.oidc.issuer-uri:}") String issuer,
+            @Value("${devlog.security.mcp.actor-client-id:}") String mcpActorClientId,
+            @Value("${devlog.security.mcp.agent-principal-id:}") String mcpAgentPrincipalId,
+            @Value("${devlog.security.mcp.delegation-audience:devlog-mcp}") String delegationAudience,
+            McpDelegationGrantService delegationService) {
+        this(issuer, mcpActorClientId, mcpAgentPrincipalId, delegationAudience, delegationService, true);
+    }
+
+    private RequestAuthenticatedPrincipalResolver(
+            String issuer, String mcpActorClientId, String mcpAgentPrincipalId,
+            String delegationAudience,
+            McpDelegationGrantService delegationService, boolean ignored) {
         this.issuer = issuer == null ? "" : issuer.trim();
+        this.mcpActorClientId = mcpActorClientId == null ? "" : mcpActorClientId.trim();
+        this.mcpAgentPrincipalId = mcpAgentPrincipalId == null ? "" : mcpAgentPrincipalId.trim();
+        this.delegationAudience = delegationAudience == null ? "" : delegationAudience.trim();
+        this.delegationService = delegationService;
     }
 
     @Override
@@ -48,21 +78,10 @@ public class RequestAuthenticatedPrincipalResolver implements AuthenticatedPrinc
                 return Optional.empty();
             }
             if (authentication instanceof JwtAuthenticationToken jwtAuthenticationToken) {
-                String principalId = jwtAuthenticationToken.getName();
-                if (principalId == null || principalId.isBlank()) {
-                    principalId = jwtAuthenticationToken.getToken().getSubject();
-                }
-                if (principalId == null || principalId.isBlank()) {
-                    return Optional.empty();
-                }
-                return Optional.of(new AuthenticatedPrincipal(principalId, PrincipalKind.HUMAN, issuer));
+                return resolveJwt(jwtAuthenticationToken.getToken(), request, true);
             }
             if (authentication.getPrincipal() instanceof Jwt jwt) {
-                if (!issuer.isBlank() && !issuer.equals(jwt.getIssuer())
-                        || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
-                    return Optional.empty();
-                }
-                return Optional.of(new AuthenticatedPrincipal(jwt.getSubject(), PrincipalKind.HUMAN, issuer));
+                return resolveJwt(jwt, request, false);
             }
             if (authentication.getPrincipal() instanceof OAuth2AuthenticatedPrincipal oauth2Principal) {
                 String principalId = oauth2Principal.getName();
@@ -78,6 +97,51 @@ public class RequestAuthenticatedPrincipalResolver implements AuthenticatedPrinc
             return Optional.of(new AuthenticatedPrincipal(principalId, PrincipalKind.HUMAN, issuer));
         }
         return Optional.of(corePrincipal.authenticatedPrincipal());
+    }
+
+    private Optional<AuthenticatedPrincipal> resolveJwt(
+            Jwt jwt, HttpServletRequest request, boolean alreadyValidated) {
+        if (jwt == null || (!alreadyValidated && !issuer.isBlank()
+                && !issuer.equals(String.valueOf(jwt.getIssuer())))
+                || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
+            return Optional.empty();
+        }
+        String actorId = claim(jwt, "azp");
+        if (actorId == null) actorId = claim(jwt, "client_id");
+        boolean clientCredentials = "client_credentials".equals(normalizedGrantType(claim(jwt, "gty")));
+        if (clientCredentials && (mcpActorClientId.isBlank() || !mcpActorClientId.equals(actorId))) {
+            return Optional.empty();
+        }
+        if (actorId != null && actorId.equals(mcpActorClientId) && !mcpActorClientId.isBlank()) {
+            String delegation = request.getHeader("X-DevLog-Delegation");
+            if (delegation == null || delegation.isBlank()) {
+                if (mcpAgentPrincipalId.isBlank()) return Optional.empty();
+                return Optional.of(new AuthenticatedPrincipal(
+                        mcpAgentPrincipalId, PrincipalKind.AI_AGENT, issuer,
+                        actorId, null, null, null));
+            }
+            if (delegationService == null || delegationAudience.isBlank()) return Optional.empty();
+            try {
+                McpDelegationGrantService.DelegatedIdentity identity = delegationService.validate(
+                        delegation, actorId, delegationAudience);
+                return Optional.of(new AuthenticatedPrincipal(
+                        identity.humanPrincipalId(), PrincipalKind.HUMAN, issuer,
+                        identity.technicalActorId(), identity.grantId().toString(),
+                        identity.projectId().toString(), identity.scopes()));
+            } catch (RuntimeException ignored) {
+                return Optional.empty();
+            }
+        }
+        return Optional.of(new AuthenticatedPrincipal(jwt.getSubject(), PrincipalKind.HUMAN, issuer));
+    }
+
+    private String claim(Jwt jwt, String name) {
+        Object value = jwt.getClaims().get(name);
+        return value instanceof String string && !string.isBlank() ? string : null;
+    }
+
+    private String normalizedGrantType(String grantType) {
+        return grantType == null ? null : grantType.trim().toLowerCase().replace('-', '_');
     }
 
     /** Authentication integration boundary for an HTTP security module. */

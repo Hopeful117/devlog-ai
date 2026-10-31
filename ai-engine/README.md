@@ -56,7 +56,15 @@ records provider/model and prompt digest metadata for Core persistence.
 
 ## LLM configuration
 
-The default provider is deterministic and requires no API key:
+The runtime default provider is ChatGPT OAuth:
+
+```bash
+LLM_PROVIDER=openai_chatgpt \
+CHATGPT_OAUTH_ENABLED=true \
+uvicorn app.main:app --reload
+```
+
+For deterministic credential-free tests, explicitly select the mock provider:
 
 ```bash
 LLM_PROVIDER=mock uvicorn app.main:app --reload
@@ -74,7 +82,7 @@ uvicorn app.main:app --reload
 Additional settings are `LLM_TIMEOUT_SECONDS`, `LLM_MAX_OUTPUT_TOKENS`,
 `CORE_BASE_URL`, and `CORE_CALLBACK_TIMEOUT_SECONDS`.
 
-Sign in with ChatGPT is opt-in with `LLM_PROVIDER=openai_chatgpt` and requires
+The ChatGPT OAuth runtime requires
 the existing OAuth encryption key, redirect URI, issuer/JWKS settings, and
 `CHATGPT_OAUTH_ENABLED=true` plus `DEVLOG_SERVICE_AUTH_SECRET`. OAuth access, refresh, and ID tokens remain
 encrypted in the AI Engine. Core receives only an opaque credential handle,

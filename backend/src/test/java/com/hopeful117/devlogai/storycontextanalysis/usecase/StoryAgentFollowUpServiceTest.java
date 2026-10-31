@@ -9,9 +9,13 @@ import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
+import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
 import com.hopeful117.devlogai.authorization.PrincipalKind;
 import com.hopeful117.devlogai.authorization.ProjectMembershipRepository;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
+import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.project.entity.Project;
+import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
@@ -49,6 +53,7 @@ class StoryAgentFollowUpServiceTest {
 
     @Mock AiTaskRepository taskRepository;
     @Mock ProjectMembershipRepository membershipRepository;
+    @Mock ProjectRepository projectRepository;
     @Mock AiTaskService aiTaskService;
     @Mock AIEngineClient aiEngineClient;
     @Mock IntentCatalog intentCatalog;
@@ -57,7 +62,11 @@ class StoryAgentFollowUpServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new StoryAgentFollowUpService(taskRepository, membershipRepository, aiTaskService,
+        when(projectRepository.findById(PROJECT_ID)).thenReturn(Optional.of(Project.builder()
+                .id(PROJECT_ID).name("project").slug("project").status(ProjectStatus.ACTIVE).build()));
+        service = new StoryAgentFollowUpService(taskRepository,
+                new CoreProjectAuthorizationService(projectRepository, membershipRepository, "", ""),
+                aiTaskService,
                 aiEngineClient, intentCatalog, new ObjectMapper(), new StoryContextDigestService(new ObjectMapper()),
                 Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC));
         parent = parent();

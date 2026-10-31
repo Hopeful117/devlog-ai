@@ -7,9 +7,13 @@ import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.mapper.AiTaskMapper;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
+import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
 import com.hopeful117.devlogai.authorization.PrincipalKind;
 import com.hopeful117.devlogai.authorization.ProjectMembershipRepository;
 import com.hopeful117.devlogai.authorization.ProjectRole;
+import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.project.entity.Project;
+import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,12 +42,16 @@ class AuthorizedStoryContextSnapshotReaderTest {
 
     @Mock AiTaskRepository taskRepository;
     @Mock ProjectMembershipRepository membershipRepository;
+    @Mock ProjectRepository projectRepository;
     @Mock AiTaskMapper mapper;
     private AuthorizedStoryContextSnapshotReader reader;
 
     @BeforeEach
     void setUp() {
-        reader = new AuthorizedStoryContextSnapshotReader(taskRepository, membershipRepository,
+        lenient().when(projectRepository.findById(PROJECT_ID)).thenReturn(Optional.of(Project.builder()
+                .id(PROJECT_ID).name("project").slug("project").status(ProjectStatus.ACTIVE).build()));
+        reader = new AuthorizedStoryContextSnapshotReader(taskRepository,
+                new CoreProjectAuthorizationService(projectRepository, membershipRepository, "", ""),
                 mapper, Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC));
     }
 
@@ -96,6 +104,20 @@ class AuthorizedStoryContextSnapshotReaderTest {
 
         assertThrows(EntityNotFoundException.class,
                 () -> reader.readStoryContextSnapshot(PRINCIPAL, TASK_ID));
+        verifyNoInteractions(membershipRepository, mapper);
+    }
+
+    @Test
+    void delegatedPrincipalCannotReadAnotherProjectSnapshot() {
+        AuthenticatedPrincipal delegated = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                UUID.randomUUID().toString(), UUID.randomUUID().toString(),
+                "MCP_STORY_AGENT_READ_RESULT");
+        when(taskRepository.findStoryContextSnapshotIdentity(TASK_ID))
+                .thenReturn(Optional.of(identity(Instant.parse("2026-09-02T00:00:00Z"))));
+
+        assertThrows(EntityNotFoundException.class,
+                () -> reader.readStoryContextSnapshot(delegated, TASK_ID));
         verifyNoInteractions(membershipRepository, mapper);
     }
 

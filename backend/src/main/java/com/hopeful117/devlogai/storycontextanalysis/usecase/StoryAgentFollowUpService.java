@@ -8,7 +8,7 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
-import com.hopeful117.devlogai.authorization.ProjectMembershipRepository;
+import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
 import com.hopeful117.devlogai.authorization.ProjectRole;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
@@ -44,7 +44,7 @@ public class StoryAgentFollowUpService {
             "focus", "audience", "levelOfDetail", "writingStyle", "outputContext", "priorities");
 
     private final AiTaskRepository aiTaskRepository;
-    private final ProjectMembershipRepository membershipRepository;
+    private final CoreProjectAuthorizationService authorizationService;
     private final AiTaskService aiTaskService;
     private final AIEngineClient aiEngineClient;
     private final IntentCatalog intentCatalog;
@@ -141,6 +141,9 @@ public class StoryAgentFollowUpService {
 
     private void authorize(AuthenticatedPrincipal principal, UUID snapshotId) {
         if (principal == null) throw new com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException();
+        if (!principal.hasDelegatedScope("MCP_STORY_AGENT_EXECUTE")) {
+            throw notFound(snapshotId);
+        }
         var identity = aiTaskRepository.findStoryContextSnapshotIdentity(snapshotId)
                 .orElseThrow(() -> notFound(snapshotId));
         Instant expiryOrigin = identity.createdAt();
@@ -151,8 +154,8 @@ public class StoryAgentFollowUpService {
         }
         if (identity.taskType() != AiTaskType.STORY_CONTEXT_ANALYSIS
                 || expiryOrigin == null
-                || !membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
-                principal.principalId(), identity.projectId(), READ_ROLES)
+                || !authorizationService.isAuthorized(principal, identity.projectId(),
+                "MCP_STORY_AGENT_EXECUTE")
                 || !clock.instant().isBefore(expiryOrigin.plus(SNAPSHOT_TTL))) {
             throw notFound(snapshotId);
         }

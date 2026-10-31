@@ -35,6 +35,8 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-devlog_ai}
       DB_USERNAME: ${POSTGRES_USER:-devlog}
@@ -46,8 +48,12 @@ services:
       AI_ENGINE_READ_TIMEOUT: ${AI_ENGINE_READ_TIMEOUT:-100s}
       DEVLOG_SERVICE_AUTH_SECRET: ${DEVLOG_SERVICE_AUTH_SECRET:-}
       DEVICE_BASE_URL: ${DEVICE_BASE_URL:-http://127.0.0.1:65535}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8080/realms/devlog}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://host.docker.internal:18084/realms/devlog}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-devlog-core}
+      KEYCLOAK_MCP_ACTOR_CLIENT_ID: ${KEYCLOAK_MCP_ACTOR_CLIENT_ID:-devlog-mcp-opencode}
+      KEYCLOAK_MCP_AGENT_PRINCIPAL_ID: ${KEYCLOAK_MCP_AGENT_PRINCIPAL_ID:-}
+      KEYCLOAK_MCP_AGENT_PROJECTS: ${KEYCLOAK_MCP_AGENT_PROJECTS:-devlog-ai}
+      DEVLOG_MCP_DELEGATION_AUDIENCE: ${DEVLOG_MCP_DELEGATION_AUDIENCE:-devlog-mcp}
 
       SERVER_PORT: 8080
 
@@ -76,7 +82,7 @@ services:
     command: ["/bin/sh", "-c", "chown -R devlog:devlog /data && exec su devlog -s /bin/sh -c 'uvicorn app.main:app --host 0.0.0.0 --port 8000'"]
 
     environment:
-      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai_chatgpt}
       LLM_MODEL: ${LLM_MODEL:-gpt-5.6-luna}
       LLM_API_KEY: ${LLM_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
@@ -100,7 +106,7 @@ services:
       DEVLOG_BINDING_STORE_PATH: ${DEVLOG_BINDING_STORE_PATH:-/data/ai-bindings.sqlite3}
       DEVLOG_CREDENTIAL_STORE_PATH: ${DEVLOG_CREDENTIAL_STORE_PATH:-/data/ai-credentials.sqlite3}
       DEVLOG_CREDENTIAL_ENCRYPTION_KEY: ${DEVLOG_CREDENTIAL_ENCRYPTION_KEY:-}
-      CHATGPT_OAUTH_ENABLED: ${CHATGPT_OAUTH_ENABLED:-false}
+      CHATGPT_OAUTH_ENABLED: ${CHATGPT_OAUTH_ENABLED:-true}
       CHATGPT_AGENT_NAME: ${CHATGPT_AGENT_NAME:-DevLog AI}
       CHATGPT_EXT_AGENT_HOST_ID: ${CHATGPT_EXT_AGENT_HOST_ID:-}
       CHATGPT_AUTHORIZATION_ENDPOINT: ${CHATGPT_AUTHORIZATION_ENDPOINT:-https://auth.openai.com/api/accounts/authorize}

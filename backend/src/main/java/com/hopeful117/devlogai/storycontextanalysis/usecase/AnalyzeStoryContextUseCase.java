@@ -9,6 +9,7 @@ import com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
+import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
@@ -43,6 +44,7 @@ public class AnalyzeStoryContextUseCase {
     private static final String INTENT_VERSION = "v1";
 
     private final ProjectRepository projectRepository;
+    private final CoreProjectAuthorizationService authorizationService;
     private final EngineeringStoryRepository storyRepository;
     private final StoryContextPreparationService preparationService;
     private final IntentCatalog intentCatalog;
@@ -63,6 +65,14 @@ public class AnalyzeStoryContextUseCase {
     }
 
     public Map<String, Object> project(String projectSlug, UUID storyId, String intent, List<String> files) {
+        return prepare(projectSlug, storyId, intent, files).projection();
+    }
+
+    public Map<String, Object> project(String projectSlug, UUID storyId, String intent,
+                                       List<String> files, AuthenticatedPrincipal principal) {
+        Project project = projectRepository.findBySlug(projectSlug)
+                .orElseThrow(() -> new EntityNotFoundException("Project", projectSlug));
+        authorizePrincipal(principal, project, "MCP_ENGINEERING_CONTEXT_READ");
         return prepare(projectSlug, storyId, intent, files).projection();
     }
 
@@ -108,6 +118,7 @@ public class AnalyzeStoryContextUseCase {
     ) {
         Project project = projectRepository.findBySlug(projectSlug)
                 .orElseThrow(() -> new EntityNotFoundException("Project", projectSlug));
+        authorizePrincipal(principal, project, "MCP_STORY_AGENT_EXECUTE");
         EngineeringStory story = storyId == null ? null : storyRepository.findById(storyId)
                 .orElseThrow(() -> new EntityNotFoundException("EngineeringStory", storyId));
         if (story != null && !story.getProject().getId().equals(project.getId())) {
@@ -140,6 +151,9 @@ public class AnalyzeStoryContextUseCase {
     public UUID executePrepared(
             PreparedStoryContext prepared, Map<String, Object> guidance, String idempotencyKey,
             AuthenticatedPrincipal principal, String provider) {
+        Project project = projectRepository.findBySlug(prepared.projectSlug())
+                .orElseThrow(() -> new EntityNotFoundException("Project", prepared.projectSlug()));
+        authorizePrincipal(principal, project, "MCP_STORY_AGENT_EXECUTE");
         SubmissionIdentity identity = submissionIdentity(
                 prepared.projectSlug(), prepared.storyId(), prepared.intent(), prepared.files(),
                 prepared.question(), guidance, idempotencyKey);
@@ -149,6 +163,13 @@ public class AnalyzeStoryContextUseCase {
         }
 
         return submitPrepared(prepared, guidance, identity, principal, provider);
+    }
+
+    private void authorizePrincipal(
+            AuthenticatedPrincipal principal, Project project, String requiredScope) {
+        if (!authorizationService.isAuthorized(principal, project, requiredScope)) {
+            throw new EntityNotFoundException("Project", project.getSlug());
+        }
     }
 
     public UUID executePrepared(

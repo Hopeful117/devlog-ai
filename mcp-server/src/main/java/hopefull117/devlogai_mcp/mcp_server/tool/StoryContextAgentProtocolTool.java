@@ -1,7 +1,6 @@
 package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
-import hopefull117.devlogai_mcp.mcp_server.service.StoryContextAgentCallbackSigner;
 import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
 import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,6 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class StoryContextAgentProtocolTool {
     private final DevlogProjectContextClient client;
-    private final StoryContextAgentCallbackSigner callbackSigner;
     private final ObjectMapper objectMapper;
     private final McpAuthenticatedPrincipalProvider principalProvider;
     private final ResourceSupport resourceSupport;
@@ -45,7 +43,7 @@ public class StoryContextAgentProtocolTool {
                 .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
         requireBearer(principal);
         return write(client.getStoryContextAgentProjectionAuthenticated(projectSlug, storyId, files, intent,
-                principal.bearerToken()));
+                principal.bearerToken(), principal.delegationToken()));
     }
 
     @McpTool(name = "story_context_agent_submit_task",
@@ -63,16 +61,8 @@ public class StoryContextAgentProtocolTool {
         return write(client.submitStoryContextAgentTask(projectSlug, storyId,
                 principal.bearerToken(),
                 null,
+                principal.delegationToken(),
                 new DevlogProjectContextClient.SubmitRequest(intent, files, guidance)));
-    }
-
-    @McpTool(name = "story_context_agent_callback",
-            description = "Forward a validated Story Context Agent callback to Core")
-    public String callback(
-            @McpArg(description = "AI task and snapshot UUID", required = true) UUID aiTaskId,
-            @McpArg(description = "Versioned callback payload", required = true) Map<String, Object> request) {
-        String signature = callbackSigner.sign(aiTaskId, request);
-        return write(client.callbackStoryContextAgentTask(aiTaskId, signature, request));
     }
 
     public String getSnapshot(
@@ -90,7 +80,8 @@ public class StoryContextAgentProtocolTool {
         requireBearer(principal);
         return resourceSupport.getAuthorizedSnapshot(
                 () -> write(client.getStoryContextAgentSnapshot(aiTaskId, principal.principalId(),
-                        principal.kind().name(), principal.authenticationSource(), principal.bearerToken())),
+                        principal.kind().name(), principal.authenticationSource(), principal.bearerToken(),
+                        principal.delegationToken())),
                 "Story Context snapshot '%s' not found".formatted(aiTaskId));
     }
 
@@ -114,6 +105,7 @@ public class StoryContextAgentProtocolTool {
         return resourceSupport.submitAuthorizedSnapshot(
                 () -> write(client.submitStoryContextAgentFollowUp(snapshotId, principal.principalId(),
                         principal.kind().name(), principal.authenticationSource(), principal.bearerToken(),
+                        principal.delegationToken(),
                         new DevlogProjectContextClient.FollowUpRequest(question, guidance))),
                 "Story Context snapshot '%s' not found".formatted(snapshotId));
     }
