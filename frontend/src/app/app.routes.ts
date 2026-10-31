@@ -17,6 +17,13 @@ export const routes: Routes = [
     component: WorkspaceNavigationPage,
   },
   {
+    path: 'settings/ai',
+    loadComponent: () =>
+      import('./features/ai-configuration/simple-ai-configuration-page').then(
+        (module) => module.SimpleAiConfigurationPage,
+      ),
+  },
+  {
     path: 'projects/:id',
     loadComponent: () =>
       import('./features/workspace/project-workspace-layout').then(

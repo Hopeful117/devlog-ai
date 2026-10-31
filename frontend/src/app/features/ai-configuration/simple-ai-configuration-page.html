@@ -1,0 +1,144 @@
+<section class="configuration-page" aria-labelledby="configuration-title">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">AI settings</p>
+      <h1 id="configuration-title">Connect your AI assistant</h1>
+      <p>
+        Choose a provider, accept its recommended model, and test the connection without exposing
+        credentials.
+      </p>
+    </div>
+    @if (configuration(); as current) {
+      <span
+        class="badge"
+        [class.badge--success]="current.state === 'READY'"
+        [class.badge--warning]="current.state !== 'READY'"
+      >
+        {{ stateLabel(current.state) }}
+      </span>
+    }
+  </header>
+
+  @if (loading()) {
+    <p role="status">Loading AI configuration…</p>
+  } @else {
+    @if (error()) {
+      <div class="inline-message inline-message--error" role="alert">{{ error() }}</div>
+    }
+    @if (notice()) {
+      <div class="inline-message" role="status">{{ notice() }}</div>
+    }
+
+    <div class="configuration-grid">
+      <section class="panel setup-panel" aria-labelledby="provider-title">
+        <p class="eyebrow">Simple setup</p>
+        <h2 id="provider-title">Choose a connection</h2>
+        <div class="provider-options" role="radiogroup" aria-label="AI provider">
+          @for (provider of userProviders(); track provider.providerId) {
+            <button
+              type="button"
+              class="provider-option"
+              [class.provider-option--selected]="selectedProvider() === provider.providerId"
+              [attr.aria-checked]="selectedProvider() === provider.providerId"
+              role="radio"
+              (click)="selectProvider(provider.providerId)"
+            >
+              <strong>{{ provider.displayName }}</strong>
+              <span>{{
+                provider.authenticationMethods.includes('OAUTH')
+                  ? 'Secure OAuth connection'
+                  : 'API key connection'
+              }}</span>
+            </button>
+          }
+        </div>
+
+        @if (selectedEntry(); as provider) {
+          <div class="model-selection">
+            <label for="ai-model">Model</label>
+            <select
+              id="ai-model"
+              [value]="selectedModel()"
+              (change)="selectModel($any($event.target).value)"
+            >
+              @for (model of selectedModels(); track model.identifier) {
+                <option [value]="model.identifier">{{ model.displayName }}</option>
+              }
+            </select>
+            @if (
+              provider.recommendedModel === selectedModel() &&
+              modelSelectionOrigin() === 'RECOMMENDED'
+            ) {
+              <p class="field-hint">
+                Recommended by DevLog. You can choose another model explicitly.
+              </p>
+            } @else {
+              <p class="field-hint">
+                Explicit selection. DevLog will not replace it automatically.
+              </p>
+            }
+          </div>
+        }
+
+        <div class="form-actions">
+          <button type="button" (click)="connect()" [disabled]="busy()">
+            {{
+              busy()
+                ? 'Working…'
+                : configuration()?.state === 'REAUTH_REQUIRED'
+                  ? 'Reconnect'
+                  : 'Connect'
+            }}
+          </button>
+          <button class="secondary-button" type="button" (click)="save()" [disabled]="busy()">
+            Save model choice
+          </button>
+        </div>
+      </section>
+
+      <section class="panel status-panel" aria-labelledby="status-title">
+        <p class="eyebrow">Connection status</p>
+        <h2 id="status-title">{{ stateLabel(configuration()?.state ?? null) }}</h2>
+        <p>
+          Credentials are stored and resolved by the governed service boundary. This page never
+          displays them.
+        </p>
+
+        @if (apiKeyEnrollment()) {
+          <form class="api-key-form" (ngSubmit)="submitApiKey()" novalidate>
+            <label for="anthropic-api-key">Anthropic API key</label>
+            <input
+              id="anthropic-api-key"
+              name="apiKey"
+              type="password"
+              autocomplete="off"
+              [ngModel]="apiKey()"
+              (ngModelChange)="apiKey.set($event)"
+            />
+            <p class="field-hint">Used once for secure enrollment, then cleared from this page.</p>
+            <div class="form-actions">
+              <button type="submit" [disabled]="busy()">Save API key</button>
+              <button
+                class="secondary-button"
+                type="button"
+                (click)="cancelApiKey()"
+                [disabled]="busy()"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        } @else {
+          <button
+            type="button"
+            class="test-button"
+            (click)="test()"
+            [disabled]="busy() || configuration()?.state === 'NOT_CONFIGURED'"
+          >
+            {{ busy() ? 'Testing…' : 'Test configuration' }}
+          </button>
+        }
+      </section>
+    </div>
+  }
+</section>

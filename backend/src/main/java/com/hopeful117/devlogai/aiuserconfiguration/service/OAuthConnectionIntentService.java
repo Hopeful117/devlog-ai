@@ -1,6 +1,5 @@
 package com.hopeful117.devlogai.aiuserconfiguration.service;
 
-import com.hopeful117.devlogai.ai.engine.config.AIEngineProperties;
 import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialAssociation;
 import com.hopeful117.devlogai.aicredentialbinding.model.AiProviderIdentity;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiCredentialAssociationService;
@@ -8,6 +7,7 @@ import com.hopeful117.devlogai.aicredentialbinding.service.AiEngineCredentialAss
 import com.hopeful117.devlogai.aiuserconfiguration.entity.OAuthConnectionIntent;
 import com.hopeful117.devlogai.aiuserconfiguration.repository.OAuthConnectionIntentRepository;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
+import com.hopeful117.devlogai.authorization.PrincipalKind;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,12 +30,13 @@ public class OAuthConnectionIntentService {
     private final OAuthConnectionIntentRepository repository;
     private final AiCredentialAssociationService associationService;
     private final AiEngineCredentialAssociationClient aiEngineClient;
-    private final AIEngineProperties aiEngineProperties;
     private final Clock clock;
     @Value("${devlog.service-auth.secret:}")
     private String serviceSecret;
     @Value("${oauth.connection-intent.ttl:PT5M}")
     private Duration intentTtl;
+    @Value("${ai-engine.public-base-url:}")
+    private String publicBaseUrl;
 
     @Transactional
     public AuthorizationStart start(AuthenticatedPrincipal principal) {
@@ -45,6 +46,9 @@ public class OAuthConnectionIntentService {
         }
         if (intentTtl == null || intentTtl.isZero() || intentTtl.isNegative()) {
             throw new IllegalStateException("OAuth connection intent TTL must be positive");
+        }
+        if (publicBaseUrl == null || publicBaseUrl.isBlank()) {
+            throw new IllegalStateException("AI Engine public base URL is not configured");
         }
         Instant now = clock.instant();
         OAuthConnectionIntent intent = new OAuthConnectionIntent();
@@ -58,7 +62,7 @@ public class OAuthConnectionIntentService {
         String principalBinding = OAuthConnectionIntentSigner.principalBinding(serviceSecret, principal.principalId());
         String signature = OAuthConnectionIntentSigner.sign(serviceSecret, intent.getId(), PRODUCT_PROVIDER,
                 expiresAt, principalBinding);
-        String url = aiEngineProperties.baseUrl() + "/api/v1/auth/chatgpt/start?intentId="
+        String url = publicBaseUrl + "/api/v1/auth/chatgpt/start?intentId="
                 + encode(intent.getId().toString()) + "&intentProvider=" + encode(PRODUCT_PROVIDER)
                 + "&intentExpiresAt=" + expiresAt + "&intentPrincipalId="
                 + encode(principalBinding) + "&intentSignature=" + encode(signature);
@@ -108,6 +112,17 @@ public class OAuthConnectionIntentService {
             }
             throw exception;
         }
+    }
+
+    @Transactional
+    public AiCredentialAssociation completeFromAiEngine(UUID intentId, String completionCode) {
+        if (intentId == null || completionCode == null || completionCode.isBlank()) {
+            throw new IllegalArgumentException("OAuth completion data is incomplete");
+        }
+        OAuthConnectionIntent intent = repository.findById(intentId)
+                .orElseThrow(() -> new EntityNotFoundException("OAuth connection intent"));
+        return completeIntent(new AuthenticatedPrincipal(
+                intent.getPrincipalId(), PrincipalKind.HUMAN, "ai-engine"), intentId, completionCode);
     }
 
     private void acknowledgeAfterCommit(UUID intentId, String completionCode) {

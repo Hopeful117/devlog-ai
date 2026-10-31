@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.ai_tasks import router as ai_tasks_router
 from app.api.health import router as health_router
@@ -14,9 +15,19 @@ configure_logging()
 
 
 def create_app() -> FastAPI:
+    from app.core.config import get_settings
+
+    settings = get_settings()
     application = FastAPI(
         title="DevLog AI Engine",
         version="0.1.0",
+    )
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(settings.cors_origins),
+        allow_credentials=False,
+        allow_methods=["POST", "OPTIONS"],
+        allow_headers=["Content-Type"],
     )
     application.add_middleware(RequestLoggingMiddleware)
     application.include_router(health_router)

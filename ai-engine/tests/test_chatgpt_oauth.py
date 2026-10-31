@@ -14,7 +14,7 @@ from app.services.chatgpt_oauth import (
 )
 
 
-def make_service(tmp_path, enabled=True):
+def make_service(tmp_path, enabled=True, callback_attempts=5):
     settings = Settings(
         chatgpt_oauth_enabled=enabled,
         chatgpt_client_id="client-id",
@@ -26,6 +26,9 @@ def make_service(tmp_path, enabled=True):
         chatgpt_agent_name="DevLog Test",
         chatgpt_ext_agent_host_id="urn:uuid:test-host",
         service_auth_secret="service-secret",
+        core_callback_max_attempts=callback_attempts,
+        core_callback_initial_delay_ms=0,
+        core_callback_max_delay_ms=0,
         credential_store_path=str(tmp_path / "credentials.sqlite3"),
         credential_encryption_key=urlsafe_b64encode(
             b"0123456789abcdef0123456789abcdef"
@@ -38,6 +41,80 @@ def make_service(tmp_path, enabled=True):
         EncryptedCredentialStore(settings.credential_store_path,
                                  settings.credential_encryption_key),
     )
+
+
+def test_oauth_transaction_can_be_released_after_a_failed_exchange(tmp_path):
+    service = make_service(tmp_path)
+    transaction = OAuthTransaction(
+        "state", "browser-session", "verifier", "nonce", "https://app.example/callback",
+        "scope", "client", datetime.now(timezone.utc),
+    )
+    service._sessions.save_transaction(transaction)
+
+    consumed = service._sessions.consume_transaction("state", "browser-session", 300)
+    assert consumed.state == "state"
+    with pytest.raises(OAuthError, match="invalid OAuth transaction"):
+        service._sessions.consume_transaction("state", "browser-session", 300)
+
+    service._sessions.release_transaction("state", "browser-session")
+    assert service._sessions.consume_transaction("state", "browser-session", 300).state == "state"
+
+
+def test_oauth_transaction_claim_is_single_use_under_concurrent_callbacks(tmp_path):
+    service = make_service(tmp_path)
+    transaction = OAuthTransaction(
+        "state", "browser-session", "verifier", "nonce", "https://app.example/callback",
+        "scope", "client", datetime.now(timezone.utc),
+    )
+    service._sessions.save_transaction(transaction)
+
+    def claim() -> bool:
+        try:
+            service._sessions.consume_transaction("state", "browser-session", 300)
+            return True
+        except OAuthError:
+            return False
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(lambda _: claim(), range(2)))
+
+    assert sorted(results) == [False, True]
+
+
+@pytest.mark.asyncio
+async def test_core_callback_retries_with_fresh_replay_identity(tmp_path, monkeypatch):
+    service = make_service(tmp_path, callback_attempts=2)
+
+    class Response:
+        def __init__(self, status_code):
+            self.status_code = status_code
+
+        @property
+        def is_success(self):
+            return self.status_code < 400
+
+    class Client:
+        def __init__(self, *args, **kwargs):
+            self.headers = []
+            self.responses = iter((Response(503), Response(204)))
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, path, *, content, headers):
+            self.headers.append(headers)
+            return next(self.responses)
+
+    client = Client()
+    monkeypatch.setattr("app.services.chatgpt_oauth.httpx.AsyncClient", lambda **kwargs: client)
+
+    await service.complete_core_configuration("intent-id", "completion-code")
+
+    assert client.headers[0]["X-DevLog-Service-Nonce"] != client.headers[1]["X-DevLog-Service-Nonce"]
+    assert client.headers[0]["X-DevLog-Service-Request-Id"] != client.headers[1]["X-DevLog-Service-Request-Id"]
 
 
 def test_start_creates_pkce_transaction(tmp_path):
@@ -65,6 +142,33 @@ async def test_dynamic_registration_requires_issued_client_id(tmp_path):
 
     with pytest.raises(OAuthError, match="authorization could not be completed"):
         await service.callback("browser-session", state, "authorization-code")
+
+
+@pytest.mark.asyncio
+async def test_callback_does_not_trust_browser_supplied_scopes(tmp_path, monkeypatch):
+    service = make_service(tmp_path)
+    transaction = OAuthTransaction(
+        "state", "browser-session", "verifier", "nonce", "https://app.example/callback",
+        "requested.scope", "client", datetime.now(timezone.utc),
+    )
+    service._sessions.save_transaction(transaction)
+
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return {"access_token": "access", "id_token": "id-token"}
+
+    class Client:
+        async def post(self, *args, **kwargs):
+            return Response()
+
+    service._http_client = Client()
+    monkeypatch.setattr(service, "_validate_id_token", lambda *args: {"sub": "subject"})
+
+    with pytest.raises(OAuthError, match="did not grant scopes"):
+        await service.callback("browser-session", "state", "authorization-code",
+                               granted_scopes="forged.scope")
 
 
 def test_disabled_authorization_fails_closed(tmp_path):

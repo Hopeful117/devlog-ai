@@ -2,7 +2,7 @@
 
 Angular 22 standalone application for the DevLog AI MVP. Project list and detail pages read real
 data from the Java Core. A Project workspace can also list and manage its Git repository Sources;
-authentication is not implemented.
+application authentication is not implemented.
 
 The Project cockpit also exposes an explicit Engineering Event analysis form. It requires an active
 Git Source and a complete 40- or 64-character target commit; merely opening the page never starts an
@@ -32,8 +32,10 @@ Compose workflow before opening a Project page.
 The typed `AppEnvironment` is supplied through Angular dependency injection. Development values use
 Angular CLI file replacement (`environment.development.ts`); the default production configuration
 uses same-origin relative API paths so the Docker frontend can route Java Core traffic without
-application changes. The container serves Angular deep links through an `index.html` fallback and
-never exposes the AI Engine or PostgreSQL directly to the browser.
+application changes. The container serves Angular deep links through an `index.html` fallback. The
+Simple AI configuration page uses the explicitly configured public AI Engine enrollment endpoint for
+the one-time signed API-key intake; Core remains the authority and the browser never receives or
+persists the stored credential handle as a reusable authorization.
 
 ## Implemented routes
 
@@ -42,6 +44,26 @@ never exposes the AI Engine or PostgreSQL directly to the browser.
   `:id` URL segment), with Project Source management
 - `/analyses/:id` — Analysis execution diagnostics and monitoring
 - `/deliverables/:id` — immutable generated Deliverable and complete generation traceability
+- `/settings/ai` — Simple ChatGPT OAuth and Anthropic API-key configuration
+
+## Simple AI configuration
+
+The Simple configuration page consumes the Core catalog and configuration APIs. ChatGPT OAuth is
+completed by the AI Engine and acknowledged by Core through an authenticated server-to-server
+callback; the browser receives only a non-sensitive result status. Anthropic API-key enrollment
+uses the short-lived, signed intake intent returned by Core and posts the key directly to the public
+AI Engine intake endpoint. Core never receives the key.
+
+Set these deployment values when the frontend and AI Engine use different origins:
+
+```text
+AI_ENGINE_PUBLIC_BASE_URL=http://127.0.0.1:18081
+AI_ENGINE_CORS_ORIGINS=http://127.0.0.1:18083,http://localhost:18083,http://127.0.0.1:4200,http://localhost:4200
+```
+
+`AI_ENGINE_CORS_ORIGINS` must be an explicit allowlist. The enrollment endpoint accepts only the
+signed provider, authentication method, principal binding, intent, and expiry returned by Core.
+The API key is cleared from frontend state immediately before submission and is never re-rendered.
 
 The Project feature composes route parameters and HTTP calls as Observables. Components expose a
 typed view-state Observable and templates consume it with Angular's `async` pipe; component code does
@@ -105,7 +127,7 @@ transient failure. Profile, warning, and safely escaped context data also come f
 
 For a local end-to-end run, start PostgreSQL, Java Core, and the AI Engine with `docker compose up`;
 configure at least one active Source whose repository is reachable inside the backend container.
-The frontend never calls the AI Engine directly and never constructs a prompt. Core supplies a
+The frontend does not call the AI Engine for task generation and never constructs a prompt. Core supplies a
 typed `PromptRequest` containing the versioned Intent, structured User Guidance, and selected
 deterministic knowledge. The Python service resolves the versioned template and returns structured
 proposals to Core.

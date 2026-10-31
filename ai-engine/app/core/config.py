@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from functools import lru_cache
 import os
+from urllib.parse import urlparse
 
 
 @dataclass(frozen=True)
@@ -14,6 +15,13 @@ class Settings:
     llm_max_output_tokens: int = 2_000
     llm_max_retries: int = 2
     core_base_url: str = "http://localhost:18080"
+    public_base_url: str = "http://127.0.0.1:18081"
+    cors_origins: tuple[str, ...] = (
+        "http://127.0.0.1:18083",
+        "http://localhost:18083",
+        "http://127.0.0.1:4200",
+        "http://localhost:4200",
+    )
     sca_callback_secret: str = ""
     core_callback_timeout_seconds: float = 5.0
     core_callback_max_attempts: int = 5
@@ -32,6 +40,7 @@ class Settings:
     chatgpt_models_endpoint: str = "https://api.openai.com/v1/models"
     configuration_test_timeout_seconds: float = 4.0
     chatgpt_redirect_uri: str | None = None
+    chatgpt_frontend_redirect_uri: str = "http://127.0.0.1:18083/settings/ai"
     chatgpt_scopes: str = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"
     chatgpt_resource: str = "https://api.openai.com/v1"
     chatgpt_issuer: str = "https://auth.openai.com"
@@ -68,6 +77,15 @@ class Settings:
             ),
             llm_max_retries=int(os.getenv("LLM_MAX_RETRIES", "2")),
             core_base_url=os.getenv("CORE_BASE_URL", "http://localhost:18080"),
+            public_base_url=os.getenv("AI_ENGINE_PUBLIC_BASE_URL", "http://127.0.0.1:18081"),
+            cors_origins=tuple(
+                origin.strip()
+                for origin in os.getenv(
+                    "AI_ENGINE_CORS_ORIGINS",
+                    "http://127.0.0.1:18083,http://localhost:18083,http://127.0.0.1:4200,http://localhost:4200",
+                ).split(",")
+                if origin.strip()
+            ),
             sca_callback_secret=service_auth_secret or "",
             core_callback_timeout_seconds=float(
                 os.getenv("CORE_CALLBACK_TIMEOUT_SECONDS", "5")
@@ -112,6 +130,9 @@ class Settings:
                 os.getenv("CONFIGURATION_TEST_TIMEOUT_SECONDS", "4")
             ),
             chatgpt_redirect_uri=os.getenv("CHATGPT_REDIRECT_URI") or None,
+            chatgpt_frontend_redirect_uri=os.getenv(
+                "CHATGPT_FRONTEND_REDIRECT_URI", "http://127.0.0.1:18083/settings/ai"
+            ),
             chatgpt_scopes=os.getenv(
                 "CHATGPT_SCOPES",
                 "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct",
@@ -133,6 +154,15 @@ class Settings:
         return settings
 
     def validate(self) -> None:
+        public_url = urlparse(self.public_base_url)
+        if public_url.scheme not in {"http", "https"} or not public_url.netloc:
+            raise ValueError("AI_ENGINE_PUBLIC_BASE_URL must be an absolute HTTP(S) URL")
+        if not self.cors_origins:
+            raise ValueError("AI_ENGINE_CORS_ORIGINS must contain at least one origin")
+        for origin in self.cors_origins:
+            parsed_origin = urlparse(origin)
+            if parsed_origin.scheme not in {"http", "https"} or not parsed_origin.netloc:
+                raise ValueError("AI_ENGINE_CORS_ORIGINS must contain absolute HTTP(S) origins")
         if self.llm_provider not in {"mock", "openai", "openai_chatgpt", "gemini", "anthropic", "openrouter"}:
             raise ValueError("LLM_PROVIDER must be 'mock', 'openai', 'openai_chatgpt', 'gemini', 'anthropic', or 'openrouter'")
         if self.llm_provider in {"openai", "gemini", "openrouter"} and not self.llm_api_key:

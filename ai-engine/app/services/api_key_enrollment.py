@@ -55,6 +55,7 @@ class ApiKeyEnrollmentService:
             raise ApiKeyEnrollmentError("invalid enrollment intent") from error
         if not api_key or len(api_key) > 4096:
             raise ApiKeyEnrollmentError("invalid API key")
+        await self._validate_provider_key(api_key)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
@@ -64,7 +65,6 @@ class ApiKeyEnrollmentService:
                 )
             except sqlite3.IntegrityError as error:
                 raise ApiKeyEnrollmentError("enrollment intent has already been consumed") from error
-        await self._validate_provider_key(api_key)
         handle = "anthropic-key-" + secrets.token_urlsafe(24)
         try:
             self._credentials.put(StoredCredential(
@@ -78,18 +78,32 @@ class ApiKeyEnrollmentService:
                 )
         except Exception as error:
             self._credentials.delete(handle)
+            self._release_intent(intent_id)
             raise ApiKeyEnrollmentError("API key could not be stored") from error
         return {"credentialHandle": handle, "provider": "anthropic", "authenticationMethod": "API_KEY"}
 
     def compensate(self, handle: str) -> None:
         self._credentials.delete(handle)
 
+    def _release_intent(self, intent_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM api_key_enrollment_intents WHERE intent_id = ?",
+                (intent_id,),
+            )
+
     async def _validate_provider_key(self, api_key: str) -> None:
         client = self._http_client or httpx.AsyncClient(timeout=min(self._settings.llm_timeout_seconds, 10.0))
         try:
+            headers = {
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+            }
+            if self._settings.anthropic_workspace_id:
+                headers["anthropic-workspace-id"] = self._settings.anthropic_workspace_id
             response = await client.get(
                 "https://api.anthropic.com/v1/models",
-                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01"},
+                headers=headers,
             )
             if not 200 <= response.status_code < 300:
                 raise ApiKeyEnrollmentError("API key was rejected by Anthropic")
