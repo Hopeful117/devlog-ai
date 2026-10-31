@@ -34,6 +34,31 @@ def last_event(directory: Path) -> dict | None:
         return {"event": "INVALID_EVENT_RECORD"}
 
 
+def last_renewal_event(directory: Path) -> dict | None:
+    try:
+        lines = (directory / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    renewal_events = {
+        "TOKEN_EXPIRED",
+        "TOKEN_RENEWAL_STARTED",
+        "TOKEN_RENEWAL_SUCCEEDED",
+        "TOKEN_RENEWAL_FAILED",
+    }
+    for line in reversed(lines):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("event") in renewal_events:
+            return {
+                key: event[key]
+                for key in ("timestamp", "event", "severity", "code")
+                if key in event
+            }
+    return None
+
+
 def instance_status(directory: Path) -> dict:
     manifest = read_json(directory / "manifest.json")
     parent_pid = manifest.get("parentOpenCodePid")
@@ -49,6 +74,7 @@ def instance_status(directory: Path) -> dict:
         "parentAlive": parent_alive,
         "childAlive": child_alive,
         "lastEvent": last_event(directory),
+        "lastRenewalEvent": last_renewal_event(directory),
         "manifest": manifest,
     }
 

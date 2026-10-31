@@ -6,7 +6,7 @@ import logging
 from openai import AsyncOpenAI, APITimeoutError, APIStatusError
 from pydantic import BaseModel
 
-from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput
+from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput, effective_output_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,18 @@ class OpenAiLlmProvider:
         response_model: type[StructuredOutput],
     ) -> ProviderGenerationResult:
         started_at = datetime.now(timezone.utc)
+        effective_tokens = effective_output_tokens(request, self._max_output_tokens)
+        logger.info(
+            "Sending OpenAI provider request",
+            extra={
+                "event": "provider_request_output_allowance",
+                "taskId": request.traceability.ai_task_id,
+                "intent": request.intent_id,
+                "provider": "openai",
+                "model": request.model_identifier or self._model,
+                "effectiveOutputTokens": effective_tokens,
+            },
+        )
         response = await self._client.responses.parse(
             model=self._model,
             input=[
@@ -70,7 +82,7 @@ class OpenAiLlmProvider:
                 {"role": "user", "content": request.user_message},
             ],
             text_format=response_model,
-            max_output_tokens=self._max_output_tokens,
+            max_output_tokens=effective_tokens,
         )
         parsed = response.output_parsed
         if parsed is None:

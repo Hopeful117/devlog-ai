@@ -30,7 +30,10 @@ class JsonFormatter(logging.Formatter):
         }
         for key in (
             "method", "path", "status", "durationMs", "taskCorrelationId",
-            "attempt", "proposalCount", "exceptionType",
+            "attempt", "proposalCount", "exceptionType", "event", "taskId",
+            "intent", "provider", "model", "authorizedOutputTokens",
+            "effectiveOutputTokens", "configuredOutputTokens", "outputParameterSource",
+            "providerStatus", "incompleteReason",
         ):
             if hasattr(record, key):
                 event[key] = getattr(record, key)

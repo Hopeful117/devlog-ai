@@ -117,6 +117,14 @@ Provider-specific incomplete responses are terminal failures. The normalized
 fields include execution phase, provider status, bounded incomplete reason and
 measurement certainty; unavailable provider values are represented as `UNKNOWN`.
 
+Story Context response completion policy uses the Core-owned
+`story-context-completion-v1` policy. The current complex Story Context output
+contract requires an explicitly authorized allowance of at least 4096 tokens.
+An allowance below that threshold is rejected before provider invocation with
+`BUDGET_COMPLETION_ALLOWANCE_INSUFFICIENT`; Core does not silently raise the
+configured value. Provider adapters must not fall back to their local default
+when a Story Context request lacks Core-authorized `maxOutputTokens`.
+
 ## MCP runtime diagnostics
 
 The OpenCode MCP launcher delegates to the repository-owned supervisor at
@@ -143,6 +151,25 @@ The supervisor does not use a global MCP lock. A fresh OpenCode session starts
 an independent STDIO instance. Cleanup is limited to an instance whose parent
 and child process identities are proven; ambiguous PID reuse is reported and
 not force-killed.
+
+The supervisor keeps the technical bearer as a private, bounded lease. Before
+forwarding a new JSON-RPC request whose lease is expired or near expiry, it
+reacquires the bearer and replaces only the owned Java child. The replacement
+replays only the MCP `initialize` handshake; already-forwarded requests are
+never replayed. If a request is still in flight or renewal cannot complete, the
+runtime fails closed with `MCP_REAUTH_REQUIRED`.
+
+When the MCP child returns the explicit bounded authentication error
+`Authentication is required` with JSON-RPC code `-32600`, the supervisor may
+reacquire the bearer and retry that same request once. A second authentication
+failure is returned unchanged and is not retried. Authorization, delegation and
+provider errors do not enter this retry path.
+
+Renewal events include `TOKEN_EXPIRED`, `TOKEN_RENEWAL_STARTED`,
+`TOKEN_RENEWAL_SUCCEEDED` and `TOKEN_RENEWAL_FAILED`. The read-only status
+command exposes the last renewal event without exposing expiry claims, bearer
+values, client secrets or response bodies. Renewal is independent from Core
+authorization, human delegation and AI Engine provider OAuth.
 
 Runtime tests use only the Python standard library:
 

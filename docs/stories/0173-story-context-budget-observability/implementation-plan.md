@@ -5,7 +5,7 @@
 Implement bounded budget accounting and provider-failure diagnostics for Story
 Context executions without changing the Java/Core authority boundary or raising
 production limits. Core will create the authoritative execution accounting and
-perform fail-closed preflight. The AI Engine will normalize provider outcomes
+perform a provider-call authorization preflight. The AI Engine will normalize provider outcomes
 and return bounded diagnostics through a versioned or explicitly additive Story
 Context contract.
 
@@ -30,6 +30,11 @@ traces retain only their approved bounded fields.
 - No credentials, authorization headers, full prompts, repository payloads or raw
   provider output are added to normal diagnostics.
 - No production context/output limit is increased by this Story.
+- Every provider call has one Core-owned preflight outcome: `AUTHORIZED`,
+  `PROJECTION_REDUCED` or `REJECTED`.
+- `PROJECTION_REDUCED` may only reduce the already authorized canonical context;
+  it must not trigger retrieval, a second semantic selection or Python-side
+  context recovery.
 
 ## Planned Changes
 
@@ -72,6 +77,8 @@ Components: Story Context preparation/submission and persisted task snapshot.
   diagnostics.
 - Add preflight before provider invocation. Reject missing/unsafe model capacity
   with `BUDGET_CAPACITY_UNKNOWN` and an actionable non-sensitive caller error.
+- Reject an insufficient effective output allowance before provider invocation
+  with a bounded diagnostic rather than relying on provider truncation.
 - Do not silently increase any configured selection or output limit.
 
 Likely files:

@@ -83,4 +83,11 @@ public record PromptRequest(
         allowedParameters = allowedParameters == null ? Map.of()
                 : Collections.unmodifiableMap(new LinkedHashMap<>(allowedParameters));
     }
+
+    public PromptRequest withAllowedParameters(Map<String, Object> parameters) {
+        return new PromptRequest(requestId, correlationId, analysisId, aiTaskId, taskType, intent,
+                userGuidance, selectedKnowledge, expectedOutputContract, groundingContract, metadata,
+                contextDigest, selectionDigest, projectionDigest, credentialBindingId, provider,
+                modelIdentifier, parameters);
+    }
 }

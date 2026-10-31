@@ -68,7 +68,8 @@ class StoryAgentFollowUpServiceTest {
                 new CoreProjectAuthorizationService(projectRepository, membershipRepository, "", ""),
                 aiTaskService,
                 aiEngineClient, intentCatalog, new ObjectMapper(), new StoryContextDigestService(new ObjectMapper()),
-                Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC));
+                 Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC),
+                 StoryContextTestPolicy.resolver());
         parent = parent();
         lenient().when(taskRepository.findStoryContextSnapshotIdentity(PARENT_ID))
                 .thenReturn(Optional.of(new SnapshotIdentity(PARENT_ID, PROJECT_ID,
@@ -192,7 +193,7 @@ class StoryAgentFollowUpServiceTest {
                         "allowedParameters", Map.of("maxOutputTokens", 4096)))
                 .credentialBindingId(UUID.randomUUID())
                 .provider("anthropic")
-                .modelIdentifier("claude-test")
+                .modelIdentifier("claude-opus-5-5")
                 .build();
     }
 

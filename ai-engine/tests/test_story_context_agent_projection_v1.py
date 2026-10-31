@@ -173,6 +173,25 @@ def test_order_and_budget_are_digest_inputs_and_accounting_is_bounded():
         )
 
 
+def test_accounting_accepts_additive_measurement_metadata():
+    parsed = StoryContextAgentProjectionV1.model_validate(projection(
+        accounting={
+            "candidateCount": 0,
+            "selectedCount": 0,
+            "discardedCount": 0,
+            "usedTokens": 0,
+            "budget": 0,
+            "truncated": False,
+            "warnings": [],
+            "measurementUnit": "tokens",
+            "measurementStatus": "EXACT",
+        }
+    ))
+
+    assert parsed.accounting.measurement_unit == "tokens"
+    assert parsed.accounting.measurement_status == "EXACT"
+
+
 @pytest.mark.parametrize("field", ["candidateCount", "selectedCount", "discardedCount", "usedTokens", "budget"])
 def test_accounting_requires_strict_bounded_integer(field):
     for invalid in (None, 1.5, -1, 2**31):

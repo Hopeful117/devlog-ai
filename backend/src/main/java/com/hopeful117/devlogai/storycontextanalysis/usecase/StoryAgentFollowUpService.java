@@ -7,6 +7,7 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.aicatalog.service.AiProviderCatalogService;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
 import com.hopeful117.devlogai.authorization.ProjectRole;
@@ -16,7 +17,8 @@ import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.contracts.storycontextagent.StoryContextAgentProtocolV1;
 import com.hopeful117.devlogai.storycontextanalysis.service.SnapshotIdentity;
-import lombok.RequiredArgsConstructor;
+import com.hopeful117.devlogai.storycontextanalysis.policy.StoryContextCompletionPolicyResolver;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -33,7 +35,6 @@ import java.util.Set;
 
 /** Core-owned, one-shot follow-up capability over an authorized initial snapshot. */
 @Service
-@RequiredArgsConstructor
 public class StoryAgentFollowUpService {
     public static final int MAX_QUESTION_LENGTH = 2_000;
     public static final int MAX_GUIDANCE_LENGTH = 1_000;
@@ -51,6 +52,34 @@ public class StoryAgentFollowUpService {
     private final ObjectMapper objectMapper;
     private final StoryContextDigestService digestService;
     private final Clock clock;
+    private final StoryContextBudgetPreflight budgetPreflight;
+
+    @Autowired
+    public StoryAgentFollowUpService(
+            AiTaskRepository aiTaskRepository, CoreProjectAuthorizationService authorizationService,
+             AiTaskService aiTaskService, AIEngineClient aiEngineClient, IntentCatalog intentCatalog,
+             ObjectMapper objectMapper, StoryContextDigestService digestService, Clock clock,
+             AiProviderCatalogService providerCatalog,
+             StoryContextCompletionPolicyResolver completionPolicyResolver) {
+        this.aiTaskRepository = aiTaskRepository;
+        this.authorizationService = authorizationService;
+        this.aiTaskService = aiTaskService;
+        this.aiEngineClient = aiEngineClient;
+        this.intentCatalog = intentCatalog;
+        this.objectMapper = objectMapper;
+        this.digestService = digestService;
+        this.clock = clock;
+        this.budgetPreflight = new StoryContextBudgetPreflight(providerCatalog, objectMapper, completionPolicyResolver);
+    }
+
+    public StoryAgentFollowUpService(
+            AiTaskRepository aiTaskRepository, CoreProjectAuthorizationService authorizationService,
+            AiTaskService aiTaskService, AIEngineClient aiEngineClient, IntentCatalog intentCatalog,
+            ObjectMapper objectMapper, StoryContextDigestService digestService, Clock clock,
+            StoryContextCompletionPolicyResolver completionPolicyResolver) {
+        this(aiTaskRepository, authorizationService, aiTaskService, aiEngineClient, intentCatalog,
+                objectMapper, digestService, clock, new AiProviderCatalogService(), completionPolicyResolver);
+    }
 
     @Transactional
     public FollowUpSubmission submit(AuthenticatedPrincipal principal, UUID parentSnapshotId,
@@ -133,10 +162,44 @@ public class StoryAgentFollowUpService {
                  parent.getContextDigest(), parent.getSelectionDigest(), parent.getProjectionDigest(),
                  parent.getCredentialBindingId(), parent.getProvider(), parent.getModelIdentifier(),
                  map(parent.getContextSnapshot().get("allowedParameters")));
+         StoryContextBudgetPreflight.Result budget = budgetPreflight.check(prompt);
+         prompt = prompt.withAllowedParameters(budget.effectiveParameters());
+         Map<String, Object> snapshot = followUp.getContextSnapshot();
+         snapshot.put("allowedParameters", budget.accepted()
+                 ? budget.effectiveParameters() : map(parent.getContextSnapshot().get("allowedParameters")));
+         snapshot.put("budgetAccounting", budgetAccounting(budget));
+         followUp.setContextSnapshot(snapshot);
+         followUp = aiTaskRepository.save(followUp);
+         if (!budget.accepted()) {
+             aiTaskService.failSubmission(followUp.getId(),
+                     new com.hopeful117.devlogai.ai.task.dto.request.FailAiTaskRequest(
+                             budget.code(), budget.message()));
+             throw new IllegalStateException(budget.message());
+         }
 
-        aiTaskService.submit(followUp.getId(), new com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest(null));
-        aiEngineClient.submit(prompt);
+         aiTaskService.submit(followUp.getId(), new com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest(null));
+         aiEngineClient.submit(prompt);
         return response(followUp, parentSnapshotId);
+    }
+
+    private Map<String, Object> budgetAccounting(StoryContextBudgetPreflight.Result budget) {
+        Map<String, Object> accounting = new LinkedHashMap<>();
+        accounting.put("preflightOutcome", budget.outcome());
+        accounting.put("promptPolicyVersion", StoryContextBudgetPreflight.PROMPT_POLICY_VERSION);
+        if (budget.policyVersion() != null) accounting.put("completionPolicyVersion", budget.policyVersion());
+        if (budget.complexityClass() != null) accounting.put("complexityClass", budget.complexityClass());
+        if (budget.measurementCertainty() != null) accounting.put("measurementCertainty", budget.measurementCertainty());
+        accounting.put("measurementUnit", "tokens");
+        accounting.put("measurementStatus", budget.inputEstimate() >= 0 ? "ESTIMATED" : "UNKNOWN");
+        if (budget.inputEstimate() >= 0) accounting.put("inputEstimate", budget.inputEstimate());
+        if (budget.outputLimit() >= 0) accounting.put("outputLimit", budget.outputLimit());
+        if (budget.requiredOutputLimit() > 0) accounting.put("requiredOutputLimit", budget.requiredOutputLimit());
+         if (budget.targetOutputLimit() >= 0) accounting.put("targetOutputLimit", budget.targetOutputLimit());
+         accounting.put("outputLimitSource", budget.outputLimitSource());
+        if (budget.capacity() >= 0) accounting.put("modelCapacity", budget.capacity());
+        if (budget.code() != null) accounting.put("failureCode", budget.code());
+        if (budget.message() != null) accounting.put("failureMessage", budget.message());
+        return accounting;
     }
 
     private void authorize(AuthenticatedPrincipal principal, UUID snapshotId) {

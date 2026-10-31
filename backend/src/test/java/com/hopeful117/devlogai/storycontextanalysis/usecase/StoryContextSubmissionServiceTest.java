@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -52,7 +53,7 @@ class StoryContextSubmissionServiceTest {
         StoryContextSubmissionService service = new StoryContextSubmissionService(
                 intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository,
                 objectMapper, new StoryContextDigestService(objectMapper), null, aiEngineBindingClient,
-                authorizationService);
+                 authorizationService, StoryContextTestPolicy.resolver());
         UUID projectId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
         UUID bindingId = UUID.randomUUID();
@@ -86,8 +87,8 @@ class StoryContextSubmissionServiceTest {
         when(aiTaskRepository.save(any(AiTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(authorizationService.authorizeAndIssue(any(), eq(task))).thenReturn(
                 new AiTaskExecutionAuthorizationService.AuthorizedExecution(
-                        AiCredentialBinding.builder().id(bindingId).build(), "anthropic", "claude-test",
-                        Map.of("maxOutputTokens", 4096)));
+                         AiCredentialBinding.builder().id(bindingId).build(), "anthropic", "claude-opus-5-5",
+                         Map.of()));
 
         service.submit(prepared, null, "submission", "idempotency",
                 new AuthenticatedPrincipal("human-1", PrincipalKind.HUMAN, "test"), "anthropic");
@@ -99,7 +100,57 @@ class StoryContextSubmissionServiceTest {
         verify(aiEngineClient).submit(prompt.capture());
         assertEquals(bindingId, prompt.getValue().credentialBindingId());
         assertEquals("anthropic", prompt.getValue().provider());
-        assertEquals("claude-test", prompt.getValue().modelIdentifier());
-        assertTrue(prompt.getValue().allowedParameters().containsKey("maxOutputTokens"));
+        assertEquals("claude-opus-5-5", prompt.getValue().modelIdentifier());
+        assertEquals(Map.of("maxOutputTokens", 4096), prompt.getValue().allowedParameters());
+    }
+
+    @Test
+    void rejectedPreflightIsPersistedAndDoesNotSubmitToAiEngine() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        StoryContextSubmissionService service = new StoryContextSubmissionService(
+                intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository,
+                objectMapper, new StoryContextDigestService(objectMapper), null, aiEngineBindingClient,
+                 authorizationService, StoryContextTestPolicy.resolver());
+        Project project = mock(Project.class);
+        when(project.getId()).thenReturn(UUID.randomUUID());
+        Map<String, Object> projection = Map.of(
+                "projectionVersion", "sca/v1", "contractVersion", "story-context-agent-projection/v1",
+                "freshness", Map.of("sourceRevision", "revision-1"),
+                "accounting", Map.of("truncated", false));
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                mock(EngineeringContext.class), null, "a".repeat(64), "engineering-context-v2",
+                null, Map.of("sourceRevision", Map.of("revision", "revision-1")), Map.of(),
+                null, Map.of(), Map.of(), Map.of(), List.of());
+        PreparedStoryContext prepared = new PreparedStoryContext(
+                "devlog-ai", null, "engineering-story-context-analysis", List.of(), project, null,
+                canonical, projection, "b".repeat(64), null);
+        IntentDefinition intent = new IntentDefinition(
+                "engineering-story-context-analysis", "v1", "Analyze Story context", List.of(),
+                List.of(), Map.of("type", "object"), "story-context-analysis-prompt-v1");
+        UUID taskId = UUID.randomUUID();
+        AiTask task = AiTask.builder().id(taskId).correlationId(UUID.randomUUID())
+                .status(AiTaskStatus.CREATED).contextSnapshot(Map.of()).build();
+        when(intentCatalog.resolve("engineering-story-context-analysis", "v1")).thenReturn(intent);
+        when(analysisRepository.save(any(Analysis.class))).thenAnswer(invocation -> {
+            Analysis analysis = invocation.getArgument(0);
+            analysis.setId(UUID.randomUUID());
+            return analysis;
+        });
+        when(aiTaskService.createForStoryContextAnalysisEntity(any(), eq(AiTaskType.STORY_CONTEXT_ANALYSIS),
+                any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(task);
+        when(aiTaskRepository.save(any(AiTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(authorizationService.authorizeAndIssue(any(), eq(task))).thenReturn(
+                new AiTaskExecutionAuthorizationService.AuthorizedExecution(
+                        AiCredentialBinding.builder().id(UUID.randomUUID()).build(),
+                        "openrouter", "provider/model", Map.of("maxOutputTokens", 4096)));
+
+        assertThrows(IllegalStateException.class, () -> service.submit(prepared, null, "submission", "idempotency",
+                new AuthenticatedPrincipal("human-1", PrincipalKind.HUMAN, "test"), "openrouter"));
+
+        Map<?, ?> accounting = (Map<?, ?>) task.getContextSnapshot().get("budgetAccounting");
+        assertEquals("REJECTED", accounting.get("preflightOutcome"));
+        assertEquals("BUDGET_CAPACITY_UNKNOWN", accounting.get("failureCode"));
+        verify(aiEngineClient, never()).submit(any(PromptRequest.class));
+        verify(aiTaskService).failSubmission(eq(taskId), any());
     }
 }
