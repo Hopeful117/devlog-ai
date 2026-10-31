@@ -33,3 +33,22 @@ def test_json_formatter_includes_correlation_id() -> None:
     assert event["service"] == "devlog-ai-engine"
     assert event["correlationId"] == "request-42"
     assert event["message"] == "processed task"
+
+
+def test_json_formatter_includes_bounded_output_allowance_metadata() -> None:
+    record = logging.LogRecord(
+        "test", logging.INFO, __file__, 1, "allowance resolved", (), None
+    )
+    record.event = "provider_request_output_allowance"
+    record.taskId = "task-1"
+    record.effectiveOutputTokens = 4096
+    record.outputParameterSource = "CORE_AUTHORIZED"
+
+    event = json.loads(JsonFormatter().format(record))
+
+    assert event["event"] == "provider_request_output_allowance"
+    assert event["taskId"] == "task-1"
+    assert event["effectiveOutputTokens"] == 4096
+    assert event["outputParameterSource"] == "CORE_AUTHORIZED"
+    assert "prompt" not in event
+    assert "credential" not in event

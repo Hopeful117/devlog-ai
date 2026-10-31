@@ -1,18 +1,21 @@
-# Story 0173 - Story Context Budget Observability and Provider Failure Diagnostics
+# Story 0173 - Story Context Budget Policy and Provider Failure Diagnostics
 
 ## Status
 
-**PROPOSED - AWAITING HUMAN REVIEW**
+**IMPLEMENTATION COMPLETE - AWAITING CODE REVIEW**
 
-This Story is derived from the investigation and proposed ADR-079. It is not
-approved for implementation.
+This Story is derived from the investigation and ADR-079. The human project
+owner approved the Story, ADR-079, Repository Analysis and Implementation Plan
+on 2026-10-31. Implementation is complete within the approved scope and awaits
+independent code review.
 
 ## Problem
 
 The Story Context Agent can reduce its authorized context at the Core selection
 stage and the provider can independently terminate generation at its output
-ceiling. The current runtime does not expose enough bounded accounting to tell
-which event caused a live failure.
+ceiling. This is a recurring multi-layer budget problem, not a single prompt
+or MCP request defect. The runtime must make a provider call only when the
+effective input, output and model-capacity policy can be shown to be safe.
 
 The latest investigation reproduced both conditions: a projection with hundreds
 of candidates reduced to the Core budget, and a ChatGPT
@@ -20,7 +23,8 @@ of candidates reduced to the Core budget, and a ChatGPT
 
 ## Goal
 
-Make Story Context executions diagnostically complete enough to distinguish:
+Make Story Context executions policy-safe and diagnostically complete enough to
+distinguish:
 
 - candidate selection truncation;
 - projection or prompt-size exhaustion;
@@ -30,6 +34,8 @@ Make Story Context executions diagnostically complete enough to distinguish:
 - authoritative validation failure.
 
 Preserve fail-closed behavior and the existing Java/Core authority boundary.
+The policy must apply consistently to every Story Context execution, regardless
+of transport, intent or requested scope.
 
 ## Governing Artifacts
 
@@ -55,6 +61,11 @@ associated Repository Analysis and Implementation Plan gates.
 - Add a preflight check that reports insufficient or unknown budget capacity
   before provider invocation, without silently increasing limits. Unknown
   capacity is fail-closed with a normalized `BUDGET_CAPACITY_UNKNOWN` diagnostic.
+- Make the preflight an explicit Core authorization decision for every provider
+  call, with outcomes for authorized, deterministically reduced projection and
+  rejected execution.
+- Define the effective provider/model output policy as versioned configuration;
+  production budget changes remain separate, measured policy decisions.
 - Expose an actionable, non-sensitive failure message to the caller.
 - Add metrics with bounded labels for truncation, preflight rejection, provider
   incomplete response, parsing failure and validation failure.
@@ -115,6 +126,15 @@ execution fails before provider invocation with an actionable
 provider-side incomplete response remains a separate terminal provider failure
 when the provider is the only authority capable of reporting it.
 
+### AC-4a - Provider calls are policy-authorized
+
+Every Story Context provider call has a recorded Core preflight outcome. The
+preflight uses the effective serialized input, output allowance, safety margin
+and model capacity. It cannot silently raise limits, broaden context, or be
+bypassed by Python, MCP or REST. An insufficient configured output allowance is
+rejected with a bounded actionable diagnostic rather than discovered only after
+provider truncation.
+
 ### AC-5 - Diagnostics are safe
 
 Redaction and bounded-size tests prove that credentials, authorization headers,
@@ -158,6 +178,13 @@ the result to one task, context digest and projection digest.
 The implementation report explicitly records whether production budgets changed.
 Any proposed budget increase is separately justified with measured quality,
 latency and cost evidence.
+
+### AC-11 - Policy applies across transports and intents
+
+Equivalent Story Context executions through REST and MCP use the same Core
+preflight and provider-budget policy. Tests cover a broad request, a targeted
+request and a deliberately reduced projection without introducing a
+transport-specific or intent-specific bypass.
 
 ## Expected Validation
 

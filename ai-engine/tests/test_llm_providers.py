@@ -94,7 +94,11 @@ class FakeOpenAiClient:
 
 
 class FakeGeminiModels:
+    def __init__(self) -> None:
+        self.arguments: dict[str, object] = {}
+
     async def generate_content(self, **kwargs: object) -> object:
+        self.arguments = kwargs
         return SimpleNamespace(
             text='{"proposals": []}',
             usage_metadata=SimpleNamespace(
@@ -165,7 +169,7 @@ async def test_openai_provider_uses_structured_response_model() -> None:
 
 
 @pytest.mark.asyncio
-async def test_gemini_provider_uses_structured_json_schema() -> None:
+async def test_gemini_provider_uses_core_authorized_output_limit() -> None:
     client = FakeGeminiClient()
     provider = GeminiLlmProvider(
         api_key="test-key",
@@ -174,11 +178,17 @@ async def test_gemini_provider_uses_structured_json_schema() -> None:
         max_output_tokens=500,
         client=client,
     )
-    request = InsightPromptBuilder().build(prompt_request())
+    request = replace(
+        InsightPromptBuilder().build(prompt_request()),
+        generation_parameters={"maxOutputTokens": 4096},
+        model_identifier="authorized-model",
+    )
 
     output = await provider.generate_structured(request, InsightGenerationOutput)
 
     assert output.proposals == []
+    assert client.models.arguments["config"].max_output_tokens == 4096
+    assert client.models.arguments["model"] == "authorized-model"
 
 
 @pytest.mark.asyncio
@@ -241,3 +251,24 @@ async def test_openrouter_provider_uses_chat_structured_output() -> None:
     assert output.proposals == []
     assert client.chat.completions.arguments["model"] == "deepseek/deepseek-chat"
     assert client.chat.completions.arguments["response_format"]["type"] == "json_schema"  # type: ignore[index]
+
+
+@pytest.mark.asyncio
+async def test_openrouter_provider_uses_core_authorized_output_limit() -> None:
+    client = FakeOpenRouterClient()
+    provider = OpenRouterLlmProvider(
+        api_key="test-key",
+        model="deepseek/deepseek-chat",
+        timeout_seconds=1,
+        max_output_tokens=500,
+        client=client,
+    )
+    request = replace(
+        InsightPromptBuilder().build(prompt_request()),
+        generation_parameters={"maxOutputTokens": 4096},
+        model_identifier="authorized-model",
+    )
+
+    await provider.generate_structured(request, InsightGenerationOutput)
+
+    assert client.chat.completions.arguments["max_tokens"] == 4096

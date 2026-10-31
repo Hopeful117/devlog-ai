@@ -27,6 +27,7 @@ import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.aicatalog.service.AiProviderCatalogService;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
+import com.hopeful117.devlogai.storycontextanalysis.policy.StoryContextCompletionPolicyResolver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,7 +55,6 @@ public class StoryContextSubmissionService {
     private final AiEngineBindingClient aiEngineBindingClient;
     private final AiTaskExecutionAuthorizationService taskAuthorizationService;
     private final StoryContextBudgetPreflight budgetPreflight;
-    private final boolean budgetPreflightEnabled;
 
     @Autowired
     public StoryContextSubmissionService(
@@ -63,18 +63,20 @@ public class StoryContextSubmissionService {
              StoryContextDigestService digestService, AiCredentialBindingService credentialBindingService,
              AiEngineBindingClient aiEngineBindingClient,
              AiTaskExecutionAuthorizationService taskAuthorizationService,
-             AiProviderCatalogService providerCatalog) {
+             AiProviderCatalogService providerCatalog,
+             StoryContextCompletionPolicyResolver completionPolicyResolver) {
         this(intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository, objectMapper,
                 digestService, credentialBindingService, aiEngineBindingClient, taskAuthorizationService,
-                providerCatalog, true);
+                providerCatalog, completionPolicyResolver, true);
     }
 
     private StoryContextSubmissionService(
             IntentCatalog intentCatalog, AiTaskService aiTaskService, AIEngineClient aiEngineClient,
             AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
-            StoryContextDigestService digestService, AiCredentialBindingService credentialBindingService,
-            AiEngineBindingClient aiEngineBindingClient, AiTaskExecutionAuthorizationService taskAuthorizationService,
-            AiProviderCatalogService providerCatalog, boolean budgetPreflightEnabled) {
+             StoryContextDigestService digestService, AiCredentialBindingService credentialBindingService,
+              AiEngineBindingClient aiEngineBindingClient, AiTaskExecutionAuthorizationService taskAuthorizationService,
+              AiProviderCatalogService providerCatalog, StoryContextCompletionPolicyResolver completionPolicyResolver,
+              boolean ignored) {
         this.intentCatalog = intentCatalog;
         this.aiTaskService = aiTaskService;
         this.aiEngineClient = aiEngineClient;
@@ -85,27 +87,27 @@ public class StoryContextSubmissionService {
         this.credentialBindingService = credentialBindingService;
         this.aiEngineBindingClient = aiEngineBindingClient;
         this.taskAuthorizationService = taskAuthorizationService;
-        this.budgetPreflight = new StoryContextBudgetPreflight(providerCatalog, objectMapper);
-        this.budgetPreflightEnabled = budgetPreflightEnabled;
+        this.budgetPreflight = new StoryContextBudgetPreflight(providerCatalog, objectMapper, completionPolicyResolver);
     }
 
     public StoryContextSubmissionService(
             IntentCatalog intentCatalog, AiTaskService aiTaskService, AIEngineClient aiEngineClient,
             AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
-            StoryContextDigestService digestService) {
+            StoryContextDigestService digestService, StoryContextCompletionPolicyResolver completionPolicyResolver) {
         this(intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository,
-                objectMapper, digestService, null, null, null, new AiProviderCatalogService());
+                objectMapper, digestService, null, null, null, new AiProviderCatalogService(), completionPolicyResolver);
     }
 
     public StoryContextSubmissionService(
             IntentCatalog intentCatalog, AiTaskService aiTaskService, AIEngineClient aiEngineClient,
             AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
             StoryContextDigestService digestService, AiCredentialBindingService credentialBindingService,
-            AiEngineBindingClient aiEngineBindingClient,
-            AiTaskExecutionAuthorizationService taskAuthorizationService) {
+             AiEngineBindingClient aiEngineBindingClient,
+             AiTaskExecutionAuthorizationService taskAuthorizationService,
+             StoryContextCompletionPolicyResolver completionPolicyResolver) {
         this(intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository,
                 objectMapper, digestService, credentialBindingService, aiEngineBindingClient,
-                taskAuthorizationService, new AiProviderCatalogService(), false);
+                taskAuthorizationService, new AiProviderCatalogService(), completionPolicyResolver);
     }
 
     @Transactional
@@ -176,26 +178,6 @@ public class StoryContextSubmissionService {
         } else if (provider != null) {
             throw new IllegalStateException("authenticated principal is required for user-bound AI execution");
         }
-        aiTaskRepository.save(task);
-        if (budgetPreflightEnabled && principal != null) {
-            StoryContextBudgetPreflight.Result budget = budgetPreflight.check(
-                    authorizedProvider, authorizedModel, projection, authorizedParameters);
-            if (!budget.accepted()) {
-                aiTaskService.failSubmission(task.getId(),
-                        new FailAiTaskRequest(budget.code(), budget.message()));
-                throw new IllegalStateException(budget.message());
-            }
-            snapshot.put("budgetAccounting", Map.of(
-                    "inputEstimate", budget.inputEstimate(),
-                    "outputLimit", budget.outputLimit(),
-                    "modelCapacity", budget.capacity(),
-                    "measurementUnit", "tokens",
-                    "measurementStatus", "ESTIMATED"));
-            task.setContextSnapshot(snapshot);
-            aiTaskRepository.save(task);
-        }
-        aiTaskService.submit(task.getId(), new SubmitAiTaskRequest(null));
-
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("projectSlug", projectSlug);
         if (storyId != null) {
@@ -218,10 +200,43 @@ public class StoryContextSubmissionService {
         PromptRequest prompt = new PromptRequest(
                 UUID.randomUUID(), task.getCorrelationId(), prepared.project().getId(), task.getId(),
                 AiTaskType.STORY_CONTEXT_ANALYSIS, intent, userGuidance, projection, intent.outputSchema(),
-                groundingContract, metadata, contextDigest, null, projectionDigest,
-                bindingId, authorizedProvider, authorizedModel, authorizedParameters);
+                 groundingContract, metadata, contextDigest, null, projectionDigest,
+                 bindingId, authorizedProvider, authorizedModel, authorizedParameters);
+        StoryContextBudgetPreflight.Result budget = budgetPreflight.check(prompt);
+        prompt = prompt.withAllowedParameters(budget.effectiveParameters());
+        snapshot.put("allowedParameters", budget.accepted()
+                ? budget.effectiveParameters() : authorizedParameters);
+        snapshot.put("budgetAccounting", budgetAccounting(budget));
+        task.setContextSnapshot(snapshot);
+        aiTaskRepository.save(task);
+        if (!budget.accepted()) {
+            aiTaskService.failSubmission(task.getId(),
+                    new FailAiTaskRequest(budget.code(), budget.message()));
+            throw new IllegalStateException(budget.message());
+        }
+        aiTaskService.submit(task.getId(), new SubmitAiTaskRequest(null));
         aiEngineClient.submit(prompt);
         return task.getId();
+    }
+
+    private Map<String, Object> budgetAccounting(StoryContextBudgetPreflight.Result budget) {
+        Map<String, Object> accounting = new LinkedHashMap<>();
+        accounting.put("preflightOutcome", budget.outcome());
+        accounting.put("promptPolicyVersion", StoryContextBudgetPreflight.PROMPT_POLICY_VERSION);
+        if (budget.policyVersion() != null) accounting.put("completionPolicyVersion", budget.policyVersion());
+        if (budget.complexityClass() != null) accounting.put("complexityClass", budget.complexityClass());
+        if (budget.measurementCertainty() != null) accounting.put("measurementCertainty", budget.measurementCertainty());
+        accounting.put("measurementUnit", "tokens");
+        accounting.put("measurementStatus", budget.inputEstimate() >= 0 ? "ESTIMATED" : "UNKNOWN");
+        if (budget.inputEstimate() >= 0) accounting.put("inputEstimate", budget.inputEstimate());
+        if (budget.outputLimit() >= 0) accounting.put("outputLimit", budget.outputLimit());
+        if (budget.requiredOutputLimit() > 0) accounting.put("requiredOutputLimit", budget.requiredOutputLimit());
+        if (budget.targetOutputLimit() >= 0) accounting.put("targetOutputLimit", budget.targetOutputLimit());
+        accounting.put("outputLimitSource", budget.outputLimitSource());
+        if (budget.capacity() >= 0) accounting.put("modelCapacity", budget.capacity());
+        if (budget.code() != null) accounting.put("failureCode", budget.code());
+        if (budget.message() != null) accounting.put("failureMessage", budget.message());
+        return accounting;
     }
 
     private Map<String, Object> buildGroundingContract(

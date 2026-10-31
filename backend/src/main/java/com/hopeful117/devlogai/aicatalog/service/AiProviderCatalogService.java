@@ -36,11 +36,15 @@ public class AiProviderCatalogService {
     }
 
     public AiProviderCatalogEntry resolve(String providerId) {
-        var provider = providers.get(providerId);
+        var provider = providers.get(catalogProviderId(providerId));
         if (provider == null) {
             throw new EntityNotFoundException("AI provider", providerId);
         }
         return provider;
+    }
+
+    private String catalogProviderId(String providerId) {
+        return "chatgpt".equals(providerId) ? "openai_chatgpt" : providerId;
     }
 
     public AiProviderModel resolveModel(String providerId, String modelIdentifier) {

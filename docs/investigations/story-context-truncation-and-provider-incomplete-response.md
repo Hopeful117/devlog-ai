@@ -106,6 +106,68 @@ account for the complete AI prompt, which additionally contains:
 The AI Engine does not currently record a prompt token estimate or compare input
 size, output allowance and model context capacity before calling the provider.
 
+### HANDOFF - Why the effective Story Context allowance remains 2000
+
+The effective `maxOutputTokens=2000` is currently intentional Core behavior, not
+an MCP connectivity fallback:
+
+1. The active ChatGPT user configuration persists `allowedParameters={}`. It does
+   not provide a user-specific `maxOutputTokens` override.
+2. Core classifies a projection with `accounting.truncated=true` as `REDUCED`.
+3. Migration `V73` originally defined the active `REDUCED` completion policy for
+   `openai_chatgpt:gpt-5.6-luna` with `target_output_tokens=2000`.
+4. `StoryContextBudgetPreflight.maxOutputTokens(...)` derives the missing
+   parameter from that policy and sends `{ "maxOutputTokens": 2000 }` in the
+   Core-authorized request.
+5. The AI Engine receives that authorized value and the ChatGPT adapter logs
+   `outputParameterSource=CORE_AUTHORIZED`; its `LLM_MAX_OUTPUT_TOKENS=2000`
+   default is not the source for Story Context executions once Core provides the
+   parameter.
+
+The provider log therefore correctly reported an effective allowance of `2000`
+before the policy update described below.
+Changing repository selection limits alone does not change this value: the
+`REDUCED` policy remains selected as long as Core marks the projection truncated.
+Changing the policy target or adding a user allowance would be a separate,
+measured completion-policy decision and must not be introduced as a connectivity
+workaround.
+
+### OBSERVED - Temporary 2x completion-policy runtime experiment
+
+To distinguish policy allowance from connectivity, the three active completion
+policies were temporarily doubled and then restored:
+
+| Class | Original target | Test target | Effective provider allowance |
+|---|---:|---:|---:|
+| `REDUCED` | 2,000 | 4,000 | 4,000 |
+| `STANDARD` | 3,000 | 6,000 | not exercised |
+| `COMPLEX` | 4,096 | 8,192 | not exercised |
+
+The same runtime request then completed successfully. The AI Engine logs showed
+`outputParameterSource=CORE_AUTHORIZED`, `authorizedOutputTokens=4000`, and
+`effectiveOutputTokens=4000`; Core received the callback with HTTP `200` and
+recorded the task as `COMPLETED`.
+
+The selection projection remained independently truncated (`60/459` selected,
+`399` discarded, `2644/6000` selection tokens used). This demonstrates that the
+provider failure was caused by the `REDUCED` completion allowance of `2000`, not
+by MCP, Core callback connectivity, or the selection-token budget. The temporary
+database policy values were restored immediately after the experiment.
+
+### IMPLEMENTED - Validated completion policy values
+
+The runtime experiment validated the doubled values, which are now persisted by
+Flyway migration `V74`:
+
+| Class | Minimum | Target | Maximum |
+|---|---:|---:|---:|
+| `REDUCED` | 2,048 | 4,000 | 8,192 |
+| `STANDARD` | 4,096 | 6,000 | 16,384 |
+| `COMPLEX` | 8,192 | 8,192 | 32,768 |
+
+The model context capacity remains unchanged. This policy change is independent
+of MCP authentication and Core callback connectivity.
+
 ### OBSERVED - Failure diagnostics are incomplete at the AI boundary
 
 `InteractionTraceCollector` records provider failure status and a bounded message,

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from anthropic import AsyncAnthropic
 
-from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput
+from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput, effective_output_tokens
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -82,8 +82,17 @@ class AnthropicLlmProvider:
     ) -> ProviderGenerationResult:
         started_at = datetime.now(timezone.utc)
         tool_name = "structured_output"
-        max_output_tokens = request.generation_parameters.get(
-            "maxOutputTokens", self._max_output_tokens
+        max_output_tokens = effective_output_tokens(request, self._max_output_tokens)
+        logger.info(
+            "Sending Anthropic provider request",
+            extra={
+                "event": "provider_request_output_allowance",
+                "taskId": request.traceability.ai_task_id,
+                "intent": request.intent_id,
+                "provider": "anthropic",
+                "model": request.model_identifier or self._model,
+                "effectiveOutputTokens": max_output_tokens,
+            },
         )
         client = self._client
         if self._resolver is not None:

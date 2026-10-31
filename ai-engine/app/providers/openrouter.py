@@ -4,7 +4,7 @@ import logging
 
 from openai import APIStatusError, APITimeoutError, AsyncOpenAI
 
-from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput
+from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput, effective_output_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,18 @@ class OpenRouterLlmProvider:
         response_model: type[StructuredOutput],
     ) -> ProviderGenerationResult:
         started_at = datetime.now(timezone.utc)
+        effective_tokens = effective_output_tokens(request, self._max_output_tokens)
+        logger.info(
+            "Sending OpenRouter provider request",
+            extra={
+                "event": "provider_request_output_allowance",
+                "taskId": request.traceability.ai_task_id,
+                "intent": request.intent_id,
+                "provider": "openrouter",
+                "model": request.model_identifier or self._model,
+                "effectiveOutputTokens": effective_tokens,
+            },
+        )
         response = await self._client.chat.completions.create(
             model=self._model,
             messages=[
@@ -89,7 +101,7 @@ class OpenRouterLlmProvider:
                     "schema": response_model.model_json_schema(),
                 },
             },
-            max_tokens=self._max_output_tokens,
+            max_tokens=effective_tokens,
         )
         message = response.choices[0].message
         raw_output = message.content

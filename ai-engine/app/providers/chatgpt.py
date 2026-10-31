@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
@@ -9,10 +10,17 @@ import httpx
 from openai.lib._pydantic import to_strict_json_schema
 from pydantic import BaseModel
 
-from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput
+from app.providers.base import (
+    OutputAllowanceError,
+    Prompt,
+    ProviderGenerationResult,
+    StructuredOutput,
+    effective_output_tokens,
+)
 from app.security.credential_resolver import ProviderCredentialResolver
 from app.services.chatgpt_oauth import required_scopes_granted
 
+logger = logging.getLogger(__name__)
 
 class ChatGptProviderError(RuntimeError):
     """Bounded provider failure without remote response disclosure."""
@@ -48,13 +56,26 @@ class OpenAiChatGptProvider:
                 credential = await self._refresh(task_id, credential)
             if not required_scopes_granted(credential.scopes):
                 raise ChatGptProviderError("ChatGPT plan authorization is incomplete")
+            effective_tokens = effective_output_tokens(request, self._max_output_tokens)
+            logger.info(
+                "Sending ChatGPT provider request",
+                extra={
+                    "event": "provider_request_output_allowance",
+                    "taskId": request.traceability.ai_task_id,
+                    "intent": request.intent_id,
+                    "provider": "openai_chatgpt",
+                    "model": request.model_identifier or self._model,
+                    "effectiveOutputTokens": effective_tokens,
+                    "outputParameterSource": "CORE_AUTHORIZED"
+                    if request.intent_id == "engineering-story-context-analysis"
+                    else "REQUEST_OR_ENGINE_CONFIG",
+                },
+            )
             body = {
                 "model": request.model_identifier or self._model,
                 "store": False,
                 "stream": True,
-                "max_output_tokens": request.generation_parameters.get(
-                    "maxOutputTokens", self._max_output_tokens
-                ),
+                "max_output_tokens": effective_tokens,
                 "input": [
                     {"role": "system", "content": request.system_message},
                     {"role": "user", "content": request.user_message},
@@ -66,6 +87,8 @@ class OpenAiChatGptProvider:
             }
             output_text = await self._stream(credential.access_token, body)
             return response_model.model_validate(json.loads(output_text))
+        except OutputAllowanceError:
+            raise
         except (ValueError, KeyError, json.JSONDecodeError, httpx.HTTPError) as exception:
             raise ChatGptProviderError("ChatGPT provider request failed") from exception
 
@@ -129,6 +152,15 @@ class OpenAiChatGptProvider:
                             chunks.append(data.get("delta", ""))
                         elif received_type in {"response.failed", "response.incomplete", "error"}:
                             reason = self._incomplete_reason(data)
+                            logger.warning(
+                                "ChatGPT provider response incomplete",
+                                extra={
+                                    "event": "provider_response_incomplete",
+                                    "provider": "openai_chatgpt",
+                                    "providerStatus": received_type.upper(),
+                                    "incompleteReason": reason,
+                                },
+                            )
                             raise ChatGptProviderError(
                                 self._incomplete_response_message(received_type, data),
                                 status=received_type.upper(), reason=reason,

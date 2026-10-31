@@ -97,7 +97,8 @@ async def test_stream_reports_bounded_incomplete_reason(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_provider_uses_core_authorized_model_and_output_limit(monkeypatch):
+async def test_provider_uses_core_authorized_model_and_output_limit(monkeypatch, caplog):
+    caplog.set_level("INFO")
     captured: dict[str, object] = {}
 
     class Resolver:
@@ -130,6 +131,39 @@ async def test_provider_uses_core_authorized_model_and_output_limit(monkeypatch)
 
     assert captured["model"] == "authorized-model"
     assert captured["max_output_tokens"] == 4096
+    allowance_events = [
+        record for record in caplog.records
+        if getattr(record, "event", None) == "provider_request_output_allowance"
+    ]
+    assert allowance_events
+    assert allowance_events[-1].taskId == request.traceability.ai_task_id
+    assert allowance_events[-1].effectiveOutputTokens == 4096
+
+
+@pytest.mark.asyncio
+async def test_story_context_rejects_missing_core_output_allowance(monkeypatch):
+    class Resolver:
+        def resolve_for_task(self, task_id, provider):
+            return SimpleNamespace(
+                access_token="fixture-token",
+                access_token_expires_at=None,
+                scopes=["openid", "profile", "email"],
+            )
+
+    provider = OpenAiChatGptProvider(
+        resolver=Resolver(), endpoint="https://api.openai.com/v1/responses",
+        model="configured-model", timeout_seconds=1, token_endpoint=None,
+        client_id=None, resource=None, max_output_tokens=2000,
+    )
+    monkeypatch.setattr("app.providers.chatgpt.required_scopes_granted", lambda scopes: True)
+    request = replace(
+        InsightPromptBuilder().build(prompt_request()),
+        intent_id="engineering-story-context-analysis",
+        generation_parameters={},
+    )
+
+    with pytest.raises(ValueError, match="not authorized by Core"):
+        await provider.generate_structured(request, InsightGenerationOutput)
 
 
 def test_provider_error_message_is_bounded() -> None:

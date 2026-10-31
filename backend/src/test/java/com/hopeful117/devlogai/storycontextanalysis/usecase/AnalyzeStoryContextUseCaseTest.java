@@ -12,6 +12,9 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.reference.AiReferenceRegistry;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBinding;
+import com.hopeful117.devlogai.aicredentialbinding.service.AiEngineBindingClient;
+import com.hopeful117.devlogai.aicredentialbinding.service.AiTaskExecutionAuthorizationService;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
@@ -106,6 +109,8 @@ class AnalyzeStoryContextUseCaseTest {
     @Mock private IntentCatalog intentCatalog;
     @Mock private AiTaskService aiTaskService;
     @Mock private AIEngineClient aiEngineClient;
+    @Mock private AiEngineBindingClient aiEngineBindingClient;
+    @Mock private AiTaskExecutionAuthorizationService taskAuthorizationService;
     @Mock private AiTaskRepository aiTaskRepository;
     @Mock private StoryContextAnalysisRepository storyContextAnalysisRepository;
     @Mock private AnalysisRepository analysisRepository;
@@ -137,14 +142,17 @@ class AnalyzeStoryContextUseCaseTest {
                         storyContextAnalysisRepository,
                         objectMapper,
                         new StoryContextCallbackIdentityValidator()),
-                new StoryContextSubmissionService(
-                        intentCatalog,
-                        aiTaskService,
-                        aiEngineClient,
+                 new StoryContextSubmissionService(
+                         intentCatalog,
+                         aiTaskService,
+                         aiEngineClient,
                         aiTaskRepository,
                         analysisRepository,
-                        objectMapper,
-                        new StoryContextDigestService(objectMapper)),
+                         objectMapper,
+                         new StoryContextDigestService(objectMapper),
+                         null,
+                         aiEngineBindingClient,
+                          taskAuthorizationService, StoryContextTestPolicy.resolver()),
                 analysisRepository
         );
     }
@@ -191,8 +199,21 @@ class AnalyzeStoryContextUseCaseTest {
                  any(), eq(null), any(AiReferenceRegistry.class)))
                 .thenReturn(task);
 
+        UUID projectIdForPrincipal = project.getId();
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                UUID.randomUUID().toString(), projectIdForPrincipal.toString(),
+                "MCP_STORY_AGENT_EXECUTE");
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectIdForPrincipal), any())).thenReturn(true);
+        when(taskAuthorizationService.authorizeAndIssue(any(), eq(task))).thenReturn(
+                new AiTaskExecutionAuthorizationService.AuthorizedExecution(
+                        AiCredentialBinding.builder().id(UUID.randomUUID()).build(),
+                        "anthropic", "claude-opus-5-5", Map.of("maxOutputTokens", 4096)));
+
         UUID result = useCase.execute(
-                PROJECT_SLUG, storyId, List.of("src/main/java/Canonical.java"), null);
+                PROJECT_SLUG, storyId, INTENT_ID, List.of("src/main/java/Canonical.java"), null,
+                null, principal, "anthropic");
 
         assertEquals(task.getId(), result);
         verify(engineeringContextFacade).getCanonicalEngineeringContext(

@@ -98,6 +98,10 @@ class StoryAgentAccounting(ContractModel):
     budget: StrictInt = Field(ge=0, le=2**31 - 1)
     truncated: bool
     warnings: list[dict[str, Any]] = Field(default_factory=list)
+    measurement_unit: str | None = Field(default=None, alias="measurementUnit", max_length=20)
+    measurement_status: Literal["EXACT", "ESTIMATED", "UNKNOWN"] | None = Field(
+        default=None, alias="measurementStatus"
+    )
 
     @model_validator(mode="after")
     def bounded(self):

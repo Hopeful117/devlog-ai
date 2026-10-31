@@ -3,7 +3,7 @@
 ## Result
 
 Implemented in the working tree and ready for human review. No commit or push
-has been performed yet.
+has been performed.
 
 ## Production Changes
 
@@ -11,6 +11,9 @@ has been performed yet.
 - Added Core fail-closed budget preflight before authenticated provider
   submission, including input estimate, output allowance, safety margin and
   bounded failure codes.
+- Made the preflight outcome explicit as `AUTHORIZED`, `PROJECTION_REDUCED` or
+  `REJECTED`, including rejection before provider invocation when the configured
+  output allowance cannot fit the model capacity.
 - Persisted budget accounting in the immutable task snapshot.
 - Added normalized execution phase, provider status, incomplete reason and
   measurement certainty to interaction traces.
@@ -24,6 +27,8 @@ has been performed yet.
 ## Tests Added/Modified
 
 - Added `StoryContextBudgetPreflightTest` for known and unknown model capacity.
+- Added deterministic tests for projection-reduced and insufficient-output
+  preflight outcomes.
 - Updated the migration-version expectation to include V72.
 - Preserved existing constructor compatibility for existing unit fixtures.
 
@@ -32,6 +37,7 @@ has been performed yet.
 ```bash
 ./backend/mvnw -pl backend test -Dtest=StoryContextBudgetPreflightTest,StoryContextSubmissionServiceTest,AiProviderCatalogTest,AiInteractionTracePersistenceServiceTest,AiTaskResultServiceTest -B
 ./backend/mvnw -pl backend test -Dtest=AnalyzeStoryContextUseCaseTest,AiUserConfigurationPostgresIntegrationTest,StoryContextBudgetPreflightTest -B
+./backend/mvnw -pl backend test -Dtest=StoryContextBudgetPreflightTest,StoryContextSubmissionServiceTest,AnalyzeStoryContextUseCaseTest -B
 ./backend/mvnw -pl backend -am clean verify -B
 python3 -m py_compile app/providers/base.py app/providers/chatgpt.py app/schemas/interaction_trace.py app/services/interaction_trace.py app/providers/mock.py app/providers/openai.py app/providers/anthropic.py app/providers/gemini.py app/providers/openrouter.py
 git diff --check
@@ -39,9 +45,10 @@ git diff --check
 
 ## Test Results
 
-- Targeted Java tests: PASS, 40 tests.
+- Targeted Java tests: PASS, including the four budget-preflight tests and the
+  submission/orchestration regression set of 28 tests.
 - Regression/integration tests: PASS, 27 tests.
-- Full backend verification: PASS, 1600 tests, JaCoCo checks passed.
+- Full backend verification: PASS, 1602 tests, JaCoCo checks passed.
 - Python syntax compilation: PASS.
 - Python pytest suite: NOT RUN; `pytest` is not installed in the environment.
 

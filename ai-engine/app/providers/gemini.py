@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
-from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput
+from app.providers.base import Prompt, ProviderGenerationResult, StructuredOutput, effective_output_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -61,14 +61,26 @@ class GeminiLlmProvider:
         response_model: type[StructuredOutput],
     ) -> ProviderGenerationResult:
         started_at = datetime.now(timezone.utc)
+        effective_tokens = effective_output_tokens(request, self._max_output_tokens)
+        logger.info(
+            "Sending Gemini provider request",
+            extra={
+                "event": "provider_request_output_allowance",
+                "taskId": request.traceability.ai_task_id,
+                "intent": request.intent_id,
+                "provider": "gemini",
+                "model": request.model_identifier or self._model,
+                "effectiveOutputTokens": effective_tokens,
+            },
+        )
         response = await self._client.models.generate_content(
-            model=self._model,
+            model=request.model_identifier or self._model,
             contents=request.user_message,
             config=types.GenerateContentConfig(
                 system_instruction=request.system_message,
                 response_mime_type="application/json",
                 response_json_schema=response_model.model_json_schema(),
-                max_output_tokens=self._max_output_tokens,
+                max_output_tokens=effective_tokens,
             ),
         )
         raw_output = getattr(response, "text", None)

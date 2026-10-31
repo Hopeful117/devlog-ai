@@ -164,6 +164,8 @@ class InteractionTraceCollector:
                     generation,
                     parsed,
                     execution_phase,
+                    provider_status,
+                    incomplete_reason,
                 )
             )
             self._retry_reason = None
@@ -199,6 +201,8 @@ class InteractionTraceCollector:
         generation: ProviderGenerationResult | None,
         parsed: BaseModel | None,
         execution_phase: str,
+        provider_status: str | None,
+        incomplete_reason: str | None,
     ) -> AiInteractionTrace:
         knowledge = self.submission.selected_knowledge
         diagnostic = self.diagnostic
