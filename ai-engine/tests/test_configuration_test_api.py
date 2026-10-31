@@ -1,4 +1,5 @@
 import time
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -24,6 +25,20 @@ def _client(monkeypatch):
         lambda: StubConfigurationTestService(),
     )
     return app, authenticator
+
+
+def test_default_service_authenticator_is_process_scoped(monkeypatch):
+    settings = SimpleNamespace(
+        service_auth_secret="service-secret",
+        sca_callback_secret=None,
+        service_auth_max_clock_skew_seconds=60,
+    )
+    monkeypatch.setattr("app.api.bindings.get_settings", lambda: settings)
+    get_authenticator.cache_clear()
+    try:
+        assert get_authenticator() is get_authenticator()
+    finally:
+        get_authenticator.cache_clear()
 
 
 @pytest.mark.asyncio

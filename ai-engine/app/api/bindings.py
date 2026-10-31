@@ -22,6 +22,7 @@ from app.services.provider_identity import engine_provider
 router = APIRouter(prefix="/ai/bindings", tags=["ai-bindings"])
 
 
+@lru_cache
 def get_authenticator() -> HmacServiceAuthenticator | None:
     settings = get_settings()
     secret = settings.service_auth_secret or settings.sca_callback_secret

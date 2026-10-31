@@ -54,6 +54,31 @@ async def test_enrollment_encrypts_key_and_returns_only_handle(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_provider_validation_sends_configured_workspace_header(tmp_path):
+    settings, service, client = _service(tmp_path)
+    settings = Settings(
+        **{**settings.__dict__, "anthropic_workspace_id": "workspace-test"},
+    )
+    requests = []
+
+    async def handler(request):
+        requests.append(request)
+        return httpx.Response(200, request=request, json={"data": []})
+
+    await client.aclose()
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    service = ApiKeyEnrollmentService(
+        settings,
+        EncryptedCredentialStore(settings.credential_store_path, settings.credential_encryption_key),
+        http_client=client,
+    )
+    await service.enroll(**_claims(settings), api_key="sk-ant-secret")
+
+    assert requests[0].headers["anthropic-workspace-id"] == "workspace-test"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
 async def test_intent_is_single_use_and_mismatch_is_rejected(tmp_path):
     settings, service, client = _service(tmp_path)
     claims = _claims(settings)
@@ -71,4 +96,54 @@ async def test_rejected_key_is_bounded_and_does_not_store(tmp_path):
     settings, service, client = _service(tmp_path, response_status=401)
     with pytest.raises(ApiKeyEnrollmentError, match="rejected"):
         await service.enroll(**_claims(settings), api_key="sk-ant-secret")
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_rejected_key_does_not_consume_intent_and_can_be_retried(tmp_path):
+    settings = Settings(
+        service_auth_secret="service-secret",
+        credential_store_path=str(tmp_path / "credentials.sqlite3"),
+        binding_store_path=str(tmp_path / "bindings.sqlite3"),
+        credential_encryption_key=urlsafe_b64encode(b"0123456789abcdef0123456789abcdef").decode(),
+    )
+    statuses = iter((401, 200))
+
+    async def handler(request):
+        return httpx.Response(next(statuses), request=request, json={"data": []})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    service = ApiKeyEnrollmentService(
+        settings,
+        EncryptedCredentialStore(settings.credential_store_path, settings.credential_encryption_key),
+        http_client=client,
+    )
+    claims = _claims(settings)
+
+    with pytest.raises(ApiKeyEnrollmentError, match="rejected"):
+        await service.enroll(**claims, api_key="sk-ant-secret")
+    result = await service.enroll(**claims, api_key="sk-ant-corrected")
+
+    assert result["provider"] == "anthropic"
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_storage_failure_releases_intent_for_retry(tmp_path, monkeypatch):
+    settings, service, client = _service(tmp_path)
+    monkeypatch.setattr(
+        service._credentials,
+        "put",
+        lambda _: (_ for _ in ()).throw(RuntimeError("storage")),
+    )
+    claims = _claims(settings)
+
+    with pytest.raises(ApiKeyEnrollmentError, match="could not be stored"):
+        await service.enroll(**claims, api_key="sk-ant-secret")
+
+    with service._connect() as connection:
+        assert connection.execute(
+            "SELECT 1 FROM api_key_enrollment_intents WHERE intent_id = ?",
+            (claims["intent_id"],),
+        ).fetchone() is None
     await client.aclose()

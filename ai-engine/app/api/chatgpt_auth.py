@@ -47,7 +47,7 @@ async def start(response: Response, intentId: str | None = Query(default=None),
     redirect = RedirectResponse(url=location, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     if devlog_oauth_session is None:
         redirect.set_cookie(SESSION_COOKIE, current, httponly=True,
-                            secure=location.startswith("https://"),
+                            secure=get_settings().public_base_url.lower().startswith("https://"),
                             samesite="lax", max_age=3600)
     return redirect
 
@@ -69,8 +69,24 @@ async def callback(
             devlog_oauth_session, state, code or "", error, client_id, scope
         )
     except OAuthError:
-        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST,
-                            content={"code": "CHATGPT_AUTHORIZATION_FAILED"})
+        return RedirectResponse(
+            url=f"{get_settings().chatgpt_frontend_redirect_uri}?oauth=failed",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    if isinstance(result, dict) and result.get("status") == "PENDING_CORE_CONFIRMATION":
+        try:
+            await get_oauth_service().complete_core_configuration(
+                str(result["intentId"]), str(result["completionCode"])
+            )
+        except (OAuthError, KeyError):
+            return RedirectResponse(
+                url=f"{get_settings().chatgpt_frontend_redirect_uri}?oauth=failed",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+        return RedirectResponse(
+            url=f"{get_settings().chatgpt_frontend_redirect_uri}?oauth=connected",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
     return {"status": result}
 
 

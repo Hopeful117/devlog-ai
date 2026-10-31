@@ -72,3 +72,18 @@ def test_hmac_authenticator_rejects_stale_request_without_claiming_nonce() -> No
             method="POST", path="/internal/ai/bindings", body=body,
             headers=headers, now=1_061,
         )
+
+
+def test_replay_protector_rejects_the_same_request_across_verification_calls() -> None:
+    authenticator = HmacServiceAuthenticator("binding-secret")
+    body = b"{}"
+    headers = authenticator.sign(
+        method="POST", path="/internal/ai/bindings", body=body,
+        timestamp=1_000, nonce="nonce-1", request_id="request-1",
+    )
+
+    authenticator.verify(method="POST", path="/internal/ai/bindings", body=body,
+                         headers=headers, now=1_000)
+    with pytest.raises(ServiceAuthenticationError, match="replayed"):
+        authenticator.verify(method="POST", path="/internal/ai/bindings", body=body,
+                             headers=headers, now=1_000)

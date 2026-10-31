@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import asyncio
 import hashlib
 import hmac
 import json
@@ -48,7 +49,7 @@ class OAuthSessionStore:
                 "nonce TEXT NOT NULL, redirect_uri TEXT NOT NULL, scopes TEXT NOT NULL, "
                 "client_id TEXT NOT NULL, "
                 "intent_id TEXT, intent_signature TEXT, intent_principal_id TEXT, "
-                "created_at TEXT NOT NULL)"
+                "created_at TEXT NOT NULL, consumed_at TEXT)"
             )
             try:
                 connection.execute(
@@ -64,6 +65,10 @@ class OAuthSessionStore:
                     pass
             try:
                 connection.execute("ALTER TABLE oauth_transactions ADD COLUMN intent_principal_id TEXT")
+            except sqlite3.OperationalError:
+                pass
+            try:
+                connection.execute("ALTER TABLE oauth_transactions ADD COLUMN consumed_at TEXT")
             except sqlite3.OperationalError:
                 pass
             connection.execute(
@@ -101,6 +106,7 @@ class OAuthSessionStore:
     def consume_transaction(self, state: str, session_id: str,
                             ttl_seconds: int) -> OAuthTransaction:
         with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 "SELECT state, session_id, verifier, nonce, redirect_uri, scopes, client_id, created_at, "
                 "intent_id, intent_signature, intent_principal_id "
@@ -108,11 +114,30 @@ class OAuthSessionStore:
             ).fetchone()
             if row is None or row[1] != session_id:
                 raise OAuthError("invalid OAuth transaction")
-            connection.execute("DELETE FROM oauth_transactions WHERE state = ?", (state,))
+            consumed = connection.execute(
+                "SELECT consumed_at FROM oauth_transactions WHERE state = ?", (state,)
+            ).fetchone()[0]
+            if consumed is not None:
+                raise OAuthError("invalid OAuth transaction")
+            updated = connection.execute(
+                "UPDATE oauth_transactions SET consumed_at = ? "
+                "WHERE state = ? AND session_id = ? AND consumed_at IS NULL",
+                (datetime.now(timezone.utc).isoformat(), state, session_id),
+            )
+            if updated.rowcount != 1:
+                raise OAuthError("invalid OAuth transaction")
         transaction = OAuthTransaction(*row[:7], datetime.fromisoformat(row[7]), row[8], row[9], row[10])
         if datetime.now(timezone.utc) - transaction.created_at > timedelta(seconds=ttl_seconds):
             raise OAuthError("expired OAuth transaction")
         return transaction
+
+    def release_transaction(self, state: str, session_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE oauth_transactions SET consumed_at = NULL "
+                "WHERE state = ? AND session_id = ? AND consumed_at IS NOT NULL",
+                (state, session_id),
+            )
 
     def set_session(self, session_id: str, credential_handle: str | None,
                     status: str, scopes: str = "") -> None:
@@ -287,8 +312,10 @@ class ChatGptOAuthService:
         effective_client_id = client_id or transaction.client_id
         if transaction.client_id == "dynamic_agent_client":
             if not client_id or client_id == "dynamic_agent_client":
+                self._sessions.release_transaction(state, session_id)
                 raise OAuthError("authorization could not be completed")
         elif effective_client_id != transaction.client_id:
+            self._sessions.release_transaction(state, session_id)
             raise OAuthError("authorization could not be completed")
         payload = {
             "grant_type": "authorization_code", "client_id": effective_client_id,
@@ -310,7 +337,9 @@ class ChatGptOAuthService:
             if not isinstance(access_token, str) or not access_token or not isinstance(id_token, str):
                 raise OAuthError("authorization could not be completed")
             claims = self._validate_id_token(id_token, transaction.nonce, effective_client_id)
-            scopes = str(token.get("scope") or granted_scopes or "")
+            scopes = token.get("scope")
+            if not isinstance(scopes, str) or not scopes.strip():
+                raise OAuthError("authorization did not grant scopes")
             handle = "chatgpt-" + secrets.token_urlsafe(24)
             expires_at = None
             if isinstance(token.get("expires_in"), int):
@@ -340,8 +369,61 @@ class ChatGptOAuthService:
                     "intentId": transaction.intent_id,
                 }
             return self._sessions.get_session(session_id)[1]
-        except (httpx.HTTPError, ValueError, KeyError) as exception:
+        except OAuthError:
+            self._sessions.release_transaction(state, session_id)
+            raise
+        except Exception as exception:
+            self._sessions.release_transaction(state, session_id)
             raise OAuthError("authorization could not be completed") from exception
+
+    async def complete_core_configuration(self, intent_id: str, completion_code: str) -> None:
+        path = "/api/v1/ai/configuration/oauth/chatgpt/callback"
+        body = json.dumps(
+            {"completionCode": completion_code, "intentId": intent_id},
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        secret = self._settings.service_auth_secret
+        if not secret:
+            raise OAuthError("authorization could not be completed")
+        try:
+            async with httpx.AsyncClient(
+                base_url=self._settings.core_base_url,
+                timeout=self._settings.core_callback_timeout_seconds,
+            ) as client:
+                for attempt in range(1, self._settings.core_callback_max_attempts + 1):
+                    headers = HmacServiceAuthenticator(secret).sign(
+                        method="POST",
+                        path=path,
+                        body=body,
+                        timestamp=int(datetime.now(timezone.utc).timestamp()),
+                        nonce=secrets.token_urlsafe(16),
+                        request_id=secrets.token_urlsafe(16),
+                    )
+                    try:
+                        response = await client.post(path, content=body, headers=headers)
+                    except httpx.HTTPError as exception:
+                        if attempt == self._settings.core_callback_max_attempts:
+                            raise OAuthError("authorization could not be completed") from exception
+                        await asyncio.sleep(self._callback_delay(attempt))
+                        continue
+                    if response.is_success:
+                        return
+                    if response.status_code < 500 or attempt == self._settings.core_callback_max_attempts:
+                        raise OAuthError("authorization could not be completed")
+                    await asyncio.sleep(self._callback_delay(attempt))
+        except (httpx.HTTPError, OAuthError) as exception:
+            if isinstance(exception, OAuthError):
+                raise
+            raise OAuthError("authorization could not be completed") from exception
+
+    def _callback_delay(self, failed_attempt: int) -> float:
+        delay_ms = min(
+            self._settings.core_callback_initial_delay_ms * (2 ** (failed_attempt - 1)),
+            self._settings.core_callback_max_delay_ms,
+        )
+        return delay_ms / 1_000
 
     def _validate_id_token(self, id_token: str, nonce: str, client_id: str) -> dict:
         try:

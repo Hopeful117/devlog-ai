@@ -5,7 +5,6 @@ import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialAssociatio
 import com.hopeful117.devlogai.aicredentialbinding.model.AiProviderIdentity;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiCredentialAssociationService;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiEngineCredentialAssociationClient;
-import com.hopeful117.devlogai.ai.engine.config.AIEngineProperties;
 import com.hopeful117.devlogai.aiuserconfiguration.entity.OAuthConnectionIntent;
 import com.hopeful117.devlogai.aiuserconfiguration.repository.OAuthConnectionIntentRepository;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
@@ -16,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URLEncoder;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -29,15 +30,21 @@ public class ApiKeyConnectionIntentService {
     private final OAuthConnectionIntentRepository repository;
     private final AiCredentialAssociationService associationService;
     private final AiEngineCredentialAssociationClient aiEngineClient;
-    private final AIEngineProperties aiEngineProperties;
     private final Clock clock;
     @Value("${devlog.service-auth.secret:}") private String serviceSecret;
     @Value("${api-key.connection-intent.ttl:PT5M}") private Duration intentTtl;
+    @Value("${ai-engine.public-base-url:}") private String publicBaseUrl;
 
     @Transactional
     public EnrollmentStart start(AuthenticatedPrincipal principal) {
         if (principal == null || serviceSecret == null || serviceSecret.isBlank())
             throw new IllegalStateException("API-key enrollment is not configured");
+        if (publicBaseUrl == null || publicBaseUrl.isBlank()) {
+            throw new IllegalStateException("AI Engine public base URL is not configured");
+        }
+        if (!isAllowedPublicBaseUrl(publicBaseUrl)) {
+            throw new IllegalStateException("AI Engine public base URL must use HTTPS");
+        }
         Instant now = clock.instant();
         OAuthConnectionIntent intent = new OAuthConnectionIntent();
         intent.setPrincipalId(principal.principalId());
@@ -51,9 +58,24 @@ public class ApiKeyConnectionIntentService {
         String binding = OAuthConnectionIntentSigner.principalBinding(serviceSecret, principal.principalId());
         String signature = OAuthConnectionIntentSigner.sign(serviceSecret, intent.getId(), PROVIDER,
                 issued, expires, binding, AiAuthenticationMethod.API_KEY.name());
-        return new EnrollmentStart(aiEngineProperties.baseUrl() + "/api/v1/auth/api-key/enroll",
+        return new EnrollmentStart(publicBaseUrl + "/api/v1/auth/api-key/enroll",
                 intent.getId(), PROVIDER, AiAuthenticationMethod.API_KEY.name(), issued, expires, binding, signature,
                 intent.getExpiresAt());
+    }
+
+    private boolean isAllowedPublicBaseUrl(String value) {
+        try {
+            URI uri = new URI(value);
+            if ("https".equalsIgnoreCase(uri.getScheme())) return true;
+            if (!"http".equalsIgnoreCase(uri.getScheme())) return false;
+            String host = uri.getHost();
+            return "localhost".equalsIgnoreCase(host)
+                    || "127.0.0.1".equals(host)
+                    || "[::1]".equals(host)
+                    || "::1".equals(host);
+        } catch (URISyntaxException error) {
+            return false;
+        }
     }
 
     @Transactional

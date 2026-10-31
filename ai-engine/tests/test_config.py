@@ -17,6 +17,36 @@ def test_settings_preserve_explicit_core_url(monkeypatch) -> None:
     assert settings.core_base_url == "http://core.example:19080"
 
 
+def test_settings_expose_browser_facing_ai_engine_url(monkeypatch) -> None:
+    monkeypatch.setenv("AI_ENGINE_PUBLIC_BASE_URL", "https://ai.example")
+
+    settings = Settings.from_environment()
+
+    assert settings.public_base_url == "https://ai.example"
+
+
+def test_settings_reject_invalid_public_url() -> None:
+    settings = Settings(public_base_url="ai-engine:8000")
+
+    try:
+        settings.validate()
+    except ValueError as error:
+        assert "AI_ENGINE_PUBLIC_BASE_URL" in str(error)
+    else:
+        raise AssertionError("invalid public URL was accepted")
+
+
+def test_settings_reject_invalid_cors_origin() -> None:
+    settings = Settings(cors_origins=("frontend:4200",))
+
+    try:
+        settings.validate()
+    except ValueError as error:
+        assert "AI_ENGINE_CORS_ORIGINS" in str(error)
+    else:
+        raise AssertionError("invalid CORS origin was accepted")
+
+
 def test_settings_default_llm_timeout(monkeypatch) -> None:
     monkeypatch.delenv("LLM_TIMEOUT_SECONDS", raising=False)
 

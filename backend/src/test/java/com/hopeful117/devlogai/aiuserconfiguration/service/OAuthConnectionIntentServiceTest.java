@@ -1,6 +1,5 @@
 package com.hopeful117.devlogai.aiuserconfiguration.service;
 
-import com.hopeful117.devlogai.ai.engine.config.AIEngineProperties;
 import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialAssociation;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiCredentialAssociationService;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiEngineCredentialAssociationClient;
@@ -44,7 +43,8 @@ class OAuthConnectionIntentServiceTest {
 
         var result = service.start(PRINCIPAL);
 
-        assertThat(result.authorizationUrl()).contains("intentId=11111111-1111-1111-1111-111111111111")
+        assertThat(result.authorizationUrl()).startsWith("https://public-ai.example/api/v1/auth/chatgpt/start?")
+                .contains("intentId=11111111-1111-1111-1111-111111111111")
                 .contains("intentProvider=openai_chatgpt")
                 .contains("intentSignature=")
                 .doesNotContain("token", "secret", "principal-1");
@@ -73,6 +73,27 @@ class OAuthConnectionIntentServiceTest {
 
         assertThat(intent.getConsumedAt()).isEqualTo(NOW);
         verify(repository).save(intent);
+        verify(aiEngine).acknowledgeCompletion(intent.getId().toString(), "completion-code");
+    }
+
+    @Test
+    void completesFromTheAuthenticatedAiEngineCallbackUsingTheIntentPrincipal() {
+        var repository = mock(OAuthConnectionIntentRepository.class);
+        var associations = mock(AiCredentialAssociationService.class);
+        var aiEngine = mock(AiEngineCredentialAssociationClient.class);
+        var service = service(repository, associations, aiEngine);
+        var intent = intent(NOW.plus(Duration.ofMinutes(5)));
+        when(repository.findById(intent.getId())).thenReturn(Optional.of(intent));
+        when(repository.findByIdForUpdate(intent.getId())).thenReturn(Optional.of(intent));
+        when(associations.associate(any(), any(), any(), any())).thenReturn(new AiCredentialAssociation());
+        when(aiEngine.redeemCompletion(any(), any())).thenReturn(
+                new AiEngineCredentialAssociationClient.OAuthCompletion("opaque", "subject", "scopes", "client"));
+
+        service.completeFromAiEngine(intent.getId(), "completion-code");
+
+        verify(associations).associate(
+                new AuthenticatedPrincipal("principal-1", PrincipalKind.HUMAN, "ai-engine"),
+                "subject", "opaque", "openai_chatgpt");
         verify(aiEngine).acknowledgeCompletion(intent.getId().toString(), "completion-code");
     }
 
@@ -130,10 +151,10 @@ class OAuthConnectionIntentServiceTest {
     private static OAuthConnectionIntentService service(OAuthConnectionIntentRepository repository,
                                                         AiCredentialAssociationService associations,
                                                         AiEngineCredentialAssociationClient aiEngine) {
-        var service = new OAuthConnectionIntentService(repository, associations, aiEngine,
-                new AIEngineProperties("http://ai", Duration.ofSeconds(1), Duration.ofSeconds(1)), CLOCK);
+        var service = new OAuthConnectionIntentService(repository, associations, aiEngine, CLOCK);
         ReflectionTestUtils.setField(service, "serviceSecret", "service-secret");
         ReflectionTestUtils.setField(service, "intentTtl", Duration.ofMinutes(5));
+        ReflectionTestUtils.setField(service, "publicBaseUrl", "https://public-ai.example");
         return service;
     }
 
