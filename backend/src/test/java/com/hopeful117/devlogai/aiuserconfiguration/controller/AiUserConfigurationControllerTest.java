@@ -4,6 +4,8 @@ import com.hopeful117.devlogai.aiuserconfiguration.entity.AiUserConfiguration;
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiModelSelectionOrigin;
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiUserConfigurationState;
 import com.hopeful117.devlogai.aiuserconfiguration.service.AiUserConfigurationService;
+import com.hopeful117.devlogai.aiuserconfiguration.service.AiConfigurationTestService;
+import com.hopeful117.devlogai.aicredentialbinding.service.AiCredentialAssociationService;
 import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipalResolver;
@@ -23,12 +25,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class AiUserConfigurationControllerTest {
     private final AiUserConfigurationService service = mock(AiUserConfigurationService.class);
     private final AuthenticatedPrincipalResolver principalResolver = mock(AuthenticatedPrincipalResolver.class);
+    private final AiConfigurationTestService configurationTestService = mock(AiConfigurationTestService.class);
+    private final MockMvc testMvc = MockMvcBuilders
+            .standaloneSetup(new AiUserConfigurationController(
+                    service, principalResolver, mock(AiCredentialAssociationService.class), configurationTestService))
+            .build();
     private final MockMvc mvc = MockMvcBuilders
             .standaloneSetup(new AiUserConfigurationController(service, principalResolver))
             .build();
@@ -98,6 +106,22 @@ class AiUserConfigurationControllerTest {
                         .contentType("application/json")
                         .content("{\"provider\":\"mock\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returnsBoundedConfigurationTestResultForAuthenticatedPrincipal() throws Exception {
+        when(principalResolver.resolve(any())).thenReturn(Optional.of(principal()));
+        when(configurationTestService.test(any())).thenReturn(new AiConfigurationTestService.Result(
+                com.hopeful117.devlogai.aiuserconfiguration.model.AiConfigurationTestStatus.SUCCESS,
+                "anthropic", "claude-opus-5-5", "CONFIGURATION_VALID"));
+
+        testMvc.perform(post("/api/v1/ai/configuration/test"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUCCESS"))
+                .andExpect(jsonPath("$.provider").value("anthropic"))
+                .andExpect(jsonPath("$.model").value("claude-opus-5-5"))
+                .andExpect(jsonPath("$.diagnosticCode").value("CONFIGURATION_VALID"))
+                .andExpect(jsonPath("$.credentialHandle").doesNotExist());
     }
 
     private static AuthenticatedPrincipal principal() {

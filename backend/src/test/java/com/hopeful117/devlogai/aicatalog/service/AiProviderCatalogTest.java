@@ -40,8 +40,8 @@ class AiProviderCatalogTest {
 
         var anthropic = entries.get(4);
         assertEquals(List.of(AiAuthenticationMethod.API_KEY), anthropic.authenticationMethods());
-        assertTrue(anthropic.models().isEmpty());
-        assertNull(anthropic.recommendedModel());
+        assertEquals("claude-opus-5-5", anthropic.recommendedModel());
+        assertEquals("claude-opus-5-5", anthropic.models().getFirst().identifier());
     }
 
     @Test
@@ -75,8 +75,7 @@ class AiProviderCatalogTest {
     void shouldRepresentUnavailableRecommendationWithoutASelection() {
         var anthropic = catalog.resolve("anthropic");
 
-        assertTrue(anthropic.models().isEmpty());
-        assertNull(anthropic.recommendedModel());
+        assertEquals("claude-opus-5-5", anthropic.recommendedModel());
     }
 
     @Test

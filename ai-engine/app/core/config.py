@@ -29,6 +29,8 @@ class Settings:
     chatgpt_authorization_endpoint: str = "https://auth.openai.com/api/accounts/authorize"
     chatgpt_token_endpoint: str = "https://auth.openai.com/api/accounts/oauth/token"
     chatgpt_responses_endpoint: str = "https://api.openai.com/v1/responses"
+    chatgpt_models_endpoint: str = "https://api.openai.com/v1/models"
+    configuration_test_timeout_seconds: float = 4.0
     chatgpt_redirect_uri: str | None = None
     chatgpt_scopes: str = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct"
     chatgpt_resource: str = "https://api.openai.com/v1"
@@ -102,6 +104,12 @@ class Settings:
             ),
             chatgpt_responses_endpoint=os.getenv(
                 "CHATGPT_RESPONSES_ENDPOINT", "https://api.openai.com/v1/responses"
+            ),
+            chatgpt_models_endpoint=os.getenv(
+                "CHATGPT_MODELS_ENDPOINT", "https://api.openai.com/v1/models"
+            ),
+            configuration_test_timeout_seconds=float(
+                os.getenv("CONFIGURATION_TEST_TIMEOUT_SECONDS", "4")
             ),
             chatgpt_redirect_uri=os.getenv("CHATGPT_REDIRECT_URI") or None,
             chatgpt_scopes=os.getenv(

@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.aiuserconfiguration.controller;
 import com.hopeful117.devlogai.aiuserconfiguration.entity.AiUserConfiguration;
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiModelSelectionOrigin;
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiUserConfigurationState;
+import com.hopeful117.devlogai.aiuserconfiguration.service.AiConfigurationTestService;
 import com.hopeful117.devlogai.aiuserconfiguration.service.AiUserConfigurationService;
 import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiCredentialAssociationService;
@@ -30,19 +31,22 @@ public class AiUserConfigurationController {
     private final AiUserConfigurationService service;
     private final AuthenticatedPrincipalResolver principalResolver;
     private final AiCredentialAssociationService associationService;
+    private final AiConfigurationTestService configurationTestService;
 
     @Autowired
     public AiUserConfigurationController(AiUserConfigurationService service,
                                          AuthenticatedPrincipalResolver principalResolver,
-                                         AiCredentialAssociationService associationService) {
+                                         AiCredentialAssociationService associationService,
+                                         AiConfigurationTestService configurationTestService) {
         this.service = service;
         this.principalResolver = principalResolver;
         this.associationService = associationService;
+        this.configurationTestService = configurationTestService;
     }
 
     public AiUserConfigurationController(AiUserConfigurationService service,
                                          AuthenticatedPrincipalResolver principalResolver) {
-        this(service, principalResolver, null);
+        this(service, principalResolver, null, null);
     }
 
     @GetMapping
@@ -88,6 +92,13 @@ public class AiUserConfigurationController {
                 .orElseThrow(UnauthenticatedPrincipalException::new);
         service.delete(principal);
         return ResponseEntity.noContent().build();
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/test")
+    public ResponseEntity<AiConfigurationTestService.Result> test(HttpServletRequest request) {
+        var principal = principalResolver.resolve(request)
+                .orElseThrow(UnauthenticatedPrincipalException::new);
+        return ResponseEntity.ok(configurationTestService.test(principal));
     }
 
     public record ConfigurationRequest(

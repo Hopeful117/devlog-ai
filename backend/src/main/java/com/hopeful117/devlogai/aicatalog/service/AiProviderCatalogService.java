@@ -71,7 +71,8 @@ public class AiProviderCatalogService {
                 List.of(), null, AiCatalogLifecycleStatus.EXPERIMENTAL));
         register(result, provider(
                 "anthropic", "Anthropic", List.of(AiAuthenticationMethod.API_KEY),
-                List.of(), null, AiCatalogLifecycleStatus.EXPERIMENTAL));
+                List.of(model("claude-opus-5-5", "Claude Opus 5.5")),
+                "claude-opus-5-5", AiCatalogLifecycleStatus.STABLE));
         register(result, provider(
                 "openrouter", "OpenRouter", List.of(AiAuthenticationMethod.API_KEY),
                 List.of(), null, AiCatalogLifecycleStatus.EXPERIMENTAL));

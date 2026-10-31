@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.aiuserconfiguration.service;
 
 import com.hopeful117.devlogai.aiuserconfiguration.entity.AiUserConfiguration;
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiModelSelectionOrigin;
+import com.hopeful117.devlogai.aiuserconfiguration.model.AiConfigurationTestStatus;
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiUserConfigurationState;
 import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 import com.hopeful117.devlogai.aicatalog.model.AiCatalogLifecycleStatus;
@@ -21,6 +22,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -153,6 +155,69 @@ class AiUserConfigurationServiceTest {
         assertThat(saved.getSelectedModel()).isEqualTo("alternative");
         assertThat(saved.getModelSelectionOrigin()).isEqualTo(AiModelSelectionOrigin.EXPLICIT);
         verify(repository).save(any(AiUserConfiguration.class));
+    }
+
+    @Test
+    void failedConfigurationTestPreventsReadyStateUntilConfigurationChanges() {
+        var repository = mock(AiUserConfigurationRepository.class);
+        var catalog = catalog();
+        var service = service(repository, catalog);
+        var configuration = new AiUserConfiguration();
+        configuration.setProvider("mock");
+        configuration.setAuthenticationMethod(AiAuthenticationMethod.NONE);
+        configuration.setSelectedModel("deterministic-v1");
+        configuration.setModelSelectionOrigin(AiModelSelectionOrigin.RECOMMENDED);
+        configuration.setAllowedParameters(Map.of());
+        configuration.setLastConfigurationTestStatus(AiConfigurationTestStatus.PROVIDER_UNAVAILABLE);
+
+        assertThat(service.state(Optional.of(configuration)))
+                .isEqualTo(AiUserConfigurationState.PROVIDER_UNAVAILABLE);
+    }
+
+    @Test
+    void ignoresResultFromAnOlderConfigurationTestIdentity() {
+        var repository = mock(AiUserConfigurationRepository.class);
+        var configuration = new AiUserConfiguration();
+        configuration.setLastConfigurationTestId(UUID.randomUUID());
+        when(repository.findByPrincipalId("principal-1")).thenReturn(Optional.of(configuration));
+        var service = service(repository, catalog());
+
+        service.recordConfigurationTest(PRINCIPAL, UUID.randomUUID(), AiConfigurationTestStatus.SUCCESS);
+
+        assertThat(configuration.getLastConfigurationTestStatus()).isNull();
+        verify(repository, never()).save(any(AiUserConfiguration.class));
+    }
+
+    @Test
+    void successfulTestStillRequiresAnAuthorizedAssociation() {
+        var repository = mock(AiUserConfigurationRepository.class);
+        var catalog = mock(AiProviderCatalogService.class);
+        var model = new AiProviderModel("model", "Model", List.of(), AiProviderModelAvailability.AVAILABLE);
+        var provider = new AiProviderCatalogEntry("anthropic", "Anthropic",
+                List.of(AiAuthenticationMethod.API_KEY), List.of(model), "model", List.of(),
+                AiCatalogLifecycleStatus.STABLE);
+        when(catalog.resolve("anthropic")).thenReturn(provider);
+        when(catalog.resolveModel("anthropic", "model")).thenReturn(model);
+        var service = service(repository, catalog);
+        var configuration = configuration("anthropic", AiAuthenticationMethod.API_KEY, "model");
+        configuration.setLastConfigurationTestStatus(AiConfigurationTestStatus.SUCCESS);
+        var association = new com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialAssociation();
+        association.setAuthenticationMethod(AiAuthenticationMethod.API_KEY);
+        association.setState(com.hopeful117.devlogai.aicredentialbinding.model.AiCredentialAssociationState.REVOKED);
+
+        assertThat(service.state(Optional.of(configuration), Optional.of(association)))
+                .isEqualTo(AiUserConfigurationState.REVOKED);
+    }
+
+    private static AiUserConfiguration configuration(String provider, AiAuthenticationMethod method,
+                                                      String model) {
+        var configuration = new AiUserConfiguration();
+        configuration.setProvider(provider);
+        configuration.setAuthenticationMethod(method);
+        configuration.setSelectedModel(model);
+        configuration.setModelSelectionOrigin(AiModelSelectionOrigin.EXPLICIT);
+        configuration.setAllowedParameters(Map.of());
+        return configuration;
     }
 
     private static AiUserConfigurationService service(AiUserConfigurationRepository repository,
