@@ -101,6 +101,22 @@ Use the backend and MCP module tests before the full backend verification:
 ./backend/mvnw -pl backend -am clean verify -B
 ```
 
+## Story Context budget diagnostics
+
+Story Context executions record bounded budget and provider diagnostics. Known
+catalog models use their configured context capacity; executions with unknown
+capacity fail closed before provider invocation. `maxOutputTokens` remains an
+independent output allowance and is not treated as measured provider usage.
+
+Normal traces contain metadata only. Diagnostic traces follow the configured
+short retention policy, while the immutable Core execution snapshot remains a
+separate audit/grounding artifact. Diagnostics must not contain credentials,
+authorization headers, full prompts, repository payloads or raw provider output.
+
+Provider-specific incomplete responses are terminal failures. The normalized
+fields include execution phase, provider status, bounded incomplete reason and
+measurement certainty; unavailable provider values are represented as `UNKNOWN`.
+
 ## MCP runtime diagnostics
 
 The OpenCode MCP launcher delegates to the repository-owned supervisor at

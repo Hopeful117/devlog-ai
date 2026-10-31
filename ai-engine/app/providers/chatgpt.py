@@ -17,6 +17,12 @@ from app.services.chatgpt_oauth import required_scopes_granted
 class ChatGptProviderError(RuntimeError):
     """Bounded provider failure without remote response disclosure."""
 
+    def __init__(self, message: str, *, status: str = "FAILED", reason: str | None = None) -> None:
+        super().__init__(message)
+        self.provider_status = status
+        self.incomplete_reason = reason
+        self.failure_category = "PROVIDER_INCOMPLETE" if reason else "PROVIDER_ERROR"
+
 
 class OpenAiChatGptProvider:
     def __init__(self, *, resolver: ProviderCredentialResolver, endpoint: str,
@@ -122,8 +128,10 @@ class OpenAiChatGptProvider:
                         if received_type == "response.output_text.delta":
                             chunks.append(data.get("delta", ""))
                         elif received_type in {"response.failed", "response.incomplete", "error"}:
+                            reason = self._incomplete_reason(data)
                             raise ChatGptProviderError(
-                                self._incomplete_response_message(received_type, data)
+                                self._incomplete_response_message(received_type, data),
+                                status=received_type.upper(), reason=reason,
                             )
                         elif received_type == "response.completed":
                             completed = True
@@ -147,6 +155,13 @@ class OpenAiChatGptProvider:
             code = re.sub(r"[^A-Za-z0-9_.-]", "_", code)[:80]
             return f"ChatGPT response did not complete ({event_type}; code={code})"
         return f"ChatGPT response did not complete ({event_type})"
+
+    @staticmethod
+    def _incomplete_reason(data: dict) -> str | None:
+        response = data.get("response") if isinstance(data.get("response"), dict) else data
+        details = response.get("incomplete_details") if isinstance(response, dict) else None
+        reason = details.get("reason") if isinstance(details, dict) else None
+        return re.sub(r"[^A-Za-z0-9_.-]", "_", reason)[:80] if isinstance(reason, str) and reason else None
 
     @staticmethod
     def _provider_error_message(status_code: int, response: httpx.Response) -> str:

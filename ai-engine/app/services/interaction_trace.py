@@ -117,23 +117,30 @@ class InteractionTraceCollector:
         status = "SUCCEEDED"
         failure_category: str | None = None
         failure_message: str | None = None
+        execution_phase = "PROVIDER"
+        provider_status: str | None = None
+        incomplete_reason: str | None = None
         try:
             generation = await self._generate(prompt, response_model)
             try:
                 parsed = response_model.model_validate(generation.output)
             except Exception:
+                execution_phase = "PARSING"
                 status = "PARSING_FAILED"
                 failure_category = "FORMAT_ERROR"
                 raise
             try:
                 validator(parsed)
             except Exception as validation_error:
+                execution_phase = "VALIDATION"
                 status = "VALIDATION_FAILED"
                 failure_category = _failure_category(validation_error)
                 raise
             return parsed
         except Exception as error:
             failure_message = _failure_message(error)
+            provider_status = getattr(error, "provider_status", None)
+            incomplete_reason = getattr(error, "incomplete_reason", None)
             if failure_category is None:
                 if isinstance(error, ValidationError):
                     status = "PARSING_FAILED"
@@ -156,6 +163,7 @@ class InteractionTraceCollector:
                     failure_message,
                     generation,
                     parsed,
+                    execution_phase,
                 )
             )
             self._retry_reason = None
@@ -190,6 +198,7 @@ class InteractionTraceCollector:
         failure_message: str | None,
         generation: ProviderGenerationResult | None,
         parsed: BaseModel | None,
+        execution_phase: str,
     ) -> AiInteractionTrace:
         knowledge = self.submission.selected_knowledge
         diagnostic = self.diagnostic
@@ -227,4 +236,9 @@ class InteractionTraceCollector:
             if diagnostic and generation else None,
             parsed_model_response=_json_value(parsed) if diagnostic and parsed else None,
             validation_diagnostics=redact_sensitive_text(failure_message),
+            execution_phase=execution_phase,
+            provider_status=provider_status or (generation.response_status if generation else None),
+            incomplete_reason=incomplete_reason or (generation.incomplete_reason if generation else None),
+            measurement_unit="tokens" if generation and generation.total_tokens is not None else "UNKNOWN",
+            measurement_status="EXACT" if generation and generation.total_tokens is not None else "UNKNOWN",
         )

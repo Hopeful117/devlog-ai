@@ -42,3 +42,8 @@ class AiInteractionTrace(ContractModel):
         default=None, alias="parsedModelResponse"
     )
     validation_diagnostics: str | None = Field(default=None, alias="validationDiagnostics")
+    execution_phase: str | None = Field(default=None, alias="executionPhase", max_length=40)
+    provider_status: str | None = Field(default=None, alias="providerStatus", max_length=40)
+    incomplete_reason: str | None = Field(default=None, alias="incompleteReason", max_length=80)
+    measurement_unit: str | None = Field(default=None, alias="measurementUnit", max_length=20)
+    measurement_status: str | None = Field(default=None, alias="measurementStatus", max_length=20)

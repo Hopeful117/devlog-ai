@@ -16,7 +16,9 @@ public class StoryContextAgentMetrics {
             "sca_protocol_requests_total", "sca_projection_construction_total",
             "sca_budget_truncated_total", "sca_digest_mismatch_total",
             "sca_grounding_rejection_total", "sca_idempotent_retry_total",
-            "sca_duplicate_terminal_total"
+            "sca_duplicate_terminal_total", "sca_preflight_rejected_total",
+            "sca_provider_incomplete_total", "sca_parsing_failure_total",
+            "sca_validation_failure_total"
     };
 
     private final MeterRegistry registry;

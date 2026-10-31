@@ -42,6 +42,29 @@ public record AiInteractionTraceRequest(
         String userPrompt,
         String rawModelResponse,
         Object parsedModelResponse,
-        @Size(max = 5000) String validationDiagnostics
+        @Size(max = 5000) String validationDiagnostics,
+        @Size(max = 40) String executionPhase,
+        @Size(max = 40) String providerStatus,
+        @Size(max = 80) String incompleteReason,
+        @Size(max = 20) String measurementUnit,
+        @Size(max = 20) String measurementStatus
 ) {
+    public AiInteractionTraceRequest(
+            UUID id, int attempt, String interactionType, String traceLevel, String provider,
+            String modelIdentifier, String intent, String intentVersion, String promptVersion,
+            Instant startedAt, Instant completedAt, long durationMs, String validationStatus,
+            String failureCategory, String retryReason, String selectedKnowledgeFingerprint,
+            String promptFingerprint, int selectedFactCount, int selectedObservationCount,
+            int selectedInsightCount, int selectedEngineeringEventCount, String groundingFingerprint,
+            Integer inputTokens, Integer outputTokens, Integer totalTokens, String traceId,
+            String spanId, String systemPrompt, String userPrompt, String rawModelResponse,
+            Object parsedModelResponse, String validationDiagnostics) {
+        this(id, attempt, interactionType, traceLevel, provider, modelIdentifier, intent, intentVersion,
+                promptVersion, startedAt, completedAt, durationMs, validationStatus, failureCategory,
+                retryReason, selectedKnowledgeFingerprint, promptFingerprint, selectedFactCount,
+                selectedObservationCount, selectedInsightCount, selectedEngineeringEventCount,
+                groundingFingerprint, inputTokens, outputTokens, totalTokens, traceId, spanId,
+                systemPrompt, userPrompt, rawModelResponse, parsedModelResponse, validationDiagnostics,
+                null, null, null, null, null);
+    }
 }

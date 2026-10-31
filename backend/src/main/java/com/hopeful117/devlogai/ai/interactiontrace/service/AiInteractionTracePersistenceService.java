@@ -74,6 +74,11 @@ public class AiInteractionTracePersistenceService {
                 .rawModelResponse(diagnostic ? request.rawModelResponse() : null)
                 .parsedModelResponse(diagnostic ? request.parsedModelResponse() : null)
                 .validationDiagnostics(diagnostic ? request.validationDiagnostics() : null)
+                .executionPhase(request.executionPhase())
+                .providerStatus(request.providerStatus())
+                .incompleteReason(request.incompleteReason())
+                .measurementUnit(request.measurementUnit())
+                .measurementStatus(request.measurementStatus())
                 .expiresAt(expiresAt)
                 .build();
     }

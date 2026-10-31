@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.ai.engine.client.AIEngineClient;
 import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
 import com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory;
 import com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest;
+import com.hopeful117.devlogai.ai.task.dto.request.FailAiTaskRequest;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
@@ -23,6 +24,7 @@ import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
+import com.hopeful117.devlogai.aicatalog.service.AiProviderCatalogService;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,14 +53,28 @@ public class StoryContextSubmissionService {
     private final AiCredentialBindingService credentialBindingService;
     private final AiEngineBindingClient aiEngineBindingClient;
     private final AiTaskExecutionAuthorizationService taskAuthorizationService;
+    private final StoryContextBudgetPreflight budgetPreflight;
+    private final boolean budgetPreflightEnabled;
 
     @Autowired
     public StoryContextSubmissionService(
             IntentCatalog intentCatalog, AiTaskService aiTaskService, AIEngineClient aiEngineClient,
             AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
+             StoryContextDigestService digestService, AiCredentialBindingService credentialBindingService,
+             AiEngineBindingClient aiEngineBindingClient,
+             AiTaskExecutionAuthorizationService taskAuthorizationService,
+             AiProviderCatalogService providerCatalog) {
+        this(intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository, objectMapper,
+                digestService, credentialBindingService, aiEngineBindingClient, taskAuthorizationService,
+                providerCatalog, true);
+    }
+
+    private StoryContextSubmissionService(
+            IntentCatalog intentCatalog, AiTaskService aiTaskService, AIEngineClient aiEngineClient,
+            AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
             StoryContextDigestService digestService, AiCredentialBindingService credentialBindingService,
-            AiEngineBindingClient aiEngineBindingClient,
-            AiTaskExecutionAuthorizationService taskAuthorizationService) {
+            AiEngineBindingClient aiEngineBindingClient, AiTaskExecutionAuthorizationService taskAuthorizationService,
+            AiProviderCatalogService providerCatalog, boolean budgetPreflightEnabled) {
         this.intentCatalog = intentCatalog;
         this.aiTaskService = aiTaskService;
         this.aiEngineClient = aiEngineClient;
@@ -69,6 +85,8 @@ public class StoryContextSubmissionService {
         this.credentialBindingService = credentialBindingService;
         this.aiEngineBindingClient = aiEngineBindingClient;
         this.taskAuthorizationService = taskAuthorizationService;
+        this.budgetPreflight = new StoryContextBudgetPreflight(providerCatalog, objectMapper);
+        this.budgetPreflightEnabled = budgetPreflightEnabled;
     }
 
     public StoryContextSubmissionService(
@@ -76,7 +94,18 @@ public class StoryContextSubmissionService {
             AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
             StoryContextDigestService digestService) {
         this(intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository,
-                objectMapper, digestService, null, null, null);
+                objectMapper, digestService, null, null, null, new AiProviderCatalogService());
+    }
+
+    public StoryContextSubmissionService(
+            IntentCatalog intentCatalog, AiTaskService aiTaskService, AIEngineClient aiEngineClient,
+            AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
+            StoryContextDigestService digestService, AiCredentialBindingService credentialBindingService,
+            AiEngineBindingClient aiEngineBindingClient,
+            AiTaskExecutionAuthorizationService taskAuthorizationService) {
+        this(intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository,
+                objectMapper, digestService, credentialBindingService, aiEngineBindingClient,
+                taskAuthorizationService, new AiProviderCatalogService(), false);
     }
 
     @Transactional
@@ -148,6 +177,23 @@ public class StoryContextSubmissionService {
             throw new IllegalStateException("authenticated principal is required for user-bound AI execution");
         }
         aiTaskRepository.save(task);
+        if (budgetPreflightEnabled && principal != null) {
+            StoryContextBudgetPreflight.Result budget = budgetPreflight.check(
+                    authorizedProvider, authorizedModel, projection, authorizedParameters);
+            if (!budget.accepted()) {
+                aiTaskService.failSubmission(task.getId(),
+                        new FailAiTaskRequest(budget.code(), budget.message()));
+                throw new IllegalStateException(budget.message());
+            }
+            snapshot.put("budgetAccounting", Map.of(
+                    "inputEstimate", budget.inputEstimate(),
+                    "outputLimit", budget.outputLimit(),
+                    "modelCapacity", budget.capacity(),
+                    "measurementUnit", "tokens",
+                    "measurementStatus", "ESTIMATED"));
+            task.setContextSnapshot(snapshot);
+            aiTaskRepository.save(task);
+        }
         aiTaskService.submit(task.getId(), new SubmitAiTaskRequest(null));
 
         Map<String, Object> metadata = new LinkedHashMap<>();

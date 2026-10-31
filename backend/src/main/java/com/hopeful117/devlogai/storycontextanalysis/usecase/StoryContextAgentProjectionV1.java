@@ -208,6 +208,13 @@ public final class StoryContextAgentProjectionV1 {
         if (used > budget) throw new IllegalArgumentException("Accounting usedTokens exceeds budget");
         a.put("budget", budget); a.put("truncated",
                 c.repositoryContext() != null && c.repositoryContext().truncated());
+        a.put("measurementUnit", "tokens");
+        a.put("measurementStatus", "EXACT");
+        Object projectionSize = raw == null ? null : raw.get("serializedProjectionSize");
+        if (projectionSize instanceof Number size && size.longValue() >= 0) {
+            a.put("serializedProjectionSize", size.longValue());
+            a.put("serializedProjectionMeasurementStatus", "EXACT");
+        }
         List<Map<String, String>> warnings = c.repositoryContext() == null ? List.of() : c.repositoryContext().warnings().stream().map(value -> Map.of("code", "CONTEXT_WARNING", "message", value)).sorted(Comparator.comparing((Map<String, String> value) -> value.get("code")).thenComparing(value -> value.get("message"))).toList();
         a.put("warnings", warnings);
         return a;

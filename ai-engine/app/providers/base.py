@@ -16,6 +16,8 @@ class ProviderGenerationResult:
     input_tokens: int | None
     output_tokens: int | None
     total_tokens: int | None
+    response_status: str | None = None
+    incomplete_reason: str | None = None
 
 
 @dataclass(frozen=True)

@@ -52,6 +52,10 @@ public class AiProviderCatalogService {
                         "AI model", providerId + ":" + modelIdentifier));
     }
 
+    public Integer contextCapacityTokens(String providerId, String modelIdentifier) {
+        return resolveModel(providerId, modelIdentifier).contextCapacityTokens();
+    }
+
     public String catalogVersion() {
         return CATALOG_VERSION;
     }
@@ -60,22 +64,22 @@ public class AiProviderCatalogService {
         Map<String, AiProviderCatalogEntry> result = new LinkedHashMap<>();
         register(result, provider(
                 "mock", "Mock", List.of(AiAuthenticationMethod.NONE),
-                List.of(model("deterministic-v1", "Deterministic v1")),
+                 List.of(model("deterministic-v1", "Deterministic v1", 1_048_576)),
                 "deterministic-v1", AiCatalogLifecycleStatus.STABLE));
         register(result, provider(
                 "openai", "OpenAI", List.of(AiAuthenticationMethod.API_KEY),
-                List.of(model("gpt-5.6-luna", "GPT-5.6 Luna")),
+                 List.of(model("gpt-5.6-luna", "GPT-5.6 Luna", 1_048_576)),
                 "gpt-5.6-luna", AiCatalogLifecycleStatus.STABLE));
         register(result, provider(
                 "openai_chatgpt", "ChatGPT", List.of(AiAuthenticationMethod.OAUTH),
-                List.of(model("gpt-5.6-luna", "GPT-5.6 Luna")),
+                 List.of(model("gpt-5.6-luna", "GPT-5.6 Luna", 1_048_576)),
                 "gpt-5.6-luna", AiCatalogLifecycleStatus.EXPERIMENTAL));
         register(result, provider(
                 "gemini", "Gemini", List.of(AiAuthenticationMethod.API_KEY),
                 List.of(), null, AiCatalogLifecycleStatus.EXPERIMENTAL));
         register(result, provider(
                 "anthropic", "Anthropic", List.of(AiAuthenticationMethod.API_KEY),
-                List.of(model("claude-opus-5-5", "Claude Opus 5.5")),
+                 List.of(model("claude-opus-5-5", "Claude Opus 5.5", 1_000_000)),
                 "claude-opus-5-5", AiCatalogLifecycleStatus.STABLE));
         register(result, provider(
                 "openrouter", "OpenRouter", List.of(AiAuthenticationMethod.API_KEY),
@@ -103,9 +107,9 @@ public class AiProviderCatalogService {
                         MIN_MAX_OUTPUT_TOKENS, MAX_MAX_OUTPUT_TOKENS, 2_000)));
     }
 
-    private static AiProviderModel model(String identifier, String displayName) {
+    private static AiProviderModel model(String identifier, String displayName, int contextCapacityTokens) {
         return new AiProviderModel(identifier, displayName, List.of(STRUCTURED_OUTPUT),
-                AiProviderModelAvailability.AVAILABLE);
+                AiProviderModelAvailability.AVAILABLE, contextCapacityTokens);
     }
 
     private static void register(Map<String, AiProviderCatalogEntry> catalog,
