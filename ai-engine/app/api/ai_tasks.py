@@ -56,6 +56,14 @@ async def submit_ai_task(
                 ),
             },
         )
+    if request.task_type == AiTaskType.STORY_CONTEXT_ANALYSIS:
+        try:
+            processing_service.authorize_submission(request)
+        except ValueError as error:
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={"code": "AI_TASK_BINDING_REJECTED", "message": str(error)[:500]},
+            )
     response = service.accept(request)
     background_tasks.add_task(
         processing_service.process,

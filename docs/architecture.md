@@ -336,6 +336,27 @@ context decision, while the second identifies the final semantic agent payload. 
 evidence remains navigation context; the current working repository is still authoritative for
 implementation decisions. This boundary is recorded by ADR-046.
 
+### User-Bound AI Task Execution
+
+For a principal-aware Story Agent submission, Java Core resolves the principal's
+active AI user configuration and requires the derived state to be `READY`. The
+selected catalog provider and model are copied into the task execution contract;
+Core issues one opaque, task-scoped credential binding and registers only its
+non-secret binding metadata with the AI Engine. ChatGPT OAuth is represented by
+the product provider `openai_chatgpt` and the Engine provider `chatgpt`.
+
+Before any user provider call, the AI Engine verifies the exact Core-issued
+binding against the task and provider, then rejects missing, expired, revoked,
+or mismatched identities and models. It must not select a credential from caller
+metadata or a process-level fallback for this path. Binding handles and secrets
+are never included in prompts, callbacks, traces, or user-visible MCP results.
+
+REST and MCP Story Agent adapters use the same Core submission capability. The
+general background analysis workflow remains outside this user-bound path: it
+does not have an authenticated principal and therefore does not infer one from
+project, task, metadata, or transport context. A future user-bound background
+workflow requires an explicit execution identity decision.
+
 ### Core Service (Java Spring)
 
 The Core Service contains the business logic and acts as the source of truth for project knowledge.

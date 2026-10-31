@@ -21,7 +21,6 @@ import java.util.Map;
 public class DevLogStoryAgentService implements DevLogStoryAgent {
 
     private static final String STORY_CONTEXT_ANALYSIS_INTENT = "engineering-story-context-analysis";
-    private static final String CHATGPT_PROVIDER = "chatgpt";
 
     private final AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
     private final AiTaskService aiTaskService;
@@ -50,7 +49,7 @@ public class DevLogStoryAgentService implements DevLogStoryAgent {
         var taskId = analyzeStoryContextUseCase.executePrepared(
                 prepared,
                 guidance,
-                request.idempotencyKey(), principal, CHATGPT_PROVIDER);
+                request.idempotencyKey(), principal);
 
         AiTaskResponse task = aiTaskService.getById(taskId);
         if (task.id() == null || !taskId.equals(task.id())) {

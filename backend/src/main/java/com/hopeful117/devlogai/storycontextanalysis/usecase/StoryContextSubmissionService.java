@@ -11,6 +11,7 @@ import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBinding;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiCredentialBindingService;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiEngineBindingClient;
+import com.hopeful117.devlogai.aicredentialbinding.service.AiTaskExecutionAuthorizationService;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
@@ -49,13 +50,15 @@ public class StoryContextSubmissionService {
     private final StoryContextDigestService digestService;
     private final AiCredentialBindingService credentialBindingService;
     private final AiEngineBindingClient aiEngineBindingClient;
+    private final AiTaskExecutionAuthorizationService taskAuthorizationService;
 
     @Autowired
     public StoryContextSubmissionService(
             IntentCatalog intentCatalog, AiTaskService aiTaskService, AIEngineClient aiEngineClient,
             AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
             StoryContextDigestService digestService, AiCredentialBindingService credentialBindingService,
-            AiEngineBindingClient aiEngineBindingClient) {
+            AiEngineBindingClient aiEngineBindingClient,
+            AiTaskExecutionAuthorizationService taskAuthorizationService) {
         this.intentCatalog = intentCatalog;
         this.aiTaskService = aiTaskService;
         this.aiEngineClient = aiEngineClient;
@@ -65,6 +68,7 @@ public class StoryContextSubmissionService {
         this.digestService = digestService;
         this.credentialBindingService = credentialBindingService;
         this.aiEngineBindingClient = aiEngineBindingClient;
+        this.taskAuthorizationService = taskAuthorizationService;
     }
 
     public StoryContextSubmissionService(
@@ -72,7 +76,7 @@ public class StoryContextSubmissionService {
             AiTaskRepository aiTaskRepository, AnalysisRepository analysisRepository, ObjectMapper objectMapper,
             StoryContextDigestService digestService) {
         this(intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository,
-                objectMapper, digestService, null, null);
+                objectMapper, digestService, null, null, null);
     }
 
     @Transactional
@@ -124,13 +128,22 @@ public class StoryContextSubmissionService {
         task.setContextSnapshot(snapshot);
         aiTaskRepository.save(task);
         aiTaskRepository.flush();
-        if ("chatgpt".equals(provider)) {
-            if (principal == null) {
-                throw new IllegalStateException("authenticated principal is required for ChatGPT Story Agent execution");
+        UUID bindingId = null;
+        String authorizedProvider = null;
+        String authorizedModel = null;
+        if (principal != null) {
+            if (taskAuthorizationService == null || aiEngineBindingClient == null) {
+                throw new IllegalStateException("user-bound AI task authorization is not configured");
             }
-            AiCredentialBinding binding = credentialBindingService.issue(principal, task.getId(), provider);
-            aiEngineBindingClient.register(binding);
+            var authorization = taskAuthorizationService.authorizeAndIssue(principal, task);
+            bindingId = authorization.binding().getId();
+            authorizedProvider = authorization.provider();
+            authorizedModel = authorization.model();
+            aiEngineBindingClient.register(authorization.binding());
+        } else if (provider != null) {
+            throw new IllegalStateException("authenticated principal is required for user-bound AI execution");
         }
+        aiTaskRepository.save(task);
         aiTaskService.submit(task.getId(), new SubmitAiTaskRequest(null));
 
         Map<String, Object> metadata = new LinkedHashMap<>();
@@ -147,10 +160,16 @@ public class StoryContextSubmissionService {
         metadata.put("freshness", projection.get("freshness"));
         metadata.put("groundingDigest", digestService.sha256(digestService.canonicalJson(groundingContract)));
         metadata.put("storyAgentContractVersion", projection.get("contractVersion"));
+        if (bindingId != null) {
+            metadata.put("credentialBindingId", bindingId.toString());
+            metadata.put("provider", authorizedProvider);
+            metadata.put("modelIdentifier", authorizedModel);
+        }
         PromptRequest prompt = new PromptRequest(
                 UUID.randomUUID(), task.getCorrelationId(), prepared.project().getId(), task.getId(),
                 AiTaskType.STORY_CONTEXT_ANALYSIS, intent, userGuidance, projection, intent.outputSchema(),
-                groundingContract, metadata);
+                groundingContract, metadata, contextDigest, null, projectionDigest,
+                bindingId, authorizedProvider, authorizedModel);
         aiEngineClient.submit(prompt);
         return task.getId();
     }
