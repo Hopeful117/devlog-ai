@@ -137,6 +137,21 @@ public class AiInteractionTrace {
     @Column(name = "validation_diagnostics", columnDefinition = "TEXT", updatable = false)
     private String validationDiagnostics;
 
+    @Column(name = "execution_phase", length = 40, updatable = false)
+    private String executionPhase;
+
+    @Column(name = "provider_status", length = 40, updatable = false)
+    private String providerStatus;
+
+    @Column(name = "incomplete_reason", length = 80, updatable = false)
+    private String incompleteReason;
+
+    @Column(name = "measurement_unit", length = 20, updatable = false)
+    private String measurementUnit;
+
+    @Column(name = "measurement_status", length = 20, updatable = false)
+    private String measurementStatus;
+
     @Column(name = "expires_at", updatable = false)
     private Instant expiresAt;
 }

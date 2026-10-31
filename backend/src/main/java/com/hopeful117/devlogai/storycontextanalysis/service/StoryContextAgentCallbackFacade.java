@@ -23,6 +23,15 @@ public class StoryContextAgentCallbackFacade {
     @Transactional
     public AiTaskResultAcknowledgement callback(UUID aiTaskId, AiTaskResultRequest request) {
         request.validateCallbackContract();
+        request.interactionTraces().forEach(trace -> {
+            if ("PROVIDER_INCOMPLETE".equals(trace.failureCategory())) {
+                metrics.increment("sca_provider_incomplete_total");
+            } else if ("PARSING_FAILED".equals(trace.validationStatus())) {
+                metrics.increment("sca_parsing_failure_total");
+            } else if ("VALIDATION_FAILED".equals(trace.validationStatus())) {
+                metrics.increment("sca_validation_failure_total");
+            }
+        });
         AiTask task = aiTaskRepository.findById(aiTaskId)
                 .orElseThrow(() -> new EntityNotFoundException("AI task", aiTaskId));
         if (task.getId() == null || !task.getId().equals(aiTaskId)) {
