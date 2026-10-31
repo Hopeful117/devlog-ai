@@ -36,6 +36,8 @@ export class SimpleAiConfigurationPage implements OnInit {
   readonly error = signal('');
   readonly notice = signal('');
   readonly testStatus = signal<AiConfigurationTestStatus | null>(null);
+  readonly advanced = signal(false);
+  readonly maxOutputTokens = signal(2000);
 
   readonly userProviders = computed(() =>
     (this.catalog()?.providers ?? []).filter(
@@ -47,8 +49,9 @@ export class SimpleAiConfigurationPage implements OnInit {
     this.userProviders().find((provider) => provider.providerId === this.selectedProvider()),
   );
 
-  readonly selectedModels = computed(() =>
-    (this.selectedEntry()?.models ?? []).filter((model) => model.availability !== 'UNAVAILABLE'),
+  readonly selectedModels = computed(() => this.selectedEntry()?.models ?? []);
+  readonly outputTokenParameter = computed(() =>
+    this.selectedEntry()?.parameters?.find((parameter) => parameter.name === 'maxOutputTokens'),
   );
 
   ngOnInit(): void {
@@ -75,8 +78,23 @@ export class SimpleAiConfigurationPage implements OnInit {
   }
 
   selectModel(model: string): void {
+    const selected = this.selectedModels().find((candidate) => candidate.identifier === model);
+    if (
+      selected?.availability === 'UNAVAILABLE' &&
+      !window.confirm(
+        'This model is unavailable. Select it only to review its state; confirm a supported replacement to continue.',
+      )
+    )
+      return;
     this.selectedModel.set(model);
     this.modelSelectionOrigin.set('EXPLICIT');
+  }
+
+  useRecommended(): void {
+    const recommended = this.selectedEntry()?.recommendedModel;
+    if (!recommended || !window.confirm('Use the recommended model?')) return;
+    this.selectedModel.set(recommended);
+    this.modelSelectionOrigin.set('RECOMMENDED');
   }
 
   async save(): Promise<void> {
@@ -91,7 +109,7 @@ export class SimpleAiConfigurationPage implements OnInit {
           authenticationMethod: this.authenticationMethod(),
           selectedModel: this.selectedModel(),
           modelSelectionOrigin: this.modelSelectionOrigin(),
-          allowedParameters: {},
+          allowedParameters: this.advanced() ? { maxOutputTokens: this.maxOutputTokens() } : {},
         }),
       );
       this.configuration.set(saved);
@@ -158,6 +176,17 @@ export class SimpleAiConfigurationPage implements OnInit {
     });
   }
 
+  async revoke(): Promise<void> {
+    if (!window.confirm('Disconnect this provider?')) return;
+    await this.runAction(async () => {
+      await firstValueFrom(
+        this.service.revoke(this.selectedProvider() as 'openai_chatgpt' | 'anthropic'),
+      );
+      await this.reloadConfiguration();
+      this.notice.set('Connection revoked. Reconnect explicitly to use this provider.');
+    });
+  }
+
   stateLabel(state: AiConfigurationState | null): string {
     return (
       {
@@ -192,6 +221,8 @@ export class SimpleAiConfigurationPage implements OnInit {
         this.selectedModel.set(configuration.selectedModel);
         this.modelSelectionOrigin.set(configuration.modelSelectionOrigin ?? 'EXPLICIT');
       }
+      const configuredTokens = configuration.allowedParameters?.['maxOutputTokens'];
+      if (typeof configuredTokens === 'number') this.maxOutputTokens.set(configuredTokens);
     } catch {
       this.error.set('AI configuration could not be loaded. Try again.');
     } finally {
@@ -224,6 +255,7 @@ export class SimpleAiConfigurationPage implements OnInit {
           API_KEY_ENROLLMENT_FAILED: 'The API key could not be accepted. Check it and try again.',
           CREDENTIAL_INVALID: 'The saved credential is invalid. Reconnect this provider.',
           MODEL_UNAVAILABLE: 'The selected model is unavailable. Choose and confirm another model.',
+          INVALID_PARAMETER: 'The advanced parameter is outside the supported safe range.',
           PROVIDER_UNAVAILABLE: 'The provider is temporarily unavailable. Try again later.',
         } as Record<string, string>
       )[body?.code ?? ''] ?? 'The request could not be completed. Try again.'

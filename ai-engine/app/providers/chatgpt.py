@@ -21,11 +21,13 @@ class ChatGptProviderError(RuntimeError):
 class OpenAiChatGptProvider:
     def __init__(self, *, resolver: ProviderCredentialResolver, endpoint: str,
                  model: str, timeout_seconds: float, token_endpoint: str | None,
-                 client_id: str | None, resource: str | None) -> None:
+                 client_id: str | None, resource: str | None,
+                 max_output_tokens: int) -> None:
         self._resolver = resolver
         self._endpoint = endpoint
         self._model = model
         self._timeout_seconds = timeout_seconds
+        self._max_output_tokens = max_output_tokens
         self._token_endpoint = token_endpoint
         self._client_id = client_id
         self._resource = resource
@@ -41,9 +43,12 @@ class OpenAiChatGptProvider:
             if not required_scopes_granted(credential.scopes):
                 raise ChatGptProviderError("ChatGPT plan authorization is incomplete")
             body = {
-                "model": self._model,
+                "model": request.model_identifier or self._model,
                 "store": False,
                 "stream": True,
+                "max_output_tokens": request.generation_parameters.get(
+                    "maxOutputTokens", self._max_output_tokens
+                ),
                 "input": [
                     {"role": "system", "content": request.system_message},
                     {"role": "user", "content": request.user_message},

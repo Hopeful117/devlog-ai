@@ -37,6 +37,22 @@ Simple AI configuration page uses the explicitly configured public AI Engine enr
 the one-time signed API-key intake; Core remains the authority and the browser never receives or
 persists the stored credential handle as a reusable authorization.
 
+## Docker E2E
+
+Run the authenticated Docker-backed browser suite with:
+
+```bash
+npm run e2e:docker
+```
+
+The E2E Compose override configures a shared Keycloak hostname for the backend
+and browser, creates an idempotent local OIDC user, obtains a short-lived test
+token, and seeds the `devlog-ai` project when it is absent. The token is written
+only to ignored `test-results/e2e-auth.json` and is injected by the Playwright
+fixture, not by the application. The default production Compose configuration
+is unchanged. Override the local test credentials with
+`PLAYWRIGHT_E2E_USERNAME` and `PLAYWRIGHT_E2E_PASSWORD` when needed.
+
 ## Implemented routes
 
 - `/projects` — read-only Project list
@@ -64,6 +80,24 @@ AI_ENGINE_CORS_ORIGINS=http://127.0.0.1:18083,http://localhost:18083,http://127.
 `AI_ENGINE_CORS_ORIGINS` must be an explicit allowlist. The enrollment endpoint accepts only the
 signed provider, authentication method, principal binding, intent, and expiry returned by Core.
 The API key is cleared from frontend state immediately before submission and is never re-rendered.
+
+The same `/settings/ai` page also provides **Advanced mode**. It uses the same Core configuration
+contract as Simple mode and adds only the catalog-owned `maxOutputTokens` parameter. Core accepts
+values from `256` through `32,768` inclusive and rejects all other or unknown parameters. An
+explicit model remains explicit until the user chooses **Use recommended model** or confirms a
+replacement. An unavailable configured model is not silently replaced and must be remediated
+explicitly.
+
+Disconnect actions call Core's provider-specific revocation endpoints. Revocation and expiry fail
+closed for future task bindings; reconnecting is a separate user action. The page renders only
+bounded status/diagnostic categories and never stores tokens, API keys, enrollment payloads, or
+credential handles in browser storage, URLs, or telemetry. Operators keep provider secrets in the
+AI Engine secret store; Core owns non-secret configuration and task binding.
+
+The lifecycle is `configure -> enroll/authorize -> test -> bind task -> execute`, with `replace`,
+`disconnect/revoke`, and `reauthorize` as explicit actions. ADR-072 and ADR-073 retain their
+documented implementation-versus-human-architecture-approval distinction; this Story does not
+change either ADR status.
 
 The Project feature composes route parameters and HTTP calls as Observables. Components expose a
 typed view-state Observable and templates consume it with Angular's `async` pipe; component code does

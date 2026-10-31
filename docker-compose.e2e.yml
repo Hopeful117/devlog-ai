@@ -1,0 +1,11 @@
+services:
+  keycloak:
+    environment:
+      KC_HOSTNAME: http://host.docker.internal:18084
+      KC_HOSTNAME_STRICT: "false"
+
+  backend:
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      KEYCLOAK_ISSUER_URI: http://host.docker.internal:18084/realms/devlog

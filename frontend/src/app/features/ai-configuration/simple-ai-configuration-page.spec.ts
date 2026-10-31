@@ -23,6 +23,16 @@ const catalog = {
       recommendedModel: 'gpt-5.6-luna',
       capabilities: [],
       lifecycleStatus: 'STABLE',
+      parameters: [
+        {
+          name: 'maxOutputTokens',
+          displayName: 'Maximum output tokens',
+          type: 'integer',
+          minimum: 256,
+          maximum: 32768,
+          defaultValue: 2000,
+        },
+      ],
     },
     {
       providerId: 'anthropic',
@@ -39,6 +49,16 @@ const catalog = {
       recommendedModel: 'claude-sonnet',
       capabilities: [],
       lifecycleStatus: 'STABLE',
+      parameters: [
+        {
+          name: 'maxOutputTokens',
+          displayName: 'Maximum output tokens',
+          type: 'integer',
+          minimum: 256,
+          maximum: 32768,
+          defaultValue: 2000,
+        },
+      ],
     },
   ],
 } as const;
@@ -81,6 +101,7 @@ describe('SimpleAiConfigurationPage', () => {
       testConfiguration: vi.fn(() =>
         of({ status: 'SUCCESS' as const, provider: 'anthropic', model: 'claude-sonnet' }),
       ),
+      revoke: vi.fn(() => of(void 0)),
     };
     TestBed.configureTestingModule({
       imports: [SimpleAiConfigurationPage],
@@ -151,5 +172,33 @@ describe('SimpleAiConfigurationPage', () => {
 
     expect(fixture.componentInstance.apiKeyEnrollment()).toBeNull();
     expect(fixture.componentInstance.apiKey()).toBe('');
+  });
+
+  it('sends the bounded Advanced parameter through the shared save contract', async () => {
+    const { fixture, service } = render();
+    await fixture.whenStable();
+    await fixture.whenStable();
+    fixture.componentInstance.selectProvider('anthropic');
+    fixture.componentInstance.advanced.set(true);
+    fixture.componentInstance.maxOutputTokens.set(4096);
+
+    await fixture.componentInstance.save();
+
+    expect(service.saveConfiguration).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowedParameters: { maxOutputTokens: 4096 },
+      }),
+    );
+  });
+
+  it('revokes explicitly and refreshes configuration state', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const { fixture, service } = render();
+    fixture.componentInstance.selectProvider('anthropic');
+
+    await fixture.componentInstance.revoke();
+
+    expect(service.revoke).toHaveBeenCalledWith('anthropic');
+    expect(service.getConfiguration).toHaveBeenCalledTimes(2);
   });
 });

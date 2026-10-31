@@ -42,6 +42,10 @@ class AiProviderCatalogTest {
         assertEquals(List.of(AiAuthenticationMethod.API_KEY), anthropic.authenticationMethods());
         assertEquals("claude-opus-5-5", anthropic.recommendedModel());
         assertEquals("claude-opus-5-5", anthropic.models().getFirst().identifier());
+        var parameter = anthropic.parameters().getFirst();
+        assertEquals("maxOutputTokens", parameter.name());
+        assertEquals(256, parameter.minimum());
+        assertEquals(32_768, parameter.maximum());
     }
 
     @Test

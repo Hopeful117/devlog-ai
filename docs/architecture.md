@@ -3,6 +3,30 @@
 
 ## Core Principles
 
+### AI Configuration Lifecycle
+
+Simple and Advanced configuration are two presentations of the same Core-owned
+`AiUserConfiguration` contract. Advanced exposes only catalog metadata and the bounded
+`maxOutputTokens` parameter (`256..32,768`, inclusive); Core validates and normalizes it before
+persistence. Unknown parameters, provider/model-inapplicable values, and out-of-range values are
+rejected. There is no automatic provider, credential, or model fallback.
+
+```text
+configure -> enroll/authorize -> test -> READY -> Core binding -> task execution
+     |             |              |         |
+  replace     reauthorize     diagnostics  revoke/expire -> fail closed
+```
+
+The browser expresses user intent but never selects credentials, authorizes a task, or receives a
+secret. Explicit model choices remain explicit. An unavailable configured model remains visible as
+`MODEL_UNAVAILABLE` until the user explicitly selects a supported replacement or returns to the
+catalog recommendation. Existing association, binding, outbox, and AI Engine revocation paths are
+reused; diagnostics are bounded and exclude secrets and raw provider payloads.
+
+ADR-072 and ADR-073 are intentionally not status-changed by this implementation. Their documents
+retain the distinction between repository implementation evidence and explicit human architectural
+approval; Story closure or passing tests do not substitute for that approval.
+
 ### Knowledge First
 
 DevLog AI is built around the idea that project knowledge is the primary asset.

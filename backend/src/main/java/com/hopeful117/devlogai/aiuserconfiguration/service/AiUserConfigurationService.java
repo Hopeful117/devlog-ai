@@ -50,7 +50,7 @@ public class AiUserConfigurationService {
         AiProviderModel model = resolveModel(provider, selectedModel);
         validateAuthenticationMethod(providerEntry, authenticationMethod);
         validateSelection(providerEntry, selectedModel, modelSelectionOrigin);
-        Map<String, Object> parameters = validateParameters(allowedParameters);
+        Map<String, Object> parameters = validateParameters(providerEntry, allowedParameters);
 
         Instant now = clock.instant();
         AiUserConfiguration configuration = repository.findByPrincipalId(principal.principalId())
@@ -124,7 +124,7 @@ public class AiUserConfigurationService {
         if (!provider.authenticationMethods().contains(value.getAuthenticationMethod())
                 || value.getModelSelectionOrigin() == null
                 || value.getAllowedParameters() == null
-                || !value.getAllowedParameters().isEmpty()) {
+                || !validPersistedParameters(provider, value.getAllowedParameters())) {
             return AiUserConfigurationState.CONFIGURATION_INCOMPLETE;
         }
         if (value.getModelSelectionOrigin() == AiModelSelectionOrigin.RECOMMENDED
@@ -193,11 +193,29 @@ public class AiUserConfigurationService {
         }
     }
 
-    private Map<String, Object> validateParameters(Map<String, Object> allowedParameters) {
-        if (allowedParameters != null && !allowedParameters.isEmpty()) {
+    private Map<String, Object> validateParameters(AiProviderCatalogEntry provider,
+                                                   Map<String, Object> allowedParameters) {
+        if (allowedParameters == null || allowedParameters.isEmpty()) return Map.of();
+        var supported = provider.parameters().stream().map(parameter -> parameter.name()).toList();
+        if (allowedParameters.size() != supported.size() || !supported.containsAll(allowedParameters.keySet())) {
             throw new InvalidParameterException("allowedParameters", allowedParameters.keySet());
         }
-        return Map.of();
+        Object raw = allowedParameters.get(AiProviderCatalogService.MAX_OUTPUT_TOKENS);
+        if (!(raw instanceof Number number) || number.doubleValue() != number.intValue()
+                || number.intValue() < AiProviderCatalogService.MIN_MAX_OUTPUT_TOKENS
+                || number.intValue() > AiProviderCatalogService.MAX_MAX_OUTPUT_TOKENS) {
+            throw new InvalidParameterException("maxOutputTokens", raw);
+        }
+        return Map.of(AiProviderCatalogService.MAX_OUTPUT_TOKENS, number.intValue());
+    }
+
+    private boolean validPersistedParameters(AiProviderCatalogEntry provider, Map<String, Object> parameters) {
+        try {
+            validateParameters(provider, parameters);
+            return true;
+        } catch (InvalidParameterException exception) {
+            return false;
+        }
     }
 
     private void requirePrincipal(AuthenticatedPrincipal principal) {

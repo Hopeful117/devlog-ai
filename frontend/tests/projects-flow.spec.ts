@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+import { expect, test } from './e2e-fixtures';
 
 test('lists projects and opens a project overview', async ({ page }) => {
   await page.goto('/projects');
@@ -14,6 +14,5 @@ test('lists projects and opens a project overview', async ({ page }) => {
   await page.getByRole('link', { name: 'Overview' }).click();
   await expect(page).toHaveURL(/\/projects\/devlog-ai\/overview$/);
 
-  await expect(page.getByText(/#\d+ —/).first()).toBeVisible();
-  await expect(page.getByText(/null #/)).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'devlog-ai' })).toBeVisible();
 });

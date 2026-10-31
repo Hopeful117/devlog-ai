@@ -128,9 +128,11 @@ public class StoryAgentFollowUpService {
                 followUp.getId(), AiTaskType.STORY_CONTEXT_ANALYSIS, intent,
                 com.hopeful117.devlogai.intent.model.UserGuidance.from(
                         providerGuidance(question, guidance)),
-                followUp.getSelectedKnowledgeSnapshot(), intent.outputSchema(),
-                map(parent.getContextSnapshot().get("groundingContract")), metadata,
-                parent.getContextDigest(), parent.getSelectionDigest(), parent.getProjectionDigest());
+                 followUp.getSelectedKnowledgeSnapshot(), intent.outputSchema(),
+                 map(parent.getContextSnapshot().get("groundingContract")), metadata,
+                 parent.getContextDigest(), parent.getSelectionDigest(), parent.getProjectionDigest(),
+                 parent.getCredentialBindingId(), parent.getProvider(), parent.getModelIdentifier(),
+                 map(parent.getContextSnapshot().get("allowedParameters")));
 
         aiTaskService.submit(followUp.getId(), new com.hopeful117.devlogai.ai.task.dto.request.SubmitAiTaskRequest(null));
         aiEngineClient.submit(prompt);

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
@@ -199,6 +200,28 @@ async def test_anthropic_provider_uses_forced_structured_tool() -> None:
     assert client.messages.arguments["model"] == "claude-test"
     assert client.messages.arguments["tool_choice"] == {"type": "tool", "name": "structured_output"}
     assert client.messages.arguments["workspace_id"] == "wrkspc_test"
+
+
+@pytest.mark.asyncio
+async def test_anthropic_provider_uses_core_authorized_output_limit() -> None:
+    client = FakeAnthropicClient()
+    provider = AnthropicLlmProvider(
+        api_key="test-key",
+        model="claude-test",
+        timeout_seconds=1,
+        max_output_tokens=500,
+        client=client,
+    )
+    request = replace(
+        InsightPromptBuilder().build(prompt_request()),
+        generation_parameters={"maxOutputTokens": 4096},
+        model_identifier="authorized-model",
+    )
+
+    await provider.generate_structured(request, InsightGenerationOutput)
+
+    assert client.messages.arguments["max_tokens"] == 4096
+    assert client.messages.arguments["model"] == "authorized-model"
 
 
 @pytest.mark.asyncio

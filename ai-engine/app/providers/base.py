@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Protocol, TypeVar
 
@@ -58,6 +58,8 @@ class Prompt:
     generation_policy: GenerationPolicy
     traceability: PromptTraceability
     content_digest: str
+    generation_parameters: dict[str, Any] = field(default_factory=dict)
+    model_identifier: str | None = None
 
 
 class LlmProvider(Protocol):

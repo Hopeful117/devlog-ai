@@ -47,6 +47,7 @@ def build_llm_provider(settings: Settings) -> LlmProvider:
             token_endpoint=settings.chatgpt_token_endpoint,
             client_id=settings.chatgpt_client_id,
             resource=settings.chatgpt_resource,
+            max_output_tokens=settings.llm_max_output_tokens,
         )
     if settings.llm_provider == "gemini":
         if settings.llm_api_key is None:

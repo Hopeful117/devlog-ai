@@ -82,6 +82,9 @@ class AnthropicLlmProvider:
     ) -> ProviderGenerationResult:
         started_at = datetime.now(timezone.utc)
         tool_name = "structured_output"
+        max_output_tokens = request.generation_parameters.get(
+            "maxOutputTokens", self._max_output_tokens
+        )
         client = self._client
         if self._resolver is not None:
             credential = self._resolver.resolve_for_task(UUID(request.traceability.ai_task_id), "anthropic")
@@ -90,10 +93,10 @@ class AnthropicLlmProvider:
             raise ValueError("Anthropic credential is not configured")
         try:
             response = await client.messages.create(
-                model=self._model,
+                model=request.model_identifier or self._model,
                 system=request.system_message,
                 messages=[{"role": "user", "content": request.user_message}],
-                max_tokens=self._max_output_tokens,
+                max_tokens=max_output_tokens,
                 tools=[
                     {
                         "name": tool_name,

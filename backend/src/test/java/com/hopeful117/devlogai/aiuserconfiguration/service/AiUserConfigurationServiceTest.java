@@ -116,6 +116,34 @@ class AiUserConfigurationServiceTest {
     }
 
     @Test
+    void acceptsAndNormalizesTheBoundedOutputTokenParameter() {
+        var repository = mock(AiUserConfigurationRepository.class);
+        when(repository.findByPrincipalId("principal-1")).thenReturn(Optional.empty());
+        when(repository.save(any(AiUserConfiguration.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        var service = service(repository, new AiProviderCatalogService());
+
+        var saved = service.save(PRINCIPAL, "anthropic", AiAuthenticationMethod.API_KEY,
+                "claude-opus-5-5", AiModelSelectionOrigin.EXPLICIT, Map.of("maxOutputTokens", 32_768L));
+
+        assertThat(saved.getAllowedParameters()).containsEntry("maxOutputTokens", 32_768);
+    }
+
+    @Test
+    void rejectsOutputTokenValuesOutsideTheSafeRange() {
+        var repository = mock(AiUserConfigurationRepository.class);
+        var service = service(repository, new AiProviderCatalogService());
+
+        assertThatThrownBy(() -> service.save(PRINCIPAL, "anthropic", AiAuthenticationMethod.API_KEY,
+                "claude-opus-5-5", AiModelSelectionOrigin.EXPLICIT,
+                Map.of("maxOutputTokens", 255)))
+                .isInstanceOf(InvalidParameterException.class);
+        assertThatThrownBy(() -> service.save(PRINCIPAL, "anthropic", AiAuthenticationMethod.API_KEY,
+                "claude-opus-5-5", AiModelSelectionOrigin.EXPLICIT,
+                Map.of("maxOutputTokens", 32_769)))
+                .isInstanceOf(InvalidParameterException.class);
+    }
+
+    @Test
     void preservesExplicitUnavailableModelAndRemovesReadyState() {
         var repository = mock(AiUserConfigurationRepository.class);
         var unavailableModel = new AiProviderModel("known-model", "Known model", List.of(),

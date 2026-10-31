@@ -27,7 +27,8 @@ public record PromptRequest(
         String projectionDigest,
         UUID credentialBindingId,
         String provider,
-        String modelIdentifier
+        String modelIdentifier,
+        Map<String, Object> allowedParameters
 ) {
     public PromptRequest(UUID requestId, UUID correlationId, UUID analysisId, UUID aiTaskId,
                          AiTaskType taskType, IntentDefinition intent, UserGuidance userGuidance,
@@ -36,7 +37,7 @@ public record PromptRequest(
         this(requestId, correlationId, analysisId, aiTaskId, taskType, intent, userGuidance,
                 selectedKnowledge, expectedOutputContract, groundingContract, metadata,
                 string(metadata, "contextDigest"), string(metadata, "selectionDigest"),
-                string(metadata, "projectionDigest"), null, null, null);
+                string(metadata, "projectionDigest"), null, null, null, Map.of());
     }
 
     public PromptRequest(UUID requestId, UUID correlationId, UUID analysisId, UUID aiTaskId,
@@ -46,7 +47,19 @@ public record PromptRequest(
                          String contextDigest, String selectionDigest, String projectionDigest) {
         this(requestId, correlationId, analysisId, aiTaskId, taskType, intent, userGuidance,
                 selectedKnowledge, expectedOutputContract, groundingContract, metadata,
-                contextDigest, selectionDigest, projectionDigest, null, null, null);
+                 contextDigest, selectionDigest, projectionDigest, null, null, null, Map.of());
+    }
+
+    public PromptRequest(UUID requestId, UUID correlationId, UUID analysisId, UUID aiTaskId,
+                         AiTaskType taskType, IntentDefinition intent, UserGuidance userGuidance,
+                         Map<String, Object> selectedKnowledge, Map<String, Object> expectedOutputContract,
+                         Map<String, Object> groundingContract, Map<String, Object> metadata,
+                         String contextDigest, String selectionDigest, String projectionDigest,
+                         UUID credentialBindingId, String provider, String modelIdentifier) {
+        this(requestId, correlationId, analysisId, aiTaskId, taskType, intent, userGuidance,
+                selectedKnowledge, expectedOutputContract, groundingContract, metadata,
+                contextDigest, selectionDigest, projectionDigest, credentialBindingId, provider,
+                modelIdentifier, Map.of());
     }
     private static String string(Map<String, Object> map, String key) {
         Object value = map == null ? null : map.get(key);
@@ -67,5 +80,7 @@ public record PromptRequest(
         groundingContract = groundingContract == null ? Map.of()
                 : Collections.unmodifiableMap(new LinkedHashMap<>(groundingContract));
         metadata = Map.copyOf(metadata);
+        allowedParameters = allowedParameters == null ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(allowedParameters));
     }
 }

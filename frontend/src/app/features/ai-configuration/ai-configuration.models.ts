@@ -27,6 +27,16 @@ export interface AiProviderCatalogEntry {
   readonly recommendedModel: string | null;
   readonly capabilities: readonly string[];
   readonly lifecycleStatus: string;
+  readonly parameters?: readonly AiParameterDescriptor[];
+}
+
+export interface AiParameterDescriptor {
+  readonly name: string;
+  readonly displayName: string;
+  readonly type: 'integer';
+  readonly minimum: number;
+  readonly maximum: number;
+  readonly defaultValue: number;
 }
 
 export interface AiProviderCatalog {
@@ -85,4 +95,5 @@ export interface AiConfigurationTestResult {
   readonly status: AiConfigurationTestStatus;
   readonly provider: string | null;
   readonly model: string | null;
+  readonly diagnosticCode?: string;
 }

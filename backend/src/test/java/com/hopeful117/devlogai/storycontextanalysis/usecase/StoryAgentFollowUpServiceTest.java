@@ -84,6 +84,10 @@ class StoryAgentFollowUpServiceTest {
         assertEquals(parent.getSelectedKnowledgeSnapshot(), prompt.getValue().selectedKnowledge());
         assertEquals(parent.getContextDigest(), prompt.getValue().contextDigest());
         assertEquals(parent.getProjectionDigest(), prompt.getValue().projectionDigest());
+        assertEquals(parent.getCredentialBindingId(), prompt.getValue().credentialBindingId());
+        assertEquals(parent.getProvider(), prompt.getValue().provider());
+        assertEquals(parent.getModelIdentifier(), prompt.getValue().modelIdentifier());
+        assertEquals(Map.of("maxOutputTokens", 4096), prompt.getValue().allowedParameters());
         assertEquals("maintainers", prompt.getValue().userGuidance().audience());
         verify(taskRepository).findStoryContextSnapshotIdentity(PARENT_ID);
         verify(membershipRepository).existsByPrincipalIdAndProjectIdAndRoleIn(eq("human-1"), eq(PROJECT_ID), any());
@@ -175,7 +179,11 @@ class StoryAgentFollowUpServiceTest {
                 .contextSnapshot(Map.of("scope", scope,
                         "freshness", Map.of("state", "FRESH"), "groundingDigest", "c".repeat(64),
                         "groundingContract", Map.of("allowedGroundingReferences", List.of()),
-                        "projectionVersion", "sca/v1"))
+                        "projectionVersion", "sca/v1",
+                        "allowedParameters", Map.of("maxOutputTokens", 4096)))
+                .credentialBindingId(UUID.randomUUID())
+                .provider("anthropic")
+                .modelIdentifier("claude-test")
                 .build();
     }
 

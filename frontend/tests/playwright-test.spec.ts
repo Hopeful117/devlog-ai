@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+import { expect, test } from './e2e-fixtures';
 
 test('Application serves the SPA shell', async ({ page }) => {
   await page.goto('/');
@@ -22,6 +22,16 @@ test('AI settings supports an API-key enrollment without exposing the key', asyn
           },
         ],
         recommendedModel: 'claude-sonnet',
+        parameters: [
+          {
+            name: 'maxOutputTokens',
+            displayName: 'Maximum output tokens',
+            type: 'integer',
+            minimum: 256,
+            maximum: 32768,
+            defaultValue: 2000,
+          },
+        ],
         capabilities: ['CHAT'],
         lifecycleStatus: 'ACTIVE',
       },
