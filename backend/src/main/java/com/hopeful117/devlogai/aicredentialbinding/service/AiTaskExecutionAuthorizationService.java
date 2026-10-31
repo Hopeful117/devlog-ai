@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.Map;
 
 /** Core-owned authorization boundary for user-bound AI task execution. */
 @Service
@@ -44,13 +45,15 @@ public class AiTaskExecutionAuthorizationService {
         AiCredentialBinding binding = bindingService.issue(principal, task.getId(), provider);
         task.setProvider(provider);
         task.setModelIdentifier(configuration.getSelectedModel());
-        return new AuthorizedExecution(binding, provider, configuration.getSelectedModel());
+        return new AuthorizedExecution(binding, provider, configuration.getSelectedModel(),
+                configuration.getAllowedParameters());
     }
 
     private IllegalStateException rejected(String message) {
         return new IllegalStateException(message);
     }
 
-    public record AuthorizedExecution(AiCredentialBinding binding, String provider, String model) {
+    public record AuthorizedExecution(AiCredentialBinding binding, String provider, String model,
+                                      Map<String, Object> allowedParameters) {
     }
 }

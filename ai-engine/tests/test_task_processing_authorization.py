@@ -77,3 +77,19 @@ def test_story_agent_rejects_missing_or_mismatched_binding(tmp_path):
     mismatch = authorized_submission("anthropic", "claude-opus-5-5", binding_id, task_id)
     with pytest.raises(ValueError, match="binding"):
         service(registry).authorize_submission(mismatch)
+
+
+@pytest.mark.parametrize("value", [255, 32769, True, "4096"])
+def test_prompt_request_rejects_unsafe_generation_parameter(value):
+    with pytest.raises(ValueError, match="maxOutputTokens"):
+        PromptRequest.model_validate(
+            prompt_request()
+            .model_copy(
+                update={
+                    "task_type": AiTaskType.STORY_CONTEXT_ANALYSIS,
+                    "projection_digest": "a" * 64,
+                    "allowed_parameters": {"maxOutputTokens": value},
+                }
+            )
+            .model_dump(by_alias=True)
+        )

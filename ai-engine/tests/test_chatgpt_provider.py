@@ -1,7 +1,13 @@
+from dataclasses import replace
+from types import SimpleNamespace
+
 import pytest
 import httpx
 
+from app.prompts.insight import InsightPromptBuilder
 from app.providers.chatgpt import ChatGptProviderError, OpenAiChatGptProvider
+from app.schemas.insight import InsightGenerationOutput
+from tests.intent_fixtures import prompt_request
 
 
 class StreamResponse:
@@ -54,11 +60,47 @@ async def test_stream_requires_completed_event(monkeypatch):
     provider = OpenAiChatGptProvider(
         resolver=None, endpoint="https://api.openai.com/v1/responses",
         model="test", timeout_seconds=1, token_endpoint=None,
-        client_id=None, resource=None,
+        client_id=None, resource=None, max_output_tokens=2000,
     )
 
     assert await provider._stream("fixture-token", {"store": False}) == '{"ok":true}'
     assert FakeClient.last_headers["Authorization"] == "Bearer fixture-token"
+
+
+@pytest.mark.asyncio
+async def test_provider_uses_core_authorized_model_and_output_limit(monkeypatch):
+    captured: dict[str, object] = {}
+
+    class Resolver:
+        def resolve_for_task(self, task_id, provider):
+            return SimpleNamespace(
+                access_token="fixture-token",
+                access_token_expires_at=None,
+                scopes=["openid", "profile", "email"],
+            )
+
+    provider = OpenAiChatGptProvider(
+        resolver=Resolver(), endpoint="https://api.openai.com/v1/responses",
+        model="configured-model", timeout_seconds=1, token_endpoint=None,
+        client_id=None, resource=None, max_output_tokens=2000,
+    )
+
+    async def fake_stream(access_token, body):
+        captured.update(body)
+        return '{"proposals": []}'
+
+    monkeypatch.setattr("app.providers.chatgpt.required_scopes_granted", lambda scopes: True)
+    monkeypatch.setattr(provider, "_stream", fake_stream)
+    request = replace(
+        InsightPromptBuilder().build(prompt_request()),
+        model_identifier="authorized-model",
+        generation_parameters={"maxOutputTokens": 4096},
+    )
+
+    await provider.generate_structured(request, InsightGenerationOutput)
+
+    assert captured["model"] == "authorized-model"
+    assert captured["max_output_tokens"] == 4096
 
 
 def test_provider_error_message_is_bounded() -> None:

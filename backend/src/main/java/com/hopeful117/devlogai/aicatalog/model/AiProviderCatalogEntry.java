@@ -10,8 +10,17 @@ public record AiProviderCatalogEntry(
         List<AiProviderModel> models,
         String recommendedModel,
         List<String> capabilities,
-        AiCatalogLifecycleStatus lifecycleStatus
+        AiCatalogLifecycleStatus lifecycleStatus,
+        List<AiParameterDescriptor> parameters
 ) {
+    public AiProviderCatalogEntry(String providerId, String displayName,
+                                 List<AiAuthenticationMethod> authenticationMethods,
+                                 List<AiProviderModel> models, String recommendedModel,
+                                 List<String> capabilities, AiCatalogLifecycleStatus lifecycleStatus) {
+        this(providerId, displayName, authenticationMethods, models, recommendedModel,
+                capabilities, lifecycleStatus, List.of());
+    }
+
     public AiProviderCatalogEntry {
         if (providerId == null || providerId.isBlank()) {
             throw new IllegalArgumentException("Provider identifier must not be blank");
@@ -22,6 +31,7 @@ public record AiProviderCatalogEntry(
         authenticationMethods = List.copyOf(authenticationMethods);
         models = List.copyOf(models);
         capabilities = List.copyOf(capabilities);
+        parameters = List.copyOf(parameters);
         if (new HashSet<>(models.stream().map(AiProviderModel::identifier).toList()).size() != models.size()) {
             throw new IllegalArgumentException("Model identifiers must be unique within a provider");
         }

@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -48,6 +49,7 @@ class AiTaskExecutionAuthorizationServiceTest {
         assertEquals(bindingId, result.binding().getId());
         assertEquals("chatgpt", result.provider());
         assertEquals("gpt-5.6-luna", result.model());
+        assertEquals(Map.of("maxOutputTokens", 4096), result.allowedParameters());
         verify(task).setProvider("chatgpt");
         verify(task).setModelIdentifier("gpt-5.6-luna");
     }
@@ -93,6 +95,7 @@ class AiTaskExecutionAuthorizationServiceTest {
         AiUserConfiguration value = mock(AiUserConfiguration.class);
         when(value.getProvider()).thenReturn(provider);
         when(value.getSelectedModel()).thenReturn(model);
+        when(value.getAllowedParameters()).thenReturn(Map.of("maxOutputTokens", 4096));
         return value;
     }
 

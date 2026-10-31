@@ -62,7 +62,13 @@
               (change)="selectModel($any($event.target).value)"
             >
               @for (model of selectedModels(); track model.identifier) {
-                <option [value]="model.identifier">{{ model.displayName }}</option>
+                <option
+                  [value]="model.identifier"
+                  [disabled]="model.availability === 'UNAVAILABLE'"
+                >
+                  {{ model.displayName
+                  }}{{ model.availability === 'UNAVAILABLE' ? ' (unavailable)' : '' }}
+                </option>
               }
             </select>
             @if (
@@ -77,6 +83,40 @@
                 Explicit selection. DevLog will not replace it automatically.
               </p>
             }
+            <div class="form-actions">
+              <button class="secondary-button" type="button" (click)="useRecommended()">
+                Use recommended model
+              </button>
+            </div>
+          </div>
+        }
+
+        <label class="advanced-toggle">
+          <input
+            type="checkbox"
+            [checked]="advanced()"
+            (change)="advanced.set($any($event.target).checked)"
+          />
+          Advanced mode
+        </label>
+        @if (advanced()) {
+          <div class="advanced-fields">
+            <label for="max-output-tokens">{{
+              outputTokenParameter()?.displayName ?? 'Maximum output tokens'
+            }}</label>
+            <input
+              id="max-output-tokens"
+              type="number"
+              [min]="outputTokenParameter()?.minimum ?? 256"
+              [max]="outputTokenParameter()?.maximum ?? 32768"
+              step="1"
+              [value]="maxOutputTokens()"
+              (input)="maxOutputTokens.set(+$any($event.target).value)"
+            />
+            <p class="field-hint">
+              Supported range: {{ outputTokenParameter()?.minimum ?? 256 }} to
+              {{ outputTokenParameter()?.maximum ?? 32768 }}. Values are validated by Core.
+            </p>
           </div>
         }
 
@@ -137,6 +177,14 @@
           >
             {{ busy() ? 'Testing…' : 'Test configuration' }}
           </button>
+          @if (
+            configuration()?.authenticationMethod !== 'NONE' &&
+            configuration()?.state !== 'NOT_CONFIGURED'
+          ) {
+            <button class="secondary-button" type="button" (click)="revoke()" [disabled]="busy()">
+              Disconnect provider
+            </button>
+          }
         }
       </section>
     </div>

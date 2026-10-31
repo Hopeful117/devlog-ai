@@ -5,6 +5,7 @@ import com.hopeful117.devlogai.aicatalog.model.AiCatalogLifecycleStatus;
 import com.hopeful117.devlogai.aicatalog.model.AiProviderCatalogEntry;
 import com.hopeful117.devlogai.aicatalog.model.AiProviderModel;
 import com.hopeful117.devlogai.aicatalog.model.AiProviderModelAvailability;
+import com.hopeful117.devlogai.aicatalog.model.AiParameterDescriptor;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.springframework.stereotype.Component;
 
@@ -17,6 +18,9 @@ public class AiProviderCatalogService {
     public static final String CATALOG_VERSION = "ai-provider-catalog-v1";
     private static final String STRUCTURED_OUTPUT = "STRUCTURED_OUTPUT";
     private static final Map<String, AiProviderCatalogEntry> DEFAULT_PROVIDERS = catalog();
+    public static final String MAX_OUTPUT_TOKENS = "maxOutputTokens";
+    public static final int MIN_MAX_OUTPUT_TOKENS = 256;
+    public static final int MAX_MAX_OUTPUT_TOKENS = 32_768;
     private final Map<String, AiProviderCatalogEntry> providers;
 
     public AiProviderCatalogService() {
@@ -93,7 +97,10 @@ public class AiProviderCatalogService {
                 models,
                 recommendedModel,
                 List.of(STRUCTURED_OUTPUT),
-                lifecycleStatus);
+                lifecycleStatus,
+                models.isEmpty() ? List.of() : List.of(new AiParameterDescriptor(
+                        MAX_OUTPUT_TOKENS, "Maximum output tokens", "integer",
+                        MIN_MAX_OUTPUT_TOKENS, MAX_MAX_OUTPUT_TOKENS, 2_000)));
     }
 
     private static AiProviderModel model(String identifier, String displayName) {

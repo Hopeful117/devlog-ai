@@ -25,6 +25,25 @@ def test_story_context_prompt_uses_only_java_authored_grounding_contract() -> No
     ) in empty_contract_prompt.user_message
 
 
+def test_story_context_prompt_preserves_core_authorized_generation_parameters() -> None:
+    request = load_scenario(SCENARIO_ID).prompt_request.model_copy(
+        update={
+            "allowed_parameters": {"maxOutputTokens": 4096},
+            "model_identifier": "authorized-model",
+        }
+    )
+
+    prompt = StoryContextAnalysisPromptBuilder().build(request)
+
+    assert prompt.generation_parameters == {"maxOutputTokens": 4096}
+    assert prompt.model_identifier == "authorized-model"
+    retry = StoryContextAnalysisPromptBuilder().corrective_retry(
+        prompt, ValueError("invalid output")
+    )
+    assert retry.generation_parameters == {"maxOutputTokens": 4096}
+    assert retry.model_identifier == "authorized-model"
+
+
 def test_story_context_prompt_builder_requires_projection_digest() -> None:
     request = load_scenario(SCENARIO_ID).prompt_request.model_copy(
         update={"projection_digest": None}

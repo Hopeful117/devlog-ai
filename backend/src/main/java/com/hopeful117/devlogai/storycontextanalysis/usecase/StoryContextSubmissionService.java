@@ -131,6 +131,7 @@ public class StoryContextSubmissionService {
         UUID bindingId = null;
         String authorizedProvider = null;
         String authorizedModel = null;
+        Map<String, Object> authorizedParameters = Map.of();
         if (principal != null) {
             if (taskAuthorizationService == null || aiEngineBindingClient == null) {
                 throw new IllegalStateException("user-bound AI task authorization is not configured");
@@ -139,7 +140,10 @@ public class StoryContextSubmissionService {
             bindingId = authorization.binding().getId();
             authorizedProvider = authorization.provider();
             authorizedModel = authorization.model();
+            authorizedParameters = authorization.allowedParameters();
             aiEngineBindingClient.register(authorization.binding());
+            snapshot.put("allowedParameters", authorizedParameters);
+            task.setContextSnapshot(snapshot);
         } else if (provider != null) {
             throw new IllegalStateException("authenticated principal is required for user-bound AI execution");
         }
@@ -169,7 +173,7 @@ public class StoryContextSubmissionService {
                 UUID.randomUUID(), task.getCorrelationId(), prepared.project().getId(), task.getId(),
                 AiTaskType.STORY_CONTEXT_ANALYSIS, intent, userGuidance, projection, intent.outputSchema(),
                 groundingContract, metadata, contextDigest, null, projectionDigest,
-                bindingId, authorizedProvider, authorizedModel);
+                bindingId, authorizedProvider, authorizedModel, authorizedParameters);
         aiEngineClient.submit(prompt);
         return task.getId();
     }

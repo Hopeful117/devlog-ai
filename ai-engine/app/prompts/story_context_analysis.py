@@ -257,6 +257,8 @@ class StoryContextAnalysisPromptBuilder:
             ),
             generation_policy=GenerationPolicy(10, 5000, True),
             content_digest=content_digest,
+            generation_parameters=request.allowed_parameters,
+            model_identifier=request.model_identifier,
         )
 
     def _canonical(self, value: object) -> str:
@@ -302,4 +304,6 @@ class StoryContextAnalysisPromptBuilder:
             traceability=original_prompt.traceability,
             generation_policy=original_prompt.generation_policy,
             content_digest=content_digest,
+            generation_parameters=original_prompt.generation_parameters,
+            model_identifier=original_prompt.model_identifier,
         )

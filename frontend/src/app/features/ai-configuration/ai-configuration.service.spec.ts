@@ -66,4 +66,11 @@ describe('AiConfigurationService', () => {
       signature: 'signature',
     });
   });
+
+  it('uses the existing provider-specific revocation endpoints', () => {
+    service.revoke('anthropic').subscribe();
+    expect(
+      http.expectOne('http://core.test/api/v1/ai-credential-associations/anthropic').request.method,
+    ).toBe('DELETE');
+  });
 });

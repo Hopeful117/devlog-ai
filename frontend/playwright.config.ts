@@ -7,6 +7,7 @@ const servePort = process.env.PLAYWRIGHT_SERVE_PORT || '18084';
 
 module.exports = defineConfig({
   testDir: './tests',
+  globalSetup: './tests/global-setup.ts',
   timeout: 30000,
   expect: {
     timeout: 5000,

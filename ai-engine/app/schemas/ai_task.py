@@ -71,7 +71,8 @@ class PromptRequest(ContractModel):
     credential_binding_id: UUID | None = Field(default=None, alias="credentialBindingId")
     provider: str | None = Field(default=None, min_length=1, max_length=100)
     model_identifier: str | None = Field(default=None, alias="modelIdentifier",
-                                          min_length=1, max_length=255)
+                                           min_length=1, max_length=255)
+    allowed_parameters: dict[str, Any] = Field(default_factory=dict, alias="allowedParameters")
 
     @model_validator(mode="after")
     def validate_capability_identities(self):
@@ -81,6 +82,12 @@ class PromptRequest(ContractModel):
                 raise ValueError(
                     "projectionDigest is required for STORY_CONTEXT_ANALYSIS"
                 )
+        if self.allowed_parameters:
+            if set(self.allowed_parameters) != {"maxOutputTokens"}:
+                raise ValueError("unsupported allowed parameter")
+            value = self.allowed_parameters["maxOutputTokens"]
+            if isinstance(value, bool) or not isinstance(value, int) or not 256 <= value <= 32768:
+                raise ValueError("maxOutputTokens is outside the supported range")
         return self
 
 

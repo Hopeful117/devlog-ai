@@ -68,4 +68,10 @@ export class AiConfigurationService {
   testConfiguration(): Observable<AiConfigurationTestResult> {
     return this.http.post<AiConfigurationTestResult>(`${this.configurationUrl}/test`, {});
   }
+
+  revoke(provider: 'openai_chatgpt' | 'anthropic'): Observable<void> {
+    return this.http.delete<void>(
+      `${this.baseUrl}-credential-associations/${provider === 'openai_chatgpt' ? 'chatgpt' : 'anthropic'}`,
+    );
+  }
 }
