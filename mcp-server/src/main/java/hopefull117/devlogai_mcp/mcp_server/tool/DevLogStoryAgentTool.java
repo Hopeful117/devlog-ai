@@ -118,6 +118,7 @@ public class DevLogStoryAgentTool {
                     storyId,
                     bearerToken,
                     idempotencyKey,
+                    principal.delegationToken(),
                     new DevlogProjectContextClient.SubmitRequest(
                             STORY_CONTEXT_ANALYSIS_INTENT, files, effectiveGuidance));
         } catch (RuntimeException exception) {
@@ -155,8 +156,9 @@ public class DevLogStoryAgentTool {
             Map<String, Object> taskStatus;
             try {
                 taskStatus = callUntil(deadline,
-                        () -> client.getStoryContextAgentSnapshot(taskId, principal.principalId(),
-                                principal.kind().name(), principal.authenticationSource(), bearerToken));
+                         () -> client.getStoryContextAgentSnapshot(taskId, principal.principalId(),
+                                 principal.kind().name(), principal.authenticationSource(), bearerToken,
+                                 principal.delegationToken()));
             } catch (DeadlineExceededException exception) {
                 break;
             }
@@ -166,8 +168,9 @@ public class DevLogStoryAgentTool {
             }
             if ("COMPLETED".equals(stringValue(taskStatus.get("status")))) {
                 try {
-                    StoryContextAnalysisResponse analysis = callUntil(deadline,
-                            () -> client.getStoryContextAgentResultAuthenticated(taskId, bearerToken));
+                            StoryContextAnalysisResponse analysis = callUntil(deadline,
+                                    () -> client.getStoryContextAgentResultAuthenticated(taskId, bearerToken,
+                                            principal.delegationToken()));
                     return completedExecution(latestExecution, taskStatus,
                             analysis);
                 } catch (DeadlineExceededException exception) {

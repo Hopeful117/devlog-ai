@@ -275,7 +275,7 @@ npm run build             # Production build
 ### Docker / Full Stack
 
 ```bash
-# Start all services (mock LLM provider by default)
+# Start all services (ChatGPT OAuth provider by default; use LLM_PROVIDER=mock for tests)
 docker compose up --build -d
 
 # With OpenAI provider

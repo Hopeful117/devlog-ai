@@ -15,9 +15,14 @@ public interface McpAuthenticatedPrincipalProvider {
     enum PrincipalKind { HUMAN, AI_AGENT, SYSTEM }
 
     record McpPrincipal(String principalId, PrincipalKind kind, String authenticationSource,
-                        String bearerToken) {
+                        String bearerToken, String delegationToken) {
         public McpPrincipal(String principalId, PrincipalKind kind, String authenticationSource) {
-            this(principalId, kind, authenticationSource, null);
+            this(principalId, kind, authenticationSource, null, null);
+        }
+
+        public McpPrincipal(String principalId, PrincipalKind kind, String authenticationSource,
+                            String bearerToken) {
+            this(principalId, kind, authenticationSource, bearerToken, null);
         }
     }
 }

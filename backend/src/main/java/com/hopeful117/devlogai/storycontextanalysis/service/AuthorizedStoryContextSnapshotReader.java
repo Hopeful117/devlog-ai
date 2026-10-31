@@ -5,7 +5,7 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.task.mapper.AiTaskMapper;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
-import com.hopeful117.devlogai.authorization.ProjectMembershipRepository;
+import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
 import com.hopeful117.devlogai.authorization.ProjectRole;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -26,15 +26,29 @@ public class AuthorizedStoryContextSnapshotReader {
             ProjectRole.PROJECT_READER, ProjectRole.PROJECT_OWNER);
 
     private final AiTaskRepository aiTaskRepository;
-    private final ProjectMembershipRepository membershipRepository;
+    private final CoreProjectAuthorizationService authorizationService;
     private final AiTaskMapper aiTaskMapper;
     private final Clock clock;
 
     @Transactional(readOnly = true)
     public AiTaskResponse readStoryContextSnapshot(
         AuthenticatedPrincipal principal, UUID snapshotId) {
+        authorize(principal, snapshotId);
+
+        // Detailed materialization is deliberately after authentication, scope,
+        // membership, and TTL checks.
+        return aiTaskRepository.findById(snapshotId)
+                .map(aiTaskMapper::toResponse)
+                .orElseThrow(() -> notFound(snapshotId));
+    }
+
+    @Transactional(readOnly = true)
+    public void authorize(AuthenticatedPrincipal principal, UUID snapshotId) {
         if (principal == null) {
             throw new com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException();
+        }
+        if (!principal.hasDelegatedScope("MCP_STORY_AGENT_READ_RESULT")) {
+            throw notFound(snapshotId);
         }
 
         // This projection intentionally excludes all JSON snapshot columns.
@@ -48,17 +62,11 @@ public class AuthorizedStoryContextSnapshotReader {
         }
         if (identity.taskType() != AiTaskType.STORY_CONTEXT_ANALYSIS
                 || expiryOrigin == null
-                || !membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
-                        principal.principalId(), identity.projectId(), READ_ROLES)
+                || !authorizationService.isAuthorized(principal, identity.projectId(),
+                "MCP_STORY_AGENT_READ_RESULT")
                 || !clock.instant().isBefore(expiryOrigin.plus(SNAPSHOT_TTL))) {
             throw notFound(snapshotId);
         }
-
-        // Detailed materialization is deliberately after authentication, scope,
-        // membership, and TTL checks.
-        return aiTaskRepository.findById(snapshotId)
-                .map(aiTaskMapper::toResponse)
-                .orElseThrow(() -> notFound(snapshotId));
     }
 
     private EntityNotFoundException notFound(UUID snapshotId) {

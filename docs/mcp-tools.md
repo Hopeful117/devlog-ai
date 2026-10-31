@@ -19,7 +19,7 @@ retour    : EngineeringContext (project, evidence[], metadata)
 The canonical runtime route is the versioned asynchronous protocol:
 
 ```text
-submit_task -> callback -> get_snapshot -> result
+submit_task -> AI Engine callback -> get_snapshot -> result
 ```
 
 MCP tools:
@@ -27,8 +27,8 @@ MCP tools:
 ```text
 story_context_agent_get_projection
 story_context_agent_submit_task
-story_context_agent_callback
 story_context_agent_get_snapshot_authenticated
+story_context_agent_follow_up_authenticated
 ```
 
 The high-level `devlog_story_agent` consumer orchestrates the same protocol and

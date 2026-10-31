@@ -6,8 +6,16 @@ import java.util.Objects;
 public record AuthenticatedPrincipal(
         String principalId,
         PrincipalKind kind,
-        String authenticationSource
+        String authenticationSource,
+        String technicalActorId,
+        String delegationGrantId,
+        String delegatedProjectId,
+        String delegatedScopes
 ) {
+    public AuthenticatedPrincipal(String principalId, PrincipalKind kind, String authenticationSource) {
+        this(principalId, kind, authenticationSource, null, null, null, null);
+    }
+
     public AuthenticatedPrincipal {
         if (principalId == null || principalId.isBlank()) {
             throw new IllegalArgumentException("principalId must not be blank");
@@ -16,5 +24,14 @@ public record AuthenticatedPrincipal(
         if (authenticationSource == null || authenticationSource.isBlank()) {
             throw new IllegalArgumentException("authenticationSource must not be blank");
         }
+    }
+
+    public boolean isDelegated() {
+        return technicalActorId != null && delegationGrantId != null;
+    }
+
+    public boolean hasDelegatedScope(String scope) {
+        return !isDelegated() || (delegatedScopes != null
+                && java.util.Set.of(delegatedScopes.split(" ")).contains(scope));
     }
 }

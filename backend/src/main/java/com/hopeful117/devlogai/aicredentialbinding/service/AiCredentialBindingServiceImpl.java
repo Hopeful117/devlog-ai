@@ -10,7 +10,7 @@ import com.hopeful117.devlogai.aicredentialbinding.repository.AiCredentialBindin
 import com.hopeful117.devlogai.aicredentialbinding.model.AiProviderIdentity;
 import com.hopeful117.devlogai.aicredentialbinding.model.AiCredentialAssociationState;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
-import com.hopeful117.devlogai.authorization.ProjectMembershipRepository;
+import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
 import com.hopeful117.devlogai.authorization.ProjectRole;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +34,7 @@ public class AiCredentialBindingServiceImpl implements AiCredentialBindingServic
     private final AiCredentialAssociationRepository associationRepository;
     private final AiEngineCredentialAssociationClient credentialClient;
     private final AiTaskRepository aiTaskRepository;
-    private final ProjectMembershipRepository membershipRepository;
+    private final CoreProjectAuthorizationService authorizationService;
     private final Clock clock;
 
     @Value("${ai-credential-binding.ttl:PT15M}")
@@ -149,8 +149,8 @@ public class AiCredentialBindingServiceImpl implements AiCredentialBindingServic
 
     private void authorize(AuthenticatedPrincipal principal, AiTask task) {
         if (task.getAnalysis() == null || task.getAnalysis().getProject() == null
-                || !membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
-                principal.principalId(), task.getAnalysis().getProject().getId(), ALLOWED_ROLES)) {
+                || !authorizationService.isAuthorized(principal, task.getAnalysis().getProject(),
+                "MCP_STORY_AGENT_EXECUTE")) {
             throw new EntityNotFoundException("AI credential binding", task.getId());
         }
     }

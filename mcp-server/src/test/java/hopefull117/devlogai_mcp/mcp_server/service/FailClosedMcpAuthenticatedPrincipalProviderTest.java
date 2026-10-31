@@ -57,4 +57,48 @@ class FailClosedMcpAuthenticatedPrincipalProviderTest {
             assertThat(principal.bearerToken()).isEqualTo("Bearer token");
         });
     }
+
+    @Test
+    void classifiesConfiguredClientCredentialsActorAsAiAgent() {
+        Jwt jwt = Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .issuer("https://issuer.example")
+                .subject("service-account-subject")
+                .claim("azp", "devlog-mcp")
+                .claim("gty", "client-credentials")
+                .build();
+        JwtDecoder decoder = mock(JwtDecoder.class);
+        when(decoder.decode("token")).thenReturn(jwt);
+        ObjectProvider<JwtDecoder> decoders = mock(ObjectProvider.class);
+        when(decoders.getIfAvailable(org.mockito.ArgumentMatchers.any())).thenReturn(decoder);
+
+        var provider = new FailClosedMcpAuthenticatedPrincipalProvider(
+                "https://issuer.example", "token", "devlog-mcp", "delegation", decoders);
+
+        assertThat(provider.currentPrincipal()).hasValueSatisfying(principal -> {
+            assertThat(principal.principalId()).isEqualTo("devlog-mcp");
+            assertThat(principal.kind()).isEqualTo(McpAuthenticatedPrincipalProvider.PrincipalKind.AI_AGENT);
+            assertThat(principal.delegationToken()).isEqualTo("delegation");
+        });
+    }
+
+    @Test
+    void rejectsUnregisteredUnderscoreClientCredentialsActor() {
+        Jwt jwt = Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .issuer("https://issuer.example")
+                .subject("unknown-service-account")
+                .claim("azp", "unknown-service")
+                .claim("gty", "client_credentials")
+                .build();
+        JwtDecoder decoder = mock(JwtDecoder.class);
+        when(decoder.decode("token")).thenReturn(jwt);
+        ObjectProvider<JwtDecoder> decoders = mock(ObjectProvider.class);
+        when(decoders.getIfAvailable(org.mockito.ArgumentMatchers.any())).thenReturn(decoder);
+
+        var provider = new FailClosedMcpAuthenticatedPrincipalProvider(
+                "https://issuer.example", "token", "devlog-mcp", "delegation", decoders);
+
+        assertThat(provider.currentPrincipal()).isEmpty();
+    }
 }

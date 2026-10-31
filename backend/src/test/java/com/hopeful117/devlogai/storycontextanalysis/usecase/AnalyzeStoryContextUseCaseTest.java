@@ -16,6 +16,10 @@ import com.hopeful117.devlogai.analysis.entity.Analysis;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
+import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
+import com.hopeful117.devlogai.authorization.PrincipalKind;
+import com.hopeful117.devlogai.authorization.ProjectMembershipRepository;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
 import com.hopeful117.devlogai.contracts.engineeringcontext.ContextRequestEcho;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContextFreshness;
@@ -40,6 +44,7 @@ import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.entity.StoryStatus;
@@ -73,6 +78,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -94,6 +100,7 @@ class AnalyzeStoryContextUseCaseTest {
             "state", "STALE");
 
     @Mock private ProjectRepository projectRepository;
+    @Mock private ProjectMembershipRepository membershipRepository;
     @Mock private EngineeringStoryRepository storyRepository;
     @Mock private EngineeringContextFacade engineeringContextFacade;
     @Mock private IntentCatalog intentCatalog;
@@ -110,6 +117,7 @@ class AnalyzeStoryContextUseCaseTest {
         ObjectMapper objectMapper = new ObjectMapper();
         useCase = new AnalyzeStoryContextUseCase(
                 projectRepository,
+                new CoreProjectAuthorizationService(projectRepository, membershipRepository, "", ""),
                 storyRepository,
                 new StoryContextPreparationService(
                         projectRepository,
@@ -415,6 +423,39 @@ class AnalyzeStoryContextUseCaseTest {
         verify(engineeringContextFacade, never()).getCanonicalEngineeringContext(
                 any(), any(), any(), any());
         verify(analysisRepository, never()).save(any(Analysis.class));
+    }
+
+    @Test
+    void delegatedExecutionRechecksHumanProjectMembership() {
+        UUID projectId = UUID.randomUUID();
+        Project project = project(projectId);
+        AuthenticatedPrincipal delegated = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                UUID.randomUUID().toString(), projectId.toString(),
+                "MCP_STORY_AGENT_EXECUTE");
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectId), any())).thenReturn(false);
+
+        assertThrows(EntityNotFoundException.class, () -> useCase.execute(
+                PROJECT_SLUG, null, INTENT_ID, List.of(), null, null, delegated, "chatgpt"));
+        verifyNoInteractions(storyRepository, engineeringContextFacade, analysisRepository);
+    }
+
+    @Test
+    void autonomousAgentExecutionRechecksProjectMembershipWithoutDelegation() {
+        UUID projectId = UUID.randomUUID();
+        Project project = project(projectId);
+        AuthenticatedPrincipal agent = new AuthenticatedPrincipal(
+                "opencode-agent", PrincipalKind.AI_AGENT, "test", "mcp-actor",
+                null, null, null);
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("opencode-agent"), eq(projectId), any())).thenReturn(false);
+
+        assertThrows(EntityNotFoundException.class, () -> useCase.execute(
+                PROJECT_SLUG, null, INTENT_ID, List.of(), null, null, agent, "chatgpt"));
+        verifyNoInteractions(storyRepository, engineeringContextFacade, analysisRepository);
     }
 
     @Test

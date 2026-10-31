@@ -16,6 +16,7 @@ from app.schemas.binding import (
 )
 from app.security.credential_store import CredentialStoreError, EncryptedCredentialStore
 from app.security.service_auth import HmacServiceAuthenticator, ServiceAuthenticationError
+from app.services.chatgpt_oauth import OAuthError, OAuthSessionStore, ChatGptOAuthService
 from app.services.binding_registry import BindingRegistry
 from app.services.provider_identity import engine_provider
 
@@ -83,9 +84,18 @@ async def verify_credential_association(
         authenticator.verify(method=request.method, path=request.url.path, body=raw_body,
                              headers=request.headers)
         payload = CredentialAssociationVerificationRequest.model_validate_json(raw_body)
-        credential = EncryptedCredentialStore(
+        credential_store = EncryptedCredentialStore(
             get_settings().credential_store_path, get_settings().credential_encryption_key
-        ).get(payload.credential_handle, engine_provider(payload.provider))
+        )
+        provider = engine_provider(payload.provider)
+        credential = credential_store.get(payload.credential_handle, provider)
+        if provider == "chatgpt":
+            settings = get_settings()
+            credential = await ChatGptOAuthService(
+                settings,
+                OAuthSessionStore(settings.oauth_store_path),
+                credential_store,
+            ).refresh_if_expired(payload.credential_handle)
         expected_kind = {
             "API_KEY": "API_KEY",
             "OAUTH": "OAUTH",
@@ -109,7 +119,7 @@ async def verify_credential_association(
             if expected_kind == "API_KEY"
             else credential.subject == payload.subject
         )
-    except (ServiceAuthenticationError, ValueError, CredentialStoreError):
+    except (ServiceAuthenticationError, ValueError, CredentialStoreError, OAuthError):
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED,
                             content={"code": "INVALID_CREDENTIAL_ASSOCIATION"})
     if credential is None:

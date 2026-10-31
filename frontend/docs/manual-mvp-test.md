@@ -30,7 +30,7 @@ curl -sS http://localhost:18080/api/v1/intents
 
 ## Scenario A — Mock provider
 
-Set `LLM_PROVIDER=mock` (the Docker Compose default), restart the AI Engine, and create a new
+Set `LLM_PROVIDER=mock` (the deterministic test override), restart the AI Engine, and create a new
 Analysis. Expect AI execution details to identify provider `mock`, model `deterministic-v1`, and a
 terminal state. The default Mock implementation returns zero proposals, so the UI explicitly says
 that no mock proposal was configured and never claims OpenAI was called. If a deterministic mock
@@ -85,7 +85,8 @@ refresh to the actual immutable state without retrying.
 
 - **Missing API key:** `ai-engine` refuses to start when `LLM_PROVIDER=openai` without
   `LLM_API_KEY`; inspect `docker compose logs ai-engine`.
-- **Unsupported provider or model:** verify `LLM_PROVIDER` is exactly `mock` or `openai`, check the
+- **Unsupported provider or model:** verify `LLM_PROVIDER` is exactly `mock`, `openai`, or
+  `openai_chatgpt`, check the
   configured model, restart the AI Engine, and create a new Analysis.
 - **Malformed structured output:** inspect the AI Engine logs and the task failure code/message.
   Python performs one corrective structured-output retry; Angular never repairs provider output.

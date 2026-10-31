@@ -37,7 +37,8 @@ public interface DevlogProjectContextClient {
             @RequestParam("intent") String intent,
             @RequestParam(value = "files", required = false) List<String> files,
             @RequestParam(value = "storyId", required = false) UUID storyId,
-            @RequestHeader("Authorization") String authorization
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation
     );
 
     @PostExchange("/projects/{projectSlug}/stories/{storyId}/analyze-context")
@@ -83,7 +84,8 @@ public interface DevlogProjectContextClient {
             @RequestParam(value = "storyId", required = false) UUID storyId,
             @RequestParam(value = "files", required = false) List<String> files,
             @RequestParam("intent") String intent,
-            @RequestHeader("Authorization") String authorization
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation
     );
 
     @PostExchange("/story-context-agent/projects/{projectSlug}/tasks")
@@ -92,14 +94,8 @@ public interface DevlogProjectContextClient {
             @RequestParam(value = "storyId", required = false) UUID storyId,
             @RequestHeader("Authorization") String authorization,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader("X-DevLog-Delegation") String delegation,
             @RequestBody SubmitRequest request
-    );
-
-    @PostExchange("/story-context-agent/tasks/{aiTaskId}/callback")
-    Map<String, Object> callbackStoryContextAgentTask(
-            @PathVariable UUID aiTaskId,
-            @RequestHeader("X-SCA-Signature") String signature,
-            @RequestBody Map<String, Object> request
     );
 
     @GetExchange("/story-context-agent/tasks/{aiTaskId}/snapshot")
@@ -108,12 +104,14 @@ public interface DevlogProjectContextClient {
             @RequestHeader("X-DevLog-Principal-Id") String principalId,
             @RequestHeader("X-DevLog-Principal-Kind") String principalKind,
             @RequestHeader("X-DevLog-Authentication-Source") String authenticationSource,
-            @RequestHeader("Authorization") String authorization);
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation);
 
     @GetExchange("/story-context-agent/tasks/{aiTaskId}/result")
     StoryContextAnalysisResponse getStoryContextAgentResultAuthenticated(
             @PathVariable UUID aiTaskId,
-            @RequestHeader("Authorization") String authorization);
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation);
 
     @PostExchange("/story-context-agent/snapshots/{snapshotId}/follow-up")
     Map<String, Object> submitStoryContextAgentFollowUp(
@@ -122,6 +120,7 @@ public interface DevlogProjectContextClient {
             @RequestHeader("X-DevLog-Principal-Kind") String principalKind,
             @RequestHeader("X-DevLog-Authentication-Source") String authenticationSource,
             @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation,
             @RequestBody FollowUpRequest request);
 
     @PostExchange("/projects/{projectSlug}/story-agent")

@@ -97,10 +97,17 @@ public class StoryContextAgentProtocolController {
             @PathVariable String projectSlug,
             @RequestParam(required = false) UUID storyId,
             @RequestParam(required = false) List<String> files,
-            @RequestParam @NotBlank String intent) {
+            @RequestParam @NotBlank String intent,
+            HttpServletRequest servletRequest) {
         return metrics.time("projection", () -> {
             metrics.request("projection");
-            return ResponseEntity.ok(analyzeStoryContextUseCase.project(projectSlug, storyId, intent, files));
+            if (principalResolver == null) {
+                return ResponseEntity.ok(analyzeStoryContextUseCase.project(projectSlug, storyId, intent, files));
+            }
+            var principal = principalResolver.resolve(servletRequest)
+                    .orElseThrow(UnauthenticatedPrincipalException::new);
+            return ResponseEntity.ok(analyzeStoryContextUseCase.project(
+                    projectSlug, storyId, intent, files, principal));
         });
     }
 
@@ -171,8 +178,14 @@ public class StoryContextAgentProtocolController {
             if (analysisQueryService == null || principalResolver == null) {
                 throw new UnauthenticatedPrincipalException();
             }
-            principalResolver.resolve(servletRequest)
+            var principal = principalResolver.resolve(servletRequest)
                     .orElseThrow(UnauthenticatedPrincipalException::new);
+            if (principal.isDelegated()
+                    && !principal.hasDelegatedScope("MCP_STORY_AGENT_READ_RESULT")) {
+                throw new com.hopeful117.devlogai.shared.exception.EntityNotFoundException(
+                        "AI task", aiTaskId);
+            }
+            snapshotReader.authorize(principal, aiTaskId);
             return analysisQueryService.findResponseByAiTaskId(aiTaskId)
                     .map(ResponseEntity::ok)
                     .orElse(ResponseEntity.notFound().build());

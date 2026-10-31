@@ -10,6 +10,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.net.BindException;
+import java.net.InetAddress;
+import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -33,6 +36,27 @@ class StdioProtocolHygieneTest {
     private static final Duration PRE_INIT_QUIET_WINDOW = Duration.ofMillis(750);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    @Test
+    void shouldInitializeWhenTheDefaultWebPortIsAlreadyOccupied() throws Exception {
+        try (ServerSocket portBlocker = reserveDefaultWebPortIfAvailable()) {
+            Process process = startServerProcess();
+            try (BufferedReader stdout = reader(process.getInputStream());
+                 ExecutorService executor = Executors.newCachedThreadPool();
+                 Writer stdin = new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8)) {
+                writeJsonLine(stdin, """
+                        {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"port-collision-test","version":"1.0.0"}}}
+                        """);
+
+                JsonNode initializeResponse = readJsonLine(stdout, executor, READ_TIMEOUT);
+                assertThat(initializeResponse.path("id").asInt()).isEqualTo(1);
+                assertThat(initializeResponse.path("result").path("protocolVersion").asText())
+                        .isEqualTo("2025-11-25");
+            } finally {
+                terminate(process);
+            }
+        }
+    }
 
     @Test
     void shouldKeepStdoutProtocolCleanDuringStartupAndInitialization() throws Exception {
@@ -153,6 +177,14 @@ class StdioProtocolHygieneTest {
                 "DEVLOG_BACKEND_BASE_URL", "http://localhost:18080"
         ));
         return processBuilder.start();
+    }
+
+    private static ServerSocket reserveDefaultWebPortIfAvailable() throws IOException {
+        try {
+            return new ServerSocket(8080, 1, InetAddress.getLoopbackAddress());
+        } catch (BindException alreadyOccupied) {
+            return null;
+        }
     }
 
     private static BufferedReader reader(InputStream inputStream) {

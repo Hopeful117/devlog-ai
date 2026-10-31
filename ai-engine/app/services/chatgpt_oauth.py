@@ -247,6 +247,50 @@ class ChatGptOAuthService:
         self._credentials = credentials
         self._http_client = http_client
 
+    async def refresh_if_expired(self, credential_handle: str) -> StoredCredential:
+        """Refresh a stored ChatGPT credential before Core verifies it."""
+        credential = self._credentials.get(credential_handle, "chatgpt")
+        if credential.access_token_expires_at is None or \
+                credential.access_token_expires_at > datetime.now(timezone.utc):
+            return credential
+        if not credential.refresh_token or not credential.client_id:
+            raise OAuthError("ChatGPT credential requires reauthorization")
+
+        payload = {
+            "grant_type": "refresh_token",
+            "client_id": credential.client_id,
+            "refresh_token": credential.refresh_token,
+        }
+        if self._settings.chatgpt_resource:
+            payload["resource"] = self._settings.chatgpt_resource
+        try:
+            client = self._http_client or httpx.AsyncClient(
+                timeout=self._settings.llm_timeout_seconds
+            )
+            response = await client.post(self._settings.chatgpt_token_endpoint, data=payload)
+            if self._http_client is None:
+                await client.aclose()
+            if response.status_code >= 400:
+                raise OAuthError("ChatGPT credential requires reauthorization")
+            token = response.json()
+            access_token = token.get("access_token")
+            if not isinstance(access_token, str) or not access_token:
+                raise OAuthError("ChatGPT credential requires reauthorization")
+            expires_at = None
+            if isinstance(token.get("expires_in"), int):
+                expires_at = datetime.now(timezone.utc) + timedelta(seconds=token["expires_in"])
+            self._credentials.replace_tokens(
+                credential.handle,
+                access_token,
+                token.get("refresh_token"),
+                expires_at,
+            )
+            return self._credentials.get(credential.handle, "chatgpt")
+        except OAuthError:
+            raise
+        except (httpx.HTTPError, ValueError, KeyError) as error:
+            raise OAuthError("ChatGPT credential requires reauthorization") from error
+
     def start(self, session_id: str, intent_id: str | None = None,
               intent_provider: str | None = None, intent_expires_at: int | None = None,
               intent_signature: str | None = None,

@@ -90,7 +90,8 @@ public class EngineeringContextTool {
                         intent,
                         files,
                         storyId,
-                        principal.bearerToken()
+                        principal.bearerToken(),
+                        principal.delegationToken()
                 );
 
         return objectMapper.writeValueAsString(engineeringContext);

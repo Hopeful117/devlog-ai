@@ -33,7 +33,6 @@ class ServerInfoResourceTest {
                 "devlog_story_agent",
                 "get_engineering_context",
                 "search_project_history",
-                "story_context_agent_callback",
                 "story_context_agent_follow_up_authenticated",
                 "story_context_agent_get_projection",
                 "story_context_agent_get_snapshot_authenticated",

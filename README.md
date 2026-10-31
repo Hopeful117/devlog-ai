@@ -171,13 +171,21 @@ continue to use `backend:8080`, `ai-engine:8000`, and `postgres:5432`.
 
 ### AI provider
 
-The default provider is deterministic and suitable for local development:
+The DevLog runtime defaults to ChatGPT OAuth for the internal DevLog Agent:
+
+```bash
+LLM_PROVIDER=openai_chatgpt \
+CHATGPT_OAUTH_ENABLED=true \
+docker compose up --build -d
+```
+
+For deterministic credential-free tests, explicitly select the mock provider:
 
 ```bash
 LLM_PROVIDER=mock docker compose up --build -d
 ```
 
-To use OpenAI:
+To use OpenAI with an API key:
 
 ```bash
 LLM_PROVIDER=openai \
@@ -190,9 +198,10 @@ Main settings:
 
 | Variable                     | Default        | Purpose                             |
 | ---------------------------- | -------------- | ----------------------------------- |
-| `LLM_PROVIDER`               | `mock`         | `mock` or `openai`                  |
+| `LLM_PROVIDER`               | `openai_chatgpt` | `openai_chatgpt` for runtime OAuth, `mock` for tests, or another configured provider |
 | `LLM_MODEL`                  | `gpt-5.6-luna` | Model used by the OpenAI provider   |
-| `LLM_API_KEY`                | empty          | Required when `LLM_PROVIDER=openai` |
+| `LLM_API_KEY`                | empty          | Required for API-key providers      |
+| `CHATGPT_OAUTH_ENABLED`      | `true`         | Enables the runtime ChatGPT OAuth provider |
 | `LLM_TIMEOUT_SECONDS`        | `30`           | LLM request timeout                 |
 | `LLM_MAX_OUTPUT_TOKENS`      | `2000`         | Maximum structured output size      |
 | `CORE_CALLBACK_MAX_ATTEMPTS` | `5`            | Maximum callback attempts           |

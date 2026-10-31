@@ -37,10 +37,10 @@ class DevLogStoryAgentToolTest {
 
         when(client.submitStoryContextAgentTask(
                 eq("devlog-ai"), eq(storyId), eq("Bearer test"), eq("request-1"),
-                eq(new DevlogProjectContextClient.SubmitRequest(
+                 eq(""), eq(new DevlogProjectContextClient.SubmitRequest(
                         "engineering-story-context-analysis", List.of("README.md"), guidance))))
                 .thenReturn(response);
-        when(client.getStoryContextAgentSnapshot(storyId, "test-principal", "HUMAN", "test", "Bearer test")).thenReturn(
+        when(client.getStoryContextAgentSnapshot(storyId, "test-principal", "HUMAN", "test", "Bearer test", "")).thenReturn(
                 Map.of("id", storyId, "status", "FAILED", "failureCode", "FAILED", "failureMessage", "failure"));
 
         String result = tool.execute(
@@ -55,9 +55,9 @@ class DevLogStoryAgentToolTest {
         assertThat(json.path("diagnostics").path("status").asString()).isEqualTo("FAILED");
         verify(client).submitStoryContextAgentTask(
                 eq("devlog-ai"), eq(storyId), eq("Bearer test"), eq("request-1"),
-                eq(new DevlogProjectContextClient.SubmitRequest(
+                 eq(""), eq(new DevlogProjectContextClient.SubmitRequest(
                         "engineering-story-context-analysis", List.of("README.md"), guidance)));
-        verify(client).getStoryContextAgentSnapshot(storyId, "test-principal", "HUMAN", "test", "Bearer test");
+        verify(client).getStoryContextAgentSnapshot(storyId, "test-principal", "HUMAN", "test", "Bearer test", "");
     }
 
     @Test
@@ -76,7 +76,7 @@ class DevLogStoryAgentToolTest {
 
         when(client.submitStoryContextAgentTask(
                 eq("devlog-ai"), eq((UUID) null), eq("Bearer test"), eq("request-1"),
-                eq(new DevlogProjectContextClient.SubmitRequest(
+                 eq(""), eq(new DevlogProjectContextClient.SubmitRequest(
                         "engineering-story-context-analysis", List.of("README.md"),
                         Map.of("focus", "polling", "callerIntent", "Investigate Story Agent")))))
                 .thenReturn(response);
@@ -88,6 +88,7 @@ class DevLogStoryAgentToolTest {
         assertThat(objectMapper.readTree(result).path("status").asString()).isEqualTo("FAILED");
         verify(client).submitStoryContextAgentTask(
                 eq("devlog-ai"), eq((UUID) null), eq("Bearer test"), eq("request-1"),
+                eq(""),
                 eq(new DevlogProjectContextClient.SubmitRequest(
                         "engineering-story-context-analysis", List.of("README.md"),
                         Map.of("focus", "polling", "callerIntent", "Investigate Story Agent"))));
@@ -100,14 +101,15 @@ class DevLogStoryAgentToolTest {
         DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper, 100, 0, principalProvider());
         UUID taskId = UUID.randomUUID();
         when(client.submitStoryContextAgentTask(eq("devlog-ai"), eq((UUID) null), eq("Bearer test"), eq("request-1"),
+                eq(""),
                 eq(new DevlogProjectContextClient.SubmitRequest(
                         "engineering-story-context-analysis", null, Map.of("focus", "intent", "callerIntent", "intent")))))
                 .thenReturn(Map.of("status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId,
                         "result", Map.of(), "diagnostics", Map.of("status", "SUBMITTED")));
-        when(client.getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test")).thenReturn(
+        when(client.getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test", "")).thenReturn(
                 Map.of("id", taskId, "status", "COMPLETED", "contextDigest", "context",
                         "projectionDigest", "projection", "contextSnapshot", Map.of("scope", Map.of("projectSlug", "devlog-ai"))));
-        when(client.getStoryContextAgentResultAuthenticated(taskId, "Bearer test")).thenReturn(
+        when(client.getStoryContextAgentResultAuthenticated(taskId, "Bearer test", "")).thenReturn(
                 new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse(null, Map.of()));
 
         JsonNode json = objectMapper.readTree(tool.execute("devlog-ai", null, "intent", null, null, "request-1"));
@@ -115,8 +117,8 @@ class DevLogStoryAgentToolTest {
         assertThat(json.path("status").asText()).isEqualTo("COMPLETED");
         assertThat(json.path("result").path("contextDigest").asText()).isEqualTo("context");
         assertThat(json.path("result").path("projectionDigest").asText()).isEqualTo("projection");
-        verify(client).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test");
-        verify(client).getStoryContextAgentResultAuthenticated(taskId, "Bearer test");
+        verify(client).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test", "");
+        verify(client).getStoryContextAgentResultAuthenticated(taskId, "Bearer test", "");
     }
 
     @Test
@@ -130,13 +132,13 @@ class DevLogStoryAgentToolTest {
         snapshot.put("scope", Map.of("projectSlug", "trading-os"));
 
         when(client.submitStoryContextAgentTask(eq("trading-os"), eq((UUID) null), eq("Bearer test"), eq("request-1"),
-                eq(new DevlogProjectContextClient.SubmitRequest(
+                 eq(""), eq(new DevlogProjectContextClient.SubmitRequest(
                         "engineering-story-context-analysis", null, Map.of("focus", "intent", "callerIntent", "intent")))))
                 .thenReturn(Map.of("status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId));
-        when(client.getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test")).thenReturn(
+        when(client.getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test", "")).thenReturn(
                 Map.of("id", taskId, "status", "COMPLETED", "contextDigest", "context",
                         "projectionDigest", "projection", "contextSnapshot", snapshot));
-        when(client.getStoryContextAgentResultAuthenticated(taskId, "Bearer test")).thenReturn(
+        when(client.getStoryContextAgentResultAuthenticated(taskId, "Bearer test", "")).thenReturn(
                 new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse(null, Map.of()));
 
         JsonNode json = objectMapper.readTree(
@@ -145,8 +147,8 @@ class DevLogStoryAgentToolTest {
         assertThat(json.path("status").asText()).isEqualTo("COMPLETED");
         assertThat(json.path("result").path("scope").path("projectSlug").asText())
                 .isEqualTo("trading-os");
-        verify(client).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test");
-        verify(client).getStoryContextAgentResultAuthenticated(taskId, "Bearer test");
+        verify(client).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test", "");
+        verify(client).getStoryContextAgentResultAuthenticated(taskId, "Bearer test", "");
     }
 
     @Test
@@ -156,7 +158,7 @@ class DevLogStoryAgentToolTest {
         DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper, 0, 0, principalProvider());
         UUID taskId = UUID.randomUUID();
         when(client.submitStoryContextAgentTask(eq("devlog-ai"), eq((UUID) null), eq("Bearer test"), eq("request-1"),
-                eq(new DevlogProjectContextClient.SubmitRequest(
+                 eq(""), eq(new DevlogProjectContextClient.SubmitRequest(
                         "engineering-story-context-analysis", null, Map.of("focus", "intent", "callerIntent", "intent")))))
                 .thenReturn(Map.of("status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId));
 
@@ -175,10 +177,10 @@ class DevLogStoryAgentToolTest {
         UUID taskId = UUID.randomUUID();
         CountDownLatch statusStarted = new CountDownLatch(1);
         when(client.submitStoryContextAgentTask(eq("devlog-ai"), eq((UUID) null), eq("Bearer test"), eq("request-1"),
-                eq(new DevlogProjectContextClient.SubmitRequest(
+                 eq(""), eq(new DevlogProjectContextClient.SubmitRequest(
                         "engineering-story-context-analysis", null, Map.of("focus", "intent", "callerIntent", "intent")))))
                 .thenReturn(Map.of("status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId));
-        when(client.getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test")).thenAnswer(invocation -> {
+        when(client.getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test", "")).thenAnswer(invocation -> {
             statusStarted.countDown();
             try {
                 Thread.sleep(TimeUnit.SECONDS.toMillis(10));
@@ -214,12 +216,12 @@ class DevLogStoryAgentToolTest {
         DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper, 100, 0, principalProvider());
         UUID taskId = UUID.randomUUID();
         when(client.submitStoryContextAgentTask(eq("trading-os"), eq((UUID) null), eq("Bearer test"), eq("request-1"),
-                eq(new DevlogProjectContextClient.SubmitRequest(
+                 eq(""), eq(new DevlogProjectContextClient.SubmitRequest(
                         "engineering-story-context-analysis", null, Map.of("focus", "intent", "callerIntent", "intent")))))
                 .thenReturn(Map.of("status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId));
-        when(client.getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test")).thenReturn(
+        when(client.getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test", "")).thenReturn(
                 Map.of("id", taskId, "status", "COMPLETED", "contextDigest", "context", "projectionDigest", "projection"));
-        when(client.getStoryContextAgentResultAuthenticated(taskId, "Bearer test"))
+        when(client.getStoryContextAgentResultAuthenticated(taskId, "Bearer test", ""))
                 .thenThrow(new IllegalStateException("analysis endpoint returned no result"));
 
         JsonNode json = objectMapper.readTree(
@@ -231,13 +233,13 @@ class DevLogStoryAgentToolTest {
                 .isEqualTo("COMPLETED_RESULT_UNAVAILABLE");
         assertThat(json.path("diagnostics").path("aiTaskId").asText())
                 .isEqualTo(taskId.toString());
-        verify(client).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test");
-        verify(client).getStoryContextAgentResultAuthenticated(taskId, "Bearer test");
+        verify(client).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test", "");
+        verify(client).getStoryContextAgentResultAuthenticated(taskId, "Bearer test", "");
     }
 
     private static McpAuthenticatedPrincipalProvider principalProvider() {
         return () -> java.util.Optional.of(new McpAuthenticatedPrincipalProvider.McpPrincipal(
                 "test-principal", McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN,
-                "test", "Bearer test"));
+                "test", "Bearer test", ""));
     }
 }

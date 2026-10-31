@@ -18,15 +18,30 @@ import lombok.extern.slf4j.Slf4j;
 public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthenticatedPrincipalProvider {
     private final String issuer;
     private final String configuredBearerToken;
+    private final String configuredActorClientId;
+    private final String configuredDelegationToken;
     private final ObjectProvider<JwtDecoder> jwtDecoder;
+
+    public FailClosedMcpAuthenticatedPrincipalProvider(
+            String issuer, String configuredBearerToken, ObjectProvider<JwtDecoder> jwtDecoder) {
+        this.issuer = issuer == null ? "" : issuer.trim();
+        this.configuredBearerToken = configuredBearerToken == null ? "" : configuredBearerToken.trim();
+        this.configuredActorClientId = "";
+        this.configuredDelegationToken = "";
+        this.jwtDecoder = jwtDecoder;
+    }
 
     @Autowired
     public FailClosedMcpAuthenticatedPrincipalProvider(
             @Value("${devlog.security.oidc.issuer-uri:}") String issuer,
             @Value("${devlog.security.oidc.bearer-token:}") String configuredBearerToken,
+            @Value("${devlog.security.mcp.actor-client-id:}") String configuredActorClientId,
+            @Value("${devlog.security.mcp.delegation-token:}") String configuredDelegationToken,
             ObjectProvider<JwtDecoder> jwtDecoder) {
         this.issuer = issuer == null ? "" : issuer.trim();
         this.configuredBearerToken = configuredBearerToken == null ? "" : configuredBearerToken.trim();
+        this.configuredActorClientId = configuredActorClientId == null ? "" : configuredActorClientId.trim();
+        this.configuredDelegationToken = configuredDelegationToken == null ? "" : configuredDelegationToken.trim();
         this.jwtDecoder = jwtDecoder;
     }
 
@@ -38,9 +53,9 @@ public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthentic
             return configuredPrincipal();
         }
         String bearerToken = bearer(authentication.getCredentials());
-        if (bearerToken != null) return principalFromBearer(bearerToken);
+        if (bearerToken != null) return principalFromBearer(bearerToken, null);
         if (authentication.getPrincipal() instanceof Jwt jwt) {
-            return principalFromJwt(jwt, "Bearer " + jwt.getTokenValue());
+            return principalFromJwt(jwt, "Bearer " + jwt.getTokenValue(), null);
         }
         return configuredPrincipal();
     }
@@ -50,7 +65,7 @@ public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthentic
         if (requestContext != null) {
             Object raw = requestContext.transportContext().get("authorization");
             if (raw instanceof String authorization && authorization.startsWith("Bearer ")) {
-                return principalFromBearer(authorization);
+                return principalFromBearer(authorization, delegationFrom(requestContext));
             }
         }
         return currentPrincipal();
@@ -64,10 +79,10 @@ public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthentic
         if (configuredBearerToken.isBlank()) return Optional.empty();
         String authorization = configuredBearerToken.startsWith("Bearer ")
                 ? configuredBearerToken : "Bearer " + configuredBearerToken;
-        return principalFromBearer(authorization);
+        return principalFromBearer(authorization, configuredDelegationToken);
     }
 
-    private Optional<McpPrincipal> principalFromBearer(String authorization) {
+    private Optional<McpPrincipal> principalFromBearer(String authorization, String delegationToken) {
         if (issuer.isBlank()) return Optional.empty();
         String token = authorization.substring("Bearer ".length()).trim();
         if (token.isBlank()) return Optional.empty();
@@ -77,14 +92,14 @@ public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthentic
                 log.warn("MCP bearer validation unavailable because no JwtDecoder is configured");
                 return Optional.empty();
             }
-            return principalFromJwt(decoder.decode(token), "Bearer " + token);
+            return principalFromJwt(decoder.decode(token), "Bearer " + token, delegationToken);
         } catch (RuntimeException exception) {
             log.warn("MCP bearer validation failed: {}", exception.getMessage());
             return Optional.empty();
         }
     }
 
-    private Optional<McpPrincipal> principalFromJwt(Jwt jwt, String authorization) {
+    private Optional<McpPrincipal> principalFromJwt(Jwt jwt, String authorization, String delegationToken) {
         if (jwt == null || jwt.getIssuer() == null || !issuer.equals(jwt.getIssuer().toString())) {
             log.warn("MCP bearer rejected because issuer does not match configured issuer");
             return Optional.empty();
@@ -93,6 +108,33 @@ public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthentic
             log.warn("MCP bearer rejected because subject is blank");
             return Optional.empty();
         }
-        return Optional.of(new McpPrincipal(jwt.getSubject(), PrincipalKind.HUMAN, issuer, authorization));
+        String actorId = claim(jwt, "azp");
+        if (actorId == null) actorId = claim(jwt, "client_id");
+        boolean technicalActor = !configuredActorClientId.isBlank()
+                && configuredActorClientId.equals(actorId);
+        if (!technicalActor && "client_credentials".equals(normalizedGrantType(claim(jwt, "gty")))) {
+            log.warn("MCP bearer rejected because the client-credentials actor is not configured");
+            return Optional.empty();
+        }
+        String effectiveDelegation = delegationToken == null || delegationToken.isBlank()
+                ? configuredDelegationToken : delegationToken;
+        return Optional.of(new McpPrincipal(
+                technicalActor ? actorId : jwt.getSubject(),
+                technicalActor ? PrincipalKind.AI_AGENT : PrincipalKind.HUMAN,
+                issuer, authorization, effectiveDelegation));
+    }
+
+    private String delegationFrom(McpSyncRequestContext requestContext) {
+        Object raw = requestContext.transportContext().get("x-devlog-delegation");
+        return raw instanceof String value ? value : null;
+    }
+
+    private String claim(Jwt jwt, String name) {
+        Object value = jwt.getClaims().get(name);
+        return value instanceof String string && !string.isBlank() ? string : null;
+    }
+
+    private String normalizedGrantType(String grantType) {
+        return grantType == null ? null : grantType.trim().toLowerCase().replace('-', '_');
     }
 }
