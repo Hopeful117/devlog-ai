@@ -39,3 +39,10 @@ class CredentialAssociationVerificationResponse(ContractModel):
 class CredentialRevocationRequest(ContractModel):
     credential_handle: str = Field(alias="credentialHandle", min_length=1, max_length=255)
     provider: str = Field(min_length=1, max_length=100)
+
+
+class ConfigurationTestRequest(ContractModel):
+    provider: str = Field(min_length=1, max_length=100)
+    authentication_method: str = Field(alias="authenticationMethod", min_length=1, max_length=32)
+    model: str = Field(min_length=1, max_length=255)
+    credential_handle: str | None = Field(alias="credentialHandle", default=None, max_length=255)

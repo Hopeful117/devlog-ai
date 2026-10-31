@@ -2,7 +2,7 @@
 
 ## Statut
 
-PROPOSED - design materialized; implementation not authorized.
+IMPLEMENTATION AUTHORIZED - approved by the human project owner on 2026-10-31.
 
 ## Objectif produit
 

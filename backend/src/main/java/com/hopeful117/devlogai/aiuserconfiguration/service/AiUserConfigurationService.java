@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.aiuserconfiguration.service;
 
 import com.hopeful117.devlogai.aiuserconfiguration.entity.AiUserConfiguration;
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiModelSelectionOrigin;
+import com.hopeful117.devlogai.aiuserconfiguration.model.AiConfigurationTestStatus;
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiUserConfigurationState;
 import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 import com.hopeful117.devlogai.aicatalog.model.AiProviderCatalogEntry;
@@ -60,11 +61,40 @@ public class AiUserConfigurationService {
         configuration.setSelectedModel(selectedModel);
         configuration.setModelSelectionOrigin(modelSelectionOrigin);
         configuration.setAllowedParameters(parameters);
+        configuration.setLastConfigurationTestStatus(null);
+        configuration.setLastConfigurationTestId(null);
         if (configuration.getCreatedAt() == null) {
             configuration.setCreatedAt(now);
         }
         configuration.setUpdatedAt(now);
         return repository.save(configuration);
+    }
+
+    @Transactional
+    public void recordConfigurationTest(AuthenticatedPrincipal principal, java.util.UUID testId,
+                                        AiConfigurationTestStatus status) {
+        requirePrincipal(principal);
+        repository.findByPrincipalId(principal.principalId()).ifPresent(configuration -> {
+            if (testId != null && !testId.equals(configuration.getLastConfigurationTestId())) {
+                return;
+            }
+            configuration.setLastConfigurationTestStatus(status);
+            configuration.setUpdatedAt(clock.instant());
+            repository.save(configuration);
+        });
+    }
+
+    @Transactional
+    public java.util.UUID beginConfigurationTest(AuthenticatedPrincipal principal) {
+        requirePrincipal(principal);
+        return repository.findByPrincipalId(principal.principalId()).map(configuration -> {
+            var testId = java.util.UUID.randomUUID();
+            configuration.setLastConfigurationTestId(testId);
+            configuration.setLastConfigurationTestStatus(null);
+            configuration.setUpdatedAt(clock.instant());
+            repository.save(configuration);
+            return testId;
+        }).orElse(null);
     }
 
     @Transactional
@@ -103,6 +133,16 @@ public class AiUserConfigurationService {
         }
         if (model.availability() != AiProviderModelAvailability.AVAILABLE) {
             return AiUserConfigurationState.MODEL_UNAVAILABLE;
+        }
+        if (value.getLastConfigurationTestStatus() != null
+                && value.getLastConfigurationTestStatus() != AiConfigurationTestStatus.SUCCESS) {
+            return switch (value.getLastConfigurationTestStatus()) {
+                case CREDENTIAL_INVALID -> AiUserConfigurationState.CREDENTIAL_INVALID;
+                case MODEL_UNAVAILABLE -> AiUserConfigurationState.MODEL_UNAVAILABLE;
+                case PROVIDER_UNAVAILABLE, TIMEOUT -> AiUserConfigurationState.PROVIDER_UNAVAILABLE;
+                case CONFIGURATION_INVALID -> AiUserConfigurationState.CONFIGURATION_INCOMPLETE;
+                case SUCCESS -> AiUserConfigurationState.READY;
+            };
         }
         if (value.getAuthenticationMethod() == AiAuthenticationMethod.NONE) {
             return AiUserConfigurationState.READY;

@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.aiuserconfiguration.entity;
 
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiModelSelectionOrigin;
+import com.hopeful117.devlogai.aiuserconfiguration.model.AiConfigurationTestStatus;
 import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -54,6 +55,13 @@ public class AiUserConfiguration {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "allowed_parameters", nullable = false, columnDefinition = "jsonb")
     private Map<String, Object> allowedParameters;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "last_configuration_test_status", length = 32)
+    private AiConfigurationTestStatus lastConfigurationTestStatus;
+
+    @Column(name = "last_configuration_test_id")
+    private UUID lastConfigurationTestId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
