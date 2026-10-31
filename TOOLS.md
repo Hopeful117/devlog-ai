@@ -100,3 +100,36 @@ Use the backend and MCP module tests before the full backend verification:
 ./backend/mvnw -pl mcp-server test
 ./backend/mvnw -pl backend -am clean verify -B
 ```
+
+## MCP runtime diagnostics
+
+The OpenCode MCP launcher delegates to the repository-owned supervisor at
+`tools/devlog_mcp/runtime.py`. It keeps STDOUT exclusively for MCP protocol
+traffic and writes redacted lifecycle events under:
+
+```text
+${XDG_STATE_HOME:-~/.local/state}/devlog/mcp/<instance-id>/
+```
+
+Each instance records a non-secret manifest and `events.jsonl` with bootstrap,
+ownership, process exit and parent-session diagnostics. Bearers, client
+secrets, delegation proofs, OAuth values, prompts and provider output must not
+appear in these files.
+
+Run the read-only diagnostic command with:
+
+```bash
+python3 tools/devlog_mcp/status.py status --json
+python3 tools/devlog_mcp/status.py doctor --json
+```
+
+The supervisor does not use a global MCP lock. A fresh OpenCode session starts
+an independent STDIO instance. Cleanup is limited to an instance whose parent
+and child process identities are proven; ambiguous PID reuse is reported and
+not force-killed.
+
+Runtime tests use only the Python standard library:
+
+```bash
+python3 -m unittest discover -s tools/devlog_mcp/tests -v
+```
