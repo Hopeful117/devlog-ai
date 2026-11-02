@@ -40,7 +40,17 @@ class AiUserConfigurationPostgresIntegrationTest {
                 String.class, id)).isEqualTo("{}");
         assertThat(jdbc.queryForObject(
                  "select version from flyway_schema_history where success order by installed_rank desc limit 1",
-                 String.class)).isEqualTo("74");
+                 String.class)).isEqualTo("75");
+        assertThat(jdbc.queryForObject("""
+                select target_output_tokens
+                from story_context_completion_policies
+                where policy_version = 'story-context-completion-v1'
+                  and provider = 'openai_chatgpt'
+                  and model_identifier = 'gpt-5.6-luna'
+                  and intent_id = 'engineering-story-context-analysis'
+                  and complexity_class = 'REDUCED'
+                  and status = 'ACTIVE'
+                """, Integer.class)).isEqualTo(8_192);
         assertThat(jdbc.queryForObject("""
                 select count(*) from information_schema.columns
                 where table_name = 'ai_user_configurations'

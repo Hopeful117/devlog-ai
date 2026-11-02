@@ -80,9 +80,21 @@ class StoryContextBudgetPreflightTest {
         var result = preflight.check(prompt("openai", "gpt-5.6-luna", Map.of(), Map.of()));
 
         assertTrue(result.accepted());
-        assertEquals(4_096, result.outputLimit());
+        assertEquals(6_000, result.outputLimit());
         assertEquals("CORE_POLICY", result.outputLimitSource());
-        assertEquals(Map.of("maxOutputTokens", 4_096), result.effectiveParameters());
+        assertEquals(Map.of("maxOutputTokens", 6_000), result.effectiveParameters());
+    }
+
+    @Test
+    void derivesRaisedOutputAllowanceForReducedProjection() {
+        Map<String, Object> projection = Map.of("accounting", Map.of("truncated", true));
+
+        var result = preflight.check(prompt("openai", "gpt-5.6-luna", projection, Map.of()));
+
+        assertTrue(result.accepted());
+        assertEquals("PROJECTION_REDUCED", result.outcome());
+        assertEquals(8_192, result.outputLimit());
+        assertEquals(Map.of("maxOutputTokens", 8_192), result.effectiveParameters());
     }
 
     @Test
@@ -116,7 +128,7 @@ class StoryContextBudgetPreflightTest {
 
         assertTrue(!result.accepted());
         assertEquals("BUDGET_COMPLETION_ALLOWANCE_INSUFFICIENT", result.code());
-        assertEquals(4_096, result.requiredOutputLimit());
+        assertEquals(8_192, result.requiredOutputLimit());
     }
 
     private static PromptRequest prompt(String provider, String model,
