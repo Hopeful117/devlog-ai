@@ -206,7 +206,7 @@ class DevLogStoryAgentToolTest {
         DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
 
         org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
-                () -> new DevLogStoryAgentTool(client, new ObjectMapper(), 90_001, 1_000, principalProvider()));
+                () -> new DevLogStoryAgentTool(client, new ObjectMapper(), 180_001, 1_000, principalProvider()));
     }
 
     @Test

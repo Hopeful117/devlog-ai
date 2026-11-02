@@ -28,8 +28,8 @@ import java.util.function.Supplier;
 @Slf4j
 public class DevLogStoryAgentTool {
     private static final String STORY_CONTEXT_ANALYSIS_INTENT = "engineering-story-context-analysis";
-    private static final long DEFAULT_POLL_TIMEOUT_MS = 29_000L;
-    private static final long MAX_POLL_TIMEOUT_MS = 90_000L;
+    private static final long DEFAULT_POLL_TIMEOUT_MS = 180_000L;
+    private static final long MAX_POLL_TIMEOUT_MS = 180_000L;
     private static final long DEFAULT_POLL_INTERVAL_MS = 2_000L;
 
     private final DevlogProjectContextClient client;
@@ -46,11 +46,11 @@ public class DevLogStoryAgentTool {
     public DevLogStoryAgentTool(
             DevlogProjectContextClient client,
             ObjectMapper objectMapper,
-            @Value("${devlog.story-agent.poll.timeout-ms:29000}") long pollTimeoutMs,
+            @Value("${devlog.story-agent.poll.timeout-ms:180000}") long pollTimeoutMs,
             @Value("${devlog.story-agent.poll.interval-ms:2000}") long pollIntervalMs,
             McpAuthenticatedPrincipalProvider principalProvider) {
         if (pollTimeoutMs < 0 || pollTimeoutMs > MAX_POLL_TIMEOUT_MS || pollIntervalMs < 0) {
-            throw new IllegalArgumentException("Story Agent polling timeout must be between 0 and 90000 ms");
+            throw new IllegalArgumentException("Story Agent polling timeout must be between 0 and 180000 ms");
         }
         this.client = client;
         this.objectMapper = objectMapper;
