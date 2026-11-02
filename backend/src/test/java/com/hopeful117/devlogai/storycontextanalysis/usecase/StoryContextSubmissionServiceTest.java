@@ -93,7 +93,7 @@ class StoryContextSubmissionServiceTest {
         service.submit(prepared, null, "submission", "idempotency",
                 new AuthenticatedPrincipal("human-1", PrincipalKind.HUMAN, "test"), "anthropic");
 
-        assertEquals(Map.of("maxOutputTokens", 4096), task.getContextSnapshot().get("allowedParameters"));
+        assertEquals(Map.of("maxOutputTokens", 6000), task.getContextSnapshot().get("allowedParameters"));
         assertFalse(task.getContextSnapshot().containsKey("credentialHandle"));
         assertFalse(task.getContextSnapshot().containsKey("accessToken"));
         ArgumentCaptor<PromptRequest> prompt = ArgumentCaptor.forClass(PromptRequest.class);
@@ -101,7 +101,7 @@ class StoryContextSubmissionServiceTest {
         assertEquals(bindingId, prompt.getValue().credentialBindingId());
         assertEquals("anthropic", prompt.getValue().provider());
         assertEquals("claude-opus-5-5", prompt.getValue().modelIdentifier());
-        assertEquals(Map.of("maxOutputTokens", 4096), prompt.getValue().allowedParameters());
+        assertEquals(Map.of("maxOutputTokens", 6000), prompt.getValue().allowedParameters());
     }
 
     @Test
