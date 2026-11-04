@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -25,7 +26,7 @@ class StoryContextAgentCallbackFacadeTest {
         AiTaskResultService aiTaskResultService = mock(AiTaskResultService.class);
         StoryContextAgentMetrics metrics = mock(StoryContextAgentMetrics.class);
         StoryContextAgentCallbackFacade facade = new StoryContextAgentCallbackFacade(
-                aiTaskRepository, aiTaskResultService, metrics);
+                aiTaskRepository, aiTaskResultService, metrics, mock(ObjectMapper.class));
         AiTaskResultRequest request = new AiTaskResultRequest(
                 UUID.randomUUID(), "job-42", AiTaskResultStatus.FAILED, Instant.now(), List.of(),
                 new AiTaskResultError("MODEL_ERROR", "Provider failed"), null, null, null,
