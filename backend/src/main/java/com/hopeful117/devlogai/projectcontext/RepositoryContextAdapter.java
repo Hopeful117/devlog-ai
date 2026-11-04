@@ -3,6 +3,9 @@ package com.hopeful117.devlogai.projectcontext;
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
+import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
+import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
+import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
 import com.hopeful117.devlogai.history.entity.CommitParent;
 import com.hopeful117.devlogai.history.entity.ProjectCommit;
 import com.hopeful117.devlogai.history.repository.ProjectCommitRepository;
@@ -20,14 +23,19 @@ import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
 import com.hopeful117.devlogai.repositorycontext.intelligence.IntentTerms;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
+import com.hopeful117.devlogai.source.entity.Source;
+import com.hopeful117.devlogai.source.exception.SourceSelectionException;
+import com.hopeful117.devlogai.source.repository.SourceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -77,6 +85,9 @@ public class RepositoryContextAdapter {
     private final ObservationRepository observationRepository;
     private final ProjectCommitRepository commitRepository;
     private final ProjectFreshnessService freshnessService;
+    private final SourceRepository sourceRepository;
+    private final WorkspaceManager workspaceManager;
+    private final AnalysisRepository analysisRepository;
 
     public RepositoryContext buildRepositoryContext(
             UUID projectId, String storyDescription) {
@@ -124,16 +135,68 @@ public class RepositoryContextAdapter {
                 insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
                         projectId, List.of(InsightStatus.ACTIVE));
 
-        UserGuidance guidance = createGuidance(selectionText);
+        UserGuidance guidance = createGuidance(selectionText, files);
 
-        RepositoryContext context = repositoryContextService.build(
-                syntheticContext, intent, guidance, validatedInsights);
+        RepositoryRevisionScope revisionScope = resolveRevisionScope(
+                projectId, currentStory, snapshot);
+        RepositoryContext context = revisionScope == null
+                ? repositoryContextService.build(
+                        syntheticContext, intent, guidance, validatedInsights)
+                : repositoryContextService.build(
+                        syntheticContext, intent, guidance, validatedInsights,
+                        List.of(), revisionScope);
 
         if (storyId != null) {
             context = filterByStoryScope(context, projectId, snapshot, storyId);
         }
 
         return context;
+    }
+
+    private RepositoryRevisionScope resolveRevisionScope(
+            UUID projectId, ProjectContextSnapshot.EngineeringStorySnapshot story,
+            ProjectContextSnapshot snapshot) {
+        if (story == null) return null;
+
+        List<Source> sources = sourceRepository
+                .findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId);
+        if (sources == null || sources.isEmpty()) {
+            throw new SourceSelectionException(
+                    SourceSelectionException.Reason.SOURCE_UNAVAILABLE, projectId,
+                    "No active repository source found for Story Context");
+        }
+        if (sources.size() > 1) {
+            throw new SourceSelectionException(
+                    SourceSelectionException.Reason.AMBIGUOUS_SOURCE, projectId,
+                    "Story Context requires exactly one active repository source");
+        }
+
+        Source source = sources.getFirst();
+        String requestedRevision = firstNonBlank(story.targetCommit(), analysisTargetRevision(snapshot));
+        SynchronizedWorkspace workspace = workspaceManager.synchronize(source, requestedRevision);
+        String revision = workspace.resolvedRevision();
+        String revisionSource = story.targetCommit() != null && !story.targetCommit().isBlank()
+                ? RepositoryRevisionScope.SOURCE_STORY_TARGET
+                : requestedRevision != null
+                        ? RepositoryRevisionScope.SOURCE_ANALYSIS_TARGET
+                        : RepositoryRevisionScope.SOURCE_CURRENT_REVISION;
+        return new RepositoryRevisionScope(projectId, source.getId(), revision,
+                workspace.path(), revisionSource);
+    }
+
+    private String analysisTargetRevision(ProjectContextSnapshot snapshot) {
+        if (snapshot.latestProjectProfile() == null
+                || snapshot.latestProjectProfile().analysisId() == null) return null;
+        return analysisRepository.findById(snapshot.latestProjectProfile().analysisId())
+                .map(analysis -> analysis.getTargetRevision())
+                .filter(value -> value != null && !value.isBlank())
+                .orElse(null);
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) return first;
+        if (second != null && !second.isBlank()) return second;
+        return null;
     }
 
     private AnalysisContext synthesizeAnalysisContext(
@@ -444,6 +507,10 @@ public class RepositoryContextAdapter {
     }
 
     private UserGuidance createGuidance(String storyDescription) {
+        return createGuidance(storyDescription, List.of());
+    }
+
+    private UserGuidance createGuidance(String storyDescription, List<String> requestedFiles) {
         if (storyDescription == null || storyDescription.isBlank()) {
             return null;
         }
@@ -453,7 +520,12 @@ public class RepositoryContextAdapter {
                 "focused",
                 "analytical",
                 ENGINEERING_STORY_PREPARATION,
-                List.of());
+                requestedFiles == null ? List.of() : requestedFiles.stream()
+                        .filter(Objects::nonNull)
+                        .map(String::trim)
+                        .filter(value -> !value.isBlank())
+                        .limit(10)
+                        .toList());
     }
 
     /**
@@ -554,7 +626,8 @@ public class RepositoryContextAdapter {
         }
         if (kind.equals("PROJECT_NOTE") || kind.equals("MILESTONE")
                 || kind.equals("ARTIFACT") || kind.equals("ENGINEERING_STORY")
-                || kind.equals("CHALLENGE")) {
+                || kind.equals("CHALLENGE") || kind.equals("STORY_DOCUMENT")
+                || kind.equals("ADR_DOCUMENT") || kind.equals("ROADMAP_DOCUMENT")) {
             return false;
         }
         if (kind.equals("ANALYSIS") || kind.equals("FRESHNESS")
@@ -662,6 +735,18 @@ public class RepositoryContextAdapter {
             RepositoryContext context,
             List<RepositoryEvidence> filteredEvidence
     ) {
+        Map<com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer, Integer> selectedByLayer =
+                new EnumMap<>(com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer.class);
+        Map<String, Integer> selectedByKind = new HashMap<>();
+        filteredEvidence.forEach(evidence -> {
+            selectedByLayer.merge(evidence.layer(), 1, Integer::sum);
+            selectedByKind.merge(evidence.kind(), 1, Integer::sum);
+        });
+        var diagnostics = context.diagnostics();
+        var filteredDiagnostics = new com.hopeful117.devlogai.repositorycontext.RepositoryContextDiagnostics(
+                diagnostics.candidatesByLayer(), diagnostics.candidatesByKind(), selectedByKind,
+                diagnostics.preferredLayerAvailability(), diagnostics.uniqueCandidateCount(),
+                diagnostics.duplicateCandidateCount());
         return new RepositoryContext(
                 context.contextVersion(),
                 context.profile(),
@@ -669,12 +754,12 @@ public class RepositoryContextAdapter {
                 context.contextPlanVersion(),
                 context.contextIntelligenceExplanations(),
                 filteredEvidence,
-                context.selectedByLayer(),
-                context.diagnostics(),
+                selectedByLayer,
+                filteredDiagnostics,
                 context.budget(),
                 context.usedTokens(),
-                filteredEvidence.size(),
-                context.discardedCount(),
+                context.candidateCount(),
+                Math.max(0, context.candidateCount() - filteredEvidence.size()),
                 context.truncated(),
                 context.selectionDecisions().stream()
                         .filter(d -> filteredEvidence.stream()

@@ -149,6 +149,13 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
             TermModel terms
     ) {
         if (guidance == null || guidance.isEmpty()) return 0;
+        String originatingFile = Objects.toString(
+                evidence.provenance().originatingFile(), "").replace('\\', '/');
+        if (guidance.priorities().stream().map(value -> value.replace('\\', '/'))
+                .anyMatch(requested -> originatingFile.equals(requested)
+                        || originatingFile.startsWith(requested + "/"))) {
+            return 100;
+        }
         return terms.score(evidence);
     }
 

@@ -57,6 +57,18 @@ class SelectedContentAllocationPolicyTest {
         assertEquals("file:a.java", result.getFirst().evidence().reference());
     }
 
+    @Test
+    void requestedFileReceivesFirstContentAllocation() {
+        RepositoryEvidence requested = evidence("docker-compose.yml", 10, 0, 0);
+        RepositoryEvidence ordinary = evidence("application.yml", 99, 100, 100);
+
+        List<SelectedContentAllocationPolicy.Allocation> result = policy.allocate(
+                List.of(ordinary, requested), List.of("docker-compose.yml"));
+
+        assertEquals("docker-compose.yml", result.getFirst().evidence().reference());
+        assertEquals(1, result.getFirst().rank());
+    }
+
     private RepositoryEvidence evidence(
             String reference,
             int finalScore,

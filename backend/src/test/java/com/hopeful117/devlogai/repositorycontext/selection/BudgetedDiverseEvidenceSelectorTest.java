@@ -9,6 +9,7 @@ import com.hopeful117.devlogai.repositorycontext.intelligence.ContextPlan;
 import com.hopeful117.devlogai.repositorycontext.intelligence.ContextProfileDefinition;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidencePrecisionPolicy;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
+import com.hopeful117.devlogai.intent.model.UserGuidance;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -133,8 +134,32 @@ class BudgetedDiverseEvidenceSelectorTest {
                 value.reason().equals("EVIDENCE_ITEM_BUDGET_EXCEEDED")));
     }
 
+    @Test
+    void requestedFileIsSelectedBeforeOrdinaryRanking() {
+        RepositoryEvidence requested = evidence("docker-compose.yml", "CONFIG_FILE", 10);
+        RepositoryEvidence ordinary = evidence("application.yml", "CONFIG_FILE", 90);
+
+        EvidenceSelector.SelectionResult result = selector.select(
+                List.of(ordinary, requested),
+                request(1, 1000, EvidencePrecisionPolicy.UNRESTRICTED,
+                        new UserGuidance("Inspect requested configuration", "kiko",
+                                "focused", "analytical", "engineering-story-preparation",
+                                List.of("docker-compose.yml"))));
+
+        assertEquals(List.of("docker-compose.yml"), result.selected().stream()
+                .map(RepositoryEvidence::reference).toList());
+        assertTrue(result.decisions().stream().anyMatch(value ->
+                value.evidenceReference().equals("docker-compose.yml")
+                        && value.reason().equals("SELECTED_BY_REQUESTED_FILE")));
+    }
+
     private ContextRequest request(int maximumItems, int maximumTokens,
             EvidencePrecisionPolicy policy) {
+        return request(maximumItems, maximumTokens, policy, null);
+    }
+
+    private ContextRequest request(int maximumItems, int maximumTokens,
+            EvidencePrecisionPolicy policy, UserGuidance guidance) {
         var profile = new ContextProfileDefinition("profile",
                 ContextProfile.ENGINEERING_STORY, "v1", Map.of(),
                 List.of(RepositoryContextLayer.RELATED_SOURCE_CODE), 1, 100, policy);
@@ -142,7 +167,7 @@ class BudgetedDiverseEvidenceSelectorTest {
                 profile.preferredLayers(), 1, policy, List.of());
         return new ContextRequest(mock(com.hopeful117.devlogai.analysis.context.AnalysisContext.class),
                 mock(com.hopeful117.devlogai.intent.model.IntentDefinition.class),
-                null, List.of(), plan, new RepositoryContext.ContextBudget(
+                guidance, List.of(), plan, new RepositoryContext.ContextBudget(
                 maximumItems, 500, 20, maximumTokens));
     }
 

@@ -32,6 +32,7 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
                 kindAllowance(candidates, request, policy),
                 maximumCategoryItems(request, policy));
 
+        selectRequestedFiles(candidates, request, state);
         selectDiverseEvidence(candidates, request, policy, state);
         selectKnowledgeFloor(candidates, request, policy, state);
         for (RepositoryEvidence candidate : candidates)
@@ -45,6 +46,28 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
                         "DUPLICATE_REFERENCE", candidate.relevanceScore(),
                         candidate.estimatedTokens())));
         return new SelectionResult(state.selected, decisions, state.usedTokens);
+    }
+
+    private void selectRequestedFiles(List<RepositoryEvidence> candidates,
+            ContextRequest request, SelectionState state) {
+        if (request.guidance() == null || request.guidance().priorities().isEmpty()) return;
+        for (RepositoryEvidence candidate : candidates) {
+            if (state.selectedReferences.contains(candidate.reference())
+                    || !matchesRequestedFile(candidate, request.guidance().priorities())) continue;
+            if (categoryCeilingReached(candidate, state)
+                    || !fits(candidate, state, request)) continue;
+            add(candidate, "SELECTED_BY_REQUESTED_FILE", state);
+        }
+    }
+
+    private boolean matchesRequestedFile(RepositoryEvidence candidate,
+            List<String> requestedFiles) {
+        if (candidate.provenance() == null
+                || candidate.provenance().originatingFile() == null) return false;
+        String originatingFile = candidate.provenance().originatingFile().replace('\\', '/');
+        return requestedFiles.stream().map(value -> value.replace('\\', '/'))
+                .anyMatch(requested -> originatingFile.equals(requested)
+                        || originatingFile.startsWith(requested + "/"));
     }
 
     private void selectDiverseEvidence(List<RepositoryEvidence> candidates,
