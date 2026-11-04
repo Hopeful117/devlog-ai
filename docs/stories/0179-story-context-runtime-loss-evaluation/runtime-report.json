@@ -1,0 +1,164 @@
+{
+  "captureCount": 12,
+  "counts": {
+    "candidateCount": 7338,
+    "discardedCount": 6618,
+    "duplicateCandidateCount": 0,
+    "enrichedCount": 9,
+    "groundedCount": 9,
+    "projectedCount": 720,
+    "providerVisibleCount": 0,
+    "rankedCount": 7338,
+    "selectedCount": 720,
+    "uniqueCandidateCount": 7338
+  },
+  "elapsedMs": {
+    "average": 56317,
+    "count": 12,
+    "max": 188605,
+    "min": 22686
+  },
+  "invalidCaptureCount": 0,
+  "lossReasons": {
+    "CORE_SELECTION_REDUCED": 12,
+    "ENRICHMENT_TRUNCATED": 9,
+    "SELECTION_CATEGORY_CONCENTRATION_LIMIT": 5670,
+    "SELECTION_INSUFFICIENT_RELEVANCE": 612,
+    "SELECTION_ITEM_BUDGET_EXCEEDED": 336
+  },
+  "preflightOutcomes": {
+    "PROJECTION_REDUCED": 12
+  },
+  "projectionWarnings": {
+    "CONTENT_ENRICHMENT_TRUNCATED": 9,
+    "EVIDENCE_SUMMARY_TRUNCATED": 12,
+    "REPOSITORY_CONTEXT_BUDGET_APPLIED": 12
+  },
+  "providerOutcomes": {
+    "AUTHORIZED_NOT_YET_MEASURED": 1,
+    "COMPLETED": 10,
+    "FAILED": 1
+  },
+  "revisionSet": [
+    "1790e84f25ed15855301bbc578d7195a5b2df73b"
+  ],
+  "scenarios": {
+    "0158-broad-question": {
+      "invalidCaptures": 0,
+      "lossReasons": {
+        "CORE_SELECTION_REDUCED": 3,
+        "ENRICHMENT_TRUNCATED": 3,
+        "SELECTION_CATEGORY_CONCENTRATION_LIMIT": 1416,
+        "SELECTION_INSUFFICIENT_RELEVANCE": 90,
+        "SELECTION_ITEM_BUDGET_EXCEEDED": 135
+      },
+      "preflightOutcomes": {
+        "PROJECTION_REDUCED": 3
+      },
+      "projectionWarnings": {
+        "CONTENT_ENRICHMENT_TRUNCATED": 3,
+        "EVIDENCE_SUMMARY_TRUNCATED": 3,
+        "REPOSITORY_CONTEXT_BUDGET_APPLIED": 3
+      },
+      "providerOutcomes": {
+        "COMPLETED": 3
+      },
+      "rows": 3,
+      "statuses": {
+        "COMPLETED": 3
+      },
+      "validAnalysis": 3,
+      "validRows": 3
+    },
+    "0158-insufficient-evidence": {
+      "invalidCaptures": 0,
+      "lossReasons": {
+        "CORE_SELECTION_REDUCED": 3,
+        "SELECTION_CATEGORY_CONCENTRATION_LIMIT": 1410,
+        "SELECTION_INSUFFICIENT_RELEVANCE": 180,
+        "SELECTION_ITEM_BUDGET_EXCEEDED": 69
+      },
+      "preflightOutcomes": {
+        "PROJECTION_REDUCED": 3
+      },
+      "projectionWarnings": {
+        "EVIDENCE_SUMMARY_TRUNCATED": 3,
+        "REPOSITORY_CONTEXT_BUDGET_APPLIED": 3
+      },
+      "providerOutcomes": {
+        "COMPLETED": 3
+      },
+      "rows": 3,
+      "statuses": {
+        "COMPLETED": 3
+      },
+      "validAnalysis": 3,
+      "validRows": 3
+    },
+    "0158-targeted-component": {
+      "invalidCaptures": 0,
+      "lossReasons": {
+        "CORE_SELECTION_REDUCED": 3,
+        "ENRICHMENT_TRUNCATED": 3,
+        "SELECTION_CATEGORY_CONCENTRATION_LIMIT": 1413,
+        "SELECTION_INSUFFICIENT_RELEVANCE": 171,
+        "SELECTION_ITEM_BUDGET_EXCEEDED": 66
+      },
+      "preflightOutcomes": {
+        "PROJECTION_REDUCED": 3
+      },
+      "projectionWarnings": {
+        "CONTENT_ENRICHMENT_TRUNCATED": 3,
+        "EVIDENCE_SUMMARY_TRUNCATED": 3,
+        "REPOSITORY_CONTEXT_BUDGET_APPLIED": 3
+      },
+      "providerOutcomes": {
+        "AUTHORIZED_NOT_YET_MEASURED": 1,
+        "COMPLETED": 2
+      },
+      "rows": 3,
+      "statuses": {
+        "COMPLETED": 2,
+        "TIMED_OUT": 1
+      },
+      "validAnalysis": 2,
+      "validRows": 3
+    },
+    "0158-truncated-context": {
+      "invalidCaptures": 0,
+      "lossReasons": {
+        "CORE_SELECTION_REDUCED": 3,
+        "ENRICHMENT_TRUNCATED": 3,
+        "SELECTION_CATEGORY_CONCENTRATION_LIMIT": 1431,
+        "SELECTION_INSUFFICIENT_RELEVANCE": 171,
+        "SELECTION_ITEM_BUDGET_EXCEEDED": 66
+      },
+      "preflightOutcomes": {
+        "PROJECTION_REDUCED": 3
+      },
+      "projectionWarnings": {
+        "CONTENT_ENRICHMENT_TRUNCATED": 3,
+        "EVIDENCE_SUMMARY_TRUNCATED": 3,
+        "REPOSITORY_CONTEXT_BUDGET_APPLIED": 3
+      },
+      "providerOutcomes": {
+        "COMPLETED": 2,
+        "FAILED": 1
+      },
+      "rows": 3,
+      "statuses": {
+        "COMPLETED": 2,
+        "FAILED": 1
+      },
+      "validAnalysis": 2,
+      "validRows": 3
+    }
+  },
+  "singleRevision": true,
+  "statuses": {
+    "COMPLETED": 10,
+    "FAILED": 1,
+    "TIMED_OUT": 1
+  },
+  "validCaptureCount": 12
+}

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from story_context_specificity_live import McpClient
+from story_context_runtime_report import capture_fields_valid
 
 
 PROFILES = {
@@ -46,17 +47,179 @@ def analysis_from_execution(execution: dict[str, Any]) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
+def bounded_warnings(value: Any) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    warnings = []
+    for item in value[:32]:
+        if not isinstance(item, dict):
+            continue
+        code = item.get("code")
+        message = item.get("message")
+        if isinstance(code, str) and isinstance(message, str):
+            warnings.append({"code": code[:80], "message": message[:160]})
+    return warnings
+
+
+def bounded_map(value: Any, keys: set[str]) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    return {key: value[key] for key in keys if key in value}
+
+
+def bounded_scalar(value: Any, limit: int = 160) -> Any:
+    if isinstance(value, bool):
+        return value
+    if type(value) is int and value >= 0:
+        return value
+    if isinstance(value, str):
+        return value[:limit]
+    return None
+
+
+def bounded_nonnegative_int(value: Any, maximum: int = 2**31 - 1) -> int | None:
+    if type(value) is int and 0 <= value <= maximum:
+        return value
+    return None
+
+
+def bounded_confidence(value: Any) -> str | None:
+    return value if value in {"HIGH", "MEDIUM", "LOW"} else None
+
+
+def bounded_digest(value: Any) -> str | None:
+    if isinstance(value, str) and len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    ):
+        return value
+    return None
+
+
+def bounded_task_id(value: Any) -> str | None:
+    if isinstance(value, str) and 1 <= len(value) <= 128:
+        return value
+    return None
+
+
+def bounded_count(value: Any) -> int:
+    return min(len(value), 256) if isinstance(value, list) else 0
+
+
+def bounded_scalar_map(value: Any, keys: set[str]) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    result = {}
+    for key in keys:
+        if key in value:
+            scalar = bounded_scalar(value[key])
+            if scalar is not None:
+                result[key] = scalar
+    return result
+
+
+def bounded_integer_map(value: Any, keys: set[str]) -> dict[str, int]:
+    if not isinstance(value, dict):
+        return {}
+    return {
+        key: item for key in keys
+        if type(item := value.get(key)) is int and item >= 0
+    }
+
+
+def bounded_freshness(snapshot: dict[str, Any]) -> dict[str, Any]:
+    raw = (snapshot.get("selectedKnowledgeSnapshot") or {}).get("freshness") or {}
+    source = raw.get("sourceRevision") if isinstance(raw, dict) else None
+    if not isinstance(source, dict):
+        return {}
+    return {
+        "state": str(raw.get("state", "UNKNOWN"))[:32],
+        "sourceRevision": {
+            "kind": str(source.get("kind", "PROJECT_REVISION"))[:40],
+            "project": str(source.get("project", ""))[:100],
+            "revision": str(source.get("revision", ""))[:64],
+        },
+    }
+
+
+PROVIDER_BUDGET_KEYS = {
+    "outputLimit", "inputEstimate", "modelCapacity", "complexityClass",
+    "measurementUnit", "measurementStatus", "preflightOutcome",
+    "outputLimitSource", "targetOutputLimit", "requiredOutputLimit",
+    "promptPolicyVersion", "completionPolicyVersion", "measurementCertainty",
+}
+LEDGER_BUDGET_KEYS = {
+    "selectionUsedTokens", "selectionMaximumTokens", "measurementUnit",
+    "measurementStatus", "promptInputEstimate", "providerOutputLimit",
+    "modelCapacity", "preflightOutcome", "providerVisibilityStatus",
+}
+PROJECTION_KEYS = {
+    "status", "budget", "usedTokens", "selectedCount", "candidateCount",
+    "discardedCount", "truncated", "measurementUnit", "measurementStatus",
+    "projectionDigest", "warningCount",
+}
+PROVIDER_OUTCOME_KEYS = {
+    "status", "visibility", "outcomeSource", "traceCount", "visibilityEvidence",
+}
+
+
 def snapshot_budget(snapshot: dict[str, Any]) -> dict[str, Any]:
     selected = snapshot.get("selectedKnowledgeSnapshot") or {}
     accounting = selected.get("accounting") or {}
     context_snapshot = snapshot.get("contextSnapshot") or {}
     return {
-        "selectedKnowledgeBudget": accounting.get("budget"),
-        "selectedKnowledgeTruncated": accounting.get("truncated"),
-        "selectedKnowledgeWarnings": accounting.get("warnings", []),
-        "snapshotBudget": (context_snapshot.get("accounting") or {}).get("budget"),
-        "snapshotTruncated": (context_snapshot.get("accounting") or {}).get("truncated"),
-        "providerBudgetAccounting": context_snapshot.get("budgetAccounting") or {},
+        "selectedKnowledgeBudget": bounded_scalar(accounting.get("budget")),
+        "selectedKnowledgeTruncated": bounded_scalar(accounting.get("truncated")),
+        "selectedKnowledgeWarnings": bounded_warnings(accounting.get("warnings", [])),
+        "snapshotBudget": bounded_scalar((context_snapshot.get("accounting") or {}).get("budget")),
+        "snapshotTruncated": bounded_scalar((context_snapshot.get("accounting") or {}).get("truncated")),
+        "providerBudgetAccounting": bounded_scalar_map(
+            context_snapshot.get("budgetAccounting"), PROVIDER_BUDGET_KEYS
+        ),
+    }
+
+
+def snapshot_loss_accounting(snapshot: dict[str, Any]) -> dict[str, Any]:
+    context_snapshot = snapshot.get("contextSnapshot") or {}
+    ledger = context_snapshot.get("lossAccounting") or {}
+    if not isinstance(ledger, dict):
+        return {}
+    projection = bounded_map(ledger.get("projection"), PROJECTION_KEYS)
+    if isinstance(ledger.get("projection"), dict):
+        projection["warnings"] = bounded_warnings(ledger["projection"].get("warnings"))
+    provider = bounded_scalar_map(ledger.get("providerOutcome"), PROVIDER_OUTCOME_KEYS)
+    if isinstance(ledger.get("providerOutcome"), dict):
+        for field, limit in (("validationStatuses", 40), ("incompleteReasons", 160)):
+            raw_values = ledger["providerOutcome"].get(field)
+            if raw_values is None:
+                continue
+            provider[field] = (
+                [value[:limit] for value in raw_values if isinstance(value, str)][:16]
+                if isinstance(raw_values, list)
+                else None
+            )
+    raw_reasons = ledger.get("lossReasons") or {}
+    reasons = {
+        str(key)[:100]: value for key, value in list(raw_reasons.items())[:64]
+        if isinstance(key, str) and type(value) is int and value >= 0
+    } if isinstance(raw_reasons, dict) else {}
+    return {
+        "version": str(ledger.get("version", ""))[:64],
+        "maximumDetailEntries": bounded_scalar(ledger.get("maximumDetailEntries")),
+        "detailOverflowCount": bounded_scalar(ledger.get("detailOverflowCount")),
+        "counts": bounded_integer_map(ledger.get("counts"), {
+            "candidateCount", "uniqueCandidateCount", "duplicateCandidateCount",
+            "rankedCount", "selectedCount", "enrichedCount", "projectedCount",
+            "groundedCount", "providerVisibleCount", "discardedCount",
+        }),
+        "lossReasons": reasons,
+        "budgets": bounded_scalar_map(ledger.get("budgets"), LEDGER_BUDGET_KEYS),
+        "projection": {
+            key: bounded_scalar(projection[key])
+            for key in PROJECTION_KEYS
+            if key in projection and bounded_scalar(projection[key]) is not None
+        } | {"warnings": projection.get("warnings", [])},
+        "providerOutcome": provider,
+        "digest": str(ledger.get("digest", ""))[:64],
     }
 
 
@@ -73,10 +236,7 @@ def run(args: argparse.Namespace) -> int:
             for scenario in scenarios:
                 for repetition in range(1, args.repetitions + 1):
                     nonce = str(uuid.uuid4())
-                    question = (
-                        f"{scenario['question']}\n\n"
-                        f"Benchmark profile: {args.profile}; run nonce: {nonce}."
-                    )
+                    question = scenario["question"]
                     key = f"story-context-budget-{args.profile}-{nonce}"
                     started = time.perf_counter()
                     execution = mcp.tool("devlog_story_agent", {
@@ -87,7 +247,7 @@ def run(args: argparse.Namespace) -> int:
                         "guidance": {},
                         "idempotencyKey": key,
                     })
-                    task_id = execution.get("aiTaskId")
+                    task_id = bounded_task_id(execution.get("aiTaskId"))
                     snapshot = None
                     if task_id:
                         snapshot = mcp.tool(
@@ -96,36 +256,36 @@ def run(args: argparse.Namespace) -> int:
                         )
                     analysis = analysis_from_execution(execution)
                     budget = snapshot_budget(snapshot or {})
+                    loss_accounting = snapshot_loss_accounting(snapshot or {})
                     expected = PROFILES[args.profile]
                     observed = execution.get("accounting", {}).get("budget")
-                    valid = (
-                        execution.get("status") == "COMPLETED"
-                        and analysis is not None
-                        and observed == expected
-                        and budget["selectedKnowledgeBudget"] == expected
-                    )
                     row = {
                         "profile": args.profile,
                         "expectedContextBudget": expected,
+                        "observedContextBudget": bounded_nonnegative_int(observed),
                         "scenario": scenario["scenarioId"],
                         "repetition": repetition,
                         "taskId": task_id,
-                        "status": execution.get("status"),
-                        "validCapture": valid,
+                        "status": bounded_scalar(execution.get("status")),
+                        "validCapture": False,
                         "elapsedMs": round((time.perf_counter() - started) * 1000),
-                        "accounting": execution.get("accounting", {}),
+                        "accounting": bounded_scalar_map(execution.get("accounting"), {
+                            "candidateCount", "usedTokens", "discardedCount", "truncated",
+                            "budget", "selectedCount",
+                        }),
                         "snapshotBudget": budget,
                         "analysisAvailable": analysis is not None,
-                        "confidence": (analysis or {}).get("confidence"),
-                        "missingInformation": len((analysis or {}).get("missingInformation", [])),
-                        "implementationQuestions": len(
-                            (analysis or {}).get("implementationQuestions", [])
+                        "confidence": bounded_confidence((analysis or {}).get("confidence")),
+                        "missingInformation": bounded_count((analysis or {}).get("missingInformation")),
+                        "implementationQuestions": bounded_count(
+                            (analysis or {}).get("implementationQuestions")
                         ),
-                        "freshness": (snapshot or {}).get("selectedKnowledgeSnapshot", {})
-                        .get("freshness", {}),
-                        "contextDigest": execution.get("contextDigest"),
-                        "projectionDigest": execution.get("projectionDigest"),
+                        "freshness": bounded_freshness(snapshot or {}),
+                        "contextDigest": bounded_digest(execution.get("contextDigest")),
+                        "projectionDigest": bounded_digest(execution.get("projectionDigest")),
+                        "lossAccounting": loss_accounting,
                     }
+                    row["validCapture"] = capture_fields_valid(row)
                     stream.write(json.dumps(row, ensure_ascii=False) + "\n")
                     stream.flush()
                     print(json.dumps(row, ensure_ascii=False), flush=True)
