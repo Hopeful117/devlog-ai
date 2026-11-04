@@ -146,7 +146,7 @@ public class StoryAgentFollowUpService {
         metadata.put("contractVersion", parent.getContextSnapshot().get("projection") instanceof Map<?, ?> projection
                 ? projection.get("contractVersion") : StoryContextAgentProjectionV1.CONTRACT_VERSION);
         metadata.put("projectionVersion", parent.getContextSnapshot().get("projectionVersion"));
-        metadata.put("scope", parent.getContextSnapshot().get("scope"));
+         metadata.put("scope", parent.getContextSnapshot().get("scope"));
         metadata.put("freshness", parent.getContextSnapshot().get("freshness"));
         metadata.put("groundingDigest", parent.getContextSnapshot().get("groundingDigest"));
         metadata.put("parentSnapshotId", parentSnapshotId.toString());
@@ -167,8 +167,11 @@ public class StoryAgentFollowUpService {
          Map<String, Object> snapshot = followUp.getContextSnapshot();
          snapshot.put("allowedParameters", budget.accepted()
                  ? budget.effectiveParameters() : map(parent.getContextSnapshot().get("allowedParameters")));
-         snapshot.put("budgetAccounting", budgetAccounting(budget));
-         followUp.setContextSnapshot(snapshot);
+          snapshot.put("budgetAccounting", budgetAccounting(budget));
+          if (parent.getContextSnapshot().get("lossAccounting") instanceof Map<?, ?> lossAccounting) {
+              snapshot.put("lossAccounting", copyAny(lossAccounting));
+          }
+          followUp.setContextSnapshot(snapshot);
          followUp = aiTaskRepository.save(followUp);
          if (!budget.accepted()) {
              aiTaskService.failSubmission(followUp.getId(),
@@ -247,6 +250,8 @@ public class StoryAgentFollowUpService {
 
     private Map<String, Object> followUpSnapshot(AiTask parent, UUID followUpId, String question, String digest) {
         Map<String, Object> snapshot = copy(parent.getContextSnapshot());
+        snapshot.put("aiTaskId", followUpId);
+        snapshot.put("snapshotId", followUpId);
         snapshot.put("parentSnapshotId", parent.getId());
         snapshot.put("followUpId", followUpId);
         snapshot.put("followUpQuestionDigest", digestService.sha256(question.trim()));
@@ -262,6 +267,11 @@ public class StoryAgentFollowUpService {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> copy(Map<String, Object> value) {
+        return value == null ? null : objectMapper.convertValue(value, Map.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> copyAny(Map<?, ?> value) {
         return value == null ? null : objectMapper.convertValue(value, Map.class);
     }
 

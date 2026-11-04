@@ -197,6 +197,7 @@ public class StoryContextSubmissionService {
             metadata.put("provider", authorizedProvider);
             metadata.put("modelIdentifier", authorizedModel);
         }
+        metadata.put("lossLedgerVersion", ContextLossLedger.VERSION);
         PromptRequest prompt = new PromptRequest(
                 UUID.randomUUID(), task.getCorrelationId(), prepared.project().getId(), task.getId(),
                 AiTaskType.STORY_CONTEXT_ANALYSIS, intent, userGuidance, projection, intent.outputSchema(),
@@ -207,6 +208,10 @@ public class StoryContextSubmissionService {
         snapshot.put("allowedParameters", budget.accepted()
                 ? budget.effectiveParameters() : authorizedParameters);
         snapshot.put("budgetAccounting", budgetAccounting(budget));
+        ContextLossLedger lossLedger = ContextLossLedger.capture(
+                canonicalContext, projection, budget, objectMapper);
+        Map<String, Object> lossAccounting = objectMapper.convertValue(lossLedger, Map.class);
+        snapshot.put("lossAccounting", lossAccounting);
         task.setContextSnapshot(snapshot);
         aiTaskRepository.save(task);
         if (!budget.accepted()) {
