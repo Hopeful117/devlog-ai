@@ -82,6 +82,9 @@ public class AiInteractionTrace {
     @Column(name = "failure_category", length = 80, updatable = false)
     private String failureCategory;
 
+    @Column(name = "failure_code", length = 80, updatable = false)
+    private String failureCode;
+
     @Column(name = "retry_reason", columnDefinition = "TEXT", updatable = false)
     private String retryReason;
 

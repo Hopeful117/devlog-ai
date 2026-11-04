@@ -56,6 +56,7 @@ public class AiInteractionTracePersistenceService {
                 .durationMs(request.durationMs())
                 .validationStatus(request.validationStatus())
                 .failureCategory(request.failureCategory())
+                .failureCode(request.failureCode())
                 .retryReason(request.retryReason())
                 .selectedKnowledgeFingerprint(request.selectedKnowledgeFingerprint())
                 .promptFingerprint(request.promptFingerprint())

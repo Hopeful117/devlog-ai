@@ -92,8 +92,22 @@ async def test_stream_reports_bounded_incomplete_reason(monkeypatch):
         client_id=None, resource=None, max_output_tokens=2000,
     )
 
-    with pytest.raises(ChatGptProviderError, match="reason=max_output_tokens"):
+    with pytest.raises(ChatGptProviderError, match="reason=max_output_tokens") as captured:
         await provider._stream("fixture-token", {"store": False})
+
+    assert captured.value.failure_category == "PROVIDER_INCOMPLETE"
+    assert captured.value.failure_code == "PROVIDER_INCOMPLETE_RESPONSE"
+
+
+def test_provider_failed_event_is_not_classified_as_incomplete():
+    error = ChatGptProviderError(
+        "ChatGPT provider request failed",
+        status="RESPONSE.FAILED",
+        reason="server_error",
+    )
+
+    assert error.failure_category == "PROVIDER_ERROR"
+    assert error.failure_code == "PROVIDER_ERROR"
 
 
 @pytest.mark.asyncio

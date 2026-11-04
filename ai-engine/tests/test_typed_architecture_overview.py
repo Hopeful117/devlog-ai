@@ -334,8 +334,8 @@ async def test_v3_unauthorized_grounding_gets_structured_retry_and_can_recover()
     assert "shared-token" in retry_prompt
     assert callback.results[0].status.value == "COMPLETED"  # type: ignore[attr-defined]
     trace = callback.results[0].interaction_traces[0]  # type: ignore[attr-defined]
-    assert trace.validation_diagnostics is not None
-    assert "NOT_AUTHORIZED_FOR_GROUNDING" in trace.validation_diagnostics
+    assert trace.validation_diagnostics is None
+    assert trace.failure_code == "GROUNDING_ERROR"
 
 
 @pytest.mark.asyncio

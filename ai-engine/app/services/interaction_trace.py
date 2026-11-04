@@ -37,6 +37,13 @@ def _failure_category(error: Exception) -> str:
     return "PROVIDER_ERROR"
 
 
+def _failure_code(error: Exception) -> str:
+    explicit = getattr(error, "failure_code", None)
+    if isinstance(explicit, str) and explicit:
+        return explicit[:80]
+    return _failure_category(error)
+
+
 def _failure_message(error: Exception) -> str:
     retry_message = getattr(error, "retry_message", None)
     if isinstance(retry_message, str):
@@ -101,7 +108,7 @@ class InteractionTraceCollector:
         return os.getenv("AI_TRACE_LEVEL", "NORMAL").upper() == "DIAGNOSTIC"
 
     def retry(self, reason: Exception) -> None:
-        self._retry_reason = _failure_message(reason)
+        self._retry_reason = _failure_code(reason)
 
     async def generate_and_validate(
         self,
@@ -116,6 +123,7 @@ class InteractionTraceCollector:
         parsed: BaseModel | None = None
         status = "SUCCEEDED"
         failure_category: str | None = None
+        failure_code: str | None = None
         failure_message: str | None = None
         execution_phase = "PROVIDER"
         provider_status: str | None = None
@@ -128,6 +136,7 @@ class InteractionTraceCollector:
                 execution_phase = "PARSING"
                 status = "PARSING_FAILED"
                 failure_category = "FORMAT_ERROR"
+                failure_code = "FORMAT_ERROR"
                 raise
             try:
                 validator(parsed)
@@ -135,10 +144,12 @@ class InteractionTraceCollector:
                 execution_phase = "VALIDATION"
                 status = "VALIDATION_FAILED"
                 failure_category = _failure_category(validation_error)
+                failure_code = _failure_code(validation_error)
                 raise
             return parsed
         except Exception as error:
             failure_message = _failure_message(error)
+            failure_code = failure_code or _failure_code(error)
             provider_status = getattr(error, "provider_status", None)
             incomplete_reason = getattr(error, "incomplete_reason", None)
             if failure_category is None:
@@ -160,6 +171,7 @@ class InteractionTraceCollector:
                     completed_at,
                     status,
                     failure_category,
+                    failure_code,
                     failure_message,
                     generation,
                     parsed,
@@ -197,6 +209,7 @@ class InteractionTraceCollector:
         completed_at: datetime,
         status: str,
         failure_category: str | None,
+        failure_code: str | None,
         failure_message: str | None,
         generation: ProviderGenerationResult | None,
         parsed: BaseModel | None,
@@ -221,6 +234,7 @@ class InteractionTraceCollector:
             duration_ms=max(0, int((completed_at - started_at).total_seconds() * 1000)),
             validation_status=status,
             failure_category=failure_category,
+            failure_code=failure_code,
             retry_reason=self._retry_reason,
             selected_knowledge_fingerprint=prompt.traceability.context_digest,
             prompt_fingerprint=prompt.content_digest,
@@ -239,7 +253,7 @@ class InteractionTraceCollector:
             raw_model_response=redact_sensitive_text(generation.raw_output)
             if diagnostic and generation else None,
             parsed_model_response=_json_value(parsed) if diagnostic and parsed else None,
-            validation_diagnostics=redact_sensitive_text(failure_message),
+            validation_diagnostics=redact_sensitive_text(failure_message) if diagnostic else None,
             execution_phase=execution_phase,
             provider_status=provider_status or (generation.response_status if generation else None),
             incomplete_reason=incomplete_reason or (generation.incomplete_reason if generation else None),

@@ -22,6 +22,7 @@ class AiInteractionTrace(ContractModel):
     duration_ms: int = Field(alias="durationMs", ge=0)
     validation_status: str = Field(alias="validationStatus")
     failure_category: str | None = Field(default=None, alias="failureCategory")
+    failure_code: str | None = Field(default=None, alias="failureCode", max_length=80)
     retry_reason: str | None = Field(default=None, alias="retryReason")
     selected_knowledge_fingerprint: str = Field(alias="selectedKnowledgeFingerprint")
     prompt_fingerprint: str = Field(alias="promptFingerprint")

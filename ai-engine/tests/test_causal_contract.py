@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.story_context_analysis import (
+    ArchitectureFinding,
     CausalEvidenceBasis,
     CausalClassification,
     CausalClaim,
@@ -16,6 +17,10 @@ from app.schemas.story_context_analysis import (
 )
 from app.services.story_context_analysis_generation_service import (
     StoryContextAnalysisGenerationService,
+    StoryContextAnalysisContractGroundingError,
+    StoryContextAnalysisMissingEvidenceError,
+    StoryContextAnalysisRequestedFileScopeError,
+    StoryContextAnalysisUnknownReferenceError,
     StoryContextAnalysisOutputValidationError,
 )
 from evaluations.product_value.causal_evaluation import (
@@ -59,6 +64,62 @@ def claim(classification=CausalClassification.NOT_ESTABLISHED, refs=None, **kwar
 
 def grounding_contract(*references, **extra):
     return {"groundingContractVersion":"story-context-grounding/v1","allowedGroundingReferences":[{"type":"REPOSITORY_EVIDENCE","ref":r,"scope":"PROJECT_REVISION","project":"test-project","revision":"rev-1","provenance":{"sourceType":"REPOSITORY"},"trust":"TECHNICAL_EVIDENCE","coreReference":r,"taskReference":r} for r in references], **extra}
+
+
+def test_grounding_failure_codes_distinguish_retryable_and_deterministic_errors():
+    assert StoryContextAnalysisUnknownReferenceError.failure_code == "GROUNDING_UNKNOWN_REFERENCE"
+    assert StoryContextAnalysisRequestedFileScopeError.failure_code == "GROUNDING_REQUESTED_FILE_SCOPE"
+    assert StoryContextAnalysisUnknownReferenceError.retryable is True
+    assert StoryContextAnalysisContractGroundingError.failure_code == "GROUNDING_CONTRACT_INVALID"
+    assert StoryContextAnalysisContractGroundingError.retryable is False
+    assert StoryContextAnalysisMissingEvidenceError.failure_code == "GROUNDING_MISSING_EVIDENCE"
+
+
+def test_unknown_finding_reference_uses_grounding_taxonomy():
+    service = StoryContextAnalysisGenerationService.__new__(StoryContextAnalysisGenerationService)
+    finding = ArchitectureFinding.model_validate({
+        "title": "Unsupported finding",
+        "description": "The evidence does not support this statement.",
+        "grounding": {
+            "evidenceReferences": [{"reference": "unknown"}],
+            "classification": "AI_INTERPRETATION",
+            "grounded": True,
+            "relationType": "POSSIBLE_RELEVANCE",
+        },
+    })
+    output = type("Output", (), {
+        "architecture_findings": [finding], "decision_findings": [], "evidence_findings": [],
+        "historical_context": [], "constraint_findings": [], "impacted_component_findings": [],
+        "causal_claims": [], "causal_assessment": None, "uncertainties": [],
+        "confidence": type("Confidence", (), {"level": "HIGH"})(),
+        "output_classification": [],
+    })()
+
+    with pytest.raises(StoryContextAnalysisUnknownReferenceError):
+        service._validate_output(output, {}, grounding_contract("allowed"))
+
+
+def test_factual_finding_without_evidence_is_rejected():
+    service = StoryContextAnalysisGenerationService.__new__(StoryContextAnalysisGenerationService)
+    finding = ArchitectureFinding.model_validate({
+        "title": "Unsupported finding",
+        "description": "No evidence is cited.",
+        "grounding": {
+            "classification": "FACTUAL_EXTRACTION",
+            "grounded": True,
+            "relationType": "EXPLICIT",
+        },
+    })
+    output = type("Output", (), {
+        "architecture_findings": [finding], "decision_findings": [], "evidence_findings": [],
+        "historical_context": [], "constraint_findings": [], "impacted_component_findings": [],
+        "causal_claims": [], "causal_assessment": None, "uncertainties": [],
+        "confidence": type("Confidence", (), {"level": "HIGH"})(),
+        "output_classification": [],
+    })()
+
+    with pytest.raises(StoryContextAnalysisMissingEvidenceError):
+        service._validate_output(output, {}, grounding_contract("allowed"))
 
 def test_causal_classifications_are_explicit_and_relation_metadata_is_not_a_field():
     assert {item.value for item in CausalClassification} == {

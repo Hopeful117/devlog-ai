@@ -1,4 +1,6 @@
 import json
+from types import SimpleNamespace
+from uuid import UUID
 
 import pytest
 from openai.lib._parsing import type_to_response_format_param
@@ -6,11 +8,13 @@ from pydantic import ValidationError
 
 from app.prompts.story_context_analysis import StoryContextAnalysisPromptBuilder
 import app.services.story_context_analysis_generation_service as generation_module
+from app.providers.chatgpt import ChatGptProviderError
 from app.schemas.story_context_analysis import (
     ProviderStoryContextAnalysisResult,
     StoryContextAnalysisResult,
     provider_result_to_internal,
 )
+from app.schemas.interaction_trace import AiInteractionTrace
 from evaluations.loader import load_scenario
 
 
@@ -101,6 +105,35 @@ def test_story_context_prompt_and_retry_use_provider_confidence_shape():
     assert "confidence must remain a scalar HIGH, MEDIUM, or LOW value" in retry.user_message
 
 
+def test_interaction_trace_accepts_bounded_failure_code():
+    trace = AiInteractionTrace.model_validate({
+        "id": "00000000-0000-0000-0000-000000000001",
+        "attempt": 1,
+        "interactionType": "INITIAL_GENERATION",
+        "traceLevel": "NORMAL",
+        "provider": "mock",
+        "modelIdentifier": "test-model",
+        "intent": "engineering-story-context-analysis",
+        "intentVersion": "v1",
+        "promptVersion": "prompt-v1",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "completedAt": "2026-01-01T00:00:01Z",
+        "durationMs": 1000,
+        "validationStatus": "VALIDATION_FAILED",
+        "failureCategory": "GROUNDING_ERROR",
+        "failureCode": "GROUNDING_REQUESTED_FILE_SCOPE",
+        "selectedKnowledgeFingerprint": "a" * 64,
+        "promptFingerprint": "b" * 64,
+        "selectedFactCount": 0,
+        "selectedObservationCount": 0,
+        "selectedInsightCount": 0,
+        "selectedEngineeringEventCount": 0,
+        "groundingFingerprint": "c" * 64,
+    })
+
+    assert trace.failure_code == "GROUNDING_REQUESTED_FILE_SCOPE"
+
+
 @pytest.mark.asyncio
 async def test_production_generation_uses_provider_model_before_adapting(monkeypatch):
     captured = {}
@@ -125,6 +158,100 @@ async def test_production_generation_uses_provider_model_before_adapting(monkeyp
     assert captured["response_model"] is ProviderStoryContextAnalysisResult
     assert output.confidence.level == "HIGH"
     assert output.confidence.rationale == ""
+
+
+class _ServiceTraces:
+    def __init__(self, responses):
+        self.responses = iter(responses)
+        self.calls = 0
+        self.retry_reasons = []
+        self.traces = []
+
+    def retry(self, reason):
+        self.retry_reasons.append(reason)
+
+    async def generate_and_validate(self, prompt, response_model, validator):
+        self.calls += 1
+        response = next(self.responses)
+        if isinstance(response, Exception):
+            raise response
+        provider_result = response_model.model_validate(response)
+        validator(provider_result)
+        return provider_result
+
+
+class _Callback:
+    def __init__(self):
+        self.results = []
+
+    async def send_result(self, ai_task_id, correlation_id, result):
+        self.results.append(result)
+        return None
+
+
+def _service(monkeypatch, traces, callback):
+    monkeypatch.setattr(generation_module, "InteractionTraceCollector", lambda provider, submission: traces)
+    service = generation_module.StoryContextAnalysisGenerationService(
+        provider=SimpleNamespace(provider_name="mock", model_identifier="test-model"),
+        prompt_builder=StoryContextAnalysisPromptBuilder(),
+        callback_client=callback,
+    )
+    return service
+
+
+@pytest.mark.asyncio
+async def test_generation_retries_grounding_failure_once_and_completes(monkeypatch):
+    request = load_scenario("engineering-story-context-analysis-v1").prompt_request
+    traces = _ServiceTraces([
+        generation_module.StoryContextAnalysisUnknownReferenceError("unknown reference"),
+        _provider_payload("HIGH"),
+    ])
+    callback = _Callback()
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-000000000002"))
+
+    assert traces.calls == 2
+    assert len(traces.retry_reasons) == 1
+    assert callback.results[0].status.value == "COMPLETED"
+
+
+@pytest.mark.asyncio
+async def test_generation_does_not_retry_deterministic_grounding_contract_failure(monkeypatch):
+    request = load_scenario("engineering-story-context-analysis-v1").prompt_request
+    traces = _ServiceTraces([
+        generation_module.StoryContextAnalysisContractGroundingError("invalid Core contract"),
+    ])
+    callback = _Callback()
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-000000000003"))
+
+    assert traces.calls == 1
+    assert callback.results[0].status.value == "FAILED"
+    assert callback.results[0].error.code == "GROUNDING_CONTRACT_INVALID"
+    assert callback.results[0].error.message == "Grounding validation failed; inspect the bounded interaction trace diagnostics."
+
+
+@pytest.mark.asyncio
+async def test_provider_incomplete_is_terminal_and_not_grounding_failure(monkeypatch):
+    request = load_scenario("engineering-story-context-analysis-v1").prompt_request
+    traces = _ServiceTraces([
+        ChatGptProviderError(
+            "ChatGPT response did not complete",
+            status="RESPONSE.INCOMPLETE",
+            reason="max_output_tokens",
+        ),
+    ])
+    callback = _Callback()
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-000000000004"))
+
+    assert traces.calls == 1
+    assert callback.results[0].status.value == "FAILED"
+    assert callback.results[0].error.code == "PROVIDER_INCOMPLETE_RESPONSE"
+    assert "grounding" not in callback.results[0].error.message.casefold()
 
 
 def test_story_context_prompt_preserves_null_story_id_but_omits_optional_nulls():

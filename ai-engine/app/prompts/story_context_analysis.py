@@ -154,6 +154,10 @@ class StoryContextAnalysisPromptBuilder:
                 by_alias=True, mode="json", exclude_none=True
             ) if request.user_guidance else {}
         )
+        requested_file_scope = self._requested_file_scope(
+            projection_value if request.task_type.value == "STORY_CONTEXT_ANALYSIS" else {},
+            request.grounding_contract,
+        )
         output_model = StoryAgentFollowUpResult if follow_up else ProviderStoryContextAnalysisResult
         schema_json = self._canonical(output_model.model_json_schema())
         grounding_json = self._canonical(request.grounding_contract)
@@ -192,6 +196,8 @@ class StoryContextAnalysisPromptBuilder:
             f"{SHARED_STRUCTURED_CONTEXT_CONTRACT}\n\n"
             "GROUNDING CONTRACT (AUTHORITATIVE)\n"
             f"{grounding_json}\n\n"
+            "REQUESTED FILE SCOPE (AUTHORITATIVE)\n"
+            f"{requested_file_scope}\n\n"
             "SELECTED KNOWLEDGE\n"
             f"{knowledge_json}\n\n"
             "USER GUIDANCE (NON-AUTHORITATIVE)\n"
@@ -264,6 +270,33 @@ class StoryContextAnalysisPromptBuilder:
     def _canonical(self, value: object) -> str:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
+    def _requested_file_scope(
+        self, projection: dict[str, object], grounding_contract: dict[str, object]
+    ) -> str:
+        request = projection.get("request") if isinstance(projection, dict) else None
+        requested_files = request.get("files") if isinstance(request, dict) else None
+        if not isinstance(requested_files, list) or not requested_files:
+            return self._canonical({"files": [], "groundingReferences": "ALL_AUTHORIZED_REFERENCES"})
+
+        files = [value for value in requested_files if isinstance(value, str) and value]
+        references: dict[str, list[str]] = {file: [] for file in files}
+        allowed = grounding_contract.get("allowedGroundingReferences")
+        if isinstance(allowed, list):
+            for entry in allowed:
+                if not isinstance(entry, dict) or not isinstance(entry.get("ref"), str):
+                    continue
+                reference = entry["ref"]
+                provenance = entry.get("provenance")
+                originating_file = provenance.get("originatingFile") if isinstance(provenance, dict) else None
+                for file in files:
+                    if reference == file or reference.endswith(f":{file}") or originating_file == file:
+                        references[file].append(reference)
+        return self._canonical({
+            "files": files,
+            "groundingReferences": references,
+            "rule": "Every finding must cite at least one reference mapped to a requested file. If none applies, omit the finding and state NOT_ESTABLISHED or missingInformation.",
+        })
+
     def corrective_retry(
         self,
         original_prompt: Prompt,
@@ -272,6 +305,7 @@ class StoryContextAnalysisPromptBuilder:
     ) -> Prompt:
         error_message = str(error)
         failure_category = getattr(error, "failure_category", None)
+        failure_code = getattr(error, "failure_code", None)
         if failure_category is None:
             lowered = error_message.casefold()
             failure_category = (
@@ -279,10 +313,13 @@ class StoryContextAnalysisPromptBuilder:
                 if any(term in lowered for term in ("defensible evidence", "relationship support", "causalclassification", "evidencebasis"))
                 else "FORMAT_ERROR"
             )
+        if not isinstance(failure_code, str) or not failure_code:
+            failure_code = failure_category
         corrective_user_message = (
             original_prompt.user_message
             + "\n\nCORRECTIVE RETRY\n"
             f"Failure category: {failure_category}\n"
+            f"Failure code: {failure_code}\n"
             "The previous output was invalid. Fix the following error:\n"
             f"{error_message}\n\n"
             "The failure category is explicit. For SEMANTIC_SUPPORT_ERROR, downgrade the claim to NOT_ESTABLISHED when support is insufficient; do not invent evidence or add references outside the authoritative contract.\n"

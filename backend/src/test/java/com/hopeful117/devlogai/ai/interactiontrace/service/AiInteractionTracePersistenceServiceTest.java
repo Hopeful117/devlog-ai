@@ -49,7 +49,21 @@ class AiInteractionTracePersistenceServiceTest {
         assertThat(trace.getSystemPrompt()).isNull();
         assertThat(trace.getRawModelResponse()).isNull();
         assertThat(trace.getParsedModelResponse()).isNull();
+        assertThat(trace.getFailureCode()).isNull();
         assertThat(trace.getExpiresAt()).isNull();
+    }
+
+    @Test
+    void normalModePersistsBoundedFailureCode() {
+        ReflectionTestUtils.setField(service, "configuredLevel", "NORMAL");
+        AiInteractionTraceRequest request = requestWithFailureCode();
+        when(repository.existsById(request.id())).thenReturn(false);
+
+        service.persist(task(), List.of(request));
+
+        ArgumentCaptor<AiInteractionTrace> captor = ArgumentCaptor.forClass(AiInteractionTrace.class);
+        verify(repository).save(captor.capture());
+        assertThat(captor.getValue().getFailureCode()).isEqualTo("GROUNDING_REQUESTED_FILE_SCOPE");
     }
 
     @Test
@@ -101,5 +115,16 @@ class AiInteractionTracePersistenceServiceTest {
                 started, Instant.now(), 25, "SUCCEEDED", null, null,
                 "a".repeat(64), "b".repeat(64), 1, 1, 1, 0, "c".repeat(64),
                 null, null, null, null, null, "system", "user", "{}", Map.of("ok", true), null);
+    }
+
+    private AiInteractionTraceRequest requestWithFailureCode() {
+        Instant started = Instant.now().minus(25, ChronoUnit.MILLIS);
+        return new AiInteractionTraceRequest(
+                UUID.randomUUID(), 1, "INITIAL_GENERATION", "NORMAL", "mock",
+                "deterministic-v1", "engineering-story-context-analysis", "v1",
+                "story-context-analysis-prompt-v1", started, Instant.now(), 25,
+                "VALIDATION_FAILED", "GROUNDING_ERROR", "GROUNDING_REQUESTED_FILE_SCOPE", "retry",
+                "a".repeat(64), "b".repeat(64), 1, 1, 1, 0, "c".repeat(64),
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 }

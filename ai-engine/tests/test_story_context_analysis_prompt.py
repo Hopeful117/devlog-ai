@@ -21,8 +21,36 @@ def test_story_context_prompt_uses_only_java_authored_grounding_contract() -> No
         request.model_copy(update={"grounding_contract": {}})
     )
     assert (
-        'GROUNDING CONTRACT (AUTHORITATIVE)\n{}\n\nSELECTED KNOWLEDGE'
+        'GROUNDING CONTRACT (AUTHORITATIVE)\n{}\n\n'
+        'REQUESTED FILE SCOPE (AUTHORITATIVE)\n'
+        '{"files":[],"groundingReferences":"ALL_AUTHORIZED_REFERENCES"}\n\n'
+        'SELECTED KNOWLEDGE'
     ) in empty_contract_prompt.user_message
+
+
+def test_requested_file_scope_lists_only_file_grounding_references() -> None:
+    builder = StoryContextAnalysisPromptBuilder()
+
+    scope = builder._requested_file_scope(
+        {"request": {"files": ["docker-compose.yml"]}},
+        {
+            "allowedGroundingReferences": [
+                {
+                    "ref": "docker-compose.yml",
+                    "provenance": {"originatingFile": "docker-compose.yml"},
+                },
+                {
+                    "ref": "docs/architecture.md",
+                    "provenance": {"originatingFile": "docs/architecture.md"},
+                },
+            ]
+        },
+    )
+
+    assert '"files":["docker-compose.yml"]' in scope
+    assert '"docker-compose.yml":["docker-compose.yml"]' in scope
+    assert "docs/architecture.md" not in scope
+    assert "Every finding must cite at least one reference" in scope
 
 
 def test_story_context_prompt_preserves_core_authorized_generation_parameters() -> None:
@@ -127,3 +155,19 @@ def test_story_context_contract_exposes_implementation_preparation() -> None:
     assert "implementationPreparation" in schema["properties"]
     preparation = schema["$defs"]["ImplementationPreparation"]
     assert set(preparation["properties"]) == {"affectedFiles", "constraints", "testPlan"}
+
+
+def test_corrective_retry_preserves_bounded_grounding_failure_code() -> None:
+    request = load_scenario(SCENARIO_ID).prompt_request
+    prompt = StoryContextAnalysisPromptBuilder().build(request)
+
+    class RequestedFileScopeError(ValueError):
+        failure_category = "GROUNDING_ERROR"
+        failure_code = "GROUNDING_REQUESTED_FILE_SCOPE"
+
+    retry = StoryContextAnalysisPromptBuilder().corrective_retry(
+        prompt, RequestedFileScopeError("finding is outside requested scope")
+    )
+
+    assert "Failure category: GROUNDING_ERROR" in retry.user_message
+    assert "Failure code: GROUNDING_REQUESTED_FILE_SCOPE" in retry.user_message
