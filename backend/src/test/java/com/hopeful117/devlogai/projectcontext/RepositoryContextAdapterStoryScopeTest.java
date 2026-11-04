@@ -8,6 +8,9 @@ import com.hopeful117.devlogai.observation.repository.ObservationRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
+import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
+import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
+import com.hopeful117.devlogai.source.repository.SourceRepository;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus;
 import com.hopeful117.devlogai.projectfreshness.ProjectRefreshGuidance;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
@@ -48,6 +51,9 @@ class RepositoryContextAdapterStoryScopeTest {
     @Mock ObservationRepository observationRepository;
     @Mock ProjectCommitRepository commitRepository;
     @Mock ProjectFreshnessService freshnessService;
+    @Mock SourceRepository sourceRepository;
+    @Mock WorkspaceManager workspaceManager;
+    @Mock AnalysisRepository analysisRepository;
 
     private RepositoryContextAdapter adapter;
 
@@ -55,7 +61,8 @@ class RepositoryContextAdapterStoryScopeTest {
     void setUp() {
         adapter = new RepositoryContextAdapter(projectContextProvider,
                 repositoryContextService, insightRepository, factRepository,
-                observationRepository, commitRepository, freshnessService);
+                observationRepository, commitRepository, freshnessService,
+                sourceRepository, workspaceManager, analysisRepository);
     }
 
     @Test
@@ -125,6 +132,38 @@ class RepositoryContextAdapterStoryScopeTest {
         var result = adapter.filterByStoryScope(context, PROJECT_ID, snapshot, storyId);
 
         assertThat(result.evidence()).containsExactlyInAnyOrder(evidenceB, evidenceC);
+    }
+
+    @Test
+    void baseAndTargetReachable_retainsRepositoryDocuments() {
+        var storyId = UUID.randomUUID();
+        var snapshot = snapshotWithStory(storyId, SHA_A, SHA_C);
+        var storyDocument = documentEvidence("STORY_DOCUMENT", "docs/stories/0001.md");
+        var adrDocument = documentEvidence("ADR_DOCUMENT", "docs/decisions/ADR-0001.md");
+        var roadmapDocument = documentEvidence("ROADMAP_DOCUMENT", "docs/roadmap.md");
+        var inWindowCommit = commitEvidence(SOURCE_ID, SHA_B);
+        var outsideWindowCommit = commitEvidence(SOURCE_ID, SHA_D);
+        var context = contextWithEvidenceAndCandidateCount(6,
+                storyDocument, adrDocument, roadmapDocument,
+                inWindowCommit, outsideWindowCommit);
+
+        when(commitRepository.findByProjectIdOrderByCommittedAtAscCommitHashAsc(PROJECT_ID))
+                .thenReturn(linearChain(PROJECT_ID, SHA_A, SHA_B, SHA_C));
+
+        var result = adapter.filterByStoryScope(context, PROJECT_ID, snapshot, storyId);
+
+        assertThat(result.evidence()).containsExactlyInAnyOrder(
+                storyDocument, adrDocument, roadmapDocument, inWindowCommit);
+        assertThat(result.candidateCount()).isEqualTo(6);
+        assertThat(result.discardedCount()).isEqualTo(2);
+        assertThat(result.selectedByLayer()).containsEntry(
+                RepositoryContextLayer.PROJECT_DOCUMENTATION, 3)
+                .containsEntry(RepositoryContextLayer.GIT_HISTORY, 1);
+        assertThat(result.diagnostics().selectedByKind())
+                .containsEntry("STORY_DOCUMENT", 1)
+                .containsEntry("ADR_DOCUMENT", 1)
+                .containsEntry("ROADMAP_DOCUMENT", 1)
+                .containsEntry("COMMIT", 1);
     }
 
     @Test
@@ -234,11 +273,17 @@ class RepositoryContextAdapterStoryScopeTest {
     }
 
     private RepositoryContext contextWithEvidence(RepositoryEvidence... evidence) {
+        return contextWithEvidenceAndCandidateCount(evidence.length, evidence);
+    }
+
+    private RepositoryContext contextWithEvidenceAndCandidateCount(
+            int candidateCount, RepositoryEvidence... evidence) {
         return new RepositoryContext(
                 "v1", null, List.of(), "v1", List.of(),
                 List.of(evidence), java.util.Map.of(),
                 null, new RepositoryContext.ContextBudget(50, 5000, 20, 10000),
-                100, evidence.length, 0, false, List.of(), List.of(), "digest");
+                100, candidateCount, candidateCount - evidence.length, false,
+                List.of(), List.of(), "digest");
     }
 
     private RepositoryEvidence commitEvidence(UUID sourceId, String sha) {
@@ -259,6 +304,15 @@ class RepositoryContextAdapterStoryScopeTest {
                 List.of("git:" + sourceId + ":" + commitSha),
                 new RepositoryEvidence.EvidenceProvenance(
                         "GIT", "src", filePath, null),
+                java.util.Map.of(), 60, List.of());
+    }
+
+    private RepositoryEvidence documentEvidence(String kind, String path) {
+        return new RepositoryEvidence(
+                RepositoryContextLayer.PROJECT_DOCUMENTATION, kind,
+                "document:" + path, path, Instant.now(), EvidenceScore.unscored(),
+                List.of(), new RepositoryEvidence.EvidenceProvenance(
+                        "REPOSITORY_STRUCTURE", path, path, null),
                 java.util.Map.of(), 60, List.of());
     }
 

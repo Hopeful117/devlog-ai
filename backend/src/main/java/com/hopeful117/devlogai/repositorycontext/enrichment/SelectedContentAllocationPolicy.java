@@ -13,8 +13,16 @@ public class SelectedContentAllocationPolicy {
     public static final String POLICY_VERSION = "v1";
 
     public List<Allocation> allocate(List<RepositoryEvidence> eligible) {
+        return allocate(eligible, List.of());
+    }
+
+    public List<Allocation> allocate(List<RepositoryEvidence> eligible,
+            List<String> requestedFiles) {
         List<RepositoryEvidence> ordered = eligible.stream()
-                .sorted(Comparator.comparingInt(RepositoryEvidence::relevanceScore).reversed()
+                .sorted(Comparator.comparing((RepositoryEvidence value) ->
+                                !matchesRequestedFile(value, requestedFiles))
+                        .thenComparing(Comparator.comparingInt(
+                                RepositoryEvidence::relevanceScore).reversed())
                         .thenComparing(Comparator.comparingInt(
                                 (RepositoryEvidence value) ->
                                         value.score().matchStrength().semantic()).reversed())
@@ -34,6 +42,16 @@ public class SelectedContentAllocationPolicy {
                             + value.score().matchStrength().guidance())));
         }
         return List.copyOf(result);
+    }
+
+    private boolean matchesRequestedFile(RepositoryEvidence evidence,
+            List<String> requestedFiles) {
+        if (evidence.provenance() == null
+                || evidence.provenance().originatingFile() == null) return false;
+        String originatingFile = evidence.provenance().originatingFile().replace('\\', '/');
+        return requestedFiles.stream().map(value -> value.replace('\\', '/'))
+                .anyMatch(requested -> originatingFile.equals(requested)
+                        || originatingFile.startsWith(requested + "/"));
     }
 
     public record Allocation(

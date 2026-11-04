@@ -63,7 +63,8 @@ public class SelectedFileContentEnricher {
                         || requestedInObjective(value, request))
                 .toList();
         List<SelectedContentAllocationPolicy.Allocation> allocations =
-                allocationPolicy.allocate(eligible);
+                allocationPolicy.allocate(eligible, request.guidance() == null
+                        ? List.of() : request.guidance().priorities());
         int reservedMetadataTokens = allocations.stream()
                 .mapToInt(this::metadataTokenDelta).sum();
         BudgetState state = new BudgetState(

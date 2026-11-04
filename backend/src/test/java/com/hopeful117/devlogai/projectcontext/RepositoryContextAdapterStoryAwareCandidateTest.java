@@ -1,6 +1,9 @@
 package com.hopeful117.devlogai.projectcontext;
 
 import com.hopeful117.devlogai.analysis.context.AnalysisContext;
+import com.hopeful117.devlogai.analysis.entity.Analysis;
+import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
+import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
 import com.hopeful117.devlogai.fact.entity.Fact;
 import com.hopeful117.devlogai.fact.entity.FactType;
 import com.hopeful117.devlogai.fact.repository.FactRepository;
@@ -14,9 +17,14 @@ import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 import com.hopeful117.devlogai.profile.model.ProfileCompletenessStatus;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
+import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
 import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
+import com.hopeful117.devlogai.source.repository.SourceRepository;
+import com.hopeful117.devlogai.source.entity.Source;
+import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
+import com.hopeful117.devlogai.source.exception.SourceSelectionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,12 +41,15 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class RepositoryContextAdapterStoryAwareCandidateTest {
@@ -46,6 +57,8 @@ class RepositoryContextAdapterStoryAwareCandidateTest {
     private static final UUID PROJECT_ID = UUID.fromString("10000000-0000-0000-0000-000000000115");
     private static final UUID ANALYSIS_ID = UUID.fromString("20000000-0000-0000-0000-000000000115");
     private static final UUID STORY_ID = UUID.fromString("30000000-0000-0000-0000-000000000115");
+    private static final UUID DEFAULT_SOURCE_ID = UUID.fromString(
+            "50000000-0000-0000-0000-000000000100");
 
     @Mock ProjectContextProvider projectContextProvider;
     @Mock RepositoryContextService repositoryContextService;
@@ -54,6 +67,9 @@ class RepositoryContextAdapterStoryAwareCandidateTest {
     @Mock ObservationRepository observationRepository;
     @Mock ProjectCommitRepository commitRepository;
     @Mock ProjectFreshnessService freshnessService;
+    @Mock SourceRepository sourceRepository;
+    @Mock WorkspaceManager workspaceManager;
+    @Mock AnalysisRepository analysisRepository;
 
     private RepositoryContextAdapter adapter;
 
@@ -61,10 +77,19 @@ class RepositoryContextAdapterStoryAwareCandidateTest {
     void setUp() {
         adapter = new RepositoryContextAdapter(projectContextProvider, repositoryContextService,
                 insightRepository, factRepository, observationRepository, commitRepository,
-                freshnessService);
+                freshnessService, sourceRepository, workspaceManager, analysisRepository);
         when(insightRepository.findByProjectIdAndStatusInOrderByCreatedAtDescIdDesc(
                 PROJECT_ID, List.of(InsightStatus.ACTIVE))).thenReturn(List.of());
-        when(repositoryContextService.build(any(), any(), any(), anyList()))
+        lenient().when(repositoryContextService.build(any(), any(), any(), anyList()))
+                .thenReturn(emptyRepositoryContext());
+        var source = Source.builder().id(DEFAULT_SOURCE_ID).build();
+        var workspace = new SynchronizedWorkspace(DEFAULT_SOURCE_ID,
+                java.nio.file.Path.of("/tmp/workspace"), "c".repeat(40));
+        lenient().when(sourceRepository
+                .findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(PROJECT_ID))
+                .thenReturn(List.of(source));
+        lenient().when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
+        lenient().when(repositoryContextService.build(any(), any(), any(), anyList(), anyList(), any()))
                 .thenReturn(emptyRepositoryContext());
     }
 
@@ -94,6 +119,88 @@ class RepositoryContextAdapterStoryAwareCandidateTest {
                 .anyMatch(fact -> fact.id().equals(olderRelevant.getId())));
         verify(factRepository).findByAnalysisIdOrderByDetectedAtDescIdDesc(
                 ANALYSIS_ID, PageRequest.of(0, 200));
+    }
+
+    @Test
+    void storyContextPassesResolvedRevisionScopeToRepositoryContext() {
+        UUID sourceId = UUID.fromString("50000000-0000-0000-0000-000000000115");
+        String revision = "a".repeat(40);
+        var source = Source.builder().id(sourceId).build();
+        var workspace = new SynchronizedWorkspace(sourceId, java.nio.file.Path.of("/tmp/workspace"), revision);
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(PROJECT_ID))
+                .thenReturn(List.of(source));
+        when(workspaceManager.synchronize(source, null)).thenReturn(workspace);
+        when(repositoryContextService.build(any(), any(), any(), anyList(), anyList(), any()))
+                .thenReturn(emptyRepositoryContext());
+
+        var story = new ProjectContextSnapshot.EngineeringStorySnapshot(
+                STORY_ID, PROJECT_ID, 115, "OAuth gateway", "IN_PROGRESS",
+                "docs/stories/0115-oauth/story.md", null, null, Instant.EPOCH, null);
+        var snapshot = new ProjectContextSnapshot(
+                new AnalysisContext.ProjectSnapshot(PROJECT_ID, "Project", "project", null,
+                        ProjectStatus.ACTIVE), null, List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(story), List.of());
+
+        adapter.buildRepositoryContext(PROJECT_ID, "Prepare Story", snapshot,
+                List.of(), STORY_ID);
+
+        ArgumentCaptor<RepositoryRevisionScope> captor =
+                ArgumentCaptor.forClass(RepositoryRevisionScope.class);
+        verify(repositoryContextService, times(1)).build(
+                any(), any(), any(), anyList(), anyList(), captor.capture());
+        assertEquals(revision, captor.getValue().resolvedRevision());
+        assertEquals(RepositoryRevisionScope.SOURCE_CURRENT_REVISION,
+                captor.getValue().revisionSource());
+    }
+
+    @Test
+    void storyContextUsesBaselineAnalysisRevisionBeforeCurrentRevision() {
+        UUID sourceId = UUID.fromString("50000000-0000-0000-0000-000000000116");
+        String baselineRevision = "b".repeat(40);
+        var source = Source.builder().id(sourceId).build();
+        var workspace = new SynchronizedWorkspace(sourceId,
+                java.nio.file.Path.of("/tmp/workspace"), baselineRevision);
+        var analysis = org.mockito.Mockito.mock(Analysis.class);
+        when(analysis.getTargetRevision()).thenReturn(baselineRevision);
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(PROJECT_ID))
+                .thenReturn(List.of(source));
+        when(analysisRepository.findById(ANALYSIS_ID)).thenReturn(java.util.Optional.of(analysis));
+        when(workspaceManager.synchronize(source, baselineRevision)).thenReturn(workspace);
+        when(repositoryContextService.build(any(), any(), any(), anyList(), anyList(), any()))
+                .thenReturn(emptyRepositoryContext());
+
+        adapter.buildRepositoryContext(PROJECT_ID, "Prepare Story", snapshot(),
+                List.of(), STORY_ID);
+
+        verify(workspaceManager).synchronize(source, baselineRevision);
+    }
+
+    @Test
+    void storyContextFailsWithTypedErrorWhenNoSourceIsAvailable() {
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(PROJECT_ID))
+                .thenReturn(List.of());
+
+        SourceSelectionException exception = assertThrows(SourceSelectionException.class,
+                () -> adapter.buildRepositoryContext(PROJECT_ID, "Prepare Story", snapshot(),
+                        List.of(), STORY_ID));
+
+        assertEquals(SourceSelectionException.Reason.SOURCE_UNAVAILABLE, exception.reason());
+    }
+
+    @Test
+    void storyContextFailsWithTypedErrorWhenSourcesAreAmbiguous() {
+        var first = Source.builder().id(UUID.fromString(
+                "50000000-0000-0000-0000-000000000117")).build();
+        var second = Source.builder().id(UUID.fromString(
+                "50000000-0000-0000-0000-000000000118")).build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(PROJECT_ID))
+                .thenReturn(List.of(first, second));
+
+        SourceSelectionException exception = assertThrows(SourceSelectionException.class,
+                () -> adapter.buildRepositoryContext(PROJECT_ID, "Prepare Story", snapshot(),
+                        List.of(), STORY_ID));
+
+        assertEquals(SourceSelectionException.Reason.AMBIGUOUS_SOURCE, exception.reason());
     }
 
     @Test
@@ -156,7 +263,8 @@ class RepositoryContextAdapterStoryAwareCandidateTest {
 
     private AnalysisContext capturedContext() {
         ArgumentCaptor<AnalysisContext> captor = ArgumentCaptor.forClass(AnalysisContext.class);
-        verify(repositoryContextService).build(captor.capture(), any(), any(), anyList());
+        verify(repositoryContextService).build(captor.capture(), any(), any(), anyList(),
+                anyList(), any());
         return captor.getValue();
     }
 

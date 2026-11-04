@@ -1,0 +1,116 @@
+{
+  "protocolVersion": "story-0177-hybrid-retrieval/v1",
+  "corpusVersion": "1.0.0",
+  "scenarios": [
+    {
+      "scenarioId": "exact-targeted-compose",
+      "version": "1.0.0",
+      "scope": {"project": "devlog-ai", "source": "source-main", "revision": "rev-0177"},
+      "question": "Which configuration declares the backend to ai-engine dependency?",
+      "requestedFiles": ["docker-compose.yml"],
+      "expectedEvidence": ["file:docker-compose.yml@rev-0177"],
+      "expectedAbstention": false,
+      "candidates": [
+        {"reference": "file:docker-compose.yml@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "CONFIG_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "docker-compose.yml", "text": "backend depends on ai-engine environment configuration", "structuralTerms": ["compose", "dependency", "configuration"], "semanticTerms": ["service wiring", "runtime dependency"]},
+        {"reference": "file:README.md@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "DOCUMENT", "trustTier": "HUMAN_AUTHORED", "citability": true, "originatingFile": "README.md", "text": "local development instructions", "structuralTerms": ["documentation"], "semanticTerms": ["setup"]},
+        {"reference": "file:docker-compose.yml@old", "project": "devlog-ai", "source": "source-main", "revision": "rev-old", "family": "CONFIG_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "docker-compose.yml", "text": "backend dependency", "structuralTerms": ["compose"], "semanticTerms": ["service wiring"]}
+      ]
+    },
+    {
+      "scenarioId": "semantic-indirect-runtime-wiring",
+      "version": "1.0.0",
+      "scope": {"project": "devlog-ai", "source": "source-main", "revision": "rev-0177"},
+      "question": "Where is the runtime service coupling declared?",
+      "requestedFiles": ["docker-compose.yml"],
+      "expectedEvidence": ["file:docker-compose.yml@rev-0177"],
+      "expectedAbstention": false,
+      "candidates": [
+        {"reference": "file:docker-compose.yml@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "CONFIG_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "docker-compose.yml", "text": "services backend and ai-engine", "structuralTerms": ["compose", "environment"], "semanticTerms": ["runtime service coupling", "service wiring", "dependency injection"]},
+        {"reference": "file:backend-client.java@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "SOURCE_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "backend/src/main/java/BackendClient.java", "text": "HTTP client", "structuralTerms": ["client"], "semanticTerms": ["runtime service coupling"]},
+        {"reference": "file:unrelated.java@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "SOURCE_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "backend/src/main/java/Unrelated.java", "text": "service", "structuralTerms": ["java"], "semanticTerms": ["unrelated"]}
+      ]
+    },
+    {
+      "scenarioId": "multi-source-architecture",
+      "version": "1.0.0",
+      "scope": {"project": "devlog-ai", "source": "source-main", "revision": "rev-0177"},
+      "question": "How are Core authority, AI execution, and MCP transport separated?",
+      "requestedFiles": ["docs/decisions/ADR-067.md", "docker-compose.yml"],
+      "expectedEvidence": ["doc:ADR-067@rev-0177", "file:docker-compose.yml@rev-0177"],
+      "expectedAbstention": false,
+      "maxCandidates": 8,
+      "maxSelected": 4,
+      "candidates": [
+        {"reference": "doc:ADR-067@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "ADR_DOCUMENT", "trustTier": "HUMAN_AUTHORED", "citability": true, "originatingFile": "docs/decisions/ADR-067.md", "text": "Java Core authority Python AI execution MCP transport", "structuralTerms": ["adr", "architecture", "authority"], "semanticTerms": ["separation of concerns", "capability boundary"]},
+        {"reference": "file:docker-compose.yml@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "CONFIG_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "docker-compose.yml", "text": "backend ai-engine mcp-server services", "structuralTerms": ["compose", "service"], "semanticTerms": ["runtime topology", "transport"]},
+        {"reference": "file:repository-context.java@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "SOURCE_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "backend/src/main/java/RepositoryContext.java", "text": "context selection", "structuralTerms": ["core", "selection"], "semanticTerms": ["deterministic authority"]}
+      ]
+    },
+    {
+      "scenarioId": "insufficient-evidence",
+      "version": "1.0.0",
+      "scope": {"project": "devlog-ai", "source": "source-main", "revision": "rev-0177"},
+      "question": "Which production incident originally caused this dependency?",
+      "requestedFiles": [],
+      "expectedEvidence": [],
+      "expectedAbstention": true,
+      "candidates": [
+        {"reference": "file:docker-compose.yml@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "CONFIG_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "docker-compose.yml", "text": "service dependency", "structuralTerms": ["configuration"], "semanticTerms": ["dependency"]},
+        {"reference": "doc:ADR-067@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "ADR_DOCUMENT", "trustTier": "HUMAN_AUTHORED", "citability": true, "originatingFile": "docs/decisions/ADR-067.md", "text": "agent architecture", "structuralTerms": ["adr"], "semanticTerms": ["incident cause"]}
+      ]
+    },
+    {
+      "scenarioId": "truncated-context",
+      "version": "1.0.0",
+      "scope": {"project": "devlog-ai", "source": "source-main", "revision": "rev-0177"},
+      "question": "What exact implementation decision explains the runtime dependency?",
+      "requestedFiles": ["docker-compose.yml"],
+      "expectedEvidence": ["file:docker-compose.yml@rev-0177"],
+      "expectedAbstention": true,
+      "projection": {"truncated": true},
+      "candidates": [
+        {"reference": "file:docker-compose.yml@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "CONFIG_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "docker-compose.yml", "text": "service dependency", "structuralTerms": ["compose"], "semanticTerms": ["runtime dependency"]},
+        {"reference": "doc:ADR-067@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "ADR_DOCUMENT", "trustTier": "HUMAN_AUTHORED", "citability": true, "originatingFile": "docs/decisions/ADR-067.md", "text": "authority boundary", "structuralTerms": ["adr"], "semanticTerms": ["implementation decision"]}
+      ]
+    },
+    {
+      "scenarioId": "wrong-revision-negative-control",
+      "version": "1.0.0",
+      "scope": {"project": "devlog-ai", "source": "source-main", "revision": "rev-0177"},
+      "question": "Which file declares the service dependency?",
+      "requestedFiles": ["docker-compose.yml"],
+      "expectedEvidence": ["file:docker-compose.yml@rev-0177"],
+      "expectedAbstention": false,
+      "candidates": [
+        {"reference": "file:docker-compose.yml@rev-0176", "project": "devlog-ai", "source": "source-main", "revision": "rev-0176", "family": "CONFIG_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "docker-compose.yml", "text": "service dependency", "structuralTerms": ["compose"], "semanticTerms": ["service wiring"]},
+        {"reference": "file:docker-compose.yml@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "CONFIG_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "docker-compose.yml", "text": "service dependency", "structuralTerms": ["compose"], "semanticTerms": ["service wiring"]}
+      ]
+    },
+    {
+      "scenarioId": "out-of-scope-negative-control",
+      "version": "1.0.0",
+      "scope": {"project": "devlog-ai", "source": "source-main", "revision": "rev-0177"},
+      "question": "Which configuration declares the service dependency?",
+      "requestedFiles": ["docker-compose.yml"],
+      "expectedEvidence": ["file:docker-compose.yml@rev-0177"],
+      "expectedAbstention": false,
+      "candidates": [
+        {"reference": "file:other-compose.yml@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "CONFIG_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "other-compose.yml", "text": "service dependency", "structuralTerms": ["compose"], "semanticTerms": ["service wiring"], "scopeAllowed": false},
+        {"reference": "file:docker-compose.yml@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "CONFIG_FILE", "trustTier": "TECHNICAL_EVIDENCE", "citability": true, "originatingFile": "docker-compose.yml", "text": "service dependency", "structuralTerms": ["compose"], "semanticTerms": ["service wiring"]}
+      ]
+    },
+    {
+      "scenarioId": "superseded-document-negative-control",
+      "version": "1.0.0",
+      "scope": {"project": "devlog-ai", "source": "source-main", "revision": "rev-0177"},
+      "question": "What is the current authority boundary between Core and AI?",
+      "requestedFiles": ["docs/decisions/ADR-067.md"],
+      "expectedEvidence": ["doc:ADR-067@rev-0177"],
+      "expectedAbstention": false,
+      "candidates": [
+        {"reference": "doc:ADR-018@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "ADR_DOCUMENT", "trustTier": "HUMAN_AUTHORED", "citability": true, "originatingFile": "docs/decisions/ADR-018.md", "text": "AI coordinates context retrieval", "structuralTerms": ["adr", "historical"], "semanticTerms": ["authority boundary"], "status": "SUPERSEDED"},
+        {"reference": "doc:ADR-067@rev-0177", "project": "devlog-ai", "source": "source-main", "revision": "rev-0177", "family": "ADR_DOCUMENT", "trustTier": "HUMAN_AUTHORED", "citability": true, "originatingFile": "docs/decisions/ADR-067.md", "text": "Java Core authority Python AI execution", "structuralTerms": ["adr", "authority"], "semanticTerms": ["authority boundary", "Core AI separation"]}
+      ]
+    }
+  ]
+}

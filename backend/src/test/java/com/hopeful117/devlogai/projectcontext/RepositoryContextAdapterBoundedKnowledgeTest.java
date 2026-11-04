@@ -8,6 +8,9 @@ import com.hopeful117.devlogai.observation.entity.Observation;
 import com.hopeful117.devlogai.observation.repository.ObservationRepository;
 import com.hopeful117.devlogai.profile.dto.ProjectProfileResponse;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
+import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
+import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
+import com.hopeful117.devlogai.source.repository.SourceRepository;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,6 +44,9 @@ class RepositoryContextAdapterBoundedKnowledgeTest {
     @Mock RepositoryContextService repositoryContextService;
     @Mock ProjectCommitRepository commitRepository;
     @Mock ProjectFreshnessService freshnessService;
+    @Mock SourceRepository sourceRepository;
+    @Mock WorkspaceManager workspaceManager;
+    @Mock AnalysisRepository analysisRepository;
 
     private RepositoryContextAdapter adapter;
 
@@ -48,7 +54,8 @@ class RepositoryContextAdapterBoundedKnowledgeTest {
     void setUp() {
         adapter = new RepositoryContextAdapter(projectContextProvider,
                 repositoryContextService, null, factRepository, observationRepository,
-                commitRepository, freshnessService);
+                commitRepository, freshnessService, sourceRepository, workspaceManager,
+                analysisRepository);
     }
 
     private Fact fact(String idSeed, String content, Instant detectedAt) {

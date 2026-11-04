@@ -12,6 +12,7 @@ import com.hopeful117.devlogai.repositorycontext.intelligence.ContextProfileDefi
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceCriterion;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidencePrecisionPolicy;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
+import com.hopeful117.devlogai.intent.model.UserGuidance;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -103,7 +104,34 @@ class DeterministicEvidenceRankerTest {
                 > weaker.score().matchStrength().semantic());
     }
 
+    @Test
+    void requestedFileReceivesDeterministicGuidanceBoost() {
+        List<RepositoryEvidence> candidates = List.of(
+                evidence("config", "CONFIG_FILE", "compose configuration", "docker-compose.yml"),
+                evidence("other", "CONFIG_FILE", "compose configuration", "application.yml"));
+
+        UserGuidance guidance = new UserGuidance(
+                "Inspect the requested file", "kiko", "focused", "analytical",
+                "engineering-story-preparation", List.of("docker-compose.yml"));
+        List<RepositoryEvidence> ranked = ranker.rank(candidates,
+                request("Inspect configuration", precision(), guidance));
+
+        RepositoryEvidence requested = ranked.stream()
+                .filter(value -> value.reference().equals("config")).findFirst().orElseThrow();
+        RepositoryEvidence other = ranked.stream()
+                .filter(value -> value.reference().equals("other")).findFirst().orElseThrow();
+        assertEquals(100, requested.score().criteria()
+                .get(EvidenceCriterion.USER_GUIDANCE_BOOST));
+        assertTrue(requested.score().criteria().get(EvidenceCriterion.USER_GUIDANCE_BOOST)
+                > other.score().criteria().get(EvidenceCriterion.USER_GUIDANCE_BOOST));
+    }
+
     private ContextRequest request(String objective, EvidencePrecisionPolicy policy) {
+        return request(objective, policy, null);
+    }
+
+    private ContextRequest request(String objective, EvidencePrecisionPolicy policy,
+            UserGuidance guidance) {
         AnalysisContext context = mock(AnalysisContext.class);
         AnalysisContext.AnalysisSnapshot analysis = mock(
                 AnalysisContext.AnalysisSnapshot.class);
@@ -124,7 +152,7 @@ class DeterministicEvidenceRankerTest {
                 List.of(RepositoryContextLayer.RELATED_SOURCE_CODE), 1, 100, policy);
         var plan = new ContextPlan("v2", List.of(profile), weights,
                 profile.preferredLayers(), 1, policy, List.of());
-        return new ContextRequest(context, intent, null, List.of(), plan,
+        return new ContextRequest(context, intent, guidance, List.of(), plan,
                 new RepositoryContext.ContextBudget(60, 500, 20, 6000));
     }
 
