@@ -25,6 +25,7 @@ public record AiInteractionTraceRequest(
         @Min(0) long durationMs,
         @NotBlank @Size(max = 40) String validationStatus,
         @Size(max = 80) String failureCategory,
+        @Size(max = 80) String failureCode,
         @Size(max = 5000) String retryReason,
         @NotBlank @Pattern(regexp = "[0-9a-f]{64}") String selectedKnowledgeFingerprint,
         @NotBlank @Pattern(regexp = "[0-9a-f]{64}") String promptFingerprint,
@@ -61,7 +62,7 @@ public record AiInteractionTraceRequest(
             Object parsedModelResponse, String validationDiagnostics) {
         this(id, attempt, interactionType, traceLevel, provider, modelIdentifier, intent, intentVersion,
                 promptVersion, startedAt, completedAt, durationMs, validationStatus, failureCategory,
-                retryReason, selectedKnowledgeFingerprint, promptFingerprint, selectedFactCount,
+                null, retryReason, selectedKnowledgeFingerprint, promptFingerprint, selectedFactCount,
                 selectedObservationCount, selectedInsightCount, selectedEngineeringEventCount,
                 groundingFingerprint, inputTokens, outputTokens, totalTokens, traceId, spanId,
                 systemPrompt, userPrompt, rawModelResponse, parsedModelResponse, validationDiagnostics,

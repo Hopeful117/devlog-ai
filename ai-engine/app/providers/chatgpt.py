@@ -29,7 +29,9 @@ class ChatGptProviderError(RuntimeError):
         super().__init__(message)
         self.provider_status = status
         self.incomplete_reason = reason
-        self.failure_category = "PROVIDER_INCOMPLETE" if reason else "PROVIDER_ERROR"
+        incomplete = status == "RESPONSE.INCOMPLETE"
+        self.failure_category = "PROVIDER_INCOMPLETE" if incomplete else "PROVIDER_ERROR"
+        self.failure_code = "PROVIDER_INCOMPLETE_RESPONSE" if incomplete else "PROVIDER_ERROR"
 
 
 class OpenAiChatGptProvider:

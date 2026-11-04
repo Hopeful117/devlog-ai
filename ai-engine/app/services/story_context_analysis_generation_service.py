@@ -33,14 +33,50 @@ from app.services.interaction_trace import InteractionTraceCollector
 
 class StoryContextAnalysisOutputValidationError(ValueError):
     failure_category = "STRUCTURAL_CONTRACT_ERROR"
+    failure_code = "STRUCTURAL_CONTRACT_ERROR"
+    retryable = True
 
 
 class StoryContextAnalysisGroundingError(StoryContextAnalysisOutputValidationError):
     failure_category = "GROUNDING_ERROR"
+    failure_code = "GROUNDING_OTHER"
+
+
+class StoryContextAnalysisDeterministicGroundingError(StoryContextAnalysisGroundingError):
+    retryable = False
+
+
+class StoryContextAnalysisUnknownReferenceError(StoryContextAnalysisGroundingError):
+    failure_code = "GROUNDING_UNKNOWN_REFERENCE"
+
+
+class StoryContextAnalysisRequestedFileScopeError(StoryContextAnalysisGroundingError):
+    failure_code = "GROUNDING_REQUESTED_FILE_SCOPE"
+
+
+class StoryContextAnalysisRelationTypeError(StoryContextAnalysisGroundingError):
+    failure_code = "GROUNDING_RELATION_TYPE"
+
+
+class StoryContextAnalysisCausalSupportError(StoryContextAnalysisGroundingError):
+    failure_code = "GROUNDING_CAUSAL_SUPPORT"
+
+
+class StoryContextAnalysisMissingEvidenceError(StoryContextAnalysisGroundingError):
+    failure_code = "GROUNDING_MISSING_EVIDENCE"
+
+
+class StoryContextAnalysisContractGroundingError(StoryContextAnalysisDeterministicGroundingError):
+    failure_code = "GROUNDING_CONTRACT_INVALID"
+
+
+class StoryContextAnalysisMappingGroundingError(StoryContextAnalysisDeterministicGroundingError):
+    failure_code = "GROUNDING_MAPPING_INVALID"
 
 
 class StoryContextAnalysisSemanticSupportError(StoryContextAnalysisOutputValidationError):
     failure_category = "SEMANTIC_SUPPORT_ERROR"
+    failure_code = "SEMANTIC_SUPPORT_ERROR"
 
 
 # Findings that express relationships and must have relationType
@@ -93,6 +129,11 @@ class StoryContextAnalysisGenerationService:
                 prompt, submission.selected_knowledge, submission.grounding_contract or {}, traces
             )
         except (ValidationError, StoryContextAnalysisOutputValidationError, ValueError) as error:
+            if not getattr(error, "retryable", True):
+                await self._send_failure(
+                    submission, external_job_id, self._callback_error_code(error), error, prompt, traces
+                )
+                return
             corrective_prompt = self._prompt_builder.corrective_retry(prompt, error)
             traces.retry(error)
             try:
@@ -102,17 +143,20 @@ class StoryContextAnalysisGenerationService:
                 prompt = corrective_prompt
             except (ValidationError, StoryContextAnalysisOutputValidationError, ValueError) as retry_error:
                 await self._send_failure(
-                    submission, external_job_id, "INVALID_LLM_OUTPUT", retry_error, corrective_prompt, traces
+                    submission, external_job_id, self._callback_error_code(retry_error), retry_error,
+                    corrective_prompt, traces
                 )
                 return
             except Exception as provider_error:
                 await self._send_failure(
-                    submission, external_job_id, "LLM_PROVIDER_ERROR", provider_error, corrective_prompt, traces
+                    submission, external_job_id, self._callback_error_code(provider_error, "LLM_PROVIDER_ERROR"),
+                    provider_error, corrective_prompt, traces
                 )
                 return
         except Exception as provider_error:
             await self._send_failure(
-                submission, external_job_id, "LLM_PROVIDER_ERROR", provider_error, prompt, traces
+                submission, external_job_id, self._callback_error_code(provider_error, "LLM_PROVIDER_ERROR"),
+                provider_error, prompt, traces
             )
             return
 
@@ -192,18 +236,26 @@ class StoryContextAnalysisGenerationService:
             references.extend(getattr(uncertainty, "related_evidence", []))
         unknown = {reference.reference for reference in references} - allowed_refs
         if unknown:
-            raise StoryContextAnalysisGroundingError(
+            raise StoryContextAnalysisUnknownReferenceError(
                 f"Follow-up references unknown evidence: {sorted(unknown)}"
             )
     def _allowed_grounding_refs(self, grounding_contract: dict[str, object]) -> set[str]:
         typed_list = grounding_contract.get("allowedGroundingReferences")
         if grounding_contract.get("groundingContractVersion") != "story-context-grounding/v1" or not isinstance(typed_list, list):
-            raise StoryContextAnalysisGroundingError("typed grounding allow-list is required")
-        return {
-            entry["ref"] for entry in typed_list
-            if isinstance(entry, dict) and entry.get("type") == "REPOSITORY_EVIDENCE"
-            and isinstance(entry.get("ref"), str)
-        }
+            raise StoryContextAnalysisContractGroundingError("typed grounding allow-list is required")
+        allowed_refs: set[str] = set()
+        for entry in typed_list:
+            if not isinstance(entry, dict) or entry.get("type") != "REPOSITORY_EVIDENCE":
+                raise StoryContextAnalysisContractGroundingError("Invalid typed repository grounding reference")
+            if entry.get("scope") != "PROJECT_REVISION" or not entry.get("project") or not entry.get("revision"):
+                raise StoryContextAnalysisContractGroundingError("Repository grounding scope is incomplete")
+            reference = entry.get("ref")
+            if not isinstance(reference, str) or not reference:
+                raise StoryContextAnalysisMappingGroundingError("Repository grounding reference is missing")
+            if reference != entry.get("coreReference") or reference != entry.get("taskReference"):
+                raise StoryContextAnalysisMappingGroundingError("Repository grounding mapping is inconsistent")
+            allowed_refs.add(reference)
+        return allowed_refs
 
     def _validate_output(
         self,
@@ -213,23 +265,23 @@ class StoryContextAnalysisGenerationService:
     ) -> None:
         # Use Java-authored grounding contract (authoritative per Story 0112 D14)
         if grounding_contract.get("groundingContractVersion") != "story-context-grounding/v1":
-            raise StoryContextAnalysisGroundingError("V1 requires the typed grounding contract")
+            raise StoryContextAnalysisContractGroundingError("V1 requires the typed grounding contract")
         if "allowedEvidenceReferences" in grounding_contract:
-            raise StoryContextAnalysisGroundingError("legacy grounding allow-list is forbidden in V1")
+            raise StoryContextAnalysisContractGroundingError("legacy grounding allow-list is forbidden in V1")
         allowed_refs = set()
         typed_list = grounding_contract.get("allowedGroundingReferences")
         if not isinstance(typed_list, list):
-            raise StoryContextAnalysisGroundingError("typed grounding allow-list is required")
+            raise StoryContextAnalysisContractGroundingError("typed grounding allow-list is required")
         for entry in typed_list:
             if not isinstance(entry, dict) or entry.get("type") != "REPOSITORY_EVIDENCE":
-                raise StoryContextAnalysisGroundingError("Invalid typed repository grounding reference")
+                raise StoryContextAnalysisContractGroundingError("Invalid typed repository grounding reference")
             scope = entry.get("scope")
             if scope != "PROJECT_REVISION":
-                raise StoryContextAnalysisGroundingError("REPOSITORY scope is forbidden in Story Context V1")
+                raise StoryContextAnalysisContractGroundingError("REPOSITORY scope is forbidden in Story Context V1")
             if not entry.get("project") or not entry.get("revision"):
-                raise StoryContextAnalysisGroundingError("Repository grounding scope is incomplete")
+                raise StoryContextAnalysisContractGroundingError("Repository grounding scope is incomplete")
             if entry.get("ref") != entry.get("coreReference") or entry.get("ref") != entry.get("taskReference"):
-                raise StoryContextAnalysisGroundingError("Repository grounding mapping is inconsistent")
+                raise StoryContextAnalysisMappingGroundingError("Repository grounding mapping is inconsistent")
             if isinstance(entry.get("ref"), str):
                 allowed_refs.add(entry["ref"])
 
@@ -279,7 +331,7 @@ class StoryContextAnalysisGenerationService:
                 CausalClassification.EXPLICITLY_DOCUMENTED,
                 CausalClassification.STRONGLY_SUPPORTED,
             } and not claim.evidence_references:
-                raise StoryContextAnalysisGroundingError(
+                raise StoryContextAnalysisCausalSupportError(
                     f"Affirmative causal claim {claim.source} -> {claim.target} requires evidence"
                 )
             if claim.causal_classification.value == "NOT_ESTABLISHED" and claim.evidence_basis in {
@@ -292,11 +344,11 @@ class StoryContextAnalysisGenerationService:
             claim_refs = {er.reference for er in claim.evidence_references}
             unknown = claim_refs - allowed_refs
             if unknown:
-                raise StoryContextAnalysisGroundingError(
+                raise StoryContextAnalysisUnknownReferenceError(
                     f"Causal claim {claim.source} -> {claim.target} references unknown evidence: {sorted(unknown)}"
                 )
             if any(er.role is None for er in claim.evidence_references):
-                raise StoryContextAnalysisOutputValidationError(
+                raise StoryContextAnalysisCausalSupportError(
                     f"Causal claim {claim.source} -> {claim.target} requires an evidence role for every reference"
                 )
             maximum = maximum_defensible_classification(claim.evidence_references)
@@ -324,7 +376,7 @@ class StoryContextAnalysisGenerationService:
             finding_refs = {er.reference for er in finding.grounding.evidence_references}
             unknown = finding_refs - allowed_refs
             if unknown:
-                raise StoryContextAnalysisOutputValidationError(
+                raise StoryContextAnalysisUnknownReferenceError(
                     f"Finding {finding.title} references unknown evidence: {sorted(unknown)}"
                 )
             if finding.grounding.classification not in {"FACTUAL_EXTRACTION", "AI_INTERPRETATION", "RECOMMENDATION"}:
@@ -335,22 +387,29 @@ class StoryContextAnalysisGenerationService:
                 raise StoryContextAnalysisOutputValidationError(
                     f"FACTUAL_EXTRACTION and AI_INTERPRETATION findings must be grounded"
                 )
+            if (
+                finding.grounding.classification in {"FACTUAL_EXTRACTION", "AI_INTERPRETATION"}
+                and not finding.grounding.evidence_references
+            ):
+                raise StoryContextAnalysisMissingEvidenceError(
+                    f"Finding {finding.title} requires at least one evidence reference"
+                )
             # Validate relationType for relationship-bearing findings
             finding_type = type(finding).__name__.lower().replace("finding", "_findings").replace("historicalcontextitem", "historical_context")
             if finding_type in RELATIONSHIP_BEARING_FINDING_TYPES:
                 if finding.grounding.relation_type is None:
-                    raise StoryContextAnalysisGroundingError(
+                    raise StoryContextAnalysisRelationTypeError(
                         f"Finding {finding.title} must have relationType"
                     )
                 if finding.grounding.relation_type.value not in VALID_RELATION_TYPES:
-                    raise StoryContextAnalysisGroundingError(
+                    raise StoryContextAnalysisRelationTypeError(
                         f"Finding {finding.title} has invalid relationType: {finding.grounding.relation_type.value}"
                     )
 
         for unc in output.uncertainties:
             for er in unc.related_evidence:
                 if er.reference not in allowed_refs:
-                    raise StoryContextAnalysisOutputValidationError(
+                    raise StoryContextAnalysisUnknownReferenceError(
                         f"Uncertainty references unknown evidence: {er.reference}"
                     )
 
@@ -406,7 +465,7 @@ class StoryContextAnalysisGenerationService:
                 value.reference for value in finding.grounding.evidence_references
             }
             if references and not references & file_grounded_refs:
-                raise StoryContextAnalysisGroundingError(
+                raise StoryContextAnalysisRequestedFileScopeError(
                     f"Finding {finding.title} does not cite evidence from requested file scope"
                 )
 
@@ -445,7 +504,7 @@ class StoryContextAnalysisGenerationService:
         references = [assertion.evidence_reference.reference for assertion in assessment.evidence_assertions]
         unknown = set(references) - allowed_refs
         if unknown:
-            raise StoryContextAnalysisGroundingError(
+            raise StoryContextAnalysisUnknownReferenceError(
                 f"causalAssessment references unknown evidence: {sorted(unknown)}"
             )
         keys = [
@@ -492,7 +551,7 @@ class StoryContextAnalysisGenerationService:
                 proposals=[],
                 error=AiTaskResultError(
                     code=error_code,
-                    message=str(error)[:5000] or "LLM output validation failed",
+                    message=self._callback_error_message(error),
                 ),
                 prompt_execution=(
                     self._execution_metadata(prompt)
@@ -502,6 +561,25 @@ class StoryContextAnalysisGenerationService:
                 interaction_traces=traces.traces if traces else [],
             ),
         )
+
+    @staticmethod
+    def _callback_error_code(error: Exception, fallback: str = "INVALID_LLM_OUTPUT") -> str:
+        if getattr(error, "incomplete_reason", None):
+            return "PROVIDER_INCOMPLETE_RESPONSE"
+        failure_code = getattr(error, "failure_code", None)
+        if isinstance(failure_code, str) and failure_code:
+            return failure_code[:100]
+        return fallback
+
+    @staticmethod
+    def _callback_error_message(error: Exception) -> str:
+        if getattr(error, "incomplete_reason", None) or getattr(error, "failure_category", None) == "PROVIDER_INCOMPLETE":
+            return "Provider response was incomplete; no grounding retry was attempted."
+        if getattr(error, "failure_category", None) == "GROUNDING_ERROR":
+            return "Grounding validation failed; inspect the bounded interaction trace diagnostics."
+        if getattr(error, "failure_category", None) == "STRUCTURAL_CONTRACT_ERROR":
+            return "Structured output contract validation failed."
+        return "LLM output validation failed."
 
     def _failure_execution_metadata(
         self, submission: AiTaskSubmissionRequest
