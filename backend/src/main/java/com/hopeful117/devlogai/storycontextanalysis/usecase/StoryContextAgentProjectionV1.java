@@ -96,8 +96,16 @@ public final class StoryContextAgentProjectionV1 {
             ObjectMapper mapper) {
         Map<String, Object> snapshot = new LinkedHashMap<>(mapper.convertValue(evidence, Map.class));
         Object rawContent = snapshot.get("content");
-        if (!(rawContent instanceof Map<?, ?> content) || !(content.get("revision") instanceof String)) {
-            snapshot.put("content", Map.of("revision", revision));
+        Map<?, ?> content = rawContent instanceof Map<?, ?> map ? map : null;
+        if (content == null || !(content.get("revision") instanceof String)) {
+            Map<String, Object> preservedContent = new LinkedHashMap<>();
+            if (content != null) {
+                content.forEach((key, value) -> {
+                    if (key instanceof String stringKey) preservedContent.put(stringKey, value);
+                });
+            }
+            preservedContent.put("revision", revision);
+            snapshot.put("content", preservedContent);
         }
         return snapshot;
     }

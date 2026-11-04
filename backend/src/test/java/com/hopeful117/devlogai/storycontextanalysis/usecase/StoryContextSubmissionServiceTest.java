@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -94,6 +95,7 @@ class StoryContextSubmissionServiceTest {
                 new AuthenticatedPrincipal("human-1", PrincipalKind.HUMAN, "test"), "anthropic");
 
         assertEquals(Map.of("maxOutputTokens", 6000), task.getContextSnapshot().get("allowedParameters"));
+        assertNotNull(task.getContextSnapshot().get("lossAccounting"));
         assertFalse(task.getContextSnapshot().containsKey("credentialHandle"));
         assertFalse(task.getContextSnapshot().containsKey("accessToken"));
         ArgumentCaptor<PromptRequest> prompt = ArgumentCaptor.forClass(PromptRequest.class);
@@ -150,6 +152,9 @@ class StoryContextSubmissionServiceTest {
         Map<?, ?> accounting = (Map<?, ?>) task.getContextSnapshot().get("budgetAccounting");
         assertEquals("REJECTED", accounting.get("preflightOutcome"));
         assertEquals("BUDGET_CAPACITY_UNKNOWN", accounting.get("failureCode"));
+        Map<?, ?> lossAccounting = (Map<?, ?>) task.getContextSnapshot().get("lossAccounting");
+        assertNotNull(lossAccounting);
+        assertEquals(0, ((Map<?, ?>) lossAccounting.get("counts")).get("providerVisibleCount"));
         verify(aiEngineClient, never()).submit(any(PromptRequest.class));
         verify(aiTaskService).failSubmission(eq(taskId), any());
     }

@@ -6,10 +6,14 @@ import com.hopeful117.devlogai.ai.engine.service.AiTaskResultService;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.storycontextanalysis.usecase.ContextLossLedger;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /** Dedicated SCA transport facade. Domain callback validation remains shared Core logic. */
@@ -19,6 +23,7 @@ public class StoryContextAgentCallbackFacade {
     private final AiTaskRepository aiTaskRepository;
     private final AiTaskResultService aiTaskResultService;
     private final StoryContextAgentMetrics metrics;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public AiTaskResultAcknowledgement callback(UUID aiTaskId, AiTaskResultRequest request) {
@@ -41,6 +46,8 @@ public class StoryContextAgentCallbackFacade {
         try {
             AiTaskResultAcknowledgement acknowledgement =
                     aiTaskResultService.handle(task.getCorrelationId(), request);
+            updateLossAccounting(task, request);
+            aiTaskRepository.save(task);
             if (acknowledgement.duplicate()) {
                 metrics.increment("sca_idempotent_retry_total");
                 metrics.increment("sca_duplicate_terminal_total");
@@ -57,4 +64,36 @@ public class StoryContextAgentCallbackFacade {
             throw exception;
         }
     }
+
+    @SuppressWarnings("unchecked")
+    private void updateLossAccounting(AiTask task, AiTaskResultRequest request) {
+        Map<String, Object> snapshot = task.getContextSnapshot();
+        if (snapshot == null || !(snapshot.get("lossAccounting") instanceof Map<?, ?> rawLedger)) return;
+        Map<String, Object> ledgerMap = new LinkedHashMap<>();
+        rawLedger.forEach((key, value) -> {
+            if (key instanceof String stringKey) ledgerMap.put(stringKey, value);
+        });
+        ContextLossLedger ledger = objectMapper.convertValue(ledgerMap, ContextLossLedger.class);
+        String status = request.status().name();
+        boolean incomplete = request.interactionTraces().stream()
+                .anyMatch(trace -> "PROVIDER_INCOMPLETE".equals(trace.failureCategory())
+                        || "INCOMPLETE".equals(trace.providerStatus()));
+        if (incomplete) status = "INCOMPLETE";
+        // Interaction traces prove provider execution, not which projected references
+        // were visible. Keep per-reference visibility explicitly unknown until the
+        // callback contract carries that attribution.
+        int visibleCount = 0;
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("traceCount", request.interactionTraces().size());
+        details.put("visibilityEvidence", "NOT_EXPOSED_BY_CALLBACK_CONTRACT");
+        details.put("validationStatuses", request.interactionTraces().stream()
+                .map(trace -> trace.validationStatus()).distinct().sorted().toList());
+        details.put("incompleteReasons", request.interactionTraces().stream()
+                .map(trace -> trace.incompleteReason()).filter(value -> value != null && !value.isBlank())
+                .distinct().sorted().toList());
+        ContextLossLedger updated = ledger.withProviderOutcome(status, visibleCount, details, objectMapper);
+        snapshot.put("lossAccounting", objectMapper.convertValue(updated, Map.class));
+        snapshot.put("providerOutcome", updated.providerOutcome());
+    }
+
 }
