@@ -18,6 +18,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ContextLossLedgerTest {
@@ -65,11 +66,11 @@ class ContextLossLedgerTest {
                                  "SELECTED_BY_RANK", 10, 12),
                          new RepositoryContext.SelectionDecision("file:missing", false,
                                  "TOKEN_BUDGET_EXCEEDED", 1, 8)), List.of(), "c".repeat(64),
-                 List.of(
-                         new RepositoryContext.CandidateMetadata(selectedReference, "SOURCE_FILE",
-                                 "src/App.java", 10),
-                         new RepositoryContext.CandidateMetadata("file:missing", "SOURCE_FILE",
-                                 "src/Missing.java", 1)));
+                        List.of(
+                          new RepositoryContext.CandidateMetadata(selectedReference, "SOURCE_FILE",
+                                  "src/App.java", 10, "GIT", List.of()),
+                          new RepositoryContext.CandidateMetadata("file:missing", "SOURCE_FILE",
+                                  "src/Missing.java", 1, "GIT", List.of())));
         CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
                 org.mockito.Mockito.mock(EngineeringContext.class), context,
                  "a".repeat(64), "engineering-context-v2",
@@ -96,7 +97,10 @@ class ContextLossLedgerTest {
                 "file:missing".equals(entry.reference()) && !entry.selected()));
         assertEquals(1, ledger.evaluationTelemetry().stageCounts().get("SOURCE_FILE:SELECTED"));
         assertEquals(1, ledger.evaluationTelemetry().trustCounts().get("TECHNICAL_EVIDENCE:PROJECTED"));
+        assertEquals(1, ledger.evaluationTelemetry().trustCounts().get("TECHNICAL_EVIDENCE:REJECTED"));
         assertEquals(2, ledger.evaluationTelemetry().candidateFixture().candidates().size());
+        assertTrue(ledger.evaluationTelemetry().candidateFixture().candidates().stream()
+                .allMatch(row -> "TECHNICAL_EVIDENCE".equals(row.trust())));
         assertEquals("TOKEN_BUDGET_EXCEEDED", ledger.evaluationTelemetry().candidateFixture()
                 .candidates().stream().filter(row -> "file:missing".equals(row.reference()))
                 .findFirst().orElseThrow().reason());
@@ -107,6 +111,95 @@ class ContextLossLedgerTest {
         assertTrue(requested.selected());
         assertTrue(requested.projected());
         assertTrue(requested.grounded());
+
+        RepositoryContext changedContext = new RepositoryContext(
+                context.contextVersion(), context.profile(), context.activeProfileKeys(),
+                context.contextPlanVersion(), context.contextIntelligenceExplanations(), context.evidence(),
+                context.selectedByLayer(), context.diagnostics(), context.budget(), context.usedTokens(),
+                context.candidateCount(), context.discardedCount(), context.truncated(),
+                context.selectionDecisions(), context.warnings(), context.contextDigest(),
+                List.of(new RepositoryContext.CandidateMetadata(selectedReference, "INSIGHT",
+                                "src/App.java", 10, "CORE_KNOWLEDGE", List.of()),
+                        new RepositoryContext.CandidateMetadata("file:missing", "SOURCE_FILE",
+                                "src/Missing.java", 1, "GIT", List.of())));
+        CanonicalEngineeringContext changedCanonical = new CanonicalEngineeringContext(
+                canonical.projection(), changedContext, canonical.contextDigest(), canonical.contextVersion(),
+                canonical.requestEcho(), canonical.freshness(), canonical.accounting(), canonical.diagnostics(),
+                canonical.relationsByReference(), canonical.provenanceByReference(), canonical.trustByReference(),
+                canonical.authorizedReferences());
+        ContextLossLedger changedLedger = ContextLossLedger.capture(
+                changedCanonical, projection, null, new ObjectMapper());
+        assertNotEquals(ledger.evaluationTelemetry().candidateFixture().digest(),
+                changedLedger.evaluationTelemetry().candidateFixture().digest());
+    }
+
+    @Test
+    void classifiesEveryTrustStateForSelectedAndRejectedFixtureCandidates() {
+        List<RepositoryContext.CandidateMetadata> candidates = List.of(
+                candidate("trusted-selected", "INSIGHT", "CORE_KNOWLEDGE"),
+                candidate("trusted-rejected", "INSIGHT", "CORE_KNOWLEDGE"),
+                candidate("human-selected", "ENGINEERING_STORY", "DOCUMENTATION"),
+                candidate("human-rejected", "ENGINEERING_STORY", "DOCUMENTATION"),
+                candidate("system-selected", "ANALYSIS", "ANALYSIS"),
+                candidate("system-rejected", "ANALYSIS", "ANALYSIS"),
+                candidate("technical-selected", "SOURCE_FILE", "GIT"),
+                candidate("technical-rejected", "SOURCE_FILE", "GIT"),
+                candidate("unvalidated-selected", "VALIDATABLE_PROPOSAL", "CORE_ANALYSIS"),
+                candidate("unvalidated-rejected", "VALIDATABLE_PROPOSAL", "CORE_ANALYSIS"),
+                candidate("transient-selected", "DECISION", "AI_ENGINE"),
+                candidate("transient-rejected", "DECISION", "AI_ENGINE"),
+                candidate("unknown-selected", "MODULE", "OTHER"),
+                candidate("unknown-rejected", "MODULE", "OTHER"));
+        List<RepositoryContext.SelectionDecision> decisions = candidates.stream()
+                .map(candidate -> new RepositoryContext.SelectionDecision(
+                        candidate.reference(), candidate.reference().endsWith("selected"),
+                        candidate.reference().endsWith("selected") ? "SELECTED_BY_RANK"
+                                : "CATEGORY_CONCENTRATION_LIMIT", 1, 1))
+                .toList();
+        RepositoryContext context = new RepositoryContext(
+                "repository-context-engine-v1", ContextProfile.ARCHITECTURE_REVIEW,
+                List.of("architecture-v1"), "context-intelligence-v2", List.of(), List.of(),
+                Map.of(), RepositoryContextDiagnostics.empty(),
+                new RepositoryContext.ContextBudget(20, 500, 20, 100), 14, 14, 0, false,
+                decisions, List.of(), "c".repeat(64), candidates);
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                org.mockito.Mockito.mock(EngineeringContext.class), context, "a".repeat(64),
+                "engineering-context-v2", null,
+                Map.of("sourceRevision", Map.of("revision", "revision-1")), Map.of(), null, Map.of(), Map.of(),
+                Map.of(), List.of());
+
+        ContextLossLedger ledger = ContextLossLedger.capture(
+                canonical, Map.of("context", Map.of("repositoryEvidence", List.of())),
+                null, new ObjectMapper());
+
+        Map<String, Long> trustRows = ledger.evaluationTelemetry().candidateFixture().candidates()
+                .stream().collect(java.util.stream.Collectors.groupingBy(
+                        ContextLossLedger.CandidateRow::trust, java.util.stream.Collectors.counting()));
+        Map<String, Integer> trustCounts = ledger.evaluationTelemetry().trustCounts();
+        for (String trust : List.of("TRUSTED", "HUMAN_AUTHORED", "SYSTEM_METADATA",
+                "TECHNICAL_EVIDENCE", "UNVALIDATED", "TRANSIENT_AI", "UNKNOWN")) {
+            assertEquals(2L, trustRows.get(trust));
+            assertEquals(2, trustCounts.get(trust + ":CANDIDATE"));
+            assertEquals(1, trustCounts.get(trust + ":SELECTED"));
+            assertEquals(1, trustCounts.get(trust + ":REJECTED"));
+        }
+        Map<String, Integer> stageCounts = ledger.evaluationTelemetry().stageCounts();
+        for (String kind : List.of("INSIGHT", "ENGINEERING_STORY", "ANALYSIS", "SOURCE_FILE",
+                "VALIDATABLE_PROPOSAL", "DECISION", "MODULE")) {
+            assertEquals(2, stageCounts.get(kind + ":CANDIDATE"));
+            assertEquals(1, stageCounts.get(kind + ":SELECTED"));
+            assertEquals(1, stageCounts.get(kind + ":REJECTED"));
+        }
+        assertEquals(7, ledger.evaluationTelemetry().candidateFixture().candidates().stream()
+                .filter(ContextLossLedger.CandidateRow::selected).count());
+        assertEquals(7, ledger.evaluationTelemetry().candidateFixture().candidates().stream()
+                .filter(row -> !row.selected()).count());
+    }
+
+    private static RepositoryContext.CandidateMetadata candidate(
+            String reference, String kind, String sourceType) {
+        return new RepositoryContext.CandidateMetadata(reference, kind, "src/" + reference,
+                10, sourceType, List.of());
     }
 
     @Test

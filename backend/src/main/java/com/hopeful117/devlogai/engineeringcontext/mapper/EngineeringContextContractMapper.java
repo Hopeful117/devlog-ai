@@ -205,49 +205,7 @@ public class EngineeringContextContractMapper {
     private TrustTier classifyTrustTier(RepositoryEvidence evidence) {
         String kind = evidence.kind();
         String sourceType = evidence.provenance() != null ? evidence.provenance().sourceType() : null;
-
-        // TRUSTED: validated knowledge from accepted proposals
-        if ("CORE_KNOWLEDGE".equals(sourceType)
-                && (kind.equals("INSIGHT") || kind.equals("DECISION") || kind.equals("ENGINEERING_EVENT"))) {
-            return TrustTier.TRUSTED;
-        }
-
-        // HUMAN_AUTHORED: human context inputs, repository documents
-        if (kind.equals("PROJECT_NOTE")
-                || kind.equals("MILESTONE")
-                || kind.equals("ARTIFACT")
-                || kind.equals("ENGINEERING_STORY")
-                || kind.equals("CHALLENGE")
-                || kind.equals("STORY_DOCUMENT")
-                || kind.equals("ADR_DOCUMENT")
-                || kind.equals("ROADMAP_DOCUMENT")) {
-            return TrustTier.HUMAN_AUTHORED;
-        }
-
-        // SYSTEM_METADATA: analysis execution metadata, freshness, diagnostics
-        if (kind.equals("ANALYSIS")
-                || kind.equals("FRESHNESS")
-                || kind.equals("DIAGNOSTIC")
-                || kind.equals("SELECTION_METADATA")) {
-            return TrustTier.SYSTEM_METADATA;
-        }
-
-        // TECHNICAL_EVIDENCE: repository-derived
-        if (sourceType != null
-                && (sourceType.equals("GIT")
-                || sourceType.equals("DETERMINISTIC_EXTRACTION")
-                || sourceType.equals("CORE_ANALYSIS")
-                || sourceType.equals("REPOSITORY_STRUCTURE"))) {
-            return TrustTier.TECHNICAL_EVIDENCE;
-        }
-
-        // EXCLUDED: unvalidated proposals, AI engine output
-        if (kind.equals("VALIDATABLE_PROPOSAL") || "AI_ENGINE".equals(sourceType)) {
-            return null;
-        }
-
-        // Unknown/unsupported kinds are excluded (not silently classified)
-        return null;
+        return TrustTierClassifier.publicTrustTier(kind, sourceType);
     }
 
     private EngineeringEvidence mapEvidence(

@@ -6,6 +6,7 @@ from story_context_runtime_report import (
     readiness_report,
     summarize,
     valid_row,
+    _fixture_digest,
     _telemetry_digest,
 )
 
@@ -110,6 +111,33 @@ class RuntimeReadinessTest(unittest.TestCase):
         self.assertTrue(capture_fields_valid(row, REVISION))
         self.assertTrue(valid_row(row, REVISION))
         self.assertTrue(summarize([row], REVISION)["singleRevision"])
+
+    def test_accepts_unvalidated_candidate_fixture_marker(self):
+        row = valid_capture()
+        candidate = {
+            "reference": "proposal",
+            "kind": "VALIDATABLE_PROPOSAL",
+            "path": None,
+            "score": 1,
+            "trust": "UNVALIDATED",
+            "grounded": False,
+            "selected": False,
+            "projected": False,
+            "reason": "INSUFFICIENT_RELEVANCE",
+        }
+        fixture = row["lossAccounting"]["evaluationTelemetry"]["candidateFixture"]
+        fixture["candidates"] = [candidate]
+        fixture["digest"] = _fixture_digest(fixture)
+        row["lossAccounting"]["counts"].update({
+            "candidateCount": 1,
+            "uniqueCandidateCount": 1,
+            "rankedCount": 1,
+            "discardedCount": 1,
+        })
+        row["lossAccounting"]["evaluationTelemetry"]["digest"] = _telemetry_digest(
+            row["lossAccounting"]["evaluationTelemetry"]
+        )
+        self.assertTrue(capture_fields_valid(row, REVISION))
 
     def test_malformed_nested_input_becomes_bounded_failure(self):
         row = valid_capture()

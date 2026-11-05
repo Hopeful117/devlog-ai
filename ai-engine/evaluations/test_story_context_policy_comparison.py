@@ -29,6 +29,24 @@ class PolicyComparisonTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             compare([{"reference": "a", "kind": "SOURCE_FILE"}] * 4097, [])
 
+    def test_accepts_fixture_only_unvalidated_candidate(self):
+        result = compare([
+            {"reference": "proposal", "kind": "VALIDATABLE_PROPOSAL", "path": None, "score": 10,
+             "trust": "UNVALIDATED", "grounded": False, "selected": False,
+             "projected": False, "reason": "INSUFFICIENT_RELEVANCE"},
+        ], [], maximum_items=1)
+
+        self.assertEqual(result["candidateCount"], 1)
+        self.assertEqual(result["policies"]["current"]["trustBySelected"], {})
+
+    def test_rejects_unknown_trust_marker(self):
+        with self.assertRaises(ValueError):
+            compare([{
+                "reference": "candidate", "kind": "SOURCE_FILE", "path": None, "score": 1,
+                "trust": "NOT_A_TRUST_TIER", "grounded": False, "selected": False,
+                "projected": False, "reason": "NOT_RECORDED",
+            }], [])
+
 
 if __name__ == "__main__":
     unittest.main()
