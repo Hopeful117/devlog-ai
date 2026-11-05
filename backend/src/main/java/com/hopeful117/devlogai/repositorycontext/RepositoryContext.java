@@ -19,7 +19,8 @@ public record RepositoryContext(
         boolean truncated,
         List<SelectionDecision> selectionDecisions,
         List<String> warnings,
-        String contextDigest
+        String contextDigest,
+        List<CandidateMetadata> candidates
 ) {
     public RepositoryContext {
         evidence = List.copyOf(evidence);
@@ -30,6 +31,7 @@ public record RepositoryContext(
         if (diagnostics == null) diagnostics = RepositoryContextDiagnostics.empty();
         selectionDecisions = List.copyOf(selectionDecisions);
         warnings = List.copyOf(warnings);
+        candidates = List.copyOf(candidates == null ? List.of() : candidates);
     }
 
     public RepositoryContext(String contextVersion, ContextProfile profile,
@@ -45,7 +47,23 @@ public record RepositoryContext(
                 contextIntelligenceExplanations, evidence, selectedByLayer,
                 RepositoryContextDiagnostics.empty(), budget, usedTokens,
                 candidateCount, discardedCount, truncated, selectionDecisions,
-                warnings, contextDigest);
+                warnings, contextDigest, List.of());
+    }
+
+    public RepositoryContext(String contextVersion, ContextProfile profile,
+            List<String> activeProfileKeys, String contextPlanVersion,
+            List<String> contextIntelligenceExplanations,
+            List<RepositoryEvidence> evidence,
+            Map<RepositoryContextLayer, Integer> selectedByLayer,
+            RepositoryContextDiagnostics diagnostics,
+            ContextBudget budget, int usedTokens, int candidateCount,
+            int discardedCount, boolean truncated,
+            List<SelectionDecision> selectionDecisions, List<String> warnings,
+            String contextDigest) {
+        this(contextVersion, profile, activeProfileKeys, contextPlanVersion,
+                contextIntelligenceExplanations, evidence, selectedByLayer,
+                diagnostics, budget, usedTokens, candidateCount, discardedCount,
+                truncated, selectionDecisions, warnings, contextDigest, List.of());
     }
 
     public record ContextBudget(
@@ -63,5 +81,23 @@ public record RepositoryContext(
             int relevanceScore,
             int estimatedTokens
     ) {
+    }
+
+    public record CandidateMetadata(
+            String reference,
+            String kind,
+            String originatingFile,
+            int relevanceScore,
+            String sourceType,
+            List<String> relatedReferences
+    ) {
+        public CandidateMetadata {
+            relatedReferences = List.copyOf(relatedReferences == null ? List.of() : relatedReferences);
+        }
+
+        public CandidateMetadata(String reference, String kind, String originatingFile,
+                                 int relevanceScore) {
+            this(reference, kind, originatingFile, relevanceScore, null, List.of());
+        }
     }
 }

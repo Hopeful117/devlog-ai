@@ -125,6 +125,13 @@ public class RepositoryContextEngine implements RepositoryContextService {
         List<RepositoryEvidence> candidates = new ArrayList<>(collectCandidates(request));
         candidates.addAll(additionalCandidates);
         List<RepositoryEvidence> ranked = ranker.rank(candidates, request);
+        List<RepositoryContext.CandidateMetadata> candidateMetadata = ranked.stream()
+                .map(value -> new RepositoryContext.CandidateMetadata(value.reference(), value.kind(),
+                        value.provenance() == null ? null : value.provenance().originatingFile(),
+                        value.relevanceScore(),
+                        value.provenance() == null ? null : value.provenance().sourceType(),
+                        value.relatedReferences()))
+                .toList();
         EvidenceSelector.SelectionResult pathSelection = selector.select(ranked, request);
         SelectedJavaSymbolEnricher.EnrichmentResult symbolEnrichment =
                 symbolEnricher.enrich(request, pathSelection);
@@ -159,7 +166,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
                 contextPlan.profileKeys(), contextPlan.planVersion(),
                 contextPlan.explanations(), selected, byLayer, diagnostics, budget,
                 selection.usedTokens(), candidates.size(), discarded, truncated,
-                selection.decisions(), warnings, digest);
+                selection.decisions(), warnings, digest, candidateMetadata);
     }
 
     private String digest(

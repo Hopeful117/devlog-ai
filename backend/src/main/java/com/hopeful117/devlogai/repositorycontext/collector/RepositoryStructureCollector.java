@@ -475,11 +475,22 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
 
         for (RepositoryFile file : scan.files()) {
             String path = file.relativePath();
-            FileEvidenceKind kind = classify(path);
+            FileEvidenceKind kind = matchesRequestedFile(path, request)
+                    ? FileEvidenceKind.REQUESTED
+                    : classify(path);
             if (kind != null) candidates.get(kind).add(fileEvidence(
                     kind, path, sourceId, resolvedRevision, request));
         }
         return candidates;
+    }
+
+    private boolean matchesRequestedFile(String path, ContextRequest request) {
+        if (request.guidance() == null || request.guidance().priorities().isEmpty()) return false;
+        String normalizedPath = path.replace('\\', '/');
+        return request.guidance().priorities().stream()
+                .map(value -> value.replace('\\', '/'))
+                .anyMatch(requested -> normalizedPath.equals(requested)
+                        || normalizedPath.startsWith(requested + "/"));
     }
 
     private void sortFileCandidates(
@@ -600,6 +611,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
     }
 
     private enum FileEvidenceKind {
+        REQUESTED("CONFIG_FILE", "file:", "requested-file"),
         SOURCE("SOURCE_FILE", "file:", "source-file"),
         TEST("TEST_FILE", "file:", "test-file"),
         CONFIGURATION("CONFIG_FILE", "config:", "config-file");

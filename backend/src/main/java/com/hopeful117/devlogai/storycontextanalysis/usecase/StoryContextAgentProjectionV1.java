@@ -112,8 +112,18 @@ public final class StoryContextAgentProjectionV1 {
 
     private static Map<String,Object> freshness(CanonicalEngineeringContext c, String project) {
         String revision = canonicalRevision(c);
-        String state = String.valueOf(c.freshness().getOrDefault("state",
-                c.freshness().getOrDefault("status", "UNKNOWN"))).toUpperCase(Locale.ROOT);
+        Object rawState = c.freshness().get("state");
+        if (rawState == null) rawState = c.freshness().get("status");
+        if (rawState == null) {
+            Object summary = c.freshness().get("summary");
+            if (summary instanceof EngineeringContextFreshness freshness) {
+                rawState = freshness.status();
+            } else if (summary instanceof Map<?, ?> map) {
+                rawState = map.get("status");
+            }
+        }
+        String state = String.valueOf(rawState == null ? "UNKNOWN" : rawState)
+                .toUpperCase(Locale.ROOT);
         if (!Set.of("FRESH","STALE","UNKNOWN","NOT_ESTABLISHED").contains(state)) state = "UNKNOWN";
         return Map.of("sourceRevision", Map.of("kind", "PROJECT_REVISION",
                 "project", project, "revision", revision), "state", state);

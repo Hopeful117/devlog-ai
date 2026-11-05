@@ -160,6 +160,9 @@ class StoryContextAnalysisGenerationService:
             )
             return
 
+        if isinstance(output, StoryContextAnalysisResult):
+            output = self._apply_execution_provenance(output, prompt)
+
         logger.info(
             "Story context analysis generation completed promptVersion=%s promptDigest=%s provider=%s model=%s",
             prompt.prompt_version, prompt.content_digest, self._provider.provider_name,
@@ -197,6 +200,26 @@ class StoryContextAnalysisGenerationService:
                 interaction_traces=traces.traces,
             ),
         )
+
+    def _apply_execution_provenance(
+        self, output: StoryContextAnalysisResult, prompt: Prompt
+    ) -> StoryContextAnalysisResult:
+        payload = output.model_dump(mode="json", by_alias=True)
+        payload["confidence"] = {
+            "level": output.confidence.level,
+            "rationale": output.confidence.rationale,
+        }
+        provenance = payload["provenance"]
+        provenance.update({
+            "contextDigest": prompt.traceability.context_digest,
+            "promptVersion": prompt.prompt_version,
+            "provider": self._provider.provider_name,
+            "modelIdentifier": self._provider.model_identifier,
+            "promptContentDigest": prompt.content_digest,
+            "intentId": prompt.intent_id,
+            "intentVersion": prompt.intent_version,
+        })
+        return StoryContextAnalysisResult.model_validate(payload)
 
     async def _generate_and_validate(
         self,

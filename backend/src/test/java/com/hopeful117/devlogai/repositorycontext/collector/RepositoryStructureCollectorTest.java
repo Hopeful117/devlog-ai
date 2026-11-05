@@ -11,6 +11,7 @@ import com.hopeful117.devlogai.collection.collector.SecureRepositoryScanner;
 import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
 import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
 import com.hopeful117.devlogai.project.entity.ProjectStatus;
+import com.hopeful117.devlogai.intent.model.UserGuidance;
 import com.hopeful117.devlogai.repositorycontext.ContextRequest;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
@@ -323,6 +324,23 @@ class RepositoryStructureCollectorTest {
     }
 
     @Test
+    void includesExplicitlyRequestedFilesEvenWhenTheyAreNotClassified() {
+        Source source = Source.builder().id(sourceId).type(SourceType.GIT_REPOSITORY).active(true).build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+        when(workspaceManager.synchronize(source, null))
+                .thenReturn(new SynchronizedWorkspace(sourceId, tempDir, "abc123"));
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(new RepositoryScan(
+                List.of(new RepositoryFile("README.md", 100, null)), 1, 1, List.of()));
+
+        List<RepositoryEvidence> evidence = collector.collect(createRequest(
+                new UserGuidance("Inspect README", null, null, null, null, List.of("README.md"))));
+
+        assertTrue(evidence.stream().anyMatch(value ->
+                "README.md".equals(value.provenance().originatingFile())));
+    }
+
+    @Test
     void producesDiverseFileCandidatesForMultiModuleRepository() {
         List<RepositoryFile> files = new java.util.ArrayList<>();
         files.add(new RepositoryFile(
@@ -596,10 +614,18 @@ class RepositoryStructureCollectorTest {
     }
 
     private ContextRequest createRequest() {
-        return createRequest(null);
+        return createRequest((RepositoryRevisionScope) null);
     }
 
     private ContextRequest createRequest(RepositoryRevisionScope revisionScope) {
+        return createRequest(revisionScope, null);
+    }
+
+    private ContextRequest createRequest(UserGuidance guidance) {
+        return createRequest(null, guidance);
+    }
+
+    private ContextRequest createRequest(RepositoryRevisionScope revisionScope, UserGuidance guidance) {
         AnalysisContext analysisContext = new AnalysisContext(
                 new AnalysisContext.ProjectSnapshot(projectId, "TestProject",
                         "test-project", "A test project", ProjectStatus.ACTIVE),
@@ -620,7 +646,7 @@ class RepositoryStructureCollectorTest {
         return new ContextRequest(
                 analysisContext,
                 intent,
-                null,
+                guidance,
                 List.of(),
                 mockContextPlan(),
                 new RepositoryContext.ContextBudget(10, 100, 5, 1000),
