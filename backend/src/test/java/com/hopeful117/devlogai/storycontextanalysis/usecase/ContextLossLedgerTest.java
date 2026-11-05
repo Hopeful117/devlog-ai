@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -200,6 +201,23 @@ class ContextLossLedgerTest {
             String reference, String kind, String sourceType) {
         return new RepositoryContext.CandidateMetadata(reference, kind, "src/" + reference,
                 10, sourceType, List.of());
+    }
+
+    @Test
+    void acceptsCoreCandidateKindsAndSelectionReasonsInFixtureRows() {
+        List<String> coreKinds = List.of("ENGINEERING_EVENT", "ARTIFACT", "MILESTONE",
+                "OBSERVATION", "STORY_DOCUMENT", "ADR_DOCUMENT", "ROADMAP_DOCUMENT",
+                "PROJECT_NOTE", "FRESHNESS", "DIAGNOSTIC", "SELECTION_METADATA");
+        List<String> reasons = List.of("DUPLICATE_REFERENCE", "NOT_SELECTED",
+                "SELECTED_BY_STRONG_RELEVANCE");
+
+        for (String kind : coreKinds) {
+            for (String reason : reasons) {
+                assertDoesNotThrow(() -> new ContextLossLedger.CandidateRow(
+                        "candidate:" + kind + ":" + reason, kind, null, 1,
+                        "UNKNOWN", false, !"NOT_SELECTED".equals(reason), false, reason));
+            }
+        }
     }
 
     @Test
