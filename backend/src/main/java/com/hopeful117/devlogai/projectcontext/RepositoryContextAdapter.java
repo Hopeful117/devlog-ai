@@ -511,11 +511,13 @@ public class RepositoryContextAdapter {
     }
 
     private UserGuidance createGuidance(String storyDescription, List<String> requestedFiles) {
-        if (storyDescription == null || storyDescription.isBlank()) {
+        if ((storyDescription == null || storyDescription.isBlank())
+                && (requestedFiles == null || requestedFiles.stream()
+                .noneMatch(value -> value != null && !value.isBlank()))) {
             return null;
         }
         return new UserGuidance(
-                storyDescription,
+                storyDescription == null ? "" : storyDescription,
                 "kiko",
                 "focused",
                 "analytical",
@@ -599,7 +601,8 @@ public class RepositoryContextAdapter {
         List<RepositoryEvidence> nonTechnical = context.evidence().stream()
                 .filter(e -> !isTechnicalEvidence(e))
                 .toList();
-        return withFilteredEvidence(context, nonTechnical);
+        return withFilteredEvidence(context, nonTechnical,
+                candidate -> !isTechnicalCandidate(candidate));
     }
 
     private RepositoryContext filterContextByCommitSet(
@@ -612,13 +615,24 @@ public class RepositoryContextAdapter {
                     return evidenceRefersToCommitsInWindow(e, commitHashesInWindow);
                 })
                 .toList();
-        return withFilteredEvidence(context, filtered);
+        return withFilteredEvidence(context, filtered,
+                candidate -> !isTechnicalCandidate(candidate)
+                        || candidate.relatedReferences().stream().map(this::extractCommitSha)
+                        .anyMatch(sha -> sha != null && commitHashesInWindow.contains(sha))
+                        || commitHashesInWindow.contains(extractCommitSha(candidate.reference())));
     }
 
     private boolean isTechnicalEvidence(RepositoryEvidence evidence) {
-        String kind = evidence.kind();
         String sourceType = evidence.provenance() != null
                 ? evidence.provenance().sourceType() : null;
+        return isTechnicalKind(evidence.kind(), sourceType);
+    }
+
+    private boolean isTechnicalCandidate(RepositoryContext.CandidateMetadata candidate) {
+        return isTechnicalKind(candidate.kind(), candidate.sourceType());
+    }
+
+    private boolean isTechnicalKind(String kind, String sourceType) {
         if ("CORE_KNOWLEDGE".equals(sourceType)
                 && (kind.equals("INSIGHT") || kind.equals("DECISION")
                     || kind.equals("ENGINEERING_EVENT"))) {
@@ -658,6 +672,9 @@ public class RepositoryContextAdapter {
         if (gitMatcher.matches()) return gitMatcher.group(1).toLowerCase();
         Matcher diffMatcher = DIFF_REFERENCE.matcher(reference);
         if (diffMatcher.matches()) return diffMatcher.group(1).toLowerCase();
+        for (String token : reference.split(":")) {
+            if (GIT_OBJECT_ID.matcher(token).matches()) return token.toLowerCase();
+        }
         return null;
     }
 
@@ -733,7 +750,8 @@ public class RepositoryContextAdapter {
 
     private RepositoryContext withFilteredEvidence(
             RepositoryContext context,
-            List<RepositoryEvidence> filteredEvidence
+            List<RepositoryEvidence> filteredEvidence,
+            java.util.function.Predicate<RepositoryContext.CandidateMetadata> candidateScope
     ) {
         Map<com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer, Integer> selectedByLayer =
                 new EnumMap<>(com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer.class);
@@ -747,6 +765,8 @@ public class RepositoryContextAdapter {
                 diagnostics.candidatesByLayer(), diagnostics.candidatesByKind(), selectedByKind,
                 diagnostics.preferredLayerAvailability(), diagnostics.uniqueCandidateCount(),
                 diagnostics.duplicateCandidateCount());
+        Set<String> filteredReferences = filteredEvidence.stream()
+                .map(RepositoryEvidence::reference).collect(java.util.stream.Collectors.toSet());
         return new RepositoryContext(
                 context.contextVersion(),
                 context.profile(),
@@ -766,7 +786,11 @@ public class RepositoryContextAdapter {
                                 .anyMatch(e -> e.reference().equals(d.evidenceReference())))
                         .toList(),
                 context.warnings(),
-                context.contextDigest()
+                context.contextDigest(),
+                context.candidates().stream()
+                        .filter(candidate -> filteredReferences.contains(candidate.reference())
+                                || candidateScope.test(candidate))
+                        .toList()
         );
     }
 }

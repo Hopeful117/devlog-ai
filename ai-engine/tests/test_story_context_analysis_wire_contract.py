@@ -216,6 +216,22 @@ async def test_generation_retries_grounding_failure_once_and_completes(monkeypat
     assert callback.results[0].status.value == "COMPLETED"
 
 
+def test_execution_provenance_overrides_model_provided_values():
+    request = load_scenario("engineering-story-context-analysis-v1").prompt_request
+    prompt = StoryContextAnalysisPromptBuilder().build(request)
+    service = generation_module.StoryContextAnalysisGenerationService(
+        provider=SimpleNamespace(provider_name="mock", model_identifier="test-model"),
+        prompt_builder=StoryContextAnalysisPromptBuilder(),
+        callback_client=SimpleNamespace(),
+    )
+
+    result = service._apply_execution_provenance(_result(), prompt)
+
+    assert result.provenance.provider == "mock"
+    assert result.provenance.model_identifier == "test-model"
+    assert result.provenance.prompt_content_digest == prompt.content_digest
+
+
 @pytest.mark.asyncio
 async def test_generation_does_not_retry_deterministic_grounding_contract_failure(monkeypatch):
     request = load_scenario("engineering-story-context-analysis-v1").prompt_request

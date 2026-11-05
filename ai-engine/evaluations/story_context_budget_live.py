@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from story_context_specificity_live import McpClient
-from story_context_runtime_report import capture_fields_valid
+from story_context_runtime_report import capture_fields_valid, readiness_failures, valid_revision
 
 
 PROFILES = {
@@ -126,6 +126,101 @@ def bounded_integer_map(value: Any, keys: set[str]) -> dict[str, int]:
     }
 
 
+def bounded_loss_entries(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    entries = []
+    for item in value[:256]:
+        if not isinstance(item, dict):
+            continue
+        entry = {}
+        for key in {
+            "reference", "kind", "originatingFile", "revision", "trust",
+            "selected", "selectionReason", "enrichmentStatus", "enrichmentReason",
+            "projected", "grounded", "lossReason",
+        }:
+            if key not in item:
+                continue
+            value = item[key]
+            if isinstance(value, bool):
+                entry[key] = value
+            elif isinstance(value, str):
+                entry[key] = value[:160]
+            elif type(value) is int and value >= 0:
+                entry[key] = value
+        if entry:
+            entries.append(entry)
+    return entries
+
+
+def bounded_evaluation_telemetry(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, Any] = {}
+    if isinstance(value.get("version"), str):
+        result["version"] = value["version"][:80]
+    if isinstance(value.get("digest"), str):
+        result["digest"] = value["digest"][:64]
+    for field in ("stageCounts", "trustCounts"):
+        raw = value.get(field)
+        if isinstance(raw, dict):
+            if len(raw) > 128:
+                return {"overflow": True}
+            result[field] = {
+                str(key)[:100]: item for key, item in list(raw.items())[:128]
+                if isinstance(key, str) and type(item) is int and item >= 0
+            }
+    grounding = value.get("grounding")
+    if isinstance(grounding, dict):
+        result["grounding"] = {
+            key: item for key, item in grounding.items()
+            if key in {"authorizedCount", "projectedCount", "projectedGroundedCount"}
+            and type(item) is int and item >= 0
+        }
+    outcomes = value.get("requestedFileOutcomes")
+    if isinstance(outcomes, list):
+        if len(outcomes) > 32:
+            return {"overflow": True}
+        result["requestedFileOutcomes"] = [
+            {
+                key: item[key]
+                for key in {
+                    "path", "found", "selected", "projected", "grounded", "absenceReason"
+                }
+                if key in item and (
+                    isinstance(item[key], bool) or
+                    isinstance(item[key], str)
+                )
+            }
+            for item in outcomes[:32]
+            if isinstance(item, dict)
+        ]
+    fixture = value.get("candidateFixture")
+    if isinstance(fixture, dict):
+        candidates = fixture.get("candidates")
+        if not isinstance(candidates, list) or len(candidates) > 4096:
+            return {"overflow": True}
+        result["candidateFixture"] = {
+            "version": fixture.get("version"),
+            "taskId": fixture.get("taskId"),
+            "targetRevision": fixture.get("targetRevision"),
+            "contextDigest": fixture.get("contextDigest"),
+            "projectionDigest": fixture.get("projectionDigest"),
+            "digest": fixture.get("digest"),
+            "candidates": [
+                {
+                    key: item[key]
+                    for key in ("reference", "kind", "path", "score", "trust",
+                                "grounded", "selected", "projected", "reason")
+                    if key in item
+                }
+                for item in candidates
+                if isinstance(item, dict)
+            ],
+        }
+    return result
+
+
 def bounded_freshness(snapshot: dict[str, Any]) -> dict[str, Any]:
     raw = (snapshot.get("selectedKnowledgeSnapshot") or {}).get("freshness") or {}
     source = raw.get("sourceRevision") if isinstance(raw, dict) else None
@@ -219,24 +314,42 @@ def snapshot_loss_accounting(snapshot: dict[str, Any]) -> dict[str, Any]:
             if key in projection and bounded_scalar(projection[key]) is not None
         } | {"warnings": projection.get("warnings", [])},
         "providerOutcome": provider,
+        "evaluationTelemetry": bounded_evaluation_telemetry(
+            ledger.get("evaluationTelemetry")
+        ),
+        "entries": bounded_loss_entries(ledger.get("entries")),
         "digest": str(ledger.get("digest", ""))[:64],
     }
 
 
 def run(args: argparse.Namespace) -> int:
+    if not valid_revision(args.target_revision):
+        raise SystemExit("--target-revision must be a 7-64 character lowercase hexadecimal revision")
     if args.profile not in PROFILES:
         raise SystemExit(f"Unknown profile: {args.profile}; choose from {sorted(PROFILES)}")
 
     scenarios = json.loads(SCENARIO_MANIFEST.read_text(encoding="utf-8"))["scenarios"]
+    if args.scenario:
+        scenarios = [scenario for scenario in scenarios if scenario["scenarioId"] == args.scenario]
+        if not scenarios:
+            raise SystemExit(f"Unknown scenario: {args.scenario}")
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     mcp = McpClient(Path(args.mcp_jar), Path(args.mcp_launcher))
+    seen_task_ids: set[str] = set()
+    seen_identities: set[tuple[Any, Any]] = set()
     try:
         with output.open("w", encoding="utf-8") as stream:
             for scenario in scenarios:
-                for repetition in range(1, args.repetitions + 1):
+                for repetition in range(
+                    args.repetition_start + 1,
+                    args.repetition_start + args.repetitions + 1,
+                ):
                     nonce = str(uuid.uuid4())
-                    question = scenario["question"]
+                    question = (
+                        f"{scenario['question']}\n\n"
+                        f"[Runtime evaluation repetition marker: {nonce}]"
+                    )
                     key = f"story-context-budget-{args.profile}-{nonce}"
                     started = time.perf_counter()
                     execution = mcp.tool("devlog_story_agent", {
@@ -264,6 +377,10 @@ def run(args: argparse.Namespace) -> int:
                         "expectedContextBudget": expected,
                         "observedContextBudget": bounded_nonnegative_int(observed),
                         "scenario": scenario["scenarioId"],
+                        "requestedFiles": [
+                            value[:160] for value in scenario.get("files", [])
+                            if isinstance(value, str)
+                        ][:16],
                         "repetition": repetition,
                         "taskId": task_id,
                         "status": bounded_scalar(execution.get("status")),
@@ -285,10 +402,27 @@ def run(args: argparse.Namespace) -> int:
                         "projectionDigest": bounded_digest(execution.get("projectionDigest")),
                         "lossAccounting": loss_accounting,
                     }
-                    row["validCapture"] = capture_fields_valid(row)
+                    failures = readiness_failures(
+                        row, args.target_revision, seen_task_ids, seen_identities
+                    )
+                    capture_contract_valid = capture_fields_valid(row, args.target_revision)
+                    if not capture_contract_valid:
+                        failures.append("CAPTURE_CONTRACT_INVALID")
+                    task_id_value = row.get("taskId")
+                    identity = (row.get("scenario"), row.get("repetition"))
+                    if isinstance(task_id_value, str):
+                        seen_task_ids.add(task_id_value)
+                    seen_identities.add(identity)
+                    row["readiness"] = {
+                        "status": "READY" if not failures else "NOT_READY",
+                        "failureCodes": failures,
+                    }
+                    row["validCapture"] = not failures and capture_contract_valid
                     stream.write(json.dumps(row, ensure_ascii=False) + "\n")
                     stream.flush()
                     print(json.dumps(row, ensure_ascii=False), flush=True)
+                    if failures and args.stop_on_readiness_failure:
+                        return 2
     finally:
         mcp.close()
     return 0
@@ -300,6 +434,12 @@ def main() -> int:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--project", default="devlog-ai")
     parser.add_argument("--repetitions", default=3, type=int)
+    parser.add_argument("--repetition-start", default=0, type=int)
+    parser.add_argument("--scenario")
+    parser.add_argument("--target-revision", required=True)
+    parser.add_argument(
+        "--stop-on-readiness-failure", action=argparse.BooleanOptionalAction, default=True
+    )
     parser.add_argument(
         "--mcp-jar",
         default=Path(__file__).parents[2] / "mcp-server/target/mcp-server-0.0.1-SNAPSHOT.jar",

@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.storycontextanalysis.usecase;
 
 import com.hopeful117.devlogai.contracts.engineeringcontext.EngineeringContext;
 import com.hopeful117.devlogai.contracts.engineeringcontext.EvidenceRef;
+import com.hopeful117.devlogai.contracts.engineeringcontext.ContextRequestEcho;
 import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
 import com.hopeful117.devlogai.repositorycontext.ContextProfile;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
@@ -59,16 +60,22 @@ class ContextLossLedgerTest {
                 List.of(selected), Map.of(RepositoryContextLayer.RELATED_SOURCE_CODE, 1),
                 RepositoryContextDiagnostics.empty(),
                 new RepositoryContext.ContextBudget(2, 500, 20, 100), 12, 2, 1,
-                true, List.of(
-                        new RepositoryContext.SelectionDecision(selectedReference, true,
-                                "SELECTED_BY_RANK", 10, 12),
-                        new RepositoryContext.SelectionDecision("file:missing", false,
-                                "TOKEN_BUDGET_EXCEEDED", 1, 8)), List.of(), "c".repeat(64));
+                 true, List.of(
+                         new RepositoryContext.SelectionDecision(selectedReference, true,
+                                 "SELECTED_BY_RANK", 10, 12),
+                         new RepositoryContext.SelectionDecision("file:missing", false,
+                                 "TOKEN_BUDGET_EXCEEDED", 1, 8)), List.of(), "c".repeat(64),
+                 List.of(
+                         new RepositoryContext.CandidateMetadata(selectedReference, "SOURCE_FILE",
+                                 "src/App.java", 10),
+                         new RepositoryContext.CandidateMetadata("file:missing", "SOURCE_FILE",
+                                 "src/Missing.java", 1)));
         CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
                 org.mockito.Mockito.mock(EngineeringContext.class), context,
-                "a".repeat(64), "engineering-context-v2", null, Map.of(),
-                Map.of(), null, Map.of(),
-                Map.of(selectedReference, selected.provenance()),
+                 "a".repeat(64), "engineering-context-v2",
+                 new ContextRequestEcho("test", "inspect", List.of("src/App.java"), null),
+                 Map.of(), Map.of(), null, Map.of(),
+                 Map.of(selectedReference, selected.provenance()),
                 Map.of(selectedReference, "TECHNICAL_EVIDENCE"),
                 List.of(new EvidenceRef(selectedReference, "source")));
 
@@ -87,6 +94,19 @@ class ContextLossLedgerTest {
                 .findFirst().orElseThrow().lossReason());
         assertTrue(ledger.entries().stream().anyMatch(entry ->
                 "file:missing".equals(entry.reference()) && !entry.selected()));
+        assertEquals(1, ledger.evaluationTelemetry().stageCounts().get("SOURCE_FILE:SELECTED"));
+        assertEquals(1, ledger.evaluationTelemetry().trustCounts().get("TECHNICAL_EVIDENCE:PROJECTED"));
+        assertEquals(2, ledger.evaluationTelemetry().candidateFixture().candidates().size());
+        assertEquals("TOKEN_BUDGET_EXCEEDED", ledger.evaluationTelemetry().candidateFixture()
+                .candidates().stream().filter(row -> "file:missing".equals(row.reference()))
+                .findFirst().orElseThrow().reason());
+        ContextLossLedger.RequestedFileOutcome requested = ledger.evaluationTelemetry()
+                .requestedFileOutcomes().getFirst();
+        assertEquals("src/App.java", requested.path());
+        assertTrue(requested.found());
+        assertTrue(requested.selected());
+        assertTrue(requested.projected());
+        assertTrue(requested.grounded());
     }
 
     @Test

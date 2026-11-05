@@ -209,7 +209,7 @@ public class StoryContextSubmissionService {
                 ? budget.effectiveParameters() : authorizedParameters);
         snapshot.put("budgetAccounting", budgetAccounting(budget));
         ContextLossLedger lossLedger = ContextLossLedger.capture(
-                canonicalContext, projection, budget, objectMapper);
+                canonicalContext, projection, budget, objectMapper, task.getId().toString());
         Map<String, Object> lossAccounting = objectMapper.convertValue(lossLedger, Map.class);
         snapshot.put("lossAccounting", lossAccounting);
         task.setContextSnapshot(snapshot);
