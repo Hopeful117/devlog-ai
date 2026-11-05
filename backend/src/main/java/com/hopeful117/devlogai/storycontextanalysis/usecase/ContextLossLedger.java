@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.storycontextanalysis.usecase;
 
 import com.hopeful117.devlogai.contracts.engineeringcontext.EvidenceRef;
 import com.hopeful117.devlogai.engineeringcontext.CanonicalEngineeringContext;
+import com.hopeful117.devlogai.engineeringcontext.mapper.TrustTierClassifier;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import tools.jackson.databind.ObjectMapper;
@@ -45,6 +46,7 @@ public record ContextLossLedger(
             "ANALYSIS", "CHALLENGE", "CHANGED_FILE", "COMMIT", "CONFIGURATION_FILES",
             "CONFIG_FILE", "DECISION", "ENGINEERING_STORY", "FACT", "FILE_EXTENSIONS",
             "INSIGHT", "MODULE", "MODULE_SUMMARY", "SOURCE_DIRECTORIES", "SOURCE_FILE",
+            "VALIDATABLE_PROPOSAL",
             "TEST_DIRECTORIES", "TEST_FILE");
     private static final Set<String> CANDIDATE_REASONS = Set.of(
             "CATEGORY_CONCENTRATION_LIMIT", "EVIDENCE_ITEM_BUDGET_EXCEEDED",
@@ -222,11 +224,16 @@ public record ContextLossLedger(
                 .filter(item -> item.reference() != null)
                 .collect(java.util.stream.Collectors.toMap(RepositoryEvidence::reference,
                         value -> value, (left, right) -> left, LinkedHashMap::new));
+        Map<String, RepositoryContext.CandidateMetadata> candidateByReference = context.candidates().stream()
+                .filter(item -> item.reference() != null)
+                .collect(java.util.stream.Collectors.toMap(RepositoryContext.CandidateMetadata::reference,
+                        value -> value, (left, right) -> left, LinkedHashMap::new));
         for (RepositoryContext.SelectionDecision decision : context.selectionDecisions()) {
             RepositoryEvidence item = evidenceByReference.get(decision.evidenceReference());
-            String kind = item == null || item.kind() == null ? "UNKNOWN" : item.kind();
-            String itemTrust = item == null ? "UNKNOWN"
-                    : canonical.trustByReference().getOrDefault(item.reference(), "UNKNOWN");
+            RepositoryContext.CandidateMetadata candidate = candidateByReference.get(decision.evidenceReference());
+            String kind = item != null && item.kind() != null ? item.kind()
+                    : candidate == null || candidate.kind() == null ? "UNKNOWN" : candidate.kind();
+            String itemTrust = candidateTrust(item, candidate);
             increment(stages, kind, "CANDIDATE");
             increment(trust, itemTrust, "CANDIDATE");
             if (decision.selected()) {
@@ -249,7 +256,7 @@ public record ContextLossLedger(
             if (decisions.containsKey(item.reference())) continue;
             String kind = item.kind() == null ? "UNKNOWN" : item.kind();
             increment(stages, kind, "CANDIDATE");
-            String itemTrust = canonical.trustByReference().getOrDefault(item.reference(), "UNKNOWN");
+            String itemTrust = candidateTrust(item);
             increment(trust, itemTrust, "CANDIDATE");
             if (projected.contains(item.reference())) {
                 increment(stages, kind, "PROJECTED");
@@ -275,6 +282,18 @@ public record ContextLossLedger(
         return new EvaluationTelemetry(
                 EVALUATION_TELEMETRY_VERSION, boundedStages, boundedTrust, requested,
                 groundingSummary, fixture, telemetryDigest);
+    }
+
+    private static String candidateTrust(RepositoryEvidence item) {
+        return item == null ? "UNKNOWN" : TrustTierClassifier.classify(
+                item.kind(), item.provenance() == null ? null : item.provenance().sourceType()).name();
+    }
+
+    private static String candidateTrust(
+            RepositoryEvidence item, RepositoryContext.CandidateMetadata candidate) {
+        if (item != null) return candidateTrust(item);
+        return candidate == null ? "UNKNOWN" : TrustTierClassifier.classify(
+                candidate.kind(), candidate.sourceType()).name();
     }
 
     private static CandidateFixture candidateFixture(
@@ -308,7 +327,7 @@ public record ContextLossLedger(
                     && (candidate.originatingFile().equals(value) || candidate.originatingFile().startsWith(value + "/")))
                     ? normalizePath(candidate.originatingFile()) : null;
             return new CandidateRow(candidate.reference(), candidate.kind(), path, candidate.relevanceScore(),
-                    canonical.trustByReference().getOrDefault(candidate.reference(), "UNKNOWN"),
+                    TrustTierClassifier.classify(candidate.kind(), candidate.sourceType()).name(),
                     isGrounded, selected, projectedValue,
                     decision == null ? "NOT_RECORDED" : decision.reason());
         }).sorted(Comparator.comparing(CandidateRow::reference)).toList();

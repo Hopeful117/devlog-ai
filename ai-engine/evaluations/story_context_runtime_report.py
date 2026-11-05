@@ -369,7 +369,7 @@ def valid_evaluation_telemetry(
                     "ANALYSIS", "CHALLENGE", "CHANGED_FILE", "COMMIT", "CONFIGURATION_FILES",
                     "CONFIG_FILE", "DECISION", "ENGINEERING_STORY", "FACT", "FILE_EXTENSIONS",
                     "INSIGHT", "MODULE", "MODULE_SUMMARY", "SOURCE_DIRECTORIES", "SOURCE_FILE",
-                    "TEST_DIRECTORIES", "TEST_FILE"}
+                    "TEST_DIRECTORIES", "TEST_FILE", "VALIDATABLE_PROPOSAL"}
                 or type(candidate.get("score")) is not int
                 or not -(2**31) <= candidate["score"] <= 2**31 - 1
                 or candidate.get("trust") not in {
