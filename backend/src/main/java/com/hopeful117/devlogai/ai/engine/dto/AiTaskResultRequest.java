@@ -23,7 +23,11 @@ public record AiTaskResultRequest(
         @Valid AnalysisSynthesisResult synthesis,
         @Valid StoryContextAnalysisResult analysisResult,
         Map<String, Object> followUpResult,
-        @Valid List<AiInteractionTraceRequest> interactionTraces
+        @Valid List<AiInteractionTraceRequest> interactionTraces,
+        String investigationStopReason,
+        Integer investigationProviderGenerationCount,
+        Long investigationProviderElapsedMillis,
+        Long investigationProviderOutputTokens
 ) {
     public AiTaskResultRequest {
         interactionTraces = interactionTraces == null
@@ -52,7 +56,7 @@ public record AiTaskResultRequest(
                                AiTaskResultStatus status, Instant completedAt,
                                List<AiProposalResult> proposals, AiTaskResultError error) {
         this(correlationId, externalJobId, status, completedAt, proposals, error,
-                null, null, null, null, List.of());
+                null, null, null, null, List.of(), null, null, null, null);
     }
 
     public AiTaskResultRequest(UUID correlationId, String externalJobId,
@@ -60,7 +64,7 @@ public record AiTaskResultRequest(
                                List<AiProposalResult> proposals, AiTaskResultError error,
                                PromptExecutionMetadata promptExecution, AnalysisSynthesisResult synthesis) {
         this(correlationId, externalJobId, status, completedAt, proposals, error,
-                promptExecution, synthesis, null, null, List.of());
+                promptExecution, synthesis, null, null, List.of(), null, null, null, null);
     }
 
     public AiTaskResultRequest(UUID correlationId, String externalJobId,
@@ -70,7 +74,7 @@ public record AiTaskResultRequest(
                                AnalysisSynthesisResult synthesis,
                                StoryContextAnalysisResult analysisResult) {
         this(correlationId, externalJobId, status, completedAt, proposals, error,
-                promptExecution, synthesis, analysisResult, null, List.of());
+                promptExecution, synthesis, analysisResult, null, List.of(), null, null, null, null);
     }
 
     /** Compatibility constructor for callers that provide interaction traces. */
@@ -79,9 +83,9 @@ public record AiTaskResultRequest(
                                List<AiProposalResult> proposals, AiTaskResultError error,
                                PromptExecutionMetadata promptExecution,
                                AnalysisSynthesisResult synthesis,
-                               StoryContextAnalysisResult analysisResult,
-                               List<AiInteractionTraceRequest> interactionTraces) {
+                                StoryContextAnalysisResult analysisResult,
+                                List<AiInteractionTraceRequest> interactionTraces) {
         this(correlationId, externalJobId, status, completedAt, proposals, error,
-                promptExecution, synthesis, analysisResult, null, interactionTraces);
+                promptExecution, synthesis, analysisResult, null, interactionTraces, null, null, null, null);
     }
 }

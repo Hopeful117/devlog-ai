@@ -17,6 +17,7 @@ from app.schemas.ai_task_result import (
     AiTaskResultAcknowledgement,
     AiTaskResultRequest,
 )
+from app.schemas.story_context_investigation import InvestigationActionResponse
 
 
 class CoreCallbackError(RuntimeError):
@@ -129,6 +130,42 @@ class CoreCallbackClient:
         if not acknowledgement.acknowledged:
             raise ValueError("Core did not acknowledge the AI task result")
         return acknowledgement
+
+    async def execute_investigation_action(
+        self,
+        ai_task_id: UUID,
+        correlation_id: UUID,
+        action: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Execute one Core-authorized action using the callback authentication seam."""
+        path = f"/api/v1/story-context-agent/tasks/{ai_task_id}/investigation/actions"
+        body = json.dumps(action, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        signature = hmac.new(
+            self._callback_secret, ("POST\n" + path + "\n").encode("utf-8") + body,
+            hashlib.sha256,
+        ).hexdigest()
+        async with httpx.AsyncClient(
+            base_url=self._base_url, transport=self._transport, timeout=self._timeout
+        ) as client:
+            response = await client.post(
+                path,
+                content=body,
+                headers={
+                    CORRELATION_HEADER: correlation_id_context.get(),
+                    "X-SCA-Signature": f"sha256={signature}",
+                },
+            )
+        if not response.is_success:
+            raise self._callback_error(response, correlation_id, 1)
+        value = response.json()
+        if not isinstance(value, dict):
+            raise CoreCallbackError("Core investigation action returned a non-object response")
+        try:
+            return InvestigationActionResponse.model_validate(value).model_dump(
+                mode="json", by_alias=True, exclude_none=True
+            )
+        except Exception as error:
+            raise CoreCallbackError("Core investigation action returned an invalid v2 response") from error
 
     def _is_transient_not_ready(self, response: httpx.Response) -> bool:
         if response.status_code != 409:

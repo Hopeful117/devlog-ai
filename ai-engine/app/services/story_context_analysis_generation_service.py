@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import hashlib
+import json
 import logging
 from uuid import UUID
 
@@ -27,6 +28,14 @@ from app.schemas.story_context_analysis import (
     ProviderStoryContextAnalysisResult,
     provider_result_to_internal,
     StoryAgentFollowUpResult,
+)
+from app.schemas.story_context_investigation import (
+    INVESTIGATION_PROTOCOL_VERSION,
+    InvestigationCapabilityResult,
+    InvestigationActionDecision,
+    InvestigationDecisionResponse,
+    InvestigationFinalDecision,
+    InvestigationPlanDecision,
 )
 from app.services.interaction_trace import InteractionTraceCollector
 
@@ -93,6 +102,14 @@ VALID_RELATION_TYPES = {rt.value for rt in RelationType}
 logger = logging.getLogger(__name__)
 
 
+class _InvestigationTerminal(ValueError):
+    retryable = False
+
+    def __init__(self, code: str) -> None:
+        self.code = code
+        super().__init__(code)
+
+
 class StoryContextAnalysisGenerationService:
     def __init__(
         self,
@@ -113,6 +130,9 @@ class StoryContextAnalysisGenerationService:
         submission: AiTaskSubmissionRequest,
         external_job_id: UUID,
     ) -> None:
+        if self._investigation_enabled(submission):
+            await self._process_investigation(submission, external_job_id)
+            return
         try:
             prompt = self._prompt_builder.build(submission)
         except ValueError as intent_error:
@@ -200,6 +220,190 @@ class StoryContextAnalysisGenerationService:
                 interaction_traces=traces.traces,
             ),
         )
+
+    async def _process_investigation(
+        self, submission: AiTaskSubmissionRequest, external_job_id: UUID
+    ) -> None:
+        traces = InteractionTraceCollector(self._provider, submission)
+        results: list[dict[str, object]] = []
+        actions_taken = 0
+        budget = submission.metadata["investigation"].get("budget", {})
+        maximum_steps = budget.get("maximumSteps", 0)
+        prompt: Prompt | None = None
+        try:
+            prompt = self._prompt_builder.build_investigation(submission)
+            decision = await self._investigation_decision(prompt, traces)
+            if not isinstance(decision, InvestigationPlanDecision):
+                raise ValueError("Investigation must begin with a PLAN decision")
+            pending = list(decision.plan.actions)
+            if not pending:
+                raise ValueError("Investigation plan must contain an action")
+            while True:
+                if isinstance(decision, InvestigationFinalDecision):
+                    await self._complete_investigation(
+                        submission, external_job_id, prompt, traces, decision.stop_reason, decision.result
+                    )
+                    return
+                if actions_taken >= maximum_steps:
+                    raise _InvestigationTerminal("BUDGET_EXHAUSTED")
+                if isinstance(decision, InvestigationPlanDecision):
+                    if not pending:
+                        raise ValueError("Investigation plan did not contain a usable action")
+                    action = pending.pop(0)
+                elif isinstance(decision, InvestigationActionDecision):
+                    action = decision.action
+
+                response = await self._callback_client.execute_investigation_action(
+                    submission.ai_task_id, submission.correlation_id,
+                    self._action_payload(action, submission, traces)
+                )
+                action_accounting = self._action_payload(action, submission, traces)
+                action_result = response.get("result")
+                if not isinstance(action_result, dict):
+                    raise _InvestigationTerminal("INVESTIGATION_RESULT_INVALID")
+                try:
+                    typed_result = InvestigationCapabilityResult.model_validate(action_result)
+                except ValidationError as error:
+                    raise _InvestigationTerminal("INVESTIGATION_RESULT_INVALID") from error
+                self._validate_investigation_identity(submission, typed_result)
+                account_generations = getattr(traces, "account_provider_generations", None)
+                if account_generations is not None:
+                    account_generations(action_accounting["providerGenerationCount"])
+                # Keep the complete Core result, including evidence and grounding,
+                # in the next prompt. Metadata-only action summaries are not enough.
+                results.append(typed_result.model_dump(mode="json", by_alias=True, exclude_none=True))
+                actions_taken += 1
+                outcome = typed_result.outcome
+                if outcome in {"REJECTED", "UNAVAILABLE"}:
+                    raise _InvestigationTerminal(
+                        "BUDGET_EXHAUSTED" if typed_result.rejection_code == "BUDGET_EXHAUSTED"
+                        or typed_result.stop_reason == "BUDGET_EXHAUSTED"
+                        else "INVESTIGATION_ACTION_REJECTED"
+                    )
+                self._synchronize_investigation_grounding(submission, response)
+                prompt = self._prompt_builder.build_investigation(submission, results)
+                decision = await self._investigation_decision(prompt, traces)
+        except _InvestigationTerminal as error:
+            await self._send_failure(
+                submission, external_job_id, error.code, error, prompt, traces,
+                self._investigation_stop_reason(error.code),
+            )
+        except Exception as error:
+            await self._send_failure(
+                submission, external_job_id, self._callback_error_code(error, "INVESTIGATION_FAILED"),
+                error, prompt, traces,
+                self._investigation_stop_reason(self._callback_error_code(error, "INVESTIGATION_FAILED")),
+            )
+
+    async def _investigation_decision(
+        self, prompt: Prompt, traces: InteractionTraceCollector
+    ):
+        response = await traces.generate_and_validate(
+            prompt, InvestigationDecisionResponse, lambda value: None
+        )
+        return response.root
+
+    async def _complete_investigation(
+        self, submission: AiTaskSubmissionRequest, external_job_id: UUID,
+        prompt: Prompt | None, traces: InteractionTraceCollector,
+        stop_reason,
+        provider_result: ProviderStoryContextAnalysisResult,
+    ) -> None:
+        if prompt is None:
+            raise ValueError("Investigation final prompt is missing")
+        output = provider_result_to_internal(provider_result)
+        self._validate_output(output, submission.selected_knowledge, submission.grounding_contract or {})
+        output = self._apply_execution_provenance(output, prompt)
+        await self._callback_client.send_result(
+            submission.ai_task_id, submission.correlation_id,
+            AiTaskResultRequest(
+                correlation_id=submission.correlation_id,
+                external_job_id=str(external_job_id), status=AiTaskResultStatus.COMPLETED,
+                completed_at=datetime.now(timezone.utc), proposals=[], error=None,
+                prompt_execution=self._execution_metadata(prompt), analysis_result=output,
+                investigation_stop_reason=stop_reason,
+                investigation_provider_generation_count=len(traces.traces),
+                investigation_provider_elapsed_millis=sum(trace.duration_ms for trace in traces.traces),
+                investigation_provider_output_tokens=self._provider_output_tokens(traces),
+                interaction_traces=traces.traces,
+            ),
+        )
+
+    @staticmethod
+    def _action_payload(action: object, submission, traces) -> dict[str, object]:
+        accounting_delta = getattr(traces, "provider_accounting_delta", None)
+        if accounting_delta is None:
+            generation_count, elapsed_millis, output_tokens = 1, 0, getattr(
+                traces, "last_provider_output_tokens", 0
+            )
+        else:
+            generation_count, elapsed_millis, output_tokens = accounting_delta()
+        payload = action.model_dump(mode="json", by_alias=True, exclude_none=True)
+        investigation = submission.metadata.get("investigation")
+        if not isinstance(investigation, dict):
+            raise _InvestigationTerminal("INVESTIGATION_STATE_INVALID")
+        payload.update({
+            "protocolVersion": INVESTIGATION_PROTOCOL_VERSION,
+            "executionId": investigation.get("executionId"),
+            "parentTaskId": str(submission.ai_task_id),
+            "correlationId": str(submission.correlation_id),
+            "provider": submission.provider,
+            "credentialBindingId": str(submission.credential_binding_id),
+            "providerGenerationCount": generation_count,
+            "providerElapsedMillis": elapsed_millis,
+            "providerOutputTokens": output_tokens,
+        })
+        kind = payload.pop("kind")
+        payload["limits"] = {
+            "resultLimit": payload.pop("resultLimit"),
+            "maximumBytes": payload.pop("maximumBytes"),
+            "maximumTokens": payload.pop("maximumTokens"),
+        }
+        if kind == "SEARCH_EVIDENCE":
+            payload["kind"] = kind
+            if "pathPrefix" in payload:
+                payload["path"] = payload.pop("pathPrefix")
+        else:
+            payload["kind"] = kind
+            payload["range"] = {
+                "startLine": payload.pop("startLine"),
+                "endLine": payload.pop("endLine"),
+            }
+        return payload
+
+    @staticmethod
+    def _validate_investigation_identity(submission, result: InvestigationCapabilityResult) -> None:
+        investigation = submission.metadata.get("investigation")
+        if not isinstance(investigation, dict) or result.protocol_version != INVESTIGATION_PROTOCOL_VERSION \
+                or str(result.parent_task_id) != str(submission.ai_task_id) \
+                or str(result.execution_id) != str(investigation.get("executionId")):
+            raise _InvestigationTerminal("INVESTIGATION_IDENTITY_MISMATCH")
+
+    @staticmethod
+    def _investigation_enabled(submission: AiTaskSubmissionRequest) -> bool:
+        value = submission.metadata.get("investigation")
+        return isinstance(value, dict) and value.get("initialized") is True
+
+    @staticmethod
+    def _synchronize_investigation_grounding(
+        submission: AiTaskSubmissionRequest, response: dict[str, object]
+    ) -> None:
+        result = response.get("result")
+        if not isinstance(result, dict):
+            raise _InvestigationTerminal("INVESTIGATION_RESULT_INVALID")
+        contract = result.get("groundingContract")
+        digest = result.get("groundingDigest")
+        if not isinstance(contract, dict) or not isinstance(
+            contract.get("allowedGroundingReferences"), list
+        ) or not isinstance(digest, str) or len(digest) != 64:
+            raise _InvestigationTerminal("GROUNDING_CONTRACT_INVALID")
+        expected = hashlib.sha256(
+            json.dumps(contract, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        ).hexdigest()
+        if digest != expected:
+            raise _InvestigationTerminal("GROUNDING_CONTRACT_INVALID")
+        submission.grounding_contract = contract
+        submission.metadata["groundingDigest"] = digest
 
     def _apply_execution_provenance(
         self, output: StoryContextAnalysisResult, prompt: Prompt
@@ -562,6 +766,7 @@ class StoryContextAnalysisGenerationService:
         error: Exception,
         prompt: Prompt | None = None,
         traces: InteractionTraceCollector | None = None,
+        investigation_stop_reason: str | None = None,
     ) -> None:
         await self._callback_client.send_result(
             submission.ai_task_id,
@@ -581,8 +786,34 @@ class StoryContextAnalysisGenerationService:
                     if prompt is not None
                     else self._failure_execution_metadata(submission)
                 ),
+                investigation_stop_reason=investigation_stop_reason,
+                investigation_provider_generation_count=len(traces.traces) if traces else None,
+                investigation_provider_elapsed_millis=(
+                    sum(trace.duration_ms for trace in traces.traces) if traces else None
+                ),
+                investigation_provider_output_tokens=self._provider_output_tokens(traces) if traces else None,
                 interaction_traces=traces.traces if traces else [],
             ),
+        )
+
+    @staticmethod
+    def _investigation_stop_reason(error_code: str) -> str:
+        if error_code == "BUDGET_EXHAUSTED":
+            return "BUDGET_EXHAUSTED"
+        if error_code in {"INVESTIGATION_ACTION_REJECTED", "ACTION_REJECTED"}:
+            return "ACTION_REJECTED"
+        if error_code in {"PROVIDER_INCOMPLETE_RESPONSE", "PROVIDER_INCOMPLETE"}:
+            return "PROVIDER_INCOMPLETE"
+        return "VALIDATION_FAILED"
+
+    @staticmethod
+    def _provider_output_tokens(traces) -> int:
+        value = getattr(traces, "provider_output_tokens", None)
+        if isinstance(value, int):
+            return value
+        return sum(
+            trace.output_tokens for trace in traces.traces
+            if isinstance(trace.output_tokens, int) and trace.output_tokens >= 0
         )
 
     @staticmethod
@@ -597,7 +828,7 @@ class StoryContextAnalysisGenerationService:
     @staticmethod
     def _callback_error_message(error: Exception) -> str:
         if getattr(error, "incomplete_reason", None) or getattr(error, "failure_category", None) == "PROVIDER_INCOMPLETE":
-            return "Provider response was incomplete; no grounding retry was attempted."
+            return "Provider response was incomplete; no retry was attempted."
         if getattr(error, "failure_category", None) == "GROUNDING_ERROR":
             return "Grounding validation failed; inspect the bounded interaction trace diagnostics."
         if getattr(error, "failure_category", None) == "STRUCTURAL_CONTRACT_ERROR":

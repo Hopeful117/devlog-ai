@@ -28,6 +28,7 @@ import com.hopeful117.devlogai.aicatalog.service.AiProviderCatalogService;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.storycontextanalysis.policy.StoryContextCompletionPolicyResolver;
+import com.hopeful117.devlogai.shared.evidence.EvidencePathValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,14 @@ import java.util.UUID;
 @Service
 public class StoryContextSubmissionService {
     private static final String INTENT_VERSION = "v1";
+    private static final String INVESTIGATION_PROTOCOL_VERSION = "story-context-agent-protocol/v2";
+    private static final int MAX_INVESTIGATION_STEPS = 100;
+    private static final int MAX_INVESTIGATION_RETRIEVAL_CALLS = 100;
+    private static final int MAX_INVESTIGATION_EVIDENCE_ITEMS = 1_000;
+    private static final long MAX_INVESTIGATION_BYTES = 10_000_000L;
+    private static final long MAX_INVESTIGATION_TOKENS = 2_000_000L;
+    private static final long MAX_INVESTIGATION_ELAPSED_MILLIS = 600_000L;
+    private static final int MAX_INVESTIGATION_PROVIDER_OUTPUT_TOKENS = 100_000;
 
     private final IntentCatalog intentCatalog;
     private final AiTaskService aiTaskService;
@@ -126,6 +135,7 @@ public class StoryContextSubmissionService {
         List<String> files = prepared.files();
         CanonicalEngineeringContext canonicalContext = prepared.canonicalContext();
         Map<String, Object> projection = prepared.projection();
+        validateInvestigationGuidance(guidance);
         IntentDefinition intent = intentCatalog.resolve(requestedIntent, INTENT_VERSION);
         UserGuidance userGuidance = mapGuidance(guidance);
         String projectionDigest = prepared.projectionDigest();
@@ -192,6 +202,11 @@ public class StoryContextSubmissionService {
         metadata.put("freshness", projection.get("freshness"));
         metadata.put("groundingDigest", digestService.sha256(digestService.canonicalJson(groundingContract)));
         metadata.put("storyAgentContractVersion", projection.get("contractVersion"));
+        Object investigation = snapshot.get("investigation");
+        if (investigation instanceof Map<?, ?> initialized
+                && Boolean.TRUE.equals(initialized.get("initialized"))) {
+            metadata.put("investigation", investigation);
+        }
         if (bindingId != null) {
             metadata.put("credentialBindingId", bindingId.toString());
             metadata.put("provider", authorizedProvider);
@@ -327,6 +342,7 @@ public class StoryContextSubmissionService {
         snapshot.put("canonicalContext", valueMap(canonical));
         snapshot.put("projection", projection);
         snapshot.put("guidance", guidance == null ? Map.of() : new LinkedHashMap<>(guidance));
+        initializeInvestigation(snapshot, guidance, canonical, projectSlug, storyId, intent, files);
         snapshot.put("status", "SUBMITTED");
         snapshot.put("submissionDigest", submissionDigest);
         StoryContextAgentProtocolV1.requireSnapshotIdentity(snapshot, task.getId(), canonical.contextDigest(), projectionDigest);
@@ -366,5 +382,88 @@ public class StoryContextSubmissionService {
 
     private UserGuidance mapGuidance(Map<String, Object> guidance) {
         return guidance == null || guidance.isEmpty() ? null : UserGuidance.from(guidance);
+    }
+
+    private void validateInvestigationGuidance(Map<String, Object> guidance) {
+        Object rawInvestigation = guidance == null ? null : guidance.get("investigation");
+        if (rawInvestigation == null) return;
+        if (!(rawInvestigation instanceof Map<?, ?>))
+            throw new IllegalArgumentException("investigation guidance must be an object");
+        Map<?, ?> investigation = (Map<?, ?>) rawInvestigation;
+        Object enabled = investigation.get("enabled");
+        if (Boolean.FALSE.equals(enabled)) return;
+        if (!Boolean.TRUE.equals(enabled))
+            throw new IllegalArgumentException("investigation enabled must be a boolean");
+        if (!investigation.keySet().stream().allMatch(key -> key instanceof String
+                && java.util.Set.of("enabled", "budget", "allowedPathPrefixes").contains(key))) {
+            throw new IllegalArgumentException("investigation contains unsupported fields");
+        }
+        if (!(investigation.get("budget") instanceof Map<?, ?> budget)
+                || !(investigation.get("allowedPathPrefixes") instanceof List<?> prefixes)) {
+            throw new IllegalArgumentException("enabled investigation requires budget and allowedPathPrefixes");
+        }
+        if (!budget.keySet().equals(java.util.Set.of("maximumSteps", "maximumRetrievalCalls",
+                "maximumEvidenceItems", "maximumBytes", "maximumTokens", "maximumElapsedMillis",
+                "maximumProviderOutputTokens"))) {
+            throw new IllegalArgumentException("investigation budget fields are invalid");
+        }
+        boundedInteger(budget, "maximumSteps", 1, MAX_INVESTIGATION_STEPS);
+        boundedInteger(budget, "maximumRetrievalCalls", 1, MAX_INVESTIGATION_RETRIEVAL_CALLS);
+        boundedInteger(budget, "maximumEvidenceItems", 1, MAX_INVESTIGATION_EVIDENCE_ITEMS);
+        boundedLong(budget, "maximumBytes", 1, MAX_INVESTIGATION_BYTES);
+        boundedLong(budget, "maximumTokens", 1, MAX_INVESTIGATION_TOKENS);
+        boundedLong(budget, "maximumElapsedMillis", 1, MAX_INVESTIGATION_ELAPSED_MILLIS);
+        boundedInteger(budget, "maximumProviderOutputTokens", 1, MAX_INVESTIGATION_PROVIDER_OUTPUT_TOKENS);
+        if (prefixes.stream().anyMatch(prefix -> !(prefix instanceof String string)
+                || string.isBlank() || !EvidencePathValidator.isValidRelativePath((String) prefix)
+                || EvidencePathValidator.hasNonFileNamespacePrefix((String) prefix)
+                || ((String) prefix).contains("//") || ((String) prefix).indexOf('\\') >= 0)) {
+            throw new IllegalArgumentException("allowedPathPrefixes contains an invalid path");
+        }
+    }
+
+    private void initializeInvestigation(Map<String, Object> snapshot, Map<String, Object> guidance,
+                                         CanonicalEngineeringContext canonical, String projectSlug,
+                                         UUID storyId, String intent, List<String> files) {
+        Object rawInvestigation = guidance == null ? null : guidance.get("investigation");
+        if (!(rawInvestigation instanceof Map<?, ?> input)
+                || !Boolean.TRUE.equals(input.get("enabled"))) return;
+        Map<String, Object> investigation = new LinkedHashMap<>();
+        Map<String, Object> scope = new LinkedHashMap<>();
+        scope.put("projectSlug", projectSlug);
+        scope.put("storyId", storyId == null ? null : storyId.toString());
+        scope.put("intent", intent);
+        scope.put("files", files == null ? List.of() : List.copyOf(files));
+        scope.put("allowedPathPrefixes", List.copyOf((List<String>) input.get("allowedPathPrefixes")));
+        scope.put("revision", StoryContextAgentProjectionV1.canonicalRevision(canonical));
+        investigation.put("protocolVersion", INVESTIGATION_PROTOCOL_VERSION);
+        investigation.put("executionId", UUID.randomUUID().toString());
+        investigation.put("parentTaskId", snapshot.get("aiTaskId").toString());
+        investigation.put("scope", scope);
+        investigation.put("budget", new LinkedHashMap<>((Map<String, Object>) input.get("budget")));
+        investigation.put("usage", Map.of("steps", 0, "retrievalCalls", 0, "evidenceItems", 0,
+                "bytes", 0, "tokens", 0, "elapsedMillis", 0, "providerOutputTokens", 0));
+        investigation.put("actions", List.of());
+        investigation.put("ledger", Map.of("actionCount", 0, "results", 0, "empty", 0, "rejected", 0));
+        investigation.put("initialized", true);
+        snapshot.put("investigation", investigation);
+    }
+
+    private void boundedInteger(Map<?, ?> budget, String key, int minimum, int maximum) {
+        Object value = budget.get(key);
+        if (!(value instanceof Number number) || value instanceof Float || value instanceof Double
+                || number.longValue() != number.doubleValue()
+                || number.longValue() < minimum || number.longValue() > maximum) {
+            throw new IllegalArgumentException("investigation budget field is outside bounds: " + key);
+        }
+    }
+
+    private void boundedLong(Map<?, ?> budget, String key, long minimum, long maximum) {
+        Object value = budget.get(key);
+        if (!(value instanceof Number number) || value instanceof Float || value instanceof Double
+                || number.longValue() != number.doubleValue()
+                || number.longValue() < minimum || number.longValue() > maximum) {
+            throw new IllegalArgumentException("investigation budget field is outside bounds: " + key);
+        }
     }
 }

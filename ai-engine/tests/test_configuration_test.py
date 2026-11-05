@@ -1,4 +1,5 @@
 from base64 import urlsafe_b64encode
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -67,9 +68,10 @@ async def test_configuration_test_maps_provider_timeout(tmp_path):
 async def test_chatgpt_configuration_test_uses_oauth_without_persisting_prompt_data(tmp_path):
     async def handler(request):
         assert request.method == "GET"
+        assert str(request.url) == "https://example.test/models"
         assert request.headers["authorization"] == "Bearer oauth-secret"
         assert request.content == b""
-        return httpx.Response(200, request=request, json={"data": [{"id": "gpt-5.6-luna"}]})
+        return httpx.Response(200, request=request)
 
     service, client = _service(tmp_path, handler)
     result = await service.test(provider="openai_chatgpt", authentication_method="OAUTH",
@@ -79,9 +81,29 @@ async def test_chatgpt_configuration_test_uses_oauth_without_persisting_prompt_d
 
 
 @pytest.mark.asyncio
+async def test_chatgpt_configuration_test_refreshes_oauth_credential(tmp_path):
+    async def handler(request):
+        return httpx.Response(200, request=request)
+
+    service, client = _service(tmp_path, handler)
+    oauth_service = type("OAuthService", (), {})()
+    oauth_service.refresh_if_expired = AsyncMock(
+        return_value=service._credentials.get("oauth-handle", "chatgpt")
+    )
+    service._oauth_service = oauth_service
+
+    result = await service.test(provider="openai_chatgpt", authentication_method="OAUTH",
+                                model="gpt-5.6-luna", credential_handle="oauth-handle")
+
+    assert result == {"status": "SUCCESS", "diagnosticCode": "CONFIGURATION_VALID"}
+    oauth_service.refresh_if_expired.assert_awaited_once_with("oauth-handle")
+    await client.aclose()
+
+
+@pytest.mark.asyncio
 async def test_chatgpt_configuration_test_maps_missing_model(tmp_path):
     async def handler(request):
-        return httpx.Response(200, request=request, json={"data": [{"id": "other-model"}]})
+        return httpx.Response(404, request=request)
 
     service, client = _service(tmp_path, handler)
     result = await service.test(provider="openai_chatgpt", authentication_method="OAUTH",

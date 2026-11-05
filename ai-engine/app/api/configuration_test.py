@@ -11,6 +11,7 @@ from app.schemas.binding import ConfigurationTestRequest
 from app.security.credential_store import EncryptedCredentialStore
 from app.security.service_auth import HmacServiceAuthenticator, ServiceAuthenticationError
 from app.services.configuration_test import ConfigurationTestService
+from app.services.chatgpt_oauth import ChatGptOAuthService, OAuthSessionStore
 
 router = APIRouter(prefix="/ai/configuration", tags=["configuration-test"])
 
@@ -18,9 +19,15 @@ router = APIRouter(prefix="/ai/configuration", tags=["configuration-test"])
 @lru_cache
 def get_configuration_test_service() -> ConfigurationTestService:
     settings = get_settings()
+    credentials = EncryptedCredentialStore(settings.credential_store_path, settings.credential_encryption_key)
     return ConfigurationTestService(
         settings,
-        EncryptedCredentialStore(settings.credential_store_path, settings.credential_encryption_key),
+        credentials,
+        oauth_service=ChatGptOAuthService(
+            settings,
+            OAuthSessionStore(settings.oauth_store_path),
+            credentials,
+        ),
     )
 
 
