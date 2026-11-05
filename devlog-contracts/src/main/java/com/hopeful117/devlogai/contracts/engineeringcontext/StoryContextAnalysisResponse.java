@@ -14,9 +14,15 @@ import java.util.Map;
  */
 public record StoryContextAnalysisResponse(
         StoryContextAnalysisResult analysis,
-        Map<String, Object> contextFreshness
+        Map<String, Object> contextFreshness,
+        String investigationStopReason
 ) {
     public StoryContextAnalysisResponse {
         contextFreshness = contextFreshness != null ? Map.copyOf(contextFreshness) : null;
+    }
+
+    public StoryContextAnalysisResponse(StoryContextAnalysisResult analysis,
+                                       Map<String, Object> contextFreshness) {
+        this(analysis, contextFreshness, null);
     }
 }

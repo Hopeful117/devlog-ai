@@ -2,12 +2,15 @@ import hashlib
 import json
 import uuid
 from dataclasses import dataclass
+from typing import Any
+from pydantic import TypeAdapter
 
 from app.providers.base import GenerationPolicy, Prompt, PromptTraceability
 from app.prompts.structured_context import SHARED_STRUCTURED_CONTEXT_CONTRACT
 from app.schemas.ai_task import PromptRequest
 from app.schemas.story_context_agent_projection import StoryContextAgentProjectionV1
 from app.schemas.story_context_analysis import ProviderStoryContextAnalysisResult, StoryAgentFollowUpResult
+from app.schemas.story_context_investigation import InvestigationDecision, InvestigationInitialization
 
 
 class PromptConstructionError(ValueError):
@@ -86,6 +89,8 @@ class StoryContextAnalysisPromptBuilder:
         return request.intent.prompt_template == "story-context-analysis-prompt-v1"
 
     def build(self, request: PromptRequest) -> Prompt:
+        if self._investigation_enabled(request):
+            return self.build_investigation(request)
         if request.intent.prompt_template != "story-context-analysis-prompt-v1":
             raise UnsupportedPromptTemplateError(
                 f"Unsupported prompt template: {request.intent.prompt_template}"
@@ -266,6 +271,88 @@ class StoryContextAnalysisPromptBuilder:
             generation_parameters=request.allowed_parameters,
             model_identifier=request.model_identifier,
         )
+
+    def build_investigation(
+        self, request: PromptRequest, capability_results: list[dict[str, Any]] | None = None
+    ) -> Prompt:
+        """Render the opt-in v2 decision protocol without changing the v1 prompt."""
+        if request.intent.prompt_template != "story-context-analysis-prompt-v1":
+            raise UnsupportedPromptTemplateError(
+                f"Unsupported prompt template: {request.intent.prompt_template}"
+            )
+        if request.expected_output_contract != request.intent.output_schema:
+            raise PromptConstructionError(
+                "Expected output contract does not match the versioned Intent"
+            )
+        try:
+            projection = StoryContextAgentProjectionV1.model_validate(request.selected_knowledge)
+        except Exception as error:
+            raise PromptConstructionError(f"Story Context Analysis requires a valid projection: {error}") from error
+        if not isinstance(request.context_digest, str) or len(request.context_digest) != 64:
+            raise PromptConstructionError("Prompt contextDigest is invalid")
+        if not isinstance(request.projection_digest, str) or len(request.projection_digest) != 64:
+            raise PromptConstructionError("Prompt projectionDigest is invalid")
+        investigation = request.metadata.get("investigation")
+        if not isinstance(investigation, dict) or investigation.get("initialized") is not True:
+            raise PromptConstructionError("Investigation protocol is not explicitly initialized")
+        try:
+            initialized = InvestigationInitialization.model_validate(investigation)
+        except Exception as error:
+            raise PromptConstructionError(f"Investigation initialization is invalid: {error}") from error
+        if initialized.parent_task_id != request.ai_task_id:
+            raise PromptConstructionError("Investigation parentTaskId does not match aiTaskId")
+        knowledge_json = self._canonical(
+            projection.model_dump(by_alias=True, mode="json", exclude_none=True)
+        )
+        results_json = self._canonical(capability_results or [])
+        decision_schema = TypeAdapter(InvestigationDecision).json_schema()
+        user_message = (
+            "BOUNDED INVESTIGATION PROTOCOL v2\n"
+            "Return exactly one strict decision envelope: PLAN on the first turn, then ACTION or FINAL. "
+            "Never request a capability outside the typed action schema. Core is the authority for every action.\n"
+            f"QUESTION\n{projection.request.get('question', projection.request.get('intent', ''))}\n\n"
+             f"INVESTIGATION STATE\n{self._canonical(investigation)}\n\n"
+            f"AUTHORIZED PROJECTION\n{knowledge_json}\n\n"
+             f"PRIOR CAPABILITY RESULTS\n{results_json}\n\n"
+            "DECISION RULES\n"
+            "Use PLAN only when no capability result exists. After a result, use ACTION for one additional bounded action "
+            "or FINAL when the supplied evidence is sufficient. If Core rejects an action, do not invent a result; stop. "
+            "Final findings must cite only evidence references authorized in the Core grounding contract.\n\n"
+            "EXPECTED OUTPUT SCHEMA\n"
+            f"{self._canonical(decision_schema)}"
+        )
+        content = f"{SYSTEM_MESSAGE}\n\n{user_message}"
+        content_digest = hashlib.sha256(content.encode()).hexdigest()
+        return Prompt(
+            prompt_id=str(uuid.uuid5(uuid.NAMESPACE_URL, content_digest)),
+            prompt_version="story-context-investigation-prompt-v2",
+            intent_id=request.intent.id,
+            intent_version=request.intent.version,
+            system_message=SYSTEM_MESSAGE,
+            user_message=user_message,
+            expected_output_schema=decision_schema,
+            traceability=PromptTraceability(
+                request_id=str(request.request_id), correlation_id=str(request.correlation_id),
+                ai_task_id=str(request.ai_task_id), analysis_id=str(request.analysis_id),
+                intent_id=request.intent.id, intent_version=request.intent.version,
+                context_digest=request.context_digest, analysis_context_id=None, profile_id=None,
+                profile_version=None, selection_digest=request.selection_digest,
+                projection_digest=request.projection_digest,
+                projection_version=request.metadata.get("projectionVersion"),
+                scope=request.metadata.get("scope"), freshness=request.metadata.get("freshness"),
+                grounding_digest=request.metadata.get("groundingDigest"),
+                protocol_version="story-context-agent-protocol/v2",
+            ),
+            generation_policy=GenerationPolicy(0, 5000, True),
+            content_digest=content_digest,
+            generation_parameters=request.allowed_parameters,
+            model_identifier=request.model_identifier,
+        )
+
+    @staticmethod
+    def _investigation_enabled(request: PromptRequest) -> bool:
+        value = request.metadata.get("investigation")
+        return isinstance(value, dict) and value.get("initialized") is True
 
     def _canonical(self, value: object) -> str:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)

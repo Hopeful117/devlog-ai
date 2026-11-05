@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+import hashlib
+import hmac
 from uuid import UUID, uuid4
 
 import httpx
@@ -61,6 +63,40 @@ async def test_callback_client_posts_result_to_core() -> None:
     assert acknowledgement.acknowledged is True
     assert acknowledgement.task_status == "COMPLETED"
     assert acknowledgement.proposal_count == 1
+
+
+@pytest.mark.asyncio
+async def test_callback_client_authenticates_investigation_action() -> None:
+    ai_task_id = uuid4()
+    correlation_id = uuid4()
+    action = {"kind": "SEARCH_EVIDENCE", "actionId": "a1"}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = await request.aread()
+        expected = hmac.new(
+            b"test-secret",
+            (f"POST\n{request.url.path}\n").encode() + body,
+            hashlib.sha256,
+        ).hexdigest()
+        assert request.headers["X-SCA-Signature"] == f"sha256={expected}"
+        return httpx.Response(200, json={
+            "aiTaskId": str(ai_task_id), "duplicate": False,
+            "result": {
+                "protocolVersion": "story-context-agent-protocol/v2",
+                "executionId": str(ai_task_id), "parentTaskId": str(ai_task_id),
+                "actionId": "a1", "kind": "SEARCH_EVIDENCE", "projectSlug": "devlog",
+                "revision": "revision-1", "outcome": "EMPTY", "evidence": [],
+                "stopReason": "NO_RELEVANT_EVIDENCE",
+            },
+        })
+
+    client = CoreCallbackClient(
+        "http://core.test", callback_secret="test-secret", transport=httpx.MockTransport(handler)
+    )
+
+    result = await client.execute_investigation_action(ai_task_id, correlation_id, action)
+
+    assert result["result"]["outcome"] == "EMPTY"
 
 
 def callback_result(correlation_id: UUID) -> AiTaskResultRequest:

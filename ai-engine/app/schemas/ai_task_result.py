@@ -10,6 +10,7 @@ from app.schemas.story_context_analysis import StoryContextAnalysisResult
 from app.schemas.story_context_analysis import StoryAgentFollowUpResult
 from app.schemas.interaction_trace import AiInteractionTrace
 from app.schemas.typed_reference import ProviderAiReference
+from app.schemas.story_context_investigation import InvestigationStopReason
 
 
 class ResultContractModel(BaseModel):
@@ -78,6 +79,16 @@ class AiTaskResultRequest(ResultContractModel):
     follow_up_result: StoryAgentFollowUpResult | None = Field(default=None, alias="followUpResult")
     interaction_traces: list[AiInteractionTrace] = Field(
         default_factory=list, alias="interactionTraces"
+    )
+    investigation_stop_reason: InvestigationStopReason | None = Field(default=None, alias="investigationStopReason")
+    investigation_provider_generation_count: int | None = Field(
+        default=None, alias="investigationProviderGenerationCount", ge=0
+    )
+    investigation_provider_elapsed_millis: int | None = Field(
+        default=None, alias="investigationProviderElapsedMillis", ge=0
+    )
+    investigation_provider_output_tokens: int | None = Field(
+        default=None, alias="investigationProviderOutputTokens", ge=0
     )
 
 

@@ -22,8 +22,8 @@
           }
         }
       ],
-      "redirectUris": ["http://localhost/*"],
-      "webOrigins": ["http://localhost"]
+      "redirectUris": ["http://localhost/*", "http://127.0.0.1:18083/*", "http://localhost:18083/*", "http://devlog.localhost:18083/*"],
+      "webOrigins": ["http://localhost", "http://127.0.0.1:18083", "http://localhost:18083", "http://devlog.localhost:18083"]
     },
     {
       "clientId": "devlog-mcp-opencode",

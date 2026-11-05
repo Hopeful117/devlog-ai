@@ -1,4 +1,5 @@
 import json
+import hashlib
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -166,12 +167,14 @@ class _ServiceTraces:
         self.calls = 0
         self.retry_reasons = []
         self.traces = []
+        self.prompts = []
 
     def retry(self, reason):
         self.retry_reasons.append(reason)
 
     async def generate_and_validate(self, prompt, response_model, validator):
         self.calls += 1
+        self.prompts.append(prompt.user_message)
         response = next(self.responses)
         if isinstance(response, Exception):
             raise response
@@ -199,9 +202,92 @@ def _service(monkeypatch, traces, callback):
     return service
 
 
+def _investigation_request():
+    request = load_scenario("engineering-story-context-analysis-v1").prompt_request
+    return request.model_copy(update={
+        "metadata": {
+            **request.metadata,
+            "investigation": {
+                "initialized": True,
+                "protocolVersion": "story-context-agent-protocol/v2",
+                "executionId": str(request.ai_task_id),
+                "parentTaskId": str(request.ai_task_id),
+                "scope": {"projectSlug": "devlog", "revision": "revision-1"},
+                "budget": {"maximumSteps": 2, "maximumRetrievalCalls": 2,
+                           "maximumEvidenceItems": 10, "maximumBytes": 64000,
+                           "maximumTokens": 8000, "maximumElapsedMillis": 60000,
+                           "maximumProviderOutputTokens": 4000},
+            },
+        },
+        "grounding_contract": {
+            "groundingContractVersion": "story-context-grounding/v1",
+            "allowedGroundingReferences": [],
+            "causalAnswerRequired": False,
+        },
+    })
+
+
+def _investigation_plan(task_id):
+    return {
+        "phase": "PLAN",
+        "plan": {
+            "protocolVersion": "story-context-agent-protocol/v2",
+            "planId": "plan-1",
+            "executionId": str(task_id),
+            "parentTaskId": str(task_id),
+            "scope": {"projectSlug": "devlog", "revision": "revision-1", "allowedPathPrefixes": ["backend"]},
+            "budget": {
+                "maximumSteps": 2, "maximumRetrievalCalls": 2, "maximumEvidenceItems": 10,
+                "maximumBytes": 64000, "maximumTokens": 8000, "maximumElapsedMillis": 60000,
+                "maximumProviderOutputTokens": 4000,
+            },
+            "actions": [{
+                "kind": "SEARCH_EVIDENCE", "actionId": "action-1", "projectSlug": "devlog",
+                "revision": "revision-1", "purpose": "find evidence", "query": "validator",
+                "pathPrefix": "backend", "resultLimit": 1, "maximumBytes": 1000, "maximumTokens": 250,
+            }],
+        },
+    }
+
+
+def _final_decision():
+    return {"phase": "FINAL", "stopReason": "SUFFICIENT_EVIDENCE", "result": _provider_payload("HIGH")}
+
+
+class _InvestigationCallback(_Callback):
+    def __init__(self, action_result):
+        super().__init__()
+        self.action_result = action_result
+        self.actions = []
+
+    async def execute_investigation_action(self, ai_task_id, correlation_id, action):
+        self.actions.append(action)
+        result = dict(self.action_result)
+        result.setdefault("protocolVersion", "story-context-agent-protocol/v2")
+        result.setdefault("executionId", action.get("executionId"))
+        result.setdefault("parentTaskId", action.get("parentTaskId"))
+        result.setdefault("kind", action.get("kind"))
+        result.setdefault("projectSlug", action.get("projectSlug"))
+        result.setdefault("revision", action.get("revision"))
+        contract = result.setdefault("groundingContract", {
+            "groundingContractVersion": "story-context-grounding/v1",
+            "allowedGroundingReferences": [],
+            "causalAnswerRequired": False,
+        })
+        result.setdefault("groundingDigest", hashlib.sha256(
+            json.dumps(contract, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        ).hexdigest())
+        return {"result": result}
+
+
 @pytest.mark.asyncio
 async def test_generation_retries_grounding_failure_once_and_completes(monkeypatch):
-    request = load_scenario("engineering-story-context-analysis-v1").prompt_request
+    request = load_scenario("engineering-story-context-analysis-v1").prompt_request.model_copy(update={
+        "grounding_contract": {
+            "groundingContractVersion": "story-context-grounding/v1",
+            "allowedGroundingReferences": [], "causalAnswerRequired": False,
+        }
+    })
     traces = _ServiceTraces([
         generation_module.StoryContextAnalysisUnknownReferenceError("unknown reference"),
         _provider_payload("HIGH"),
@@ -214,6 +300,125 @@ async def test_generation_retries_grounding_failure_once_and_completes(monkeypat
     assert traces.calls == 2
     assert len(traces.retry_reasons) == 1
     assert callback.results[0].status.value == "COMPLETED"
+
+
+@pytest.mark.asyncio
+async def test_initialized_investigation_executes_one_action_and_returns_final(monkeypatch):
+    request = _investigation_request()
+    traces = _ServiceTraces([
+        _investigation_plan(request.ai_task_id),
+        _final_decision(),
+    ])
+    callback = _InvestigationCallback({"actionId": "action-1", "outcome": "RESULTS", "evidence": []})
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-000000000005"))
+
+    assert len(callback.actions) == 1
+    assert callback.actions[0]["kind"] == "SEARCH_EVIDENCE"
+    assert callback.actions[0]["limits"] == {"resultLimit": 1, "maximumBytes": 1000, "maximumTokens": 250}
+    assert '"actionId":"action-1"' in traces.prompts[1]
+    assert callback.results[0].status.value == "COMPLETED"
+    assert callback.results[0].investigation_stop_reason.value == "SUFFICIENT_EVIDENCE"
+
+
+@pytest.mark.asyncio
+async def test_investigation_synchronizes_updated_grounding_for_final_callback(monkeypatch):
+    request = _investigation_request()
+    contract = {
+        "groundingContractVersion": "story-context-grounding/v1",
+        "allowedGroundingReferences": [{
+            "type": "REPOSITORY_EVIDENCE", "ref": "retrieved:backend/App.java@revision-1",
+            "coreReference": "retrieved:backend/App.java@revision-1",
+            "taskReference": "retrieved:backend/App.java@revision-1",
+            "scope": "PROJECT_REVISION", "project": "devlog", "revision": "revision-1",
+            "provenance": {"sourceType": "REPOSITORY", "repositoryLocation": "backend/App.java"},
+            "resource": "backend/App.java", "trust": "TECHNICAL_EVIDENCE", "citable": True,
+        }],
+        "causalAnswerRequired": False,
+    }
+    digest = hashlib.sha256(
+        json.dumps(contract, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    ).hexdigest()
+    traces = _ServiceTraces([_investigation_plan(request.ai_task_id), _final_decision()])
+    callback = _InvestigationCallback({
+        "actionId": "action-1", "outcome": "RESULTS", "evidence": [],
+        "groundingContract": contract, "groundingDigest": digest,
+    })
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-000000000009"))
+
+    assert request.grounding_contract == contract
+    assert request.metadata["groundingDigest"] == digest
+    assert callback.results[0].status.value == "COMPLETED"
+    assert callback.results[0].prompt_execution.grounding_digest == digest
+
+
+@pytest.mark.asyncio
+async def test_investigation_fails_closed_when_updated_grounding_digest_is_invalid(monkeypatch):
+    request = _investigation_request()
+    traces = _ServiceTraces([_investigation_plan(request.ai_task_id)])
+    callback = _InvestigationCallback({
+        "actionId": "action-1", "outcome": "RESULTS", "evidence": [],
+        "groundingContract": {"allowedGroundingReferences": []}, "groundingDigest": "0" * 64,
+    })
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-00000000000a"))
+
+    assert callback.results[0].status.value == "FAILED"
+    assert callback.results[0].error.code == "GROUNDING_CONTRACT_INVALID"
+
+
+@pytest.mark.asyncio
+async def test_investigation_action_rejection_is_terminal(monkeypatch):
+    request = _investigation_request()
+    traces = _ServiceTraces([_investigation_plan(request.ai_task_id)])
+    callback = _InvestigationCallback({"actionId": "action-1", "outcome": "REJECTED"})
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-000000000006"))
+
+    assert callback.results[0].status.value == "FAILED"
+    assert callback.results[0].error.code == "INVESTIGATION_ACTION_REJECTED"
+
+
+@pytest.mark.asyncio
+async def test_investigation_budget_stop_is_bounded(monkeypatch):
+    base_request = _investigation_request()
+    request = base_request.model_copy(update={
+        "metadata": {**base_request.metadata, "investigation": {
+            "initialized": True, "protocolVersion": "story-context-agent-protocol/v2",
+            "executionId": str(base_request.ai_task_id), "parentTaskId": str(base_request.ai_task_id),
+            "scope": {"projectSlug": "devlog", "revision": "revision-1"},
+            "budget": {"maximumSteps": 1, "maximumRetrievalCalls": 2,
+                       "maximumEvidenceItems": 10, "maximumBytes": 64000,
+                       "maximumTokens": 8000, "maximumElapsedMillis": 60000,
+                       "maximumProviderOutputTokens": 4000},
+        }}
+    })
+    action = {"phase": "ACTION", "action": _investigation_plan(request.ai_task_id)["plan"]["actions"][0]}
+    traces = _ServiceTraces([_investigation_plan(request.ai_task_id), action])
+    callback = _InvestigationCallback({"actionId": "action-1", "outcome": "RESULTS", "evidence": []})
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-000000000007"))
+
+    assert callback.results[0].error.code == "BUDGET_EXHAUSTED"
+
+
+@pytest.mark.asyncio
+async def test_investigation_provider_incomplete_is_terminal(monkeypatch):
+    request = _investigation_request()
+    traces = _ServiceTraces([ChatGptProviderError("incomplete", status="RESPONSE.INCOMPLETE", reason="length")])
+    callback = _InvestigationCallback({"actionId": "unused", "outcome": "RESULTS"})
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-000000000008"))
+
+    assert callback.results[0].error.code == "PROVIDER_INCOMPLETE_RESPONSE"
+    assert not callback.actions
 
 
 def test_execution_provenance_overrides_model_provided_values():

@@ -33,6 +33,10 @@ public interface AiTaskRepository extends JpaRepository<AiTask, UUID> {
             @Param("correlationId") UUID correlationId
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select task from AiTask task where task.id = :id")
+    Optional<AiTask> findByIdForUpdate(@Param("id") UUID id);
+
     List<AiTask> findByAnalysisIdOrderByCreatedAtDescIdDesc(UUID analysisId);
 
     Optional<AiTask> findFirstByAnalysisIdOrderByCreatedAtDescIdDesc(UUID analysisId);
