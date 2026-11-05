@@ -14,6 +14,9 @@ function readAccessToken(): string | undefined {
 
 export const test = base.extend({
   page: async ({ page }, use) => {
+    await page.addInitScript(() => {
+      (globalThis as { __DEVLOG_E2E__?: boolean }).__DEVLOG_E2E__ = true;
+    });
     const accessToken = readAccessToken();
     if (accessToken) {
       await page.route('**/api/**', async (route) => {

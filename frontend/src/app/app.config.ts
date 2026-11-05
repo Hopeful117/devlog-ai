@@ -11,6 +11,8 @@ import {
 } from 'keycloak-angular';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 
+const e2eMode = (globalThis as { __DEVLOG_E2E__?: boolean }).__DEVLOG_E2E__ === true;
+
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
@@ -23,7 +25,7 @@ export const appConfig: ApplicationConfig = {
     provideKeycloak({
       config: environment.oidc,
       initOptions: {
-        onLoad: 'login-required',
+        onLoad: e2eMode ? 'check-sso' : 'login-required',
         pkceMethod: 'S256',
         checkLoginIframe: false,
       },

@@ -40,7 +40,9 @@ public class StoryContextAnalysisQueryService {
 
     private StoryContextAnalysisResponse toResponse(StoryContextAnalysis analysis) {
         StoryContextAnalysisResult result = toResult(analysis);
-        Map<String, Object> snapshot = analysis.getAiTask().getContextSnapshot();
+        Map<String, Object> snapshot = analysis.getAiTask() == null
+                ? null
+                : analysis.getAiTask().getContextSnapshot();
         Map<String, Object> investigation = snapshot != null && snapshot.get("investigation") instanceof Map<?, ?> value
                 ? (Map<String, Object>) value : Map.of();
         String stopReason = investigation.get("stopReason") instanceof String value ? value : null;
