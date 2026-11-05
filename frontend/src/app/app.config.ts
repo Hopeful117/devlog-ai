@@ -17,19 +17,23 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([includeBearerTokenInterceptor])),
-    {
-      provide: INCLUDE_BEARER_TOKEN_INTERCEPTOR_CONFIG,
-      useValue: [{ urlPattern: /\/api\// }],
-    },
-    provideKeycloak({
-      config: environment.oidc,
-      initOptions: {
-        onLoad: e2eMode ? 'check-sso' : 'login-required',
-        pkceMethod: 'S256',
-        checkLoginIframe: false,
-      },
-    }),
+    provideHttpClient(withInterceptors(e2eMode ? [] : [includeBearerTokenInterceptor])),
+    ...(e2eMode
+      ? []
+      : [
+          {
+            provide: INCLUDE_BEARER_TOKEN_INTERCEPTOR_CONFIG,
+            useValue: [{ urlPattern: /\/api\// }],
+          },
+          provideKeycloak({
+            config: environment.oidc,
+            initOptions: {
+              onLoad: 'login-required',
+              pkceMethod: 'S256',
+              checkLoginIframe: false,
+            },
+          }),
+        ]),
     { provide: APP_ENVIRONMENT, useValue: environment },
   ],
 };
