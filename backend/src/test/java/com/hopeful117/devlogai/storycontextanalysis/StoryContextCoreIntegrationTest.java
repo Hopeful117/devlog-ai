@@ -142,6 +142,25 @@ class StoryContextCoreIntegrationTest {
         assertThat(task.getContextSnapshot()).containsKey("groundingContract");
         assertThat(task.getStatus().name()).isNotEqualTo("COMPLETED");
 
+        if (Boolean.getBoolean("q1.core.fullPython")) {
+            Map<String, Object> pythonArtifact = runPythonOneShot(task, workspace);
+            AiTask completed = aiTaskRepository.findById(taskId).orElseThrow();
+            assertThat(completed.getStatus().name()).isEqualTo("COMPLETED");
+            StoryContextAnalysis persisted = storyContextAnalysisRepository.findAll().stream()
+                    .filter(value -> value.getAiTask().getId().equals(taskId))
+                    .findFirst().orElseThrow();
+            assertThat(persisted.getAnalysisSnapshot()).isNotEmpty();
+            writeArtifact("Q1-A-DEVLOG-CURRENT-r1", completed,
+                    completedCallback(completed), List.of(
+                            "AnalyzeStoryContextUseCase", "StoryContextPreparationService",
+                            "StoryContextSubmissionService", "StoryContextCallbackService",
+                            "StoryContextCallbackIdentityValidator", "StoryContextResultValidator",
+                            "AiTaskService", "StoryContextAnalysisRepository"), List.of(
+                            "WorkspaceManager", "AiTaskExecutionAuthorizationService",
+                            "AiEngineBindingClient", "StoryContextCompletionPolicyResolver"), pythonArtifact);
+            return;
+        }
+
         AiTaskResultRequest callback = completedCallback(task);
         useCase.handleCallback(task.getCorrelationId(), callback);
 
@@ -318,6 +337,55 @@ class StoryContextCoreIntegrationTest {
         assertThat(artifact).containsEntry("taskId", task.getId().toString());
         assertThat((List<?>) artifact.get("decisions")).hasSize(3);
         assertThat((List<?>) artifact.get("events")).hasSize(6);
+        assertThat(artifact).containsEntry("externalProviderCalls", 0);
+        assertThat(artifact).containsEntry("externalNetworkCalls", 0);
+        String outputPath = System.getProperty("q1.core.output");
+        if (outputPath != null && !outputPath.isBlank()) {
+            Path destination = Path.of(outputPath).resolveSibling("python.json");
+            Files.copy(pythonArtifact, destination);
+        }
+        return artifact;
+    }
+
+    private Map<String, Object> runPythonOneShot(AiTask task, Path workspace) throws Exception {
+        Path root = Path.of(System.getProperty("user.dir")).toAbsolutePath();
+        if (!Files.isDirectory(root.resolve("ai-engine"))) root = root.getParent();
+        if (root == null || !Files.isDirectory(root.resolve("ai-engine"))) {
+            throw new IllegalStateException("DevLog AI repository root is unavailable");
+        }
+        Path prompt = workspace.resolve("q1-a-prompt.json");
+        Path pythonArtifact = workspace.resolve("q1-a-python.json");
+        objectMapper.writeValue(prompt.toFile(), aiEngineClient.lastRequest);
+        ProcessBuilder processBuilder = new ProcessBuilder(
+                "uv", "run", "--project", root.resolve("ai-engine").toString(), "python", "-m",
+                "evaluations.devlog_ai_abc_runner.q1_a_binding",
+                "--prompt-file", prompt.toString(),
+                "--core-url", "http://127.0.0.1:" + localServerPort,
+                "--secret", "q1-test-secret",
+                "--external-job-id", UUID.randomUUID().toString(),
+                "--artifact", pythonArtifact.toString())
+                .directory(root.toFile())
+                .redirectErrorStream(true);
+        String pythonPath = processBuilder.environment().get("PYTHONPATH");
+        processBuilder.environment().put("PYTHONPATH", root.resolve("ai-engine")
+                + (pythonPath == null || pythonPath.isBlank() ? "" : ":" + pythonPath));
+        Process process = processBuilder.start();
+        boolean finished = process.waitFor(180, TimeUnit.SECONDS);
+        String output = new String(process.getInputStream().readAllBytes());
+        if (!finished) {
+            process.destroyForcibly();
+            throw new IllegalStateException("Python Q1 A binding timed out");
+        }
+        if (process.exitValue() != 0) {
+            throw new IllegalStateException("Python Q1 A binding failed: " + output);
+        }
+        assertThat(pythonArtifact).exists();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> artifact = objectMapper.readValue(
+                Files.readString(pythonArtifact), Map.class);
+        assertThat(artifact).containsEntry("status", "Q1_A_FULL_CALLBACK_INTEGRATION_PASS");
+        assertThat(artifact).containsEntry("taskId", task.getId().toString());
+        assertThat(artifact).containsEntry("providerCalls", 1);
         assertThat(artifact).containsEntry("externalProviderCalls", 0);
         assertThat(artifact).containsEntry("externalNetworkCalls", 0);
         String outputPath = System.getProperty("q1.core.output");

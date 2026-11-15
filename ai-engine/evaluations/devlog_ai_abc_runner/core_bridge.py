@@ -10,6 +10,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from .provenance import current_head
+
 
 class CoreHarnessError(RuntimeError):
     """Raised when the selected Java Core harness cannot produce an artifact."""
@@ -20,7 +22,6 @@ _OBSERVATIONS = {
     "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1",
 }
 _SAFE_OBSERVATION = re.compile(r"^Q1-[AC]-[A-Z-]+-r1$")
-_FROZEN_REVISION = "60fae3e0e1104d0ffbe3832c1f578ed532b1268a"
 
 
 def run_core_harness(
@@ -41,8 +42,8 @@ def run_core_harness(
     if output.exists():
         raise CoreHarnessError(f"refusing to overwrite Core artifact: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
-    if repository_revision != _FROZEN_REVISION:
-        raise CoreHarnessError("Core harness only accepts the frozen Q1 revision")
+    if current_head(root) != repository_revision:
+        raise CoreHarnessError("Core harness worktree HEAD does not match the recorded runtime revision")
 
     command = [
         str(wrapper), "-pl", "backend", "-am",
@@ -51,7 +52,7 @@ def run_core_harness(
         f"-Dq1.core.observationId={observation_id}",
         f"-Dq1.core.output={output}", "test", "-B",
     ]
-    if observation_id == "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1":
+    if observation_id in {"Q1-A-DEVLOG-CURRENT-r1", "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1"}:
         command.insert(-2, "-Dq1.core.fullPython=true")
     uv = shutil.which("uv")
     if uv is None:

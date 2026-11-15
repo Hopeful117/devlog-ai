@@ -16,6 +16,7 @@ from typing import Any, Mapping
 from .fixtures import fixture_for
 from .core_bridge import run_core_harness
 from .q1_b_binding import run_q1_b_binding
+from .provenance import current_head
 from .runner import TreatmentAdapter
 
 
@@ -35,7 +36,7 @@ class IntegrationSimulationAdapter:
             observation_id=observation_id,
             repository_root=self.repository_root,
             output_path=self.output_root / "observations" / observation_id / "core" / "core.json",
-            repository_revision=str(manifest["repositoryRevision"]),
+            repository_revision=current_head(self.repository_root),
         )
         payload = deepcopy(fixture_for(self.condition))
         payload["executionMode"] = "INTEGRATION_SIMULATION"
