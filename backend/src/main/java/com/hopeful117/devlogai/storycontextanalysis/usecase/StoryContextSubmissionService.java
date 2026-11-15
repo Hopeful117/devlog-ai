@@ -182,6 +182,9 @@ public class StoryContextSubmissionService {
             authorizedProvider = authorization.provider();
             authorizedModel = authorization.model();
             authorizedParameters = authorization.allowedParameters();
+            task.setCredentialBindingId(bindingId);
+            task.setProvider(authorizedProvider);
+            task.setModelIdentifier(authorizedModel);
             aiEngineBindingClient.register(authorization.binding());
             snapshot.put("allowedParameters", authorizedParameters);
             task.setContextSnapshot(snapshot);

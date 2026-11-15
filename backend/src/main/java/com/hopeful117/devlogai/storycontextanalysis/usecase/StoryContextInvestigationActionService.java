@@ -361,6 +361,8 @@ public class StoryContextInvestigationActionService {
         Map<String, Object> value = new LinkedHashMap<>(metadata);
         value.remove("evidenceCount");
         value.remove("evidenceReferences");
+        value.remove("elapsedMillis");
+        value.remove("requestDigest");
         value.put("evidence", result.evidence().stream().limit(MAX_STORED_REFERENCES)
                 .map(this::responseEvidence).toList());
         value.put("groundingContract", boundedGrounding(grounding.contract()));

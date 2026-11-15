@@ -91,7 +91,7 @@ public class AiTask {
     @Column(name = "projection_digest", length = 64)
     private String projectionDigest;
 
-    @Column(name = "credential_binding_id", updatable = false)
+    @Column(name = "credential_binding_id")
     private UUID credentialBindingId;
 
     @Enumerated(EnumType.STRING)

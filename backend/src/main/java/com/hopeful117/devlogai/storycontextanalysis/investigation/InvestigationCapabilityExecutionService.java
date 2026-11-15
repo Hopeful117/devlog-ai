@@ -81,9 +81,7 @@ public class InvestigationCapabilityExecutionService {
             String path = evidence.provenance() == null ? null : evidence.provenance().originatingFile();
             String revision = resolvedRevision(evidence);
             if (!authorizedPath(path, action, scope) || !action.revision().equals(revision)) {
-                return InvestigationCapabilityResult.rejected(
-                        projectId, storyId, action, "UNAUTHORIZED_RESULT",
-                        "Core returned evidence outside the authorized path or revision");
+                continue;
             }
             TrustTier trustTier = TrustTierClassifier.publicTrustTier(
                     evidence.kind(), evidence.provenance().sourceType());
