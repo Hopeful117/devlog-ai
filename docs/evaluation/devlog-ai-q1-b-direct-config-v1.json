@@ -1,0 +1,28 @@
+{
+  "identityVersion": "devlog-ai-q1-b-direct-config-v1",
+  "campaignId": "devlog-ai-abc-q1",
+  "observationId": "Q1-B-DIRECT-INVESTIGATOR-r1",
+  "questionId": "Q1",
+  "questionVersion": "1.0.0",
+  "question": "How does a Story Context request move from Core authorization to the final persisted analysis, and which side owns each invariant?",
+  "repository": {
+    "repositoryId": "git:github.com/Hopeful117/devlog-ai",
+    "revision": "60fae3e0e1104d0ffbe3832c1f578ed532b1268a",
+    "readMode": "pinned_git_object",
+    "toolContract": "direct-read-only-git-tools"
+  },
+  "runtime": {
+    "runtime": "comparative-v4-direct-investigator",
+    "runtimeContract": "comparative-v4-live-runtime-contract-5.1.0",
+    "historicalManifest": "ai-engine/evaluations/comparative_baseline_v4/v4-manifest.json",
+    "historicalManifestSha256": "e6d084964b84b5e9e29eee17ef2285c0f041ddd315d3c952096ef2b20831595c",
+    "historicalRepositoryRevision": "a6d3d118f87aed995ce326d1bb50e1ce9a084a31",
+    "status": "Q1_B_RUNTIME_INTEGRATION_PASS"
+  },
+  "promptVersion": "comparative-v4-common-answer-1.0.0",
+  "answerContract": "comparative-v4-common-answer-1.0.0",
+  "capabilityPolicy": "preserve_v4_direct_tools_without_equalization",
+  "provenanceRule": "runtime_must_read_repository_revision_from_repository.revision",
+  "bindingStatus": "Q1_B_RUNTIME_INTEGRATION_PASS",
+  "liveStatus": "Q1_LIVE_TECHNICALLY_BLOCKED"
+}

@@ -102,6 +102,7 @@ class InteractionTraceCollector:
     def __post_init__(self) -> None:
         self.traces: list[AiInteractionTrace] = []
         self._retry_reason: str | None = None
+        self._accounted_provider_generations = 0
 
     @property
     def diagnostic(self) -> bool:
@@ -109,6 +110,34 @@ class InteractionTraceCollector:
 
     def retry(self, reason: Exception) -> None:
         self._retry_reason = _failure_code(reason)
+
+    @property
+    def provider_output_tokens(self) -> int:
+        return sum(
+            trace.output_tokens for trace in self.traces
+            if isinstance(trace.output_tokens, int) and trace.output_tokens >= 0
+        )
+
+    @property
+    def last_provider_output_tokens(self) -> int:
+        """Return only the output of the generation immediately preceding an action."""
+        if not self.traces:
+            return 0
+        value = self.traces[-1].output_tokens
+        return value if isinstance(value, int) and value >= 0 else 0
+
+    def provider_accounting_delta(self) -> tuple[int, int, int]:
+        pending = self.traces[self._accounted_provider_generations:]
+        if any(trace.output_tokens is None for trace in pending):
+            raise ValueError("Provider output token measurement is required for investigation accounting")
+        return len(pending), sum(getattr(trace, "duration_ms", 0) for trace in pending), sum(
+            trace.output_tokens for trace in pending
+        )
+
+    def account_provider_generations(self, count: int) -> None:
+        if count < 0 or self._accounted_provider_generations + count > len(self.traces):
+            raise ValueError("Invalid provider generation accounting boundary")
+        self._accounted_provider_generations += count
 
     async def generate_and_validate(
         self,

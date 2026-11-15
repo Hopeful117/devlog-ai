@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Supervise one OpenCode-owned DevLog MCP STDIO instance."""
 
-from __future__ import annotations
-
 import json
 import base64
 import binascii
@@ -15,6 +13,7 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import dataclass
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -36,6 +35,23 @@ MAX_COMPLETED_INSTANCES = 20
 DEFAULT_RENEWAL_MARGIN_SECONDS = 30
 DEFAULT_RENEWAL_COOLDOWN_SECONDS = 10
 DEFAULT_MINIMUM_LEASE_SECONDS = 5
+TOOL_SCHEMA_VERSION = "mcp-tool-observability-v1"
+TOOL_ACTIVE = "ACTIVE"
+TOOL_RESPONDED = "RESPONDED"
+TOOL_FAILED = "FAILED"
+TOOL_INTERRUPTED = "INTERRUPTED"
+
+
+@dataclass
+class ToolOperation:
+    operation_id: str
+    request_id: str
+    initial_generation: int
+    current_generation: int
+    state: str
+    retry_count: int
+    raw_payload: bytes
+    started_at: float
 
 
 def state_root() -> Path:
@@ -255,17 +271,104 @@ class RuntimeSession:
         self.ready = threading.Event()
         self.stop_requested = threading.Event()
         self.lock = threading.RLock()
+        self.tool_event_lock = threading.Lock()
+        self.stdin_write_lock = threading.Lock()
         self.renewal_condition = threading.Condition(self.lock)
         self.renewal_in_progress = False
-        self.outstanding: dict[str, int] = {}
-        self.request_payloads: dict[str, list[bytes]] = {}
-        self.request_retries: dict[str, int] = {}
+        self.outstanding: dict[str, ToolOperation | int] = {}
+        self.operations: dict[str, ToolOperation] = {}
         self.last_renewal_failure = 0.0
         self.initialize_raw: bytes | None = None
         self.initialized_raw: bytes | None = None
         self.initialize_id: str | None = None
         self.suppress_initialize_response = False
         self.generation = 0
+
+    def _new_operation_id(self) -> str:
+        operation_id = secrets.token_hex(16)
+        while operation_id in self.operations:
+            operation_id = secrets.token_hex(16)
+        return operation_id
+
+    def _emit_tool_event(
+        self,
+        operation: ToolOperation,
+        event_type: str,
+        status: str,
+        generation: int,
+        *,
+        reason_code: str | None = None,
+    ) -> None:
+        fields: dict[str, Any] = {
+            "schemaVersion": TOOL_SCHEMA_VERSION,
+            "eventType": event_type,
+            "operationId": operation.operation_id,
+            "generation": generation,
+            "status": status,
+        }
+        if reason_code is not None:
+            fields["reasonCode"] = reason_code
+        duration_ms = max(0, int((time.monotonic() - operation.started_at) * 1000))
+        if event_type != "MCP_TOOL_STARTED":
+            fields["durationMs"] = duration_ms
+        with self.tool_event_lock:
+            try:
+                severity = "ERROR" if status == TOOL_FAILED else "WARN" if status == TOOL_INTERRUPTED else "INFO"
+                self.writer.write(event_type, severity=severity, **fields)
+            except Exception:
+                # Observability must not corrupt MCP STDOUT or change transport state.
+                try:
+                    sys.stderr.write("MCP_OBSERVABILITY_WRITE_FAILED\n")
+                    sys.stderr.flush()
+                except Exception:
+                    pass
+
+    def _finish_operation_locked(
+        self,
+        operation: ToolOperation,
+        state: str,
+        generation: int,
+        reason_code: str | None = None,
+    ) -> bool:
+        if operation.state != TOOL_ACTIVE:
+            return False
+        operation.state = state
+        if self.outstanding.get(operation.request_id) is operation:
+            self.outstanding.pop(operation.request_id, None)
+        self.operations.pop(operation.operation_id, None)
+        return True
+
+    def _emit_terminal_event(
+        self,
+        operation: ToolOperation,
+        state: str,
+        generation: int,
+        reason_code: str | None = None,
+    ) -> None:
+        self._emit_tool_event(
+            operation,
+            {
+                TOOL_RESPONDED: "MCP_TOOL_RESPONDED",
+                TOOL_FAILED: "MCP_TOOL_FAILED",
+                TOOL_INTERRUPTED: "MCP_TOOL_INTERRUPTED",
+            }[state],
+            state,
+            generation,
+            reason_code=reason_code,
+        )
+
+    def _finish_operation(
+        self,
+        operation: ToolOperation,
+        state: str,
+        generation: int,
+        reason_code: str | None = None,
+    ) -> bool:
+        with self.lock:
+            finished = self._finish_operation_locked(operation, state, generation, reason_code)
+        if finished:
+            self._emit_terminal_event(operation, state, generation, reason_code)
+        return finished
 
     @property
     def renewal_margin(self) -> float:
@@ -311,11 +414,25 @@ class RuntimeSession:
             child.stdin.flush()
 
     def stop_child(self, code: str) -> None:
-        child = self.child
-        if child is None or child.poll() is not None:
-            return
+        terminal_events: list[tuple[ToolOperation, int]] = []
         with self.lock:
-            self.generation += 1
+            child = self.child
+            if code != "TOKEN_RENEWAL":
+                self.stop_requested.set()
+                self.generation += 1
+                for operation in list(self.operations.values()):
+                    if self._finish_operation_locked(operation, TOOL_INTERRUPTED, self.generation):
+                        terminal_events.append((operation, self.generation))
+            child_running = child is not None and child.poll() is None
+        for terminal_operation, terminal_generation in terminal_events:
+            self._emit_terminal_event(
+                terminal_operation,
+                TOOL_INTERRUPTED,
+                terminal_generation,
+                reason_code="MCP_INSTANCE_STOPPING",
+            )
+        if not child_running:
+            return
         self.writer.write("MCP_INSTANCE_STOPPED", code=code)
         if child.stdin:
             try:
@@ -371,23 +488,29 @@ class RuntimeSession:
                 sys.stderr.write(line + "\n")
                 sys.stderr.flush()
 
-    def observe_response(self, message: Any) -> None:
+    def observe_response(self, message: Any, generation: int | None = None) -> None:
         if not isinstance(message, dict) or "id" not in message:
             return
         identifier = message["id"]
         if isinstance(identifier, (str, int, float)) and not isinstance(identifier, bool):
+            terminal_event: tuple[ToolOperation, str, int, str | None] | None = None
             with self.lock:
                 key = json.dumps(identifier, sort_keys=True)
-                if self.outstanding.get(key, 0) <= 1:
-                    self.outstanding.pop(key, None)
+                operation = self.outstanding.get(key)
+                if not isinstance(operation, ToolOperation):
+                    return
+                if generation is not None and generation != operation.current_generation:
+                    return
+                if isinstance(message.get("error"), dict):
+                    terminal_generation = generation if generation is not None else operation.current_generation
+                    if self._finish_operation_locked(operation, TOOL_FAILED, terminal_generation):
+                        terminal_event = (operation, TOOL_FAILED, terminal_generation, "MCP_JSONRPC_ERROR")
                 else:
-                    self.outstanding[key] -= 1
-                payloads = self.request_payloads.get(key)
-                if payloads:
-                    payloads.pop(0)
-                    if not payloads:
-                        self.request_payloads.pop(key, None)
-                        self.request_retries.pop(key, None)
+                    terminal_generation = generation if generation is not None else operation.current_generation
+                    if self._finish_operation_locked(operation, TOOL_RESPONDED, terminal_generation):
+                        terminal_event = (operation, TOOL_RESPONDED, terminal_generation, None)
+            if terminal_event is not None:
+                self._emit_terminal_event(*terminal_event)
 
     def is_transport_auth_failure(self, message: Any) -> bool:
         if not isinstance(message, dict) or not isinstance(message.get("error"), dict):
@@ -401,23 +524,41 @@ class RuntimeSession:
         identifier = self.request_id(message)
         if identifier is None:
             return False
+        terminal_event: tuple[ToolOperation, str, int, str | None] | None = None
         with self.lock:
-            payloads = self.request_payloads.get(identifier)
-            retries = self.request_retries.get(identifier, 0)
-            if not payloads or retries >= 1:
-                self.observe_response(message)
+            operation = self.outstanding.get(identifier)
+            if not isinstance(operation, ToolOperation):
                 return False
-            raw = payloads.pop(0)
-            if not payloads:
-                self.request_payloads.pop(identifier, None)
-            self.request_retries[identifier] = retries + 1
-            self.observe_response(message)
+            if operation.retry_count >= 1:
+                if self._finish_operation_locked(operation, TOOL_FAILED, operation.current_generation):
+                    terminal_event = (operation, TOOL_FAILED, operation.current_generation, "MCP_REAUTH_REQUIRED")
+            else:
+                operation.retry_count += 1
+                raw = operation.raw_payload
+                operation_id = operation.operation_id
+        if terminal_event is not None:
+            self._emit_terminal_event(*terminal_event)
+            return False
         try:
-            self.renew_if_needed(force=True)
-            self.forward(raw, json.loads(raw))
+            self.renew_if_needed(force=True, retry_operation_id=operation_id)
+            self.forward(raw, json.loads(raw), retry_operation_id=operation_id)
             self.writer.write("TOKEN_RENEWAL_SUCCEEDED", code="AUTHENTICATION_RETRY")
             return True
         except (OSError, RuntimeError, ValueError, urllib.error.URLError, TimeoutError):
+            terminal_event = None
+            with self.lock:
+                current = self.operations.get(operation_id)
+                if current is not None:
+                    if self.stop_requested.is_set():
+                        state = TOOL_INTERRUPTED
+                        reason_code = "MCP_INSTANCE_STOPPING"
+                    else:
+                        state = TOOL_FAILED
+                        reason_code = "MCP_REAUTH_REQUIRED"
+                    if self._finish_operation_locked(current, state, current.current_generation):
+                        terminal_event = (current, state, current.current_generation, reason_code)
+            if terminal_event is not None:
+                self._emit_terminal_event(*terminal_event)
             self.stop_requested.set()
             self.stop_child("MCP_REAUTH_REQUIRED")
             return False
@@ -426,18 +567,18 @@ class RuntimeSession:
         if generation is not None and generation != self.generation:
             return True
         if not isinstance(message, dict):
-            self.observe_response(message)
+            self.observe_response(message, generation)
             return False
         identifier = self.request_id(message)
         is_initialize_response = identifier == self.initialize_id and isinstance(message.get("result"), dict)
         if not self.suppress_initialize_response:
-            self.observe_response(message)
+            self.observe_response(message, generation)
             if is_initialize_response and message["result"].get("protocolVersion"):
                 self.ready.set()
                 self.writer.write("MCP_INSTANCE_READY", code="INITIALIZE_RESPONSE")
             return False
         if identifier != self.initialize_id:
-            self.observe_response(message)
+            self.observe_response(message, generation)
             return False
         if is_initialize_response and message["result"].get("protocolVersion"):
             self.ready.set()
@@ -457,7 +598,7 @@ class RuntimeSession:
             return
         raise RuntimeError("MCP_HANDSHAKE_FAILED")
 
-    def renew_if_needed(self, force: bool = False) -> None:
+    def renew_if_needed(self, force: bool = False, retry_operation_id: str | None = None) -> None:
         with self.lock:
             while self.renewal_in_progress:
                 self.renewal_condition.wait()
@@ -468,7 +609,11 @@ class RuntimeSession:
             if not force and time.time() + self.renewal_margin < self.lease.expires_at:
                 return
             if self.outstanding:
-                raise RuntimeError("MCP_REAUTH_REQUIRED")
+                if retry_operation_id is None or len(self.outstanding) != 1:
+                    raise RuntimeError("MCP_REAUTH_REQUIRED")
+                operation = next(iter(self.outstanding.values()))
+                if not isinstance(operation, ToolOperation) or operation.operation_id != retry_operation_id:
+                    raise RuntimeError("MCP_REAUTH_REQUIRED")
             if time.time() - self.last_renewal_failure < self.renewal_cooldown:
                 raise RuntimeError("MCP_REAUTH_REQUIRED")
             self.renewal_in_progress = True
@@ -509,8 +654,8 @@ class RuntimeSession:
             self.writer.write("TOKEN_RENEWAL_FAILED", severity="ERROR", code=code)
             raise RuntimeError("MCP_REAUTH_REQUIRED") from exception
 
-    def forward(self, raw: bytes, message: Any) -> None:
-        self.renew_if_needed()
+    def forward(self, raw: bytes, message: Any, retry_operation_id: str | None = None) -> None:
+        self.renew_if_needed(retry_operation_id=retry_operation_id)
         child = self.child
         if child is None or child.stdin is None:
             raise RuntimeError("MCP_PROCESS_FAILED")
@@ -523,16 +668,58 @@ class RuntimeSession:
         if isinstance(message, dict) and message.get("method") == "notifications/initialized":
             self.initialized_raw = raw
         if identifier is not None:
+            started_operation: ToolOperation | None = None
             with self.lock:
-                if self.outstanding.get(identifier, 0) > 0:
-                    raise RuntimeError("MCP_PROTOCOL_INVALID")
-                self.outstanding[identifier] = self.outstanding.get(identifier, 0) + 1
-                self.request_payloads.setdefault(identifier, []).append(raw)
-        try:
-            child.stdin.write(raw)
-            child.stdin.flush()
-        except (BrokenPipeError, OSError) as exception:
-            raise RuntimeError("MCP_PROCESS_FAILED") from exception
+                if self.stop_requested.is_set() and retry_operation_id is None:
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
+                existing = self.outstanding.get(identifier)
+                if existing is not None:
+                    if retry_operation_id is None or not isinstance(existing, ToolOperation):
+                        raise RuntimeError("MCP_PROTOCOL_INVALID")
+                    if existing.operation_id != retry_operation_id or existing.state != TOOL_ACTIVE:
+                        raise RuntimeError("MCP_PROTOCOL_INVALID")
+                    existing.current_generation = self.generation
+                    operation = existing
+                else:
+                    operation = ToolOperation(
+                        operation_id=self._new_operation_id(),
+                        request_id=identifier,
+                        initial_generation=self.generation,
+                        current_generation=self.generation,
+                        state=TOOL_ACTIVE,
+                        retry_count=0,
+                        raw_payload=raw,
+                        started_at=time.monotonic(),
+                    )
+                    self.outstanding[identifier] = operation
+                    self.operations[operation.operation_id] = operation
+                    started_operation = operation
+            if started_operation is not None:
+                self._emit_tool_event(
+                    started_operation,
+                    "MCP_TOOL_STARTED",
+                    TOOL_ACTIVE,
+                    started_operation.current_generation,
+                )
+        with self.stdin_write_lock:
+            if identifier is not None:
+                with self.lock:
+                    if operation.state != TOOL_ACTIVE:
+                        raise RuntimeError("MCP_INSTANCE_STOPPING")
+                    if self.stop_requested.is_set() and retry_operation_id is None:
+                        raise RuntimeError("MCP_INSTANCE_STOPPING")
+            try:
+                child.stdin.write(raw)
+                child.stdin.flush()
+            except (BrokenPipeError, OSError) as exception:
+                if identifier is not None:
+                    self._finish_operation(
+                        operation,
+                        TOOL_FAILED,
+                        operation.current_generation,
+                        reason_code="MCP_PROCESS_FAILED",
+                    )
+                raise RuntimeError("MCP_PROCESS_FAILED") from exception
 
     def relay_stdin(self) -> None:
         buffer = b""

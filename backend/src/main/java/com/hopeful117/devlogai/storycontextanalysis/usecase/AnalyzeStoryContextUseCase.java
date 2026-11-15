@@ -262,6 +262,7 @@ public class AnalyzeStoryContextUseCase {
                         || !(map.get("revision") instanceof String revision) || revision.isBlank()
                         || !(map.get("provenance") instanceof Map<?, ?>)
                         || !(map.get("trust") instanceof String trust) || trust.isBlank()
+                        || (map.containsKey("citable") && !Boolean.TRUE.equals(map.get("citable")))
                         || !Objects.equals(ref, map.get("coreReference"))
                         || !Objects.equals(ref, map.get("taskReference"))) {
                     throw new IllegalStateException("Invalid typed grounding reference");
@@ -273,7 +274,8 @@ public class AnalyzeStoryContextUseCase {
                 }
                 if (!Objects.equals(revision, snapshotRevision(task))) throw new IllegalStateException("Grounding revision does not match PROJECT_REVISION snapshot");
                 Map<String, Object> evidence = snapshotEvidence(task, value);
-                if (evidence == null || !Objects.equals(map.get("provenance"), evidence.get("provenance"))) throw new IllegalStateException("Grounding provenance does not match snapshot evidence");
+                if (evidence != null && !Objects.equals(map.get("provenance"), evidence.get("provenance"))) throw new IllegalStateException("Grounding provenance does not match snapshot evidence");
+                if (evidence == null && !Boolean.TRUE.equals(map.get("citable"))) throw new IllegalStateException("Grounding evidence is not citable");
                 refs.add(value);
             }
             return refs;

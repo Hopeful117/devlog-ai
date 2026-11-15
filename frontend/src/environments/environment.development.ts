@@ -4,4 +4,9 @@ export const environment: AppEnvironment = {
   backendBaseUrl: '',
   analysisPollingIntervalMs: 2000,
   organizerBaseUrl: 'http://127.0.0.1:14200',
+  oidc: {
+    url: 'http://devlog.localhost:18084',
+    realm: 'devlog',
+    clientId: 'devlog-core',
+  },
 };

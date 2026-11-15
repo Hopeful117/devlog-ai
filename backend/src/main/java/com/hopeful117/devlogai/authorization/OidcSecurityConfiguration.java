@@ -27,6 +27,7 @@ public class OidcSecurityConfiguration {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/api/v1/story-context-agent/tasks/*/callback",
+                                "/api/v1/story-context-agent/tasks/*/investigation/actions",
                                 "/api/v1/ai/configuration/oauth/chatgpt/callback").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder(issuer, audience))))

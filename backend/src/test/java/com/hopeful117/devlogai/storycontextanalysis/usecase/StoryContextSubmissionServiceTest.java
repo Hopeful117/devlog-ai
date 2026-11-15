@@ -114,7 +114,7 @@ class StoryContextSubmissionServiceTest {
                 objectMapper, new StoryContextDigestService(objectMapper), null, aiEngineBindingClient,
                  authorizationService, StoryContextTestPolicy.resolver());
         Project project = mock(Project.class);
-        when(project.getId()).thenReturn(UUID.randomUUID());
+        lenient().when(project.getId()).thenReturn(UUID.randomUUID());
         Map<String, Object> projection = Map.of(
                 "projectionVersion", "sca/v1", "contractVersion", "story-context-agent-projection/v1",
                 "freshness", Map.of("sourceRevision", "revision-1"),
@@ -157,5 +157,113 @@ class StoryContextSubmissionServiceTest {
         assertEquals(0, ((Map<?, ?>) lossAccounting.get("counts")).get("providerVisibleCount"));
         verify(aiEngineClient, never()).submit(any(PromptRequest.class));
         verify(aiTaskService).failSubmission(eq(taskId), any());
+    }
+
+    @Test
+    void absentInvestigationGuidanceKeepsOneShotSnapshot() {
+        SubmissionFixture fixture = submissionFixture();
+
+        fixture.submit(null);
+
+        assertFalse(fixture.task.getContextSnapshot().containsKey("investigation"));
+    }
+
+    @Test
+    void disabledInvestigationGuidanceKeepsOneShotSnapshot() {
+        SubmissionFixture fixture = submissionFixture();
+
+        fixture.submit(Map.of("investigation", Map.of("enabled", false)));
+
+        assertFalse(fixture.task.getContextSnapshot().containsKey("investigation"));
+    }
+
+    @Test
+    void validInvestigationGuidanceInitializesBoundedExecutionSnapshot() {
+        SubmissionFixture fixture = submissionFixture();
+        Map<String, Object> guidance = Map.of("investigation", Map.of(
+                "enabled", true,
+                "allowedPathPrefixes", List.of("backend", "docs"),
+                "budget", validInvestigationBudget()));
+
+        fixture.submit(guidance);
+
+        Map<?, ?> investigation = (Map<?, ?>) fixture.task.getContextSnapshot().get("investigation");
+        assertEquals("story-context-agent-protocol/v2", investigation.get("protocolVersion"));
+        assertNotNull(investigation.get("executionId"));
+        assertEquals(fixture.task.getId().toString(), investigation.get("parentTaskId"));
+        assertEquals(true, investigation.get("initialized"));
+        assertEquals("revision-1", ((Map<?, ?>) investigation.get("scope")).get("revision"));
+        assertEquals(List.of("backend", "docs"), ((Map<?, ?>) investigation.get("scope")).get("allowedPathPrefixes"));
+        assertEquals(Map.of("steps", 0, "retrievalCalls", 0, "evidenceItems", 0, "bytes", 0,
+                "tokens", 0, "elapsedMillis", 0, "providerOutputTokens", 0), investigation.get("usage"));
+        assertEquals(List.of(), investigation.get("actions"));
+        assertEquals(0, ((Map<?, ?>) investigation.get("ledger")).get("actionCount"));
+    }
+
+    @Test
+    void invalidEnabledInvestigationGuidanceFailsClosedBeforeTaskCreation() {
+        SubmissionFixture fixture = submissionFixture();
+        Map<String, Object> invalid = new java.util.LinkedHashMap<>(validInvestigationBudget());
+        invalid.put("maximumSteps", 0);
+
+        assertThrows(IllegalArgumentException.class, () -> fixture.service.submit(
+                fixture.prepared,
+                Map.of("investigation", Map.of("enabled", true, "allowedPathPrefixes", List.of("backend"),
+                        "budget", invalid)), "submission", "idempotency"));
+        verify(analysisRepository, never()).save(any(Analysis.class));
+        verify(aiTaskService, never()).createForStoryContextAnalysisEntity(any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any());
+    }
+
+    private SubmissionFixture submissionFixture() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        Project project = mock(Project.class);
+        lenient().when(project.getId()).thenReturn(UUID.randomUUID());
+        Map<String, Object> projection = Map.of("projectionVersion", "sca/v1",
+                "contractVersion", "story-context-agent-projection/v1",
+                "freshness", Map.of("sourceRevision", Map.of("revision", "revision-1")),
+                "requestEcho", Map.of("intent", "engineering-story-context-analysis"));
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(mock(EngineeringContext.class), null,
+                "a".repeat(64), "engineering-context-v2", null,
+                Map.of("sourceRevision", Map.of("revision", "revision-1")), Map.of(), null,
+                Map.of(), Map.of(), Map.of(), List.of());
+        PreparedStoryContext prepared = new PreparedStoryContext("devlog-ai", null,
+                "engineering-story-context-analysis", List.of(), project, null, canonical, projection,
+                "b".repeat(64), null);
+        IntentDefinition intent = new IntentDefinition("engineering-story-context-analysis", "v1",
+                "Analyze Story context", List.of(), List.of(), Map.of("type", "object"),
+                "story-context-analysis-prompt-v1");
+        AiTask task = AiTask.builder().id(UUID.randomUUID()).correlationId(UUID.randomUUID())
+                .status(AiTaskStatus.CREATED).contextSnapshot(Map.of()).build();
+        lenient().when(intentCatalog.resolve("engineering-story-context-analysis", "v1")).thenReturn(intent);
+        lenient().when(analysisRepository.save(any(Analysis.class))).thenAnswer(invocation -> {
+            Analysis analysis = invocation.getArgument(0);
+            analysis.setId(UUID.randomUUID());
+            return analysis;
+        });
+        lenient().when(aiTaskService.createForStoryContextAnalysisEntity(any(), eq(AiTaskType.STORY_CONTEXT_ANALYSIS),
+                any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(task);
+        lenient().when(aiTaskRepository.save(any(AiTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(authorizationService.authorizeAndIssue(any(), eq(task))).thenReturn(
+                        new AiTaskExecutionAuthorizationService.AuthorizedExecution(
+                        AiCredentialBinding.builder().id(UUID.randomUUID()).build(), "anthropic", "claude-opus-5-5",
+                        Map.of("maxOutputTokens", 4096)));
+        return new SubmissionFixture(new StoryContextSubmissionService(intentCatalog, aiTaskService, aiEngineClient,
+                aiTaskRepository, analysisRepository, objectMapper, new StoryContextDigestService(objectMapper), null,
+                aiEngineBindingClient, authorizationService, StoryContextTestPolicy.resolver()), prepared, task);
+    }
+
+    private Map<String, Object> validInvestigationBudget() {
+        return Map.of("maximumSteps", 2, "maximumRetrievalCalls", 2, "maximumEvidenceItems", 5,
+                "maximumBytes", 20_000, "maximumTokens", 5_000, "maximumElapsedMillis", 30_000,
+                "maximumProviderOutputTokens", 1_000);
+    }
+
+    private record SubmissionFixture(StoryContextSubmissionService service, PreparedStoryContext prepared,
+                                     AiTask task) {
+        void submit(Map<String, Object> guidance) {
+            service.submit(prepared, guidance, "submission", "idempotency",
+                    new AuthenticatedPrincipal("human-1", PrincipalKind.HUMAN, "test"), "anthropic");
+        }
     }
 }

@@ -553,7 +553,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             // completed SCA result, so retain constructor/test compatibility only
             // for the empty legacy duplicate; all v1 terminal callbacks are
             // persisted with and compared against terminalCallbackDigest.
-            if (task.getTerminalCallbackDigest() == null && request.analysisResult() == null) {
+            if (task.getTerminalCallbackDigest() == null && isEmptyLegacyTerminalCallback(request)) {
                 persistInteractionTraces(task, request);
                 return acknowledgement(task, true);
             }
@@ -620,6 +620,20 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
         return acknowledgement(task, false);
     }
 
+    private boolean isEmptyLegacyTerminalCallback(AiTaskResultRequest request) {
+        return request.status() == AiTaskResultStatus.COMPLETED
+                && request.error() == null
+                && request.analysisResult() == null
+                && request.followUpResult() == null
+                && request.synthesis() == null
+                && request.proposals().isEmpty()
+                && request.interactionTraces().isEmpty()
+                && request.investigationStopReason() == null
+                && request.investigationProviderGenerationCount() == null
+                && request.investigationProviderElapsedMillis() == null
+                && request.investigationProviderOutputTokens() == null;
+    }
+
     private String callbackDigest(AiTaskResultRequest request) {
         try {
             Map<String, Object> payload = new LinkedHashMap<>();
@@ -633,6 +647,10 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             payload.put("proposals", request.proposals());
             payload.put("synthesis", request.synthesis());
             payload.put("interactionTraces", request.interactionTraces());
+            payload.put("investigationStopReason", request.investigationStopReason());
+            payload.put("investigationProviderGenerationCount", request.investigationProviderGenerationCount());
+            payload.put("investigationProviderElapsedMillis", request.investigationProviderElapsedMillis());
+            payload.put("investigationProviderOutputTokens", request.investigationProviderOutputTokens());
             Object converted = objectMapper.convertValue(payload, Map.class);
             String canonical = converted == null ? request.toString() : canonicalJson(converted);
             return sha256(canonical);

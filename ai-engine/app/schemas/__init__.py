@@ -32,6 +32,20 @@ from app.schemas.story_context_analysis import (
     Provenance,
     OutputClassification,
 )
+from app.schemas.story_context_investigation import (
+    InvestigationActionProposal,
+    InvestigationBudget,
+    InvestigationCapabilityResult,
+    InvestigationActionDecision,
+    InvestigationFinalDecision,
+    InvestigationPlanDecision,
+    InvestigationDecisionResponse,
+    InvestigationPlanProposal,
+    InvestigationScope,
+    InvestigationStopReason,
+    ReadEvidenceRangeActionProposal,
+    SearchEvidenceActionProposal,
+)
 
 __all__ = [
     "AiProposalResult",
@@ -61,4 +75,16 @@ __all__ = [
     "ClassificationEntry",
     "Provenance",
     "OutputClassification",
+    "InvestigationActionProposal",
+    "InvestigationBudget",
+    "InvestigationCapabilityResult",
+    "InvestigationActionDecision",
+    "InvestigationFinalDecision",
+    "InvestigationPlanDecision",
+    "InvestigationDecisionResponse",
+    "InvestigationPlanProposal",
+    "InvestigationScope",
+    "InvestigationStopReason",
+    "ReadEvidenceRangeActionProposal",
+    "SearchEvidenceActionProposal",
 ]

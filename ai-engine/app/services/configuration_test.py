@@ -6,6 +6,7 @@ import httpx
 
 from app.core.config import Settings
 from app.security.credential_store import CredentialStoreError, EncryptedCredentialStore
+from app.services.chatgpt_oauth import ChatGptOAuthService, OAuthError
 from app.services.provider_identity import engine_provider
 
 
@@ -21,10 +22,12 @@ class ConfigurationTestStatus(StrEnum):
 class ConfigurationTestService:
     _MAX_MODEL_RESPONSE_BYTES = 64 * 1024
     def __init__(self, settings: Settings, credentials: EncryptedCredentialStore,
-                 http_client: httpx.AsyncClient | None = None) -> None:
+                 http_client: httpx.AsyncClient | None = None,
+                 oauth_service: ChatGptOAuthService | None = None) -> None:
         self._settings = settings
         self._credentials = credentials
         self._http_client = http_client
+        self._oauth_service = oauth_service
 
     async def test(self, *, provider: str, authentication_method: str,
                    model: str, credential_handle: str | None) -> dict[str, str]:
@@ -37,6 +40,11 @@ class ConfigurationTestService:
             credential = self._credentials.get(credential_handle, engine_provider(provider))
         except CredentialStoreError:
             return self._result(ConfigurationTestStatus.CREDENTIAL_INVALID, "CREDENTIAL_INVALID")
+        if provider == "openai_chatgpt" and self._oauth_service is not None:
+            try:
+                credential = await self._oauth_service.refresh_if_expired(credential_handle)
+            except OAuthError:
+                return self._result(ConfigurationTestStatus.CREDENTIAL_INVALID, "CREDENTIAL_REJECTED")
         expected_kind = "API_KEY" if provider == "anthropic" else "OAUTH"
         if credential.kind != expected_kind:
             return self._result(ConfigurationTestStatus.CREDENTIAL_INVALID, "CREDENTIAL_KIND_MISMATCH")
@@ -97,16 +105,6 @@ class ConfigurationTestService:
                     return self._result(ConfigurationTestStatus.PROVIDER_UNAVAILABLE, "PROVIDER_ERROR")
                 if not 200 <= response.status_code < 300:
                     return self._result(ConfigurationTestStatus.CONFIGURATION_INVALID, "PROVIDER_REQUEST_REJECTED")
-                body = await self._read_bounded(response)
-                if body is None:
-                    return self._result(ConfigurationTestStatus.PROVIDER_UNAVAILABLE, "PROVIDER_RESPONSE_TOO_LARGE")
-                payload = json.loads(body)
-            if payload.get("has_more"):
-                return self._result(ConfigurationTestStatus.PROVIDER_UNAVAILABLE, "MODEL_LIST_INCOMPLETE")
-            models = payload.get("data", [])
-            available = {item.get("id") for item in models if isinstance(item, dict)}
-            if model not in available:
-                return self._result(ConfigurationTestStatus.MODEL_UNAVAILABLE, "MODEL_UNAVAILABLE")
             return self._result(ConfigurationTestStatus.SUCCESS, "CONFIGURATION_VALID")
         except httpx.TimeoutException:
             return self._result(ConfigurationTestStatus.TIMEOUT, "PROVIDER_TIMEOUT")
