@@ -52,6 +52,7 @@ class ToolOperation:
     retry_count: int
     raw_payload: bytes
     started_at: float
+    tool_name: str | None = None
 
 
 def state_root() -> Path:
@@ -150,7 +151,53 @@ def required_configuration() -> dict[str, str]:
         "minimum_lease_seconds": env(
             "DEVLOG_MCP_MINIMUM_LEASE_SECONDS", str(DEFAULT_MINIMUM_LEASE_SECONDS)
         ),
+        "core_base_url": env("DEVLOG_BACKEND_BASE_URL", "http://localhost:18080"),
+        "project_slug": env("DEVLOG_MCP_PROJECT_SLUG", ""),
     }
+
+
+class ToolEventPusher:
+    """Best-effort HTTP push of tool-call events to the Core backend."""
+
+    def __init__(self, base_url: str, project_slug: str, instance_id: str, token_getter: Any) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._project_slug = project_slug
+        self._instance_id = instance_id
+        self._token_getter = token_getter
+
+    def push(self, fields: dict[str, Any]) -> None:
+        if not self._project_slug:
+            return
+        body_data: dict[str, Any] = {
+            **fields,
+            "instanceId": self._instance_id,
+            "projectSlug": self._project_slug,
+            "occurredAt": datetime.now(timezone.utc).isoformat(),
+        }
+        body = json.dumps(body_data).encode("utf-8")
+        threading.Thread(target=self._post, args=(body,), daemon=True).start()
+
+    def _post(self, body: bytes) -> None:
+        try:
+            token = self._token_getter()
+            url = f"{self._base_url}/api/v1/mcp/tool-events"
+            request = urllib.request.Request(
+                url,
+                data=body,
+                method="POST",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token}",
+                },
+            )
+            with urllib.request.urlopen(request, timeout=5):
+                pass
+        except Exception:
+            try:
+                sys.stderr.write("MCP_COMPANION_PUSH_FAILED\n")
+                sys.stderr.flush()
+            except Exception:
+                pass
 
 
 class TokenLease:
@@ -283,6 +330,12 @@ class RuntimeSession:
         self.initialize_id: str | None = None
         self.suppress_initialize_response = False
         self.generation = 0
+        self.pusher = ToolEventPusher(
+            base_url=configuration.get("core_base_url", "http://localhost:18080"),
+            project_slug=configuration.get("project_slug", ""),
+            instance_id=getattr(writer, "instance_id", ""),
+            token_getter=lambda: self.lease.token,
+        )
 
     def _new_operation_id(self) -> str:
         operation_id = secrets.token_hex(16)
@@ -306,11 +359,14 @@ class RuntimeSession:
             "generation": generation,
             "status": status,
         }
+        if operation.tool_name is not None:
+            fields["toolName"] = operation.tool_name
         if reason_code is not None:
             fields["reasonCode"] = reason_code
         duration_ms = max(0, int((time.monotonic() - operation.started_at) * 1000))
         if event_type != "MCP_TOOL_STARTED":
             fields["durationMs"] = duration_ms
+        push_fields = dict(fields)
         with self.tool_event_lock:
             try:
                 severity = "ERROR" if status == TOOL_FAILED else "WARN" if status == TOOL_INTERRUPTED else "INFO"
@@ -322,6 +378,7 @@ class RuntimeSession:
                     sys.stderr.flush()
                 except Exception:
                     pass
+        self.pusher.push(push_fields)
 
     def _finish_operation_locked(
         self,
@@ -669,6 +726,13 @@ class RuntimeSession:
             self.initialized_raw = raw
         if identifier is not None:
             started_operation: ToolOperation | None = None
+            tool_name: str | None = None
+            if isinstance(message, dict) and message.get("method") == "tools/call":
+                params = message.get("params")
+                if isinstance(params, dict):
+                    raw_name = params.get("name")
+                    if isinstance(raw_name, str) and raw_name:
+                        tool_name = raw_name[:128]
             with self.lock:
                 if self.stop_requested.is_set() and retry_operation_id is None:
                     raise RuntimeError("MCP_INSTANCE_STOPPING")
@@ -690,6 +754,7 @@ class RuntimeSession:
                         retry_count=0,
                         raw_payload=raw,
                         started_at=time.monotonic(),
+                        tool_name=tool_name,
                     )
                     self.outstanding[identifier] = operation
                     self.operations[operation.operation_id] = operation

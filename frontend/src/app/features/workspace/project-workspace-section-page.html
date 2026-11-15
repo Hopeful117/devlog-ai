@@ -24,6 +24,7 @@
             ><button type="button" disabled>Roadmap</button>
           </div>
           <app-project-analyses-section [projectId]="view.project.id" />
+          <app-mcp-tool-activity-section [projectId]="view.project.id" />
         }
         @case ('knowledge') {
           <header class="page-header">
