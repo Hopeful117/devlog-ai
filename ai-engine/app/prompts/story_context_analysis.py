@@ -296,7 +296,22 @@ class StoryContextAnalysisPromptBuilder:
         if not isinstance(investigation, dict) or investigation.get("initialized") is not True:
             raise PromptConstructionError("Investigation protocol is not explicitly initialized")
         try:
-            initialized = InvestigationInitialization.model_validate(investigation)
+            # Core keeps mutable usage, action, and ledger state beside the
+            # immutable initialization contract. Validate only the contract
+            # fields here; the extra state remains available to the protocol
+            # prompt below.
+            initialized = InvestigationInitialization.model_validate({
+                "protocolVersion": investigation.get("protocolVersion"),
+                "executionId": investigation.get("executionId"),
+                "parentTaskId": investigation.get("parentTaskId"),
+                "scope": {
+                    key: investigation.get("scope", {}).get(key)
+                    for key in ("projectSlug", "revision", "allowedPathPrefixes")
+                    if key in investigation.get("scope", {})
+                },
+                "budget": investigation.get("budget"),
+                "initialized": investigation.get("initialized"),
+            })
         except Exception as error:
             raise PromptConstructionError(f"Investigation initialization is invalid: {error}") from error
         if initialized.parent_task_id != request.ai_task_id:

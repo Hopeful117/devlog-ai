@@ -165,7 +165,10 @@ class CoreCallbackClient:
                 mode="json", by_alias=True, exclude_none=True
             )
         except Exception as error:
-            raise CoreCallbackError("Core investigation action returned an invalid v2 response") from error
+            raise CoreCallbackError(
+                "Core investigation action returned an invalid v2 response: "
+                f"{error}"
+            ) from error
 
     def _is_transient_not_ready(self, response: httpx.Response) -> bool:
         if response.status_code != 409:
