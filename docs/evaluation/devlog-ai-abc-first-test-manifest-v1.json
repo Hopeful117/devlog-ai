@@ -1,0 +1,113 @@
+{
+  "manifestId": "devlog-ai-abc-first-test",
+  "version": "1.1.0",
+  "status": "PROPOSED_DO_NOT_EXECUTE",
+  "benchmarkId": "devlog-ai-abc",
+  "benchmarkVersion": "1.0.0",
+  "caseId": "Q1",
+  "caseVersion": "1.0.0",
+  "repositoryId": "git:github.com/Hopeful117/devlog-ai",
+  "repositoryRevision": "60fae3e0e1104d0ffbe3832c1f578ed532b1268a",
+  "sourceSnapshot": {
+    "repositoryId": "git:github.com/Hopeful117/devlog-ai",
+    "revision": "60fae3e0e1104d0ffbe3832c1f578ed532b1268a",
+    "readMode": "pinned_git_object"
+  },
+  "runtimeIdentities": {
+    "A": {
+      "runtime": "java-core-story-context-one-shot",
+      "entrypoint": "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java",
+      "promptVersion": "story-context-agent-protocol/v1",
+      "answerContract": "story-context-analysis-result-v1"
+    },
+    "B": {
+      "runtime": "comparative-v4-direct-investigator",
+      "entrypoint": "ai-engine/evaluations/comparative_baseline_v4/runtime.py",
+      "configuration": "docs/evaluation/devlog-ai-q1-b-direct-config-v1.json",
+      "promptVersion": "comparative-v4-common-answer-1.0.0",
+      "answerContract": "comparative-v4-common-answer-1.0.0"
+    },
+    "C": {
+      "runtime": "python-core-bounded-investigation",
+      "entrypoint": "ai-engine/app/services/story_context_analysis_generation_service.py",
+      "promptVersion": "story-context-agent-protocol/v2",
+      "answerContract": "story-context-analysis-result-v1"
+    }
+  },
+  "harnessIdentity": {
+    "identityVersion": "devlog-ai-q1-harness-identity-v1",
+    "paths": [
+      "ai-engine/evaluations/devlog_ai_abc_runner",
+      "ai-engine/evaluations/devlog_ai_abc_normalization",
+      "ai-engine/tests/test_devlog_ai_abc_runner.py",
+      "ai-engine/tests/test_devlog_ai_abc_preflight.py",
+      "ai-engine/tests/test_devlog_ai_abc_live_preflight.py",
+      "docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json",
+      "docs/evaluation/devlog-ai-q1-b-direct-config-v1.json",
+      "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/StoryContextCoreIntegrationTest.java"
+    ]
+  },
+  "experimentType": "END_TO_END_SYSTEM_COMPARISON",
+  "controlledContextValueComparison": "DEFERRED",
+  "conditions": ["A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST"],
+  "repetitions": 1,
+  "observations": [
+    {"observationId": "Q1-A-DEVLOG-CURRENT-r1", "condition": "A_DEVLOG_CURRENT", "repetition": 1, "status": "PREPARED_NOT_EXECUTED"},
+    {"observationId": "Q1-B-DIRECT-INVESTIGATOR-r1", "condition": "B_DIRECT_INVESTIGATOR", "repetition": 1, "status": "PREPARED_NOT_EXECUTED"},
+    {"observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1", "condition": "C_DEVLOG_ENGINEERING_ANALYST", "repetition": 1, "status": "PREPARED_NOT_EXECUTED"}
+  ],
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "promptVersions": {
+    "A": "story-context-agent-protocol/v1",
+    "B": "comparative-v4-common-answer-1.0.0",
+    "C": "story-context-agent-protocol/v2"
+  },
+  "answerContracts": {
+    "A": "story-context-analysis-result-v1",
+    "B": "comparative-v4-common-answer-1.0.0",
+    "C": "story-context-analysis-result-v1"
+  },
+  "evaluationNormalization": {
+    "status": "READY_PROVIDER_FREE",
+    "contract": "devlog-abc-claim-evidence-normalization-v1",
+    "scope": "evaluation_only",
+    "mustPreserve": ["claim text", "evidence references", "uncertainty", "technical status", "raw answer identity"]
+  },
+  "q1Readiness": {
+    "capabilityStatus": "Q1_CAPABILITIES_BLOCKED_ASYMMETRY_ACCEPTED",
+    "answerStatus": "Q1_ANSWERS_EVALUABLE",
+    "oracleStatus": "Q1_ORACLE_PENDING_HUMAN_REVIEW",
+    "runnerStatus": "Q1_RUNNER_DRY_RUN_READY",
+    "liveStatus": "Q1_LIVE_NOT_AUTHORIZED",
+    "capabilityReport": "docs/evaluation/devlog-ai-q1-capability-equivalence-report-v1.md",
+    "executionRunbook": "docs/evaluation/devlog-ai-q1-asymmetric-pilot-runbook-v1.md"
+  },
+  "toolEnvelope": {
+    "parityMode": "END_TO_END_SYSTEM_COMPARISON",
+    "BAllowedOperations": ["read_file", "search_repository", "git_log", "git_show", "git_diff", "inspect_commit"],
+    "CAllowedActions": ["SEARCH_EVIDENCE", "READ_EVIDENCE_RANGE", "GET_HISTORY", "GET_DECISIONS", "GET_INSIGHTS", "GET_EVENTS"],
+    "capabilityDifferencePolicy": "record_actual_capabilities_do_not_equalize",
+    "commonSubsetNormalization": "evaluation_only_not_execution_constraint"
+  },
+  "technicalBudgets": {
+    "maxModelTurns": 8,
+    "maxProviderCalls": 8,
+    "maxToolOrActionOperations": 8,
+    "maxReadBytesPerOperation": 64000,
+    "maxReadTokensPerOperation": 8000,
+    "maxWallClockSeconds": 120,
+    "maxOutputTokensPerResponse": 32768
+  },
+  "stopConditions": ["FINAL_ANSWER", "BUDGET_EXHAUSTED", "PROVIDER_INCOMPLETE", "PROVIDER_TIMEOUT", "TOOL_OR_ACTION_FAILURE", "REVISION_MISMATCH", "GROUNDING_FAILURE"],
+  "metrics": ["technicalStatus", "semanticEligibility", "weightedQuality", "requiredClaimRecall", "unsupportedClaimRate", "evidenceSupportRate", "toolOrActionCount", "inputOutputTokens", "latencyMs", "cost"],
+  "technicalSuccess": ["all identities match", "repository revision is pinned", "a valid terminal answer or explicit technical failure is classified", "RAW and derived artifacts replay without provider calls", "no oracle material enters treatment input", "the evaluation-only output normalization adapter passes deterministic contract tests", "the actual capability envelope and technical completion status are recorded per observation"],
+  "humanEvaluation": {
+    "blind": true,
+    "evaluateNativeAndNormalizedArtifacts": true,
+    "displayProjectionForAAndC": "evaluation-only exact structured text projection",
+    "narrativeQualityComparable": false
+  },
+  "humanAuthorizationRequired": ["oracle approval", "provider call authorization", "confirmation that Q1 is appropriate as first case", "approval of asymmetric end-to-end comparison", "approval of the execution runner and artifact destinations"],
+  "cost": "NOT_CALCULATED_UNTIL_PROVIDER_AND_PRICING_ARE_AUTHORIZED"
+}

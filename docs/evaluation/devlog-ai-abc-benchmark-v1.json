@@ -1,0 +1,75 @@
+{
+  "benchmarkId": "devlog-ai-abc",
+  "version": "1.0.0",
+  "status": "PROPOSED_HUMAN_REVIEW",
+  "repositoryId": "git:github.com/Hopeful117/devlog-ai",
+  "repositoryRevision": "60fae3e0e1104d0ffbe3832c1f578ed532b1268a",
+  "sourceRevisionBasis": "local checkout HEAD equals origin/story/0184-bounded-story-context-investigation",
+  "oracleFile": "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json",
+  "questionPolicy": "The question wording is preserved from the strategic benchmark specification.",
+  "conditions": ["A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST"],
+  "questions": [
+    {
+      "caseId": "Q1",
+      "version": "1.0.0",
+      "category": "ARCHITECTURE",
+      "question": "How does a Story Context request move from Core authorization to the final persisted analysis, and which side owns each invariant?"
+    },
+    {
+      "caseId": "Q2",
+      "version": "1.0.0",
+      "category": "CODE_BEHAVIOR",
+      "question": "When an investigation action is repeated, what happens to repository reads and budget usage?"
+    },
+    {
+      "caseId": "Q3",
+      "version": "1.0.0",
+      "category": "HISTORICAL_DECISION",
+      "question": "Why does the current design keep Core authoritative and Python repository-blind?"
+    },
+    {
+      "caseId": "Q4",
+      "version": "1.0.0",
+      "category": "IMPACT_ANALYSIS",
+      "question": "If READ_EVIDENCE_RANGE limits or evidence projection change, which validation, grounding, and tests are affected?"
+    },
+    {
+      "caseId": "Q5",
+      "version": "1.0.0",
+      "category": "CODE_DOCUMENT_INCONSISTENCY",
+      "question": "Which claims in older Story 0184 repository artifacts no longer describe the current branch, and why?"
+    },
+    {
+      "caseId": "Q6",
+      "version": "1.0.0",
+      "category": "SEQUENTIAL_INVESTIGATION",
+      "question": "What evidence is needed to decide whether a weak answer came from candidate loss, projection loss, or synthesis failure?"
+    },
+    {
+      "caseId": "Q7",
+      "version": "1.0.0",
+      "category": "INSUFFICIENT_EVIDENCE",
+      "question": "Does the current repository prove that the bounded analyst improves real engineering answer quality?"
+    },
+    {
+      "caseId": "Q8",
+      "version": "1.0.0",
+      "category": "CONTRADICTIONS_AND_HISTORY",
+      "question": "Do the 0177 fixture result and V4 live result justify production hybrid retrieval or direct-agent adoption?"
+    }
+  ],
+  "scoring": {
+    "technicalAccuracy": 30,
+    "evidenceTraceability": 25,
+    "analysisDepth": 20,
+    "engineerUsefulness": 20,
+    "uncertaintyHandling": 5
+  },
+  "executionPolicy": {
+    "providerCalls": "FORBIDDEN_DURING_PREPARATION",
+    "oracleLeakage": "FORBIDDEN",
+    "unevaluatedAnswers": "NOT_EVALUATED_NOT_INCORRECT",
+    "repetitions": 3,
+    "humanRaters": 2
+  }
+}
