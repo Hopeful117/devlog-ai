@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID> {
@@ -38,4 +39,66 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
             @Param("schemaVersion") String schemaVersion,
             @Param("occurredAt") Instant occurredAt,
             @Param("receivedAt") Instant receivedAt);
+
+    @Query(value = """
+            WITH terminals AS (
+                SELECT DISTINCT ON (instance_id, operation_id)
+                    instance_id,
+                    operation_id,
+                    status,
+                    occurred_at   AS completed_at,
+                    duration_ms,
+                    reason_code,
+                    tool_name     AS terminal_tool_name
+                FROM mcp_tool_events
+                WHERE project_id = :projectId
+                  AND event_type IN ('MCP_TOOL_RESPONDED', 'MCP_TOOL_FAILED', 'MCP_TOOL_INTERRUPTED')
+                ORDER BY instance_id, operation_id, occurred_at DESC, event_type ASC
+            ),
+            starts AS (
+                SELECT instance_id, operation_id, tool_name, occurred_at AS started_at, generation
+                FROM mcp_tool_events
+                WHERE project_id = :projectId
+                  AND event_type = 'MCP_TOOL_STARTED'
+            )
+            SELECT
+                COALESCE(s.instance_id,          t.instance_id)        AS instance_id,
+                COALESCE(s.operation_id,         t.operation_id)       AS operation_id,
+                COALESCE(s.tool_name,            t.terminal_tool_name) AS tool_name,
+                COALESCE(t.status,               'ACTIVE')             AS status,
+                COALESCE(s.generation,           0)                    AS generation,
+                s.started_at,
+                t.completed_at,
+                t.duration_ms,
+                t.reason_code
+            FROM starts s
+            FULL OUTER JOIN terminals t
+                ON s.instance_id = t.instance_id AND s.operation_id = t.operation_id
+            ORDER BY s.started_at DESC NULLS LAST,
+                     COALESCE(s.operation_id, t.operation_id) ASC
+            LIMIT :size OFFSET :offset
+            """, nativeQuery = true)
+    List<McpOperationProjection> findOperationsByProject(
+            @Param("projectId") UUID projectId,
+            @Param("offset") int offset,
+            @Param("size") int size);
+
+    @Query(value = """
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT instance_id, operation_id FROM mcp_tool_events WHERE project_id = :projectId
+            ) sub
+            """, nativeQuery = true)
+    long countOperationsByProject(@Param("projectId") UUID projectId);
+
+    interface McpOperationProjection {
+        String getInstanceId();
+        String getOperationId();
+        String getToolName();
+        String getStatus();
+        Integer getGeneration();
+        Instant getStartedAt();
+        Instant getCompletedAt();
+        Integer getDurationMs();
+        String getReasonCode();
+    }
 }

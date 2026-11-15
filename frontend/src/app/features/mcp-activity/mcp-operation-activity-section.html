@@ -1,0 +1,45 @@
+@if (operations$ | async; as view) {
+  <section class="mcp-activity-section panel">
+    <h2 class="section-title">MCP Tool Activity</h2>
+    @if (view.state === 'loading') {
+      <p role="status" class="mcp-activity-status">Loading activity…</p>
+    } @else if (view.state === 'error') {
+      <p role="alert" class="inline-message inline-message--error">
+        MCP tool activity could not be loaded.
+      </p>
+    } @else if (!view.operations.length) {
+      <div class="empty-state">
+        <p>No MCP tool calls recorded yet.</p>
+        <p class="hint">
+          Start Claude Code or OpenCode with DevLog MCP configured and
+          <code>DEVLOG_MCP_PROJECT_SLUG</code> set.
+        </p>
+      </div>
+    } @else {
+      <ul class="mcp-event-list">
+        @for (op of view.operations; track op.operationId) {
+          <li class="mcp-event-item">
+            <span
+              class="mcp-event-status"
+              [class]="statusClass(op)"
+              [attr.aria-label]="isStale(op) ? 'status: STALE' : 'status: ' + op.status"
+            >
+              {{ statusLabel(op) }}
+            </span>
+            <span class="mcp-event-tool">{{ op.toolName ?? 'unknown tool' }}</span>
+            @if (isStale(op)) {
+              <span class="mcp-event-stale">stale</span>
+            } @else if (op.durationMs !== null) {
+              <span class="mcp-event-duration">{{ op.durationMs }}ms</span>
+            }
+            @if (displayTime(op); as t) {
+              <time class="mcp-event-time" [dateTime]="t">
+                {{ t | date: 'HH:mm:ss' }}
+              </time>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+}

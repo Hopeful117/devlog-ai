@@ -8,7 +8,7 @@ import { ProjectContextInputsSection } from '../project-context-inputs/project-c
 import { InsightService } from '../insights/insight.service';
 import { ProjectService } from '../projects/project.service';
 import { ProjectSourcesSection } from '../projects/project-sources-section';
-import { McpToolActivitySection } from '../mcp-activity/mcp-tool-activity-section';
+import { McpOperationActivitySection } from '../mcp-activity/mcp-operation-activity-section';
 
 type WorkspaceSection = 'activity' | 'knowledge' | 'documentation' | 'settings';
 
@@ -22,7 +22,7 @@ type WorkspaceSection = 'activity' | 'knowledge' | 'documentation' | 'settings';
     ProjectDeliverablesSection,
     ProjectContextInputsSection,
     ProjectSourcesSection,
-    McpToolActivitySection,
+    McpOperationActivitySection,
   ],
   templateUrl: './project-workspace-section-page.html',
   styleUrl: './project-workspace-section-page.scss',
