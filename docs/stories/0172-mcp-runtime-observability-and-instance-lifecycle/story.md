@@ -2,10 +2,20 @@
 
 ## Statut
 
-IMPLEMENTED - AWAITING HUMAN REVIEW.
+**ACCEPTED**
+
+Human accepted on 2026-11-15. Implementation integrated on `main` at commit
+`51b563c`. Regression tests for F-01 (JSON-RPC collision) and F-02 (concurrent
+renewal block) confirmed passing (33/33). One known limitation accepted: when an
+authentication failure occurs while two or more MCP operations are outstanding,
+Keycloak token renewal is refused; the failing operation ends as
+`FAILED/MCP_REAUTH_REQUIRED`, remaining active operations are interrupted as
+`INTERRUPTED/MCP_INSTANCE_STOPPING`, and all reservations are cleaned up. This
+conservative behavior is accepted for the current scope and may be revisited in
+the context of the Claude Code / DevLog Companion integration.
 
 The Story and Implementation Plan were explicitly approved by the human project
-owner. Human acceptance of the implementation remains pending.
+owner.
 
 ## Contexte
 
