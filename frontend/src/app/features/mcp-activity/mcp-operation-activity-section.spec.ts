@@ -125,10 +125,7 @@ describe('McpOperationActivitySection', () => {
   });
 });
 
-function operation(
-  status: McpOperation['status'],
-  startedAt: string | null,
-): McpOperation {
+function operation(status: McpOperation['status'], startedAt: string | null): McpOperation {
   return {
     instanceId: 'inst-1',
     operationId: 'op-1',
