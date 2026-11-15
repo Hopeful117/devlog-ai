@@ -227,13 +227,14 @@ The digest is SHA-256 of canonical JSON for the Q1 oracle object with only
 separators. This avoids an authorial hash cycle. The digest field itself is not
 included in the bytes it authenticates.
 
-- Decision: `PENDING`
+- Decision: `ACCEPTED`
 - Proposed decision: `CORRECTION_PROPOSED`
-- Reviewer: `<not recorded>`
-- Date: `<not recorded>`
+- Accepted decision: `ACCEPTED`
+- Reviewer: `Hopeful117`
+- Date: `2026-11-15T14:51:33+01:00`
 - Repository revision: `60fae3e0e1104d0ffbe3832c1f578ed532b1268a`
 - Final oracle digest: `464fcd1b50b785e78ddd76e0b4eea3e65ac6a85fb124b31cea9c355951fcc457`
-- Reservations: `<not recorded>`
-- Authorization status: `Q1_ORACLE_READY_FOR_HUMAN_APPROVAL; Q1_LIVE_NOT_AUTHORIZED`
+- Reservations: Contradiction handling rule not modified; existing rules preserved for this pilot without additional specification.
+- Authorization status: `Q1_ORACLE_ACCEPTED; Q1_LIVE_NOT_AUTHORIZED`
 
-No provider call may occur while the decision is `PENDING`.
+Provider calls remain unauthorized; `Q1_LIVE_NOT_AUTHORIZED` is unchanged by this oracle acceptance.

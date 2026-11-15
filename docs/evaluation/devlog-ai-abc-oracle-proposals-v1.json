@@ -8,7 +8,7 @@
     {
       "caseId": "Q1",
       "version": "1.1.0",
-      "status": "CORRECTION_PROPOSED",
+      "status": "ACCEPTED",
       "question": "How does a Story Context request move from Core authorization to the final persisted analysis, and which side owns each invariant?",
       "requiredClaims": [
         {
@@ -72,7 +72,7 @@
         "formatNeutrality": ["Do not reward length, narrative prose, structured output shape, citation count, or any treatment-specific field by itself.", "Score explicit claims and evidence after normalization; treat absence of a native answerText as a format difference, not an automatic penalty.", "A technical failure is not a semantic failure and is excluded from semantic scoring."]
       },
       "canonicalDigestRule": "SHA-256 of canonical JSON for this Q1 oracle object with canonicalDigest omitted, using UTF-8, sorted keys, and compact separators.",
-      "canonicalDigest": "464fcd1b50b785e78ddd76e0b4eea3e65ac6a85fb124b31cea9c355951fcc457"
+      "canonicalDigest": "2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e"
     },
     {
       "caseId": "Q2",
