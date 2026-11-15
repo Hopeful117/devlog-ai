@@ -2,7 +2,7 @@
 
 ## Status
 
-`Q1_LIVE_TECHNICALLY_BLOCKED - Q1_LIVE_NOT_AUTHORIZED`
+`Q1_LIVE_ADAPTERS_AVAILABLE - Q1_LIVE_PREFLIGHT_BLOCKED - Q1_LIVE_NOT_AUTHORIZED`
 
 This runbook prepares one observation for each of A, B, and C. It does not
 authorize a provider call, start a live run, or create an evaluation result.
@@ -43,8 +43,9 @@ outputs, bounded metadata, and normalized artifacts under one manifest. The
 integration simulation also runs the local Java Core A/C harness, but it is not
 a live adapter and does not use an external provider.
 
-The actual live entry points have been identified, but are not wired into this
-minimal runner:
+The actual production entry points remain separate from the provider-free
+runner. Controlled adapters reuse the same application boundaries for technical
+integration proof:
 
 - A: Java Core `AnalyzeStoryContextUseCase` and
   `StoryContextSubmissionService`, followed by the existing AI callback path.
@@ -52,12 +53,15 @@ minimal runner:
   adapter, connected by the Q1 B binding to the DevLog AI snapshot. Its frozen
   manifest remains historical and is not repointed.
 - C: Python `StoryContextAnalysisGenerationService` with Core-authorized
-  investigation callbacks.
+  investigation callbacks over loopback HTTP/HMAC in the integration harness.
 
-The live adapters are therefore `LIVE_ENTRYPOINT_IDENTIFIED`, while live
-execution remains `Q1_LIVE_TECHNICALLY_BLOCKED` and
-`Q1_LIVE_NOT_AUTHORIZED`. No provider transport is imported or constructed by
-the provider-free runner.
+- A and C are exercised by the real Java Core/Testcontainers harness; C also
+  launches the real Python service path. B uses the unchanged V4 runtime and
+  pinned Git tools. The static preflight reports only
+  `Q1_LIVE_ADAPTERS_AVAILABLE`; integration verification is reported by an
+  executed `INTEGRATION_SIMULATION` artifact, never by adapter construction.
+- External live execution remains `Q1_LIVE_NOT_AUTHORIZED`. No provider
+  transport is imported or constructed by the provider-free runner.
 
 ## Dry-Run Command
 
@@ -120,14 +124,14 @@ PYTHONPATH=ai-engine uv run --project ai-engine python -m evaluations.devlog_ai_
 ```
 
 The current result is expected to be `Q1_LIVE_PREFLIGHT_BLOCKED` with
-`Q1_LIVE_INTEGRATION_PARTIAL`, `Q1_LIVE_NOT_AUTHORIZED`, and zero provider and
-network calls. A fresh artifact target is checked but not created by the
-preflight. The preflight checks Git HEAD but does not detect a dirty worktree
-or untracked effective code; live execution must use a reviewed coherent
-revision, not this worktree.
+`Q1_LIVE_ADAPTERS_AVAILABLE`, `Q1_LIVE_NOT_AUTHORIZED`, and zero provider and
+network calls when the reviewed revision is clean. A fresh artifact target is
+checked but not created by the preflight. Source snapshot, runtime HEAD,
+harness identity, and effective worktree state are reported separately; live
+execution must use a reviewed coherent revision, not a dirty worktree.
 
-The preflight identifies the existing entry points but does not claim they are
-connected to the evaluation runner:
+The preflight identifies the existing entry points and reports their controlled
+integration status; it does not authorize external provider execution:
 
 - A: `AnalyzeStoryContextUseCase` -> `StoryContextSubmissionService` -> Core
   callback/persistence.
@@ -159,17 +163,25 @@ PYTHONPATH=ai-engine uv run --project ai-engine python -m evaluations.devlog_ai_
 Expected status: A/B/C integration `PASS`, `externalProviderCalls=0`,
 `externalNetworkCalls=0`, `semanticQualityEvaluated=false`, and `LIVE` remains
 closed with `LIVE_NOT_AUTHORIZED`. Overall readiness remains
-`Q1_LIVE_TECHNICALLY_BLOCKED`.
+`Q1_LIVE_PREFLIGHT_BLOCKED` until the reviewed revision, oracle, pricing,
+budget, and campaign authorization gates are satisfied.
 
 ## Live Authorization Boundary
 
 `LIVE` remains disabled by construction and fails with
 `LIVE_NOT_AUTHORIZED`. The future authorization validator requires a
 campaign-scoped document containing the exact manifest digest, accepted Q1
-oracle digest/status, three observation identities, frozen revision, provider,
-model, exact budgets/limits, and a future expiration timestamp. Credentials are
-never part of that document. Missing, expired, mismatched, or over-broad
-authorization fails closed.
+oracle digest/status, three observation identities and conditions, frozen
+revision, provider, model, exact budgets/limits, approved pricing version and
+digest, cost ceiling, approver identity, and a future expiration timestamp.
+Credentials are never part of that document. Missing, expired, mismatched, or
+over-broad authorization fails closed.
+
+Pricing is an explicit external contract. The repository contains no provider
+rates and therefore cannot calculate or approve a live cost ceiling. The
+`PricingTable` contract requires a version, SHA-256 digest, currency, and the
+applicable input/output rates before estimated or observed cost can be
+computed.
 
 No authorization document is generated by this mission. The current oracle
 decision remains `PENDING`.

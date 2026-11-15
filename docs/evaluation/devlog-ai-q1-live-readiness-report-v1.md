@@ -1,5 +1,42 @@
 # DevLog AI Q1 Live Readiness Report
 
+## Post-Commit Reconciliation Note
+
+This report was written at HEAD `60fae3e0e1104d0ffbe3832c1f578ed532b1268a` before the
+production corrections, harness, and documentation were committed. The sections below
+are preserved as originally written. The following has been subsequently verified in
+integration simulations and committed in the coherent Q1 revision (`7e41f0c` and later):
+
+- **Treatment A**: The Q1-A Python binding (`q1_a_binding.py`) exercises the full
+  Core-authorized + Python one-shot callback path. The Java Core Testcontainers harness
+  with `q1.core.fullPython=true` now records `Q1_A_FULL_CALLBACK_INTEGRATION_PASS`.
+  Simulation only — no live provider called.
+- **Treatment C**: Python `StoryContextAnalysisGenerationService._process_investigation`
+  is exercised end-to-end in the integration simulation. The C binding records two
+  `PYTHON_EVIDENCE_RECEIVED` events before `PYTHON_FINAL`; Core validates the callback
+  and persists a non-trusted analysis. Simulation only — no live provider called.
+- **Controlled adapters**: `live_adapters.py` now provides real controlled adapters
+  (`CONTROLLED_ADAPTER_AVAILABLE`) that delegate to the same integration paths used in
+  tests. The static preflight reports `Q1_LIVE_ADAPTERS_AVAILABLE`; this is a technical
+  integration milestone and is not a live execution authorization.
+- **Pricing contract**: `pricing.py` defines the explicit versioned contract required
+  before a live cost ceiling can be approved. No provider rates are bundled.
+- **Identity and revisions**: The worktree discrepancy is resolved; the coherent
+  production/harness set is committed. Provenance now reports source snapshot, runtime
+  HEAD, and harness hash separately. The source snapshot (`60fae3e0`) is preserved as
+  the Q1 historical reference.
+
+The blocking statuses remain unchanged:
+
+`Q1_LIVE_TECHNICALLY_BLOCKED` — `Q1_LIVE_NOT_AUTHORIZED` — `Q1_ORACLE_PENDING_HUMAN_REVIEW`
+
+Simulation success is not live readiness. Semantic quality of model responses remains
+unevaluated. Human oracle review, pricing approval, budget authorization, and explicit
+execution authorization have not been obtained.
+
+---
+
+
 ## Decision
 
 - Technical decision: `Q1_LIVE_TECHNICALLY_BLOCKED`
