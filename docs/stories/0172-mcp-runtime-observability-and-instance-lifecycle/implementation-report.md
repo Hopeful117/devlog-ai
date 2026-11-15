@@ -124,6 +124,30 @@ and cleanup ownership behavior.
 The Obsidian vault was not consulted. No vault action is proposed; the Story is
 fully grounded in repository, runtime and process evidence.
 
+### Post-Acceptance Addendum (2026-11-15)
+
+Human accepted on 2026-11-15. Regression tests added in worktree
+`claude/story-0172-tests-f01-f02-e20a92`:
+
+- **F-01** (`test_duplicate_request_ids_are_rejected_while_in_flight` —
+  strengthened): verifies that a JSON-RPC collision is rejected with
+  `MCP_PROTOCOL_INVALID`, the in-flight operation is preserved with its
+  identity and `ACTIVE` state, no second `MCP_TOOL_STARTED` is emitted,
+  the subsequent response is processed normally, and exactly one terminal
+  event and correct cleanup follow.
+
+- **F-02** (`test_two_outstanding_operations_blocks_renewal_on_auth_failure` —
+  new): verifies that when an authentication failure arrives while two
+  operations are active, `renew_if_needed` refuses renewal, the first
+  operation ends as `FAILED/MCP_REAUTH_REQUIRED`, the second is
+  interrupted as `INTERRUPTED/MCP_INSTANCE_STOPPING`, no additional
+  `MCP_TOOL_STARTED` events are emitted, and all reservations are released.
+
+Full suite result: **33 passed, 0 failures**. `git diff --check` clean.
+
+Known limitation accepted: concurrent-renewal block when multiple MCP operations
+are outstanding (see story.md § Statut).
+
 ### Readiness
 
-READY_FOR_HUMAN_REVIEW
+ACCEPTED

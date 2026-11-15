@@ -200,24 +200,64 @@ class RuntimeTests(unittest.TestCase):
 
     def test_duplicate_request_ids_are_rejected_while_in_flight(self) -> None:
         class Writer:
-            def write(self, *args, **kwargs):
-                pass
+            def __init__(self):
+                self.events = []
+
+            def write(self, event, **fields):
+                self.events.append((event, fields))
 
         class Child:
             stdin = io.BytesIO()
 
         with tempfile.TemporaryDirectory() as directory:
+            writer = Writer()
             session = runtime.RuntimeSession(
                 {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
                 Path(directory),
-                Writer(),
+                writer,
                 runtime.TokenLease("token", time.time() + 3600),
             )
             session.child = Child()
             raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n'
             session.forward(raw, json.loads(raw))
+
+            # Capture the in-flight operation before the collision attempt
+            operation = next(iter(session.operations.values()))
+            operation_id = operation.operation_id
+
+            # Collision: second forward with the same in-flight ID must be rejected
             with self.assertRaisesRegex(RuntimeError, "MCP_PROTOCOL_INVALID"):
                 session.forward(raw, json.loads(raw))
+
+            # Initial operation must still be alive and unchanged
+            self.assertIn(operation_id, session.operations)
+            self.assertIs(session.operations[operation_id], operation)
+            self.assertEqual(operation.state, runtime.TOOL_ACTIVE)
+
+            # JSON-RPC reservation must remain intact
+            jsonrpc_key = json.dumps(1, sort_keys=True)
+            self.assertIn(jsonrpc_key, session.outstanding)
+            self.assertIs(session.outstanding[jsonrpc_key], operation)
+
+            # No second MCP_TOOL_STARTED must have been emitted
+            started = [e for e in writer.events if e[0] == "MCP_TOOL_STARTED"]
+            self.assertEqual(len(started), 1)
+            self.assertEqual(started[0][1]["operationId"], operation_id)
+
+            # Subsequent response must be processed normally
+            session.observe_response({"jsonrpc": "2.0", "id": 1, "result": {}})
+
+            # Exactly one terminal event and it carries the original operationId
+            terminal = [
+                e for e in writer.events
+                if e[0] in {"MCP_TOOL_RESPONDED", "MCP_TOOL_FAILED", "MCP_TOOL_INTERRUPTED"}
+            ]
+            self.assertEqual(len(terminal), 1)
+            self.assertEqual(terminal[0][0], "MCP_TOOL_RESPONDED")
+            self.assertEqual(terminal[0][1]["operationId"], operation_id)
+
+        # Final cleanup: operation and reservation are both released
+        self.assertEqual(session.operations, {})
 
     def test_tool_operation_emits_started_and_responded_with_stable_identity(self) -> None:
         class Writer:
@@ -996,3 +1036,76 @@ class RuntimeTests(unittest.TestCase):
         start_time = runtime.process_start_time(runtime.os.getpid())
 
         self.assertTrue(start_time)
+
+    def test_two_outstanding_operations_blocks_renewal_on_auth_failure(self) -> None:
+        """renew_if_needed refuses when >1 outstanding; op1 → FAILED/MCP_REAUTH_REQUIRED,
+        stop_child then interrupts op2 → INTERRUPTED/MCP_INSTANCE_STOPPING."""
+
+        class Writer:
+            def __init__(self):
+                self.events = []
+
+            def write(self, event, **fields):
+                self.events.append((event, fields))
+
+        class Child:
+            def __init__(self):
+                self.stdin = io.BytesIO()
+
+            def poll(self):
+                return None
+
+            def terminate(self):
+                pass
+
+            def wait(self, timeout=None):
+                return 0
+
+        with tempfile.TemporaryDirectory() as directory:
+            writer = Writer()
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory),
+                writer,
+                runtime.TokenLease("token", time.time() + 3600),
+            )
+            session.child = Child()
+
+            # Establish two simultaneous active operations
+            raw1 = b'{"jsonrpc":"2.0","id":1,"method":"tools/call"}\n'
+            raw2 = b'{"jsonrpc":"2.0","id":2,"method":"tools/call"}\n'
+            session.forward(raw1, json.loads(raw1))
+            session.forward(raw2, json.loads(raw2))
+
+            key1 = json.dumps(1, sort_keys=True)
+            op1_id = session.outstanding[key1].operation_id
+
+            # Authentication failure arrives for op1
+            auth_failure = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "error": {"code": -32600, "message": "Authentication is required"},
+            }
+            result = session.retry_authentication(auth_failure)
+
+        # renew_if_needed rejects because two ops are outstanding → returns False
+        self.assertFalse(result)
+        self.assertTrue(session.stop_requested.is_set())
+
+        # Op1 must have terminated as FAILED/MCP_REAUTH_REQUIRED (not yet stopping when finished)
+        failed = [e for e in writer.events if e[0] == "MCP_TOOL_FAILED"]
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(failed[0][1]["operationId"], op1_id)
+        self.assertEqual(failed[0][1]["reasonCode"], "MCP_REAUTH_REQUIRED")
+
+        # stop_child must have interrupted op2 as INTERRUPTED/MCP_INSTANCE_STOPPING
+        interrupted = [e for e in writer.events if e[0] == "MCP_TOOL_INTERRUPTED"]
+        self.assertEqual(len(interrupted), 1)
+        self.assertEqual(interrupted[0][1]["reasonCode"], "MCP_INSTANCE_STOPPING")
+
+        # Exactly two STARTED events (one per original forward call), no extra ones
+        started = [e for e in writer.events if e[0] == "MCP_TOOL_STARTED"]
+        self.assertEqual(len(started), 2)
+
+        # All operations and reservations must be released
+        self.assertEqual(session.operations, {})
