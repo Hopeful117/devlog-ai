@@ -8,8 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class McpToolEventServiceTest {
@@ -23,7 +22,8 @@ class McpToolEventServiceTest {
 
         service.ingest(project, ingestRequest("inst-1", "op-1", "MCP_TOOL_RESPONDED"));
 
-        verify(repo).save(any(McpToolEvent.class));
+        verify(repo).insertIfAbsent(any(), any(), eq("inst-1"), eq("op-1"),
+                any(), any(), any(), anyInt(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -35,7 +35,8 @@ class McpToolEventServiceTest {
 
         service.ingest(project(), ingestRequest("inst-1", "op-1", "MCP_TOOL_RESPONDED"));
 
-        verify(repo, never()).save(any());
+        verify(repo, never()).insertIfAbsent(any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -50,7 +51,8 @@ class McpToolEventServiceTest {
 
         service.ingest(project(), request);
 
-        verify(repo).save(any(McpToolEvent.class));
+        verify(repo).insertIfAbsent(any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -65,7 +67,8 @@ class McpToolEventServiceTest {
 
         service.ingest(project(), request);
 
-        verify(repo).save(any(McpToolEvent.class));
+        verify(repo).insertIfAbsent(any(), any(), any(), any(),
+                any(), any(), any(), anyInt(), any(), any(), any(), any(), any());
     }
 
     @Test

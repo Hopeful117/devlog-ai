@@ -1,9 +1,7 @@
 package com.hopeful117.devlogai.mcptoolobservability;
 
 import com.hopeful117.devlogai.project.entity.Project;
-import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -29,25 +27,22 @@ public class McpToolEventService {
         } catch (Exception ignored) {
             occurredAt = Instant.now();
         }
-        McpToolEvent event = McpToolEvent.builder()
-                .project(project)
-                .instanceId(request.instanceId())
-                .operationId(request.operationId())
-                .toolName(request.toolName())
-                .eventType(request.eventType())
-                .status(request.status())
-                .generation(request.generation() != null ? request.generation() : 0)
-                .durationMs(request.durationMs())
-                .reasonCode(request.reasonCode())
-                .schemaVersion(request.schemaVersion())
-                .occurredAt(occurredAt)
-                .receivedAt(Instant.now())
-                .build();
-        try {
-            repository.save(event);
-        } catch (DataIntegrityViolationException ignored) {
-            // concurrent identical push; UNIQUE constraint enforces idempotency
-        }
+        // ON CONFLICT DO NOTHING makes this idempotent for concurrent duplicate pushes without
+        // relying on Hibernate's deferred flush, which would throw outside any try/catch.
+        repository.insertIfAbsent(
+                UUID.randomUUID(),
+                project.getId(),
+                request.instanceId(),
+                request.operationId(),
+                request.toolName(),
+                request.eventType(),
+                request.status(),
+                request.generation() != null ? request.generation() : 0,
+                request.durationMs(),
+                request.reasonCode(),
+                request.schemaVersion(),
+                occurredAt,
+                Instant.now());
     }
 
     @Transactional(readOnly = true)
