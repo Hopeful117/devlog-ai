@@ -12,7 +12,10 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Component;
 
 import java.security.Principal;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Adapts an already-authenticated request principal. It deliberately does not
@@ -21,7 +24,7 @@ import java.util.Optional;
 @Component
 public class RequestAuthenticatedPrincipalResolver implements AuthenticatedPrincipalResolver {
     private final String issuer;
-    private final String mcpActorClientId;
+    private final Set<String> mcpActorClientIds;
     private final String mcpAgentPrincipalId;
     private final String delegationAudience;
     private final McpDelegationGrantService delegationService;
@@ -56,7 +59,7 @@ public class RequestAuthenticatedPrincipalResolver implements AuthenticatedPrinc
             String delegationAudience,
             McpDelegationGrantService delegationService, boolean ignored) {
         this.issuer = issuer == null ? "" : issuer.trim();
-        this.mcpActorClientId = mcpActorClientId == null ? "" : mcpActorClientId.trim();
+        this.mcpActorClientIds = parseClientIds(mcpActorClientId);
         this.mcpAgentPrincipalId = mcpAgentPrincipalId == null ? "" : mcpAgentPrincipalId.trim();
         this.delegationAudience = delegationAudience == null ? "" : delegationAudience.trim();
         this.delegationService = delegationService;
@@ -109,10 +112,10 @@ public class RequestAuthenticatedPrincipalResolver implements AuthenticatedPrinc
         String actorId = claim(jwt, "azp");
         if (actorId == null) actorId = claim(jwt, "client_id");
         boolean clientCredentials = "client_credentials".equals(normalizedGrantType(claim(jwt, "gty")));
-        if (clientCredentials && (mcpActorClientId.isBlank() || !mcpActorClientId.equals(actorId))) {
+        if (clientCredentials && (mcpActorClientIds.isEmpty() || !mcpActorClientIds.contains(actorId))) {
             return Optional.empty();
         }
-        if (actorId != null && actorId.equals(mcpActorClientId) && !mcpActorClientId.isBlank()) {
+        if (actorId != null && !mcpActorClientIds.isEmpty() && mcpActorClientIds.contains(actorId)) {
             String delegation = request.getHeader("X-DevLog-Delegation");
             if (delegation == null || delegation.isBlank()) {
                 if (mcpAgentPrincipalId.isBlank()) return Optional.empty();
@@ -133,6 +136,14 @@ public class RequestAuthenticatedPrincipalResolver implements AuthenticatedPrinc
             }
         }
         return Optional.of(new AuthenticatedPrincipal(jwt.getSubject(), PrincipalKind.HUMAN, issuer));
+    }
+
+    private static Set<String> parseClientIds(String csv) {
+        if (csv == null || csv.isBlank()) return Set.of();
+        return Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private String claim(Jwt jwt, String name) {
