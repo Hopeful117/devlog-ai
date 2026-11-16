@@ -8,6 +8,7 @@
     </div>
   } @else {
     <section class="workspace-page">
+      <app-activity-incident-indicator [projectId]="view.project.id" />
       @switch (section) {
         @case ('activity') {
           <header class="page-header">
