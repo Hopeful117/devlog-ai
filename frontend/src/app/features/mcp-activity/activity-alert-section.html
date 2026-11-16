@@ -20,7 +20,8 @@
               [class.alert-severity--error]="alert.severity === 'ERROR'"
               [class.alert-severity--warn]="alert.severity === 'WARN'"
               [title]="alert.severity"
-            >{{ alert.severity }}</span>
+              >{{ alert.severity }}</span
+            >
             <span class="alert-tool">{{ toolLabel(alert) }}</span>
             <span class="alert-reason">{{ reasonLabel(alert) }}</span>
             @if (alert.durationMs !== null) {

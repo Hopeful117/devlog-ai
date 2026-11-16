@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { ActivityAlert } from './activity-alert.models';
 import { ActivityAlertSection } from './activity-alert-section';
 import { ActivityAlertService } from './activity-alert.service';
@@ -46,7 +46,9 @@ describe('ActivityAlertSection', () => {
 
   it('toolLabel returns toolName when present', () => {
     setup();
-    expect(component.toolLabel(alert({ toolName: 'devlog_get_story_context' }))).toBe('devlog_get_story_context');
+    expect(component.toolLabel(alert({ toolName: 'devlog_get_story_context' }))).toBe(
+      'devlog_get_story_context',
+    );
   });
 
   it('toolLabel returns "unknown tool" when toolName is null', () => {
@@ -56,22 +58,30 @@ describe('ActivityAlertSection', () => {
 
   it('reasonLabel returns reasonCode when present', () => {
     setup();
-    expect(component.reasonLabel(alert({ reasonCode: 'MCP_REAUTH_REQUIRED' }))).toBe('MCP_REAUTH_REQUIRED');
+    expect(component.reasonLabel(alert({ reasonCode: 'MCP_REAUTH_REQUIRED' }))).toBe(
+      'MCP_REAUTH_REQUIRED',
+    );
   });
 
   it('reasonLabel returns "operation failed" for FAILED with null reasonCode', () => {
     setup();
-    expect(component.reasonLabel(alert({ eventType: 'MCP_TOOL_FAILED', reasonCode: null }))).toBe('operation failed');
+    expect(component.reasonLabel(alert({ eventType: 'MCP_TOOL_FAILED', reasonCode: null }))).toBe(
+      'operation failed',
+    );
   });
 
   it('reasonLabel returns "operation interrupted" for INTERRUPTED with null reasonCode', () => {
     setup();
-    expect(component.reasonLabel(alert({ eventType: 'MCP_TOOL_INTERRUPTED', reasonCode: null }))).toBe('operation interrupted');
+    expect(
+      component.reasonLabel(alert({ eventType: 'MCP_TOOL_INTERRUPTED', reasonCode: null })),
+    ).toBe('operation interrupted');
   });
 
   it('shortSession returns first 8 chars of agentSessionId', () => {
     setup();
-    expect(component.shortSession(alert({ agentSessionId: 'cc7d159d-a138-4b73-b14e-1e7279d013ab' }))).toBe('cc7d159d');
+    expect(
+      component.shortSession(alert({ agentSessionId: 'cc7d159d-a138-4b73-b14e-1e7279d013ab' })),
+    ).toBe('cc7d159d');
   });
 
   it('shortSession returns null when agentSessionId is null', () => {
