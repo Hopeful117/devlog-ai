@@ -11,5 +11,6 @@ public record AgentSessionView(
         long respondedCount,
         long failedCount,
         long interruptedCount,
-        long activeOperationCount
+        long activeOperationCount,
+        String lifecycleStatus
 ) {}

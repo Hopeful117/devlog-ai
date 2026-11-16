@@ -76,10 +76,6 @@ export class AgentSessionActivitySection implements OnInit, OnDestroy {
     return session.agentSessionId.slice(0, 8);
   }
 
-  isActive(session: AgentSession): boolean {
-    return session.activeOperationCount > 0;
-  }
-
   openDetail(session: AgentSession): void {
     const sessionId = session.agentSessionId;
     if (this.detailState.state !== 'closed' && this.detailState.sessionId === sessionId) {
