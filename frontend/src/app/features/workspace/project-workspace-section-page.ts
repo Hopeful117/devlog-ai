@@ -10,6 +10,7 @@ import { ProjectService } from '../projects/project.service';
 import { ProjectSourcesSection } from '../projects/project-sources-section';
 import { McpOperationActivitySection } from '../mcp-activity/mcp-operation-activity-section';
 import { AgentSessionActivitySection } from '../mcp-activity/agent-session-activity-section';
+import { ActivityAlertSection } from '../mcp-activity/activity-alert-section';
 
 type WorkspaceSection = 'activity' | 'knowledge' | 'documentation' | 'settings';
 
@@ -25,6 +26,7 @@ type WorkspaceSection = 'activity' | 'knowledge' | 'documentation' | 'settings';
     ProjectSourcesSection,
     McpOperationActivitySection,
     AgentSessionActivitySection,
+    ActivityAlertSection,
   ],
   templateUrl: './project-workspace-section-page.html',
   styleUrl: './project-workspace-section-page.scss',
@@ -35,7 +37,7 @@ export class ProjectWorkspaceSectionPage {
   private readonly insightService = inject(InsightService);
 
   readonly section = this.route.snapshot.data['workspaceSection'] as WorkspaceSection;
-  activityView: 'operations' | 'sessions' = 'operations';
+  activityView: 'operations' | 'sessions' | 'alerts' = 'operations';
   readonly project$ = this.route.parent!.paramMap.pipe(
     map((params) => params.get('id') ?? ''),
     switchMap((identifier) =>

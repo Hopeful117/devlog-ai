@@ -40,13 +40,23 @@
               [attr.aria-selected]="activityView === 'sessions'"
               (click)="activityView = 'sessions'"
             >
-              Sessions
+              Sessions</button
+            ><button
+              role="tab"
+              type="button"
+              [class.active]="activityView === 'alerts'"
+              [attr.aria-selected]="activityView === 'alerts'"
+              (click)="activityView = 'alerts'"
+            >
+              Alerts
             </button>
           </div>
           @if (activityView === 'operations') {
             <app-mcp-operation-activity-section [projectId]="view.project.id" />
-          } @else {
+          } @else if (activityView === 'sessions') {
             <app-agent-session-activity-section [projectId]="view.project.id" />
+          } @else {
+            <app-activity-alert-section [projectId]="view.project.id" />
           }
         }
         @case ('knowledge') {
