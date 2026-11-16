@@ -1,6 +1,16 @@
 import { AsyncPipe, DatePipe } from '@angular/common';
 import { Component, inject, Input, OnDestroy, OnInit } from '@angular/core';
-import { BehaviorSubject, catchError, map, Observable, of, Subject, switchMap, takeUntil, timer } from 'rxjs';
+import {
+  BehaviorSubject,
+  catchError,
+  map,
+  Observable,
+  of,
+  Subject,
+  switchMap,
+  takeUntil,
+  timer,
+} from 'rxjs';
 import { APP_ENVIRONMENT } from '../../core/config/app-environment';
 import { AgentSession } from './agent-session.models';
 import { AgentSessionService } from './agent-session.service';
@@ -102,7 +112,11 @@ export class AgentSessionActivitySection implements OnInit, OnDestroy {
         if (result.operations === null) {
           this.detailState = { state: 'error', sessionId: result.sessionId };
         } else {
-          this.detailState = { state: 'loaded', sessionId: result.sessionId, operations: result.operations };
+          this.detailState = {
+            state: 'loaded',
+            sessionId: result.sessionId,
+            operations: result.operations,
+          };
         }
       });
   }

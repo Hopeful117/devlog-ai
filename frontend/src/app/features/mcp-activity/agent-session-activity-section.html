@@ -43,7 +43,10 @@
               @if (isActive(session)) {
                 <span
                   class="session-active"
-                  [title]="session.activeOperationCount + ' operation(s) without observed terminal event — session lifecycle unknown'"
+                  [title]="
+                    session.activeOperationCount +
+                    ' operation(s) without observed terminal event — session lifecycle unknown'
+                  "
                   >{{ session.activeOperationCount }} pending</span
                 >
               } @else {
