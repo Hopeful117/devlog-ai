@@ -35,9 +35,9 @@ export class ProjectWorkspaceLayout implements OnDestroy {
       if (view.state !== 'loaded') return of({ errorCount: 0 });
       return timer(0, this.intervalMs).pipe(
         switchMap(() =>
-          this.alertService.countByProject(view.project.id).pipe(
-            catchError(() => of({ errorCount: 0 })),
-          ),
+          this.alertService
+            .countByProject(view.project.id)
+            .pipe(catchError(() => of({ errorCount: 0 }))),
         ),
         takeUntil(this.destroyed$),
       );
