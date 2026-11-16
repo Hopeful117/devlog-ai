@@ -15,5 +15,7 @@ public record McpToolEventIngestRequest(
         @NotBlank @Size(max = 64)  String schemaVersion,
         Integer durationMs,
         @Size(max = 64)            String reasonCode,
-        String occurredAt
+        String occurredAt,
+        @Size(max = 128) String agentSessionId,
+        @Size(max = 128) String agentProvider
 ) {}

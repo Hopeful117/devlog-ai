@@ -78,6 +78,15 @@ export class McpOperationActivitySection implements OnDestroy {
     return op.completedAt ?? op.startedAt;
   }
 
+  providerBadge(op: McpOperation): string {
+    const p = op.agentProvider;
+    if (!p) return '?';
+    if (p.startsWith('claude-code')) return 'CC';
+    if (p.startsWith('opencode')) return 'OC';
+    if (p.startsWith('claude-desktop')) return 'CD';
+    return '?';
+  }
+
   ngOnDestroy(): void {
     this.destroyed$.next();
     this.destroyed$.complete();

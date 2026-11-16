@@ -23,7 +23,7 @@ class McpToolEventServiceTest {
         service.ingest(project, ingestRequest("inst-1", "op-1", "MCP_TOOL_RESPONDED"));
 
         verify(repo).insertIfAbsent(any(), any(), eq("inst-1"), eq("op-1"),
-                any(), any(), any(), anyInt(), any(), any(), any(), any(), any());
+                any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -36,7 +36,7 @@ class McpToolEventServiceTest {
         service.ingest(project(), ingestRequest("inst-1", "op-1", "MCP_TOOL_RESPONDED"));
 
         verify(repo, never()).insertIfAbsent(any(), any(), any(), any(),
-                any(), any(), any(), anyInt(), any(), any(), any(), any(), any());
+                any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -47,12 +47,12 @@ class McpToolEventServiceTest {
         McpToolEventIngestRequest request = new McpToolEventIngestRequest(
                 "devlog-ai", "inst-1", "op-1", "get_engineering_context",
                 "MCP_TOOL_RESPONDED", "RESPONDED", 1, "mcp-tool-observability-v1",
-                150, null, "not-a-timestamp");
+                150, null, "not-a-timestamp", null, null);
 
         service.ingest(project(), request);
 
         verify(repo).insertIfAbsent(any(), any(), any(), any(),
-                any(), any(), any(), anyInt(), any(), any(), any(), any(), any());
+                any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -63,12 +63,12 @@ class McpToolEventServiceTest {
         McpToolEventIngestRequest request = new McpToolEventIngestRequest(
                 "devlog-ai", "inst-1", "op-1", null,
                 "MCP_TOOL_STARTED", "ACTIVE", 1, "mcp-tool-observability-v1",
-                null, null, null);
+                null, null, null, null, null);
 
         service.ingest(project(), request);
 
         verify(repo).insertIfAbsent(any(), any(), any(), any(),
-                any(), any(), any(), anyInt(), any(), any(), any(), any(), any());
+                any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -132,6 +132,6 @@ class McpToolEventServiceTest {
         return new McpToolEventIngestRequest(
                 "devlog-ai", instanceId, operationId, "get_engineering_context",
                 eventType, "RESPONDED", 1, "mcp-tool-observability-v1",
-                100, null, "2026-01-01T12:00:00Z");
+                100, null, "2026-01-01T12:00:00Z", null, null);
     }
 }

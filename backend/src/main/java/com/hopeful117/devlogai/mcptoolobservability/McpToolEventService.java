@@ -42,7 +42,9 @@ public class McpToolEventService {
                 request.reasonCode(),
                 request.schemaVersion(),
                 occurredAt,
-                Instant.now());
+                Instant.now(),
+                request.agentSessionId(),
+                request.agentProvider());
     }
 
     @Transactional(readOnly = true)

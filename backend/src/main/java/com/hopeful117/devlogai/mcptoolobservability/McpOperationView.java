@@ -11,5 +11,7 @@ public record McpOperationView(
         Instant startedAt,
         Instant completedAt,
         Integer durationMs,
-        String reasonCode
+        String reasonCode,
+        String agentSessionId,
+        String agentProvider
 ) {}

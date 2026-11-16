@@ -17,7 +17,7 @@
       </div>
     } @else {
       <ul class="mcp-event-list">
-        @for (op of view.operations; track op.operationId) {
+        @for (op of view.operations; track op.instanceId + '/' + op.operationId) {
           <li class="mcp-event-item">
             <span
               class="mcp-event-status"
@@ -26,6 +26,15 @@
             >
               {{ statusLabel(op) }}
             </span>
+            <span
+              class="mcp-event-provider"
+              [class]="'provider--' + providerBadge(op).toLowerCase()"
+              [title]="
+                op.agentSessionId ??
+                'Provider unknown — upgrade your MCP runtime to capture agent identity'
+              "
+              >{{ providerBadge(op) }}</span
+            >
             <span class="mcp-event-tool">{{ op.toolName ?? 'unknown tool' }}</span>
             @if (isStale(op)) {
               <span class="mcp-event-stale">stale</span>

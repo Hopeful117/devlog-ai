@@ -214,14 +214,82 @@ class McpOperationPostgresIntegrationTest {
             UUID projectId, String instanceId, String operationId, String toolName,
             String eventType, String status, int generation,
             Integer durationMs, String reasonCode, Instant occurredAt, Instant receivedAt) {
+        insertEventWithAgent(projectId, instanceId, operationId, toolName,
+                eventType, status, generation, durationMs, reasonCode,
+                occurredAt, receivedAt, null, null);
+    }
+
+    private void insertEventWithAgent(
+            UUID projectId, String instanceId, String operationId, String toolName,
+            String eventType, String status, int generation,
+            Integer durationMs, String reasonCode,
+            Instant occurredAt, Instant receivedAt,
+            String agentSessionId, String agentProvider) {
         jdbc.update("""
                 INSERT INTO mcp_tool_events
                     (id, project_id, instance_id, operation_id, tool_name, event_type, status,
-                     generation, duration_ms, reason_code, schema_version, occurred_at, received_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'mcp-tool-observability-v1', ?, ?)
+                     generation, duration_ms, reason_code, schema_version, occurred_at, received_at,
+                     agent_session_id, agent_provider)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'mcp-tool-observability-v1', ?, ?, ?, ?)
                 """,
                 UUID.randomUUID(), projectId, instanceId, operationId, toolName,
                 eventType, status, generation, durationMs, reasonCode,
-                Timestamp.from(occurredAt), Timestamp.from(receivedAt));
+                Timestamp.from(occurredAt), Timestamp.from(receivedAt),
+                agentSessionId, agentProvider);
+    }
+
+    @Test
+    void sessionIdentityPropagatedFromStartedEvent() {
+        UUID projectId = insertProject();
+        String inst = "inst-" + projectId;
+        Instant started = Instant.parse("2026-01-01T12:00:00Z");
+        Instant completed = Instant.parse("2026-01-01T12:00:01Z");
+        String sessionId = "cc7d159d-a138-4b73-b14e-1e7279d013ab";
+        String provider = "claude-code_2-1-325_agent";
+        insertEventWithAgent(projectId, inst, "op-1", "get_engineering_context",
+                "MCP_TOOL_STARTED", "ACTIVE", 1, null, null, started, Instant.now(),
+                sessionId, provider);
+        insertEventWithAgent(projectId, inst, "op-1", null,
+                "MCP_TOOL_RESPONDED", "RESPONDED", 1, 500, null, completed, Instant.now(),
+                sessionId, provider);
+
+        McpOperationPageResponse result = service.listByProject(projectId, 0, 20);
+
+        McpOperationView op = result.content().getFirst();
+        assertThat(op.agentSessionId()).isEqualTo(sessionId);
+        assertThat(op.agentProvider()).isEqualTo(provider);
+    }
+
+    @Test
+    void sessionIdentityNullWhenAbsent() {
+        UUID projectId = insertProject();
+        String inst = "inst-" + projectId;
+        Instant started = Instant.parse("2026-01-01T12:00:00Z");
+        insertEvent(projectId, inst, "op-1", "search_project_history",
+                "MCP_TOOL_STARTED", "ACTIVE", 1, null, null, started);
+
+        McpOperationPageResponse result = service.listByProject(projectId, 0, 20);
+
+        McpOperationView op = result.content().getFirst();
+        assertThat(op.agentSessionId()).isNull();
+        assertThat(op.agentProvider()).isNull();
+    }
+
+    @Test
+    void sessionIdentityFallsBackToTerminalWhenStartedAbsent() {
+        UUID projectId = insertProject();
+        String inst = "inst-" + projectId;
+        Instant completed = Instant.parse("2026-01-01T12:00:01Z");
+        String sessionId = "aa11bb22-ccdd-eeff-0011-223344556677";
+        String provider = "claude-code_2-1-325_agent";
+        insertEventWithAgent(projectId, inst, "op-1", "get_engineering_context",
+                "MCP_TOOL_RESPONDED", "RESPONDED", 1, 300, null, completed, Instant.now(),
+                sessionId, provider);
+
+        McpOperationPageResponse result = service.listByProject(projectId, 0, 20);
+
+        McpOperationView op = result.content().getFirst();
+        assertThat(op.agentSessionId()).isEqualTo(sessionId);
+        assertThat(op.agentProvider()).isEqualTo(provider);
     }
 }

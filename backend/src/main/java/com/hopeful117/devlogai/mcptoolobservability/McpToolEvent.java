@@ -53,4 +53,10 @@ public class McpToolEvent {
 
     @Column(nullable = false)
     private Instant receivedAt;
+
+    @Column(length = 128)
+    private String agentSessionId;
+
+    @Column(length = 128)
+    private String agentProvider;
 }
