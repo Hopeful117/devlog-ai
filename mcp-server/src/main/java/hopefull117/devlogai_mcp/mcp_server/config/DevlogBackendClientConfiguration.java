@@ -2,6 +2,7 @@ package hopefull117.devlogai_mcp.mcp_server.config;
 
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogResourceClient;
+import hopefull117.devlogai_mcp.mcp_server.companion.DevlogCompanionClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +29,13 @@ public class DevlogBackendClientConfiguration {
             @Value("${devlog.backend.base-url}") String baseUrl
     ) {
         return buildClient(baseUrl, DevlogResourceClient.class);
+    }
+
+    @Bean
+    DevlogCompanionClient devlogCompanionClient(
+            @Value("${devlog.backend.base-url}") String baseUrl
+    ) {
+        return buildClient(baseUrl, DevlogCompanionClient.class);
     }
 
     private <T> T buildClient(String baseUrl, Class<T> clientType) {

@@ -23,6 +23,13 @@ public interface DevlogProjectContextClient {
     @GetExchange("/projects/{projectSlug}/context")
     ProjectContext getProjectContext(@PathVariable String projectSlug);
 
+    @GetExchange("/projects/{projectSlug}/context")
+    ProjectContext getProjectContextAuthenticated(
+            @PathVariable String projectSlug,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation
+    );
+
     @GetExchange("/projects/{projectSlug}/engineering-context")
     EngineeringContext getEngineeringContext(
             @PathVariable String projectSlug,
