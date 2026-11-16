@@ -105,6 +105,19 @@ nav a.active span {
 .workspace-content {
   min-width: 0;
 }
+.nav-badge {
+  margin-left: auto;
+  padding: 0.1rem 0.42rem;
+  border-radius: 0.6rem;
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+.nav-badge--error {
+  background: rgb(239 68 68 / 0.18);
+  color: #f87171;
+}
 @media (max-width: 52rem) {
   .workspace {
     grid-template-columns: 1fr;

@@ -85,6 +85,46 @@ class ActivityAlertControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void countByProjectReturns200() throws Exception {
+        UUID projectId = UUID.randomUUID();
+        ActivityAlertService service = mock(ActivityAlertService.class);
+        when(service.countErrors(eq(projectId))).thenReturn(new ActivityAlertCountResponse(5L));
+        CoreProjectAuthorizationService authService = mock(CoreProjectAuthorizationService.class);
+        when(authService.isAuthorized(any(AuthenticatedPrincipal.class), eq(projectId), any()))
+                .thenReturn(true);
+        MockMvc mvc = mockMvc(new ActivityAlertController(
+                r -> Optional.of(humanPrincipal()), authService, service));
+
+        mvc.perform(get("/api/v1/projects/{id}/activity-alerts/count", projectId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.errorCount").value(5));
+    }
+
+    @Test
+    void countByProjectReturns401WhenNoPrincipal() throws Exception {
+        MockMvc mvc = mockMvc(new ActivityAlertController(
+                r -> Optional.empty(),
+                mock(CoreProjectAuthorizationService.class),
+                mock(ActivityAlertService.class)));
+
+        mvc.perform(get("/api/v1/projects/{id}/activity-alerts/count", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void countByProjectReturns404WhenNotAuthorized() throws Exception {
+        UUID projectId = UUID.randomUUID();
+        CoreProjectAuthorizationService authService = mock(CoreProjectAuthorizationService.class);
+        when(authService.isAuthorized(any(), eq(projectId), any())).thenReturn(false);
+        MockMvc mvc = mockMvc(new ActivityAlertController(
+                r -> Optional.of(humanPrincipal()), authService,
+                mock(ActivityAlertService.class)));
+
+        mvc.perform(get("/api/v1/projects/{id}/activity-alerts/count", projectId))
+                .andExpect(status().isNotFound());
+    }
+
     private static AuthenticatedPrincipal humanPrincipal() {
         return new AuthenticatedPrincipal("ludo", PrincipalKind.HUMAN, "keycloak");
     }

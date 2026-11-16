@@ -97,6 +97,28 @@ class ActivityAlertServiceTest {
         assertThat(result.content()).isEmpty();
     }
 
+    @Test
+    void countErrorsReturnsOnlyErrorAlerts() {
+        McpToolEventRepository repo = mock(McpToolEventRepository.class);
+        when(repo.countErrorAlertsByProjectInWindow(any(), any())).thenReturn(3L);
+        ActivityAlertService service = new ActivityAlertService(repo);
+
+        ActivityAlertCountResponse result = service.countErrors(UUID.randomUUID());
+
+        assertThat(result.errorCount()).isEqualTo(3);
+    }
+
+    @Test
+    void countErrorsReturnsZeroWhenNoErrors() {
+        McpToolEventRepository repo = mock(McpToolEventRepository.class);
+        when(repo.countErrorAlertsByProjectInWindow(any(), any())).thenReturn(0L);
+        ActivityAlertService service = new ActivityAlertService(repo);
+
+        ActivityAlertCountResponse result = service.countErrors(UUID.randomUUID());
+
+        assertThat(result.errorCount()).isEqualTo(0);
+    }
+
     private static McpToolEventRepository.ActivityAlertProjection projection(
             String instanceId, String operationId, String status, String reasonCode) {
         return new McpToolEventRepository.ActivityAlertProjection() {

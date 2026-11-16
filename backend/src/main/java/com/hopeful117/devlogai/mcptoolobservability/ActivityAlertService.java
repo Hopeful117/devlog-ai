@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,6 +27,13 @@ public class ActivityAlertService {
                 total,
                 clampedPage,
                 clampedSize);
+    }
+
+    @Transactional(readOnly = true)
+    public ActivityAlertCountResponse countErrors(UUID projectId) {
+        Instant windowStart = Instant.now().minus(1440, ChronoUnit.MINUTES);
+        long count = repository.countErrorAlertsByProjectInWindow(projectId, windowStart);
+        return new ActivityAlertCountResponse(count);
     }
 
     static ActivityAlertView toView(McpToolEventRepository.ActivityAlertProjection p) {

@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../core/config/app-environment';
-import { ActivityAlertPage } from './activity-alert.models';
+import { ActivityAlertCount, ActivityAlertPage } from './activity-alert.models';
 
 @Injectable({ providedIn: 'root' })
 export class ActivityAlertService {
@@ -12,6 +12,12 @@ export class ActivityAlertService {
   byProject(projectId: string, page = 0, size = 20): Observable<ActivityAlertPage> {
     return this.http.get<ActivityAlertPage>(
       `${this.base}/projects/${encodeURIComponent(projectId)}/activity-alerts?page=${page}&size=${size}`,
+    );
+  }
+
+  countByProject(projectId: string): Observable<ActivityAlertCount> {
+    return this.http.get<ActivityAlertCount>(
+      `${this.base}/projects/${encodeURIComponent(projectId)}/activity-alerts/count`,
     );
   }
 }
