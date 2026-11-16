@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -95,6 +96,22 @@ class ActivityAlertServiceTest {
 
         assertThat(result.totalAlerts()).isEqualTo(0);
         assertThat(result.content()).isEmpty();
+    }
+
+    @Test
+    void countErrorsUsesExactly60MinuteWindow() {
+        McpToolEventRepository repo = mock(McpToolEventRepository.class);
+        when(repo.countErrorAlertsByProjectInWindow(any(), any())).thenReturn(0L);
+        ActivityAlertService service = new ActivityAlertService(repo);
+        Instant before = Instant.now().minusSeconds(60 * 60 + 2);
+
+        service.countErrors(UUID.randomUUID());
+
+        ArgumentCaptor<Instant> windowCaptor = ArgumentCaptor.forClass(Instant.class);
+        verify(repo).countErrorAlertsByProjectInWindow(any(), windowCaptor.capture());
+        Instant windowStart = windowCaptor.getValue();
+        assertThat(windowStart).isAfter(before);
+        assertThat(windowStart).isBefore(Instant.now().minusSeconds(60 * 60 - 2));
     }
 
     @Test

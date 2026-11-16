@@ -31,7 +31,7 @@ public class ActivityAlertService {
 
     @Transactional(readOnly = true)
     public ActivityAlertCountResponse countErrors(UUID projectId) {
-        Instant windowStart = Instant.now().minus(1440, ChronoUnit.MINUTES);
+        Instant windowStart = Instant.now().minus(60, ChronoUnit.MINUTES);
         long count = repository.countErrorAlertsByProjectInWindow(projectId, windowStart);
         return new ActivityAlertCountResponse(count);
     }
