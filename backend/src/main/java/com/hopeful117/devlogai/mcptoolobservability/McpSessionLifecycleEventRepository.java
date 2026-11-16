@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 public interface McpSessionLifecycleEventRepository
@@ -28,13 +30,13 @@ public interface McpSessionLifecycleEventRepository
             @Param("agentProvider")  String agentProvider);
 
     @Query(value = """
-            SELECT COUNT(*) > 0
+            SELECT DISTINCT agent_session_id
             FROM mcp_session_lifecycle_events
             WHERE project_id      = :projectId
-              AND agent_session_id = :agentSessionId
+              AND agent_session_id IN :sessionIds
               AND event_type       = 'SESSION_LIFECYCLE_ENDED'
             """, nativeQuery = true)
-    boolean hasEndedEvent(
-            @Param("projectId")      UUID projectId,
-            @Param("agentSessionId") String agentSessionId);
+    List<String> findEndedSessionIds(
+            @Param("projectId")  UUID projectId,
+            @Param("sessionIds") Collection<String> sessionIds);
 }

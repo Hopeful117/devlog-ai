@@ -43,7 +43,7 @@
               @if (session.lifecycleStatus === 'ENDED') {
                 <span
                   class="session-lifecycle session-lifecycle--ended"
-                  title="Session ended — observed terminal signal"
+                  title="MCP runtime disconnected — session end inferred"
                   >ended</span
                 >
               } @else if (session.lifecycleStatus === 'ACTIVE_TOOL') {

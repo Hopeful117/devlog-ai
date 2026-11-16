@@ -213,9 +213,9 @@ class ToolEventPusher:
             except Exception:
                 pass
 
-    def push_session_lifecycle_event(self, event_type: str) -> None:
+    def push_session_lifecycle_event(self, event_type: str) -> threading.Thread | None:
         if not self._project_slug or not self._agent_session_id:
-            return
+            return None
         body_data: dict[str, Any] = {
             "projectSlug": self._project_slug,
             "agentSessionId": self._agent_session_id,
@@ -225,7 +225,9 @@ class ToolEventPusher:
         if self._agent_provider:
             body_data["agentProvider"] = self._agent_provider
         body = json.dumps(body_data).encode("utf-8")
-        threading.Thread(target=self._post_session_event, args=(body,), daemon=True).start()
+        t = threading.Thread(target=self._post_session_event, args=(body,), daemon=True)
+        t.start()
+        return t
 
     def _post_session_event(self, body: bytes) -> None:
         try:
@@ -856,8 +858,10 @@ class RuntimeSession:
                 chunk = sys.stdin.buffer.read1(65536)
                 if not chunk:
                     self.stop_requested.set()
-                    self.pusher.push_session_lifecycle_event("SESSION_LIFECYCLE_ENDED")
+                    push_thread = self.pusher.push_session_lifecycle_event("SESSION_LIFECYCLE_ENDED")
                     self.stop_child("STDIN_CLOSED")
+                    if push_thread is not None:
+                        push_thread.join(timeout=6)
                     return
                 buffer += chunk
                 while b"\n" in buffer:

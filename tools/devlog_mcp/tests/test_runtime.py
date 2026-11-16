@@ -1193,3 +1193,85 @@ class RuntimeTests(unittest.TestCase):
             _time.sleep(0.05)
 
         self.assertEqual(called, [])
+
+    def test_push_session_lifecycle_event_returns_joinable_thread(self) -> None:
+        import time as _time
+        completed: list[bool] = []
+
+        def fake_post(body: bytes) -> None:
+            _time.sleep(0.01)
+            completed.append(True)
+
+        pusher = runtime.ToolEventPusher(
+            base_url="http://localhost:18080",
+            project_slug="devlog-ai",
+            instance_id="inst-1",
+            token_getter=lambda: "token",
+            agent_session_id="session-1",
+            agent_provider="claude-code",
+        )
+        with patch.object(pusher, "_post_session_event", side_effect=fake_post):
+            t = pusher.push_session_lifecycle_event("SESSION_LIFECYCLE_ENDED")
+
+        self.assertIsNotNone(t)
+        t.join(timeout=2)
+        self.assertEqual(completed, [True])
+
+    def test_relay_stdin_joins_lifecycle_push_before_returning(self) -> None:
+        import io as _io
+        import os as _os
+        completed: list[bool] = []
+
+        class Writer:
+            def write(self, *args, **kwargs) -> None:
+                pass
+
+        class Child:
+            def __init__(self):
+                self.stdin = _io.BytesIO()
+
+            def poll(self):
+                return None
+
+            def terminate(self):
+                pass
+
+            def wait(self, timeout=None):
+                return 0
+
+        read_fd, write_fd = _os.pipe()
+        original_stdin = runtime.sys.stdin
+        runtime.sys.stdin = _io.TextIOWrapper(_os.fdopen(read_fd, "rb"), encoding="utf-8")
+
+        import time as _time
+
+        def slow_post(body: bytes) -> None:
+            _time.sleep(0.05)
+            completed.append(True)
+
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {
+                    "renewal_margin_seconds": "30",
+                    "renewal_cooldown_seconds": "10",
+                    "project_slug": "devlog-ai",
+                    "agent_session_id": "session-relay-test",
+                    "agent_provider": "claude-code",
+                },
+                Path(directory),
+                Writer(),
+                runtime.TokenLease("token", _time.time() + 3600),
+            )
+            session.child = Child()
+            with patch.object(session.pusher, "_post_session_event", side_effect=slow_post):
+                thread = threading.Thread(target=session.relay_stdin)
+                thread.start()
+                try:
+                    _os.close(write_fd)
+                    thread.join(timeout=2)
+                finally:
+                    runtime.sys.stdin.close()
+                    runtime.sys.stdin = original_stdin
+
+        self.assertEqual(completed, [True], "lifecycle event push must complete before relay_stdin returns")
+

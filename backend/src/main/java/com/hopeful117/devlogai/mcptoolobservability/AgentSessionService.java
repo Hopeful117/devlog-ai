@@ -6,7 +6,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -25,9 +27,13 @@ public class AgentSessionService {
         long total = repository.countSessionsByProject(projectId);
         List<McpToolEventRepository.AgentSessionProjection> rows =
                 repository.findSessionsByProject(projectId, clampedPage * clampedSize, clampedSize);
+        Set<String> endedIds = rows.isEmpty() ? Set.of() :
+                new HashSet<>(lifecycleRepository.findEndedSessionIds(
+                        projectId,
+                        rows.stream().map(McpToolEventRepository.AgentSessionProjection::getAgentSessionId).toList()));
         Instant now = Instant.now();
         return new AgentSessionPageResponse(
-                rows.stream().map(r -> toView(r, projectId, now)).toList(),
+                rows.stream().map(r -> toView(r, endedIds, now)).toList(),
                 total,
                 clampedPage,
                 clampedSize);
@@ -50,8 +56,8 @@ public class AgentSessionService {
     }
 
     private AgentSessionView toView(McpToolEventRepository.AgentSessionProjection p,
-                                    UUID projectId, Instant now) {
-        boolean hasEnded = lifecycleRepository.hasEndedEvent(projectId, p.getAgentSessionId());
+                                    Set<String> endedIds, Instant now) {
+        boolean hasEnded = endedIds.contains(p.getAgentSessionId());
         String lifecycleStatus = computeLifecycleStatus(
                 hasEnded,
                 p.getActiveOperationCount(),
