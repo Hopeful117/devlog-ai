@@ -46,7 +46,10 @@ export class ActivityIncidentIndicator implements OnDestroy {
   );
 
   navigateToAlerts(): void {
-    void this.router.navigate([], { queryParams: { view: 'alerts' }, queryParamsHandling: 'merge' });
+    void this.router.navigate([], {
+      queryParams: { view: 'alerts' },
+      queryParamsHandling: 'merge',
+    });
   }
 
   ngOnDestroy(): void {
