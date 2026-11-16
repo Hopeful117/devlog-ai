@@ -1,0 +1,15 @@
+@if (summary$ | async; as summary) {
+  @if (summary.total > 0) {
+    <button
+      class="incident-indicator"
+      [class.incident-indicator--error]="summary.errorCount > 0"
+      [class.incident-indicator--warn]="summary.errorCount === 0 && summary.warnCount > 0"
+      type="button"
+      (click)="navigateToAlerts()"
+      [attr.aria-label]="summary.total + ' incident' + (summary.total > 1 ? 's' : '') + ' in the last hour'"
+    >
+      <span class="incident-indicator__badge">{{ summary.total > 99 ? '99+' : summary.total }}</span>
+      <span class="incident-indicator__label">incidents</span>
+    </button>
+  }
+}

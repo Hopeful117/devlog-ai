@@ -291,4 +291,73 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
         String getAgentSessionId();
         String getAgentProvider();
     }
+
+    @Query(value = """
+            WITH recent_alerts AS (
+                SELECT DISTINCT ON (instance_id, operation_id)
+                    instance_id,
+                    operation_id,
+                    tool_name,
+                    status,
+                    reason_code,
+                    occurred_at
+                FROM mcp_tool_events
+                WHERE project_id = :projectId
+                  AND event_type IN ('MCP_TOOL_FAILED', 'MCP_TOOL_INTERRUPTED')
+                  AND (reason_code IS NULL OR reason_code != 'MCP_INSTANCE_STOPPING')
+                  AND occurred_at >= :windowStart
+                ORDER BY instance_id, operation_id, occurred_at DESC
+            ),
+            grouped AS (
+                SELECT
+                    tool_name,
+                    reason_code,
+                    COUNT(*)                                                                       AS occurrence_count,
+                    MIN(occurred_at)                                                               AS first_occurred_at,
+                    MAX(occurred_at)                                                               AS last_occurred_at,
+                    BOOL_OR(status = 'FAILED' OR reason_code = 'MCP_PROCESS_FAILED')              AS has_error,
+                    string_agg(instance_id || '/' || operation_id, ',' ORDER BY occurred_at DESC) AS recent_alert_ids_raw
+                FROM recent_alerts
+                GROUP BY tool_name, reason_code
+            )
+            SELECT *
+            FROM grouped
+            ORDER BY last_occurred_at DESC NULLS LAST, has_error DESC
+            LIMIT :size OFFSET :offset
+            """, nativeQuery = true)
+    List<ActivityIncidentProjection> findIncidentsByProject(
+            @Param("projectId") UUID projectId,
+            @Param("windowStart") Instant windowStart,
+            @Param("offset") int offset,
+            @Param("size") int size);
+
+    @Query(value = """
+            SELECT COUNT(*) FROM (
+                SELECT tool_name, reason_code
+                FROM (
+                    SELECT DISTINCT ON (instance_id, operation_id)
+                        tool_name, reason_code
+                    FROM mcp_tool_events
+                    WHERE project_id = :projectId
+                      AND event_type IN ('MCP_TOOL_FAILED', 'MCP_TOOL_INTERRUPTED')
+                      AND (reason_code IS NULL OR reason_code != 'MCP_INSTANCE_STOPPING')
+                      AND occurred_at >= :windowStart
+                    ORDER BY instance_id, operation_id, occurred_at DESC
+                ) deduped
+                GROUP BY tool_name, reason_code
+            ) sub
+            """, nativeQuery = true)
+    long countIncidentsByProject(
+            @Param("projectId") UUID projectId,
+            @Param("windowStart") Instant windowStart);
+
+    interface ActivityIncidentProjection {
+        String getToolName();
+        String getReasonCode();
+        long getOccurrenceCount();
+        Instant getFirstOccurredAt();
+        Instant getLastOccurredAt();
+        boolean isHasError();
+        String getRecentAlertIdsRaw();
+    }
 }
