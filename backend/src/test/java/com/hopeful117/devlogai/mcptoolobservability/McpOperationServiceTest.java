@@ -136,6 +136,7 @@ class McpOperationServiceTest {
             public String getReasonCode() { return reasonCode; }
             public String getAgentSessionId() { return agentSessionId; }
             public String getAgentProvider() { return agentProvider; }
+            public java.util.UUID getCorrelationId() { return null; }
         };
     }
 

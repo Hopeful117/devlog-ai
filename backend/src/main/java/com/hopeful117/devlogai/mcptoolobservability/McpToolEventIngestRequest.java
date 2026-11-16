@@ -17,5 +17,6 @@ public record McpToolEventIngestRequest(
         @Size(max = 64)            String reasonCode,
         String occurredAt,
         @Size(max = 128) String agentSessionId,
-        @Size(max = 128) String agentProvider
+        @Size(max = 128) String agentProvider,
+        @Size(max = 36)  String correlationId
 ) {}

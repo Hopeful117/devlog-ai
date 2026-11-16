@@ -42,6 +42,33 @@ TOOL_FAILED = "FAILED"
 TOOL_INTERRUPTED = "INTERRUPTED"
 
 
+DEVLOG_CORRELATION_TOOLS = frozenset({
+    "devlog_story_agent",
+    "story_context_agent_follow_up_authenticated",
+})
+
+
+def _extract_devlog_correlation_id(message: Any) -> str | None:
+    """Best-effort extraction of aiTaskId from a DevLog tool MCP response."""
+    try:
+        result = message.get("result")
+        if not isinstance(result, dict):
+            return None
+        content = result.get("content")
+        if not isinstance(content, list) or not content:
+            return None
+        text = content[0].get("text") if isinstance(content[0], dict) else None
+        if not isinstance(text, str):
+            return None
+        payload = json.loads(text)
+        task_id = payload.get("aiTaskId") or payload.get("snapshotId")
+        if isinstance(task_id, str) and len(task_id) == 36:
+            return task_id
+    except Exception:
+        pass
+    return None
+
+
 @dataclass
 class ToolOperation:
     operation_id: str
@@ -53,6 +80,7 @@ class ToolOperation:
     raw_payload: bytes
     started_at: float
     tool_name: str | None = None
+    response_correlation_id: str | None = None
 
 
 def state_root() -> Path:
@@ -428,6 +456,8 @@ class RuntimeSession:
             fields["toolName"] = operation.tool_name
         if reason_code is not None:
             fields["reasonCode"] = reason_code
+        if operation.response_correlation_id is not None and event_type != "MCP_TOOL_STARTED":
+            fields["correlationId"] = operation.response_correlation_id
         duration_ms = max(0, int((time.monotonic() - operation.started_at) * 1000))
         if event_type != "MCP_TOOL_STARTED":
             fields["durationMs"] = duration_ms
@@ -629,6 +659,10 @@ class RuntimeSession:
                         terminal_event = (operation, TOOL_FAILED, terminal_generation, "MCP_JSONRPC_ERROR")
                 else:
                     terminal_generation = generation if generation is not None else operation.current_generation
+                    if operation.tool_name in DEVLOG_CORRELATION_TOOLS:
+                        correlation_id = _extract_devlog_correlation_id(message)
+                        if correlation_id:
+                            operation.response_correlation_id = correlation_id
                     if self._finish_operation_locked(operation, TOOL_RESPONDED, terminal_generation):
                         terminal_event = (operation, TOOL_RESPONDED, terminal_generation, None)
             if terminal_event is not None:

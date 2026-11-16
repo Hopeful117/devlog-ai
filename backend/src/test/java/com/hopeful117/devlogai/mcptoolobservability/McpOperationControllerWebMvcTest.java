@@ -29,14 +29,14 @@ class McpOperationControllerWebMvcTest extends ControllerWebMvcTestSupport {
                         "RESPONDED", 1,
                         Instant.parse("2026-01-01T12:00:00Z"),
                         Instant.parse("2026-01-01T12:00:01Z"),
-                        1050, null, null, null)),
+                        1050, null, null, null, null)),
                 1L, 0, 20);
         when(service.listByProject(eq(projectId), eq(0), eq(20))).thenReturn(response);
         CoreProjectAuthorizationService authService = mock(CoreProjectAuthorizationService.class);
         when(authService.isAuthorized(any(AuthenticatedPrincipal.class), eq(projectId), any()))
                 .thenReturn(true);
         MockMvc mvc = mockMvc(new McpOperationController(
-                r -> Optional.of(humanPrincipal()), authService, service));
+                r -> Optional.of(humanPrincipal()), authService, service, mock(ContextTraceService.class)));
 
         mvc.perform(get("/api/v1/projects/{id}/mcp-operations", projectId))
                 .andExpect(status().isOk())
@@ -51,7 +51,8 @@ class McpOperationControllerWebMvcTest extends ControllerWebMvcTestSupport {
         MockMvc mvc = mockMvc(new McpOperationController(
                 r -> Optional.empty(),
                 mock(CoreProjectAuthorizationService.class),
-                mock(McpOperationService.class)));
+                mock(McpOperationService.class),
+                mock(ContextTraceService.class)));
 
         mvc.perform(get("/api/v1/projects/{id}/mcp-operations", UUID.randomUUID()))
                 .andExpect(status().isUnauthorized());
@@ -65,7 +66,8 @@ class McpOperationControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 .thenReturn(false);
         MockMvc mvc = mockMvc(new McpOperationController(
                 r -> Optional.of(humanPrincipal()), authService,
-                mock(McpOperationService.class)));
+                mock(McpOperationService.class),
+                mock(ContextTraceService.class)));
 
         mvc.perform(get("/api/v1/projects/{id}/mcp-operations", projectId))
                 .andExpect(status().isNotFound());

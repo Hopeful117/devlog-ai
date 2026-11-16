@@ -108,6 +108,7 @@ public class AgentSessionService {
                 p.getDurationMs(),
                 p.getReasonCode(),
                 p.getAgentSessionId(),
-                p.getAgentProvider());
+                p.getAgentProvider(),
+                p.getCorrelationId());
     }
 }

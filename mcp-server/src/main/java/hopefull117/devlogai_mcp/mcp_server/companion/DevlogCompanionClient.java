@@ -24,4 +24,12 @@ public interface DevlogCompanionClient {
             @RequestParam(value = "size", required = false) Integer size,
             @RequestHeader("Authorization") String authorization,
             @RequestHeader("X-DevLog-Delegation") String delegation);
+
+    @GetExchange("/projects/{projectId}/mcp-operations/{instanceId}/{operationId}/context-trace")
+    String getContextTrace(
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("instanceId") String instanceId,
+            @PathVariable("operationId") String operationId,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation);
 }

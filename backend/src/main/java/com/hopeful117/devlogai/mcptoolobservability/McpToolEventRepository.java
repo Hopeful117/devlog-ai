@@ -15,14 +15,42 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
     Page<McpToolEvent> findByProjectIdOrderByReceivedAtDesc(UUID projectId, Pageable pageable);
     boolean existsByInstanceIdAndOperationIdAndEventType(String instanceId, String operationId, String eventType);
 
+    @Query(value = """
+            SELECT correlation_id FROM mcp_tool_events
+            WHERE project_id = :projectId
+              AND instance_id = :instanceId
+              AND operation_id = :operationId
+              AND correlation_id IS NOT NULL
+            LIMIT 1
+            """, nativeQuery = true)
+    java.util.UUID findCorrelationId(
+            @Param("projectId") UUID projectId,
+            @Param("instanceId") String instanceId,
+            @Param("operationId") String operationId);
+
+    @Query(value = """
+            SELECT instance_id, operation_id FROM mcp_tool_events
+            WHERE project_id = :projectId
+              AND correlation_id = :correlationId
+            LIMIT 1
+            """, nativeQuery = true)
+    CorrelationLookupProjection findOpByCorrelationId(
+            @Param("projectId") UUID projectId,
+            @Param("correlationId") UUID correlationId);
+
+    interface CorrelationLookupProjection {
+        String getInstanceId();
+        String getOperationId();
+    }
+
     @Modifying
     @Query(value = """
             INSERT INTO mcp_tool_events (id, project_id, instance_id, operation_id, tool_name,
                 event_type, status, generation, duration_ms, reason_code, schema_version,
-                occurred_at, received_at, agent_session_id, agent_provider)
+                occurred_at, received_at, agent_session_id, agent_provider, correlation_id)
             VALUES (:id, :projectId, :instanceId, :operationId, :toolName,
                 :eventType, :status, :generation, :durationMs, :reasonCode, :schemaVersion,
-                :occurredAt, :receivedAt, :agentSessionId, :agentProvider)
+                :occurredAt, :receivedAt, :agentSessionId, :agentProvider, :correlationId)
             ON CONFLICT (instance_id, operation_id, event_type) DO NOTHING
             """, nativeQuery = true)
     void insertIfAbsent(
@@ -40,7 +68,8 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
             @Param("occurredAt") Instant occurredAt,
             @Param("receivedAt") Instant receivedAt,
             @Param("agentSessionId") String agentSessionId,
-            @Param("agentProvider") String agentProvider);
+            @Param("agentProvider") String agentProvider,
+            @Param("correlationId") UUID correlationId);
 
     @Query(value = """
             WITH terminals AS (
@@ -77,7 +106,12 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
                 t.duration_ms,
                 t.reason_code,
                 COALESCE(s.agent_session_id,     t.agent_session_id)   AS agent_session_id,
-                COALESCE(s.agent_provider,       t.agent_provider)     AS agent_provider
+                COALESCE(s.agent_provider,       t.agent_provider)     AS agent_provider,
+                (SELECT correlation_id FROM mcp_tool_events e2
+                 WHERE e2.instance_id = COALESCE(s.instance_id, t.instance_id)
+                   AND e2.operation_id = COALESCE(s.operation_id, t.operation_id)
+                   AND e2.correlation_id IS NOT NULL
+                 LIMIT 1)                                              AS correlation_id
             FROM starts s
             FULL OUTER JOIN terminals t
                 ON s.instance_id = t.instance_id AND s.operation_id = t.operation_id
@@ -193,7 +227,12 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
                 t.duration_ms,
                 t.reason_code,
                 COALESCE(s.agent_session_id,     t.agent_session_id)   AS agent_session_id,
-                COALESCE(s.agent_provider,       t.agent_provider)     AS agent_provider
+                COALESCE(s.agent_provider,       t.agent_provider)     AS agent_provider,
+                (SELECT correlation_id FROM mcp_tool_events e2
+                 WHERE e2.instance_id = COALESCE(s.instance_id, t.instance_id)
+                   AND e2.operation_id = COALESCE(s.operation_id, t.operation_id)
+                   AND e2.correlation_id IS NOT NULL
+                 LIMIT 1)                                              AS correlation_id
             FROM starts s
             FULL OUTER JOIN terminals t
                 ON s.instance_id = t.instance_id AND s.operation_id = t.operation_id
@@ -243,6 +282,7 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
         String getReasonCode();
         String getAgentSessionId();
         String getAgentProvider();
+        UUID getCorrelationId();
     }
 
     @Query(value = """
