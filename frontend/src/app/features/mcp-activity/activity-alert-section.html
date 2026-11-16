@@ -1,0 +1,41 @@
+@if (alerts$ | async; as view) {
+  <section class="activity-alert-section panel">
+    <h2 class="section-title">Activity Alerts</h2>
+    @if (view.state === 'loading') {
+      <p role="status" class="activity-alert-status">Loading alerts…</p>
+    } @else if (view.state === 'error') {
+      <p role="alert" class="inline-message inline-message--error">
+        Activity alerts could not be loaded.
+      </p>
+    } @else if (!view.alerts.length) {
+      <div class="empty-state">
+        <p>No failed operations — all MCP tools responded successfully.</p>
+      </div>
+    } @else {
+      <ul class="alert-list">
+        @for (alert of view.alerts; track alert.alertId) {
+          <li class="alert-item">
+            <span
+              class="alert-severity"
+              [class.alert-severity--error]="alert.severity === 'ERROR'"
+              [class.alert-severity--warn]="alert.severity === 'WARN'"
+              [title]="alert.severity"
+              >{{ alert.severity }}</span
+            >
+            <span class="alert-tool">{{ toolLabel(alert) }}</span>
+            <span class="alert-reason">{{ reasonLabel(alert) }}</span>
+            @if (alert.durationMs !== null) {
+              <span class="alert-duration">{{ alert.durationMs }}ms</span>
+            }
+            @if (shortSession(alert); as sid) {
+              <span class="alert-session" [title]="alert.agentSessionId!">{{ sid }}</span>
+            }
+            <time class="alert-time" [dateTime]="alert.occurredAt">
+              {{ alert.occurredAt | date: 'HH:mm:ss' }}
+            </time>
+          </li>
+        }
+      </ul>
+    }
+  </section>
+}

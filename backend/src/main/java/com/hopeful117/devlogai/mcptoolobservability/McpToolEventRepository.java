@@ -244,4 +244,51 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
         String getAgentSessionId();
         String getAgentProvider();
     }
+
+    @Query(value = """
+            WITH terminal_alerts AS (
+                SELECT DISTINCT ON (instance_id, operation_id)
+                    instance_id, operation_id, tool_name, status,
+                    reason_code, occurred_at, duration_ms,
+                    agent_session_id, agent_provider
+                FROM mcp_tool_events
+                WHERE project_id = :projectId
+                  AND event_type IN ('MCP_TOOL_FAILED', 'MCP_TOOL_INTERRUPTED')
+                  AND (reason_code IS NULL OR reason_code != 'MCP_INSTANCE_STOPPING')
+                ORDER BY instance_id, operation_id, occurred_at DESC
+            )
+            SELECT *
+            FROM terminal_alerts
+            ORDER BY occurred_at DESC NULLS LAST,
+                     instance_id ASC,
+                     operation_id ASC
+            LIMIT :size OFFSET :offset
+            """, nativeQuery = true)
+    List<ActivityAlertProjection> findAlertsByProject(
+            @Param("projectId") UUID projectId,
+            @Param("offset") int offset,
+            @Param("size") int size);
+
+    @Query(value = """
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT instance_id, operation_id
+                FROM mcp_tool_events
+                WHERE project_id = :projectId
+                  AND event_type IN ('MCP_TOOL_FAILED', 'MCP_TOOL_INTERRUPTED')
+                  AND (reason_code IS NULL OR reason_code != 'MCP_INSTANCE_STOPPING')
+            ) sub
+            """, nativeQuery = true)
+    long countAlertsByProject(@Param("projectId") UUID projectId);
+
+    interface ActivityAlertProjection {
+        String getInstanceId();
+        String getOperationId();
+        String getToolName();
+        String getStatus();
+        String getReasonCode();
+        Instant getOccurredAt();
+        Integer getDurationMs();
+        String getAgentSessionId();
+        String getAgentProvider();
+    }
 }
