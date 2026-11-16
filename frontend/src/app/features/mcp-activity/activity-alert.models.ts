@@ -20,3 +20,7 @@ export interface ActivityAlertPage {
   readonly page: number;
   readonly size: number;
 }
+
+export interface ActivityAlertCount {
+  readonly errorCount: number;
+}

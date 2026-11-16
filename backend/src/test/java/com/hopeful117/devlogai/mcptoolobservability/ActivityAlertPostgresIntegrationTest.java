@@ -117,6 +117,40 @@ class ActivityAlertPostgresIntegrationTest {
         assertThat(page.content().getFirst().occurredAt()).isAfter(page.content().getLast().occurredAt());
     }
 
+    @Test
+    void countErrorsReturnsOnlyErrorSeverityWithinWindow() {
+        UUID projectId = insertProject();
+        // ERROR — FAILED
+        insertOperation(projectId, "MCP_TOOL_FAILED", "FAILED", null, null);
+        // ERROR — MCP_PROCESS_FAILED
+        insertOperation(projectId, "MCP_TOOL_INTERRUPTED", "INTERRUPTED", "MCP_PROCESS_FAILED", null);
+        // WARN — should NOT be counted
+        insertOperation(projectId, "MCP_TOOL_INTERRUPTED", "INTERRUPTED", "MCP_REAUTH_REQUIRED", null);
+
+        ActivityAlertCountResponse result = alertService.countErrors(projectId);
+
+        assertThat(result.errorCount()).isEqualTo(2);
+    }
+
+    @Test
+    void countErrorsExcludesAlertsOutsideWindow() {
+        UUID projectId = insertProject();
+        // Inside window (now - 10 min)
+        String instIn = "inst-in-" + UUID.randomUUID();
+        String opIn = "op-in-" + UUID.randomUUID();
+        insertRawEvent(projectId, instIn, opIn, "MCP_TOOL_FAILED", "FAILED", null, null,
+                Instant.now().minusSeconds(600));
+        // Outside 24h window
+        String instOut = "inst-out-" + UUID.randomUUID();
+        String opOut = "op-out-" + UUID.randomUUID();
+        insertRawEvent(projectId, instOut, opOut, "MCP_TOOL_FAILED", "FAILED", null, null,
+                Instant.now().minusSeconds(90000));
+
+        ActivityAlertCountResponse result = alertService.countErrors(projectId);
+
+        assertThat(result.errorCount()).isEqualTo(1);
+    }
+
     // --- helpers ---
 
     private UUID insertProject() {

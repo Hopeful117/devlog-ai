@@ -29,4 +29,16 @@ public class ActivityAlertController {
         }
         return ResponseEntity.ok(service.listByProject(projectId, page, size));
     }
+
+    @GetMapping("/api/v1/projects/{projectId}/activity-alerts/count")
+    public ResponseEntity<ActivityAlertCountResponse> countByProject(
+            @PathVariable UUID projectId,
+            HttpServletRequest servletRequest) {
+        AuthenticatedPrincipal principal = principalResolver.resolve(servletRequest)
+                .orElseThrow(UnauthenticatedPrincipalException::new);
+        if (!authorizationService.isAuthorized(principal, projectId, "MCP_TOOL_EVENTS_READ")) {
+            throw new EntityNotFoundException("Project", projectId);
+        }
+        return ResponseEntity.ok(service.countErrors(projectId));
+    }
 }

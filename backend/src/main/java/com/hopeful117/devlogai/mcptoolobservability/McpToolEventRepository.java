@@ -280,7 +280,24 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
             """, nativeQuery = true)
     long countAlertsByProject(@Param("projectId") UUID projectId);
 
-    interface ActivityAlertProjection {
+    @Query(value = """
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT ON (instance_id, operation_id)
+                    instance_id, operation_id, status, reason_code
+                FROM mcp_tool_events
+                WHERE project_id = :projectId
+                  AND event_type IN ('MCP_TOOL_FAILED', 'MCP_TOOL_INTERRUPTED')
+                  AND (reason_code IS NULL OR reason_code != 'MCP_INSTANCE_STOPPING')
+                  AND occurred_at >= :windowStart
+                ORDER BY instance_id, operation_id, occurred_at DESC
+            ) sub
+            WHERE status = 'FAILED' OR reason_code = 'MCP_PROCESS_FAILED'
+            """, nativeQuery = true)
+    long countErrorAlertsByProjectInWindow(
+            @Param("projectId") UUID projectId,
+            @Param("windowStart") Instant windowStart);
+
+        interface ActivityAlertProjection {
         String getInstanceId();
         String getOperationId();
         String getToolName();
