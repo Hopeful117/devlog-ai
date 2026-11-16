@@ -13,5 +13,6 @@ public record McpOperationView(
         Integer durationMs,
         String reasonCode,
         String agentSessionId,
-        String agentProvider
+        String agentProvider,
+        java.util.UUID correlationId
 ) {}

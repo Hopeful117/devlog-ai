@@ -59,4 +59,7 @@ public class McpToolEvent {
 
     @Column(length = 128)
     private String agentProvider;
+
+    @Column(name = "correlation_id")
+    private java.util.UUID correlationId;
 }

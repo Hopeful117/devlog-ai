@@ -39,6 +39,7 @@ public class McpOperationService {
                 p.getDurationMs(),
                 p.getReasonCode(),
                 p.getAgentSessionId(),
-                p.getAgentProvider());
+                p.getAgentProvider(),
+                p.getCorrelationId());
     }
 }

@@ -29,6 +29,10 @@ public class McpToolEventService {
         }
         // ON CONFLICT DO NOTHING makes this idempotent for concurrent duplicate pushes without
         // relying on Hibernate's deferred flush, which would throw outside any try/catch.
+        UUID correlationId = null;
+        if (request.correlationId() != null && !request.correlationId().isBlank()) {
+            try { correlationId = UUID.fromString(request.correlationId()); } catch (IllegalArgumentException ignored) {}
+        }
         repository.insertIfAbsent(
                 UUID.randomUUID(),
                 project.getId(),
@@ -44,7 +48,8 @@ public class McpToolEventService {
                 occurredAt,
                 Instant.now(),
                 request.agentSessionId(),
-                request.agentProvider());
+                request.agentProvider(),
+                correlationId);
     }
 
     @Transactional(readOnly = true)
