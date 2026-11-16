@@ -1,0 +1,97 @@
+@if (sessions$ | async; as view) {
+  <section class="agent-session-section panel">
+    <h2 class="section-title">Agent Sessions</h2>
+    @if (view.state === 'loading') {
+      <p role="status" class="agent-session-status">Loading sessions…</p>
+    } @else if (view.state === 'error') {
+      <p role="alert" class="inline-message inline-message--error">
+        Agent sessions could not be loaded.
+      </p>
+    } @else if (!view.sessions.length) {
+      <div class="empty-state">
+        <p>No identified agent sessions.</p>
+        <p class="hint">
+          Operations are visible in All Operations. Upgrade your MCP runtime to capture agent
+          identity.
+        </p>
+      </div>
+    } @else {
+      <ul class="session-list">
+        @for (session of view.sessions; track session.agentSessionId) {
+          <li class="session-item">
+            <button
+              type="button"
+              class="session-row"
+              [class.session-row--expanded]="
+                detailState.state !== 'closed' && detailState.sessionId === session.agentSessionId
+              "
+              (click)="openDetail(session)"
+            >
+              <span
+                class="session-provider"
+                [class]="'provider--' + providerBadge(session).toLowerCase()"
+                [title]="session.agentProvider ?? 'Unknown provider'"
+                >{{ providerBadge(session) }}</span
+              >
+              <span class="session-id" [title]="session.agentSessionId">{{
+                shortId(session)
+              }}</span>
+              <span class="session-ops">{{ session.operationCount }} ops</span>
+              @if (session.failedCount > 0) {
+                <span class="session-failures">{{ session.failedCount }} fail</span>
+              }
+              @if (isActive(session)) {
+                <span class="session-active">active</span>
+              } @else {
+                <time
+                  class="session-time"
+                  [dateTime]="session.lastObservedAt ?? session.firstObservedAt"
+                >
+                  {{ session.lastObservedAt ?? session.firstObservedAt | date: 'HH:mm:ss' }}
+                </time>
+              }
+              <span class="session-chevron" aria-hidden="true">›</span>
+            </button>
+            @if (
+              detailState.state !== 'closed' && detailState.sessionId === session.agentSessionId
+            ) {
+              <div class="session-detail">
+                @if (detailState.state === 'loading') {
+                  <p role="status" class="session-detail-status">Loading operations…</p>
+                } @else if (detailState.state === 'error') {
+                  <p role="alert" class="inline-message inline-message--error">
+                    Operations could not be loaded.
+                  </p>
+                } @else if (detailState.state === 'loaded') {
+                  @if (!detailState.operations.length) {
+                    <p class="session-detail-empty">No operations recorded for this session.</p>
+                  } @else {
+                    <ul class="session-detail-ops">
+                      @for (
+                        op of detailState.operations;
+                        track op.instanceId + '/' + op.operationId
+                      ) {
+                        <li class="session-detail-op">
+                          <span class="detail-tool">{{ op.toolName ?? 'unknown tool' }}</span>
+                          @if (op.durationMs !== null) {
+                            <span class="detail-duration">{{ op.durationMs }}ms</span>
+                          }
+                          <span class="detail-status">{{ op.status }}</span>
+                          @if (op.completedAt ?? op.startedAt; as t) {
+                            <time class="detail-time" [dateTime]="t">
+                              {{ t | date: 'HH:mm:ss' }}
+                            </time>
+                          }
+                        </li>
+                      }
+                    </ul>
+                  }
+                }
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+}
