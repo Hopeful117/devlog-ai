@@ -30,16 +30,18 @@ export class ProjectWorkspaceLayout implements OnDestroy {
     ),
   );
 
-  readonly alertCount$ = this.route.paramMap.pipe(
-    map((params) => params.get('id') ?? ''),
-    switchMap((projectId) =>
-      timer(0, this.intervalMs).pipe(
+  readonly alertCount$ = this.project$.pipe(
+    switchMap((view) => {
+      if (view.state !== 'loaded') return of({ errorCount: 0 });
+      return timer(0, this.intervalMs).pipe(
         switchMap(() =>
-          this.alertService.countByProject(projectId).pipe(catchError(() => of({ errorCount: 0 }))),
+          this.alertService
+            .countByProject(view.project.id)
+            .pipe(catchError(() => of({ errorCount: 0 }))),
         ),
         takeUntil(this.destroyed$),
-      ),
-    ),
+      );
+    }),
   );
 
   ngOnDestroy(): void {

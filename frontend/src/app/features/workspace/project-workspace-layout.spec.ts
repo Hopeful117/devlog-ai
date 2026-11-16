@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { BehaviorSubject, firstValueFrom, of, throwError } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, of, skip, throwError } from 'rxjs';
 import { vi } from 'vitest';
 
 import { ProjectWorkspaceLayout } from './project-workspace-layout';
@@ -14,7 +14,15 @@ const TEST_ENV = {
   organizerBaseUrl: '',
   oidc: { url: '', realm: '', clientId: '' },
 };
-const project = { id: 'p1', name: 'DevLog AI', slug: 'devlog-ai', description: null };
+const project = {
+  id: 'uuid-p1-0000-0000-000000000000',
+  name: 'DevLog AI',
+  slug: 'devlog-ai',
+  description: null,
+  status: 'ACTIVE' as const,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+};
 
 describe('ProjectWorkspaceLayout', () => {
   const paramMap = new BehaviorSubject(convertToParamMap({ id: 'devlog-ai' }));
@@ -80,29 +88,33 @@ describe('ProjectWorkspaceLayout', () => {
     expect(nav?.textContent).toContain('Settings');
   });
 
-  it('alertCount$ emits errorCount when service returns errors', async () => {
+  it('alertCount$ uses project UUID (not slug) to call countByProject', async () => {
     getProject.mockReturnValue(of(project));
-    countByProject.mockReturnValue(of({ errorCount: 3 }));
+    countByProject.mockReturnValue(of({ errorCount: 2 }));
     const fixture = createComponent();
     const component = fixture.componentInstance;
 
-    const count = await firstValueFrom(component.alertCount$);
+    // skip(1) skips the initial loading-state emission ({ errorCount: 0 })
+    // the second emission comes once project is loaded and timer(0) fires
+    const count = await firstValueFrom(component.alertCount$.pipe(skip(1)));
 
-    expect(count.errorCount).toBe(3);
+    // countByProject must be called with the project UUID, never the slug
+    expect(countByProject).toHaveBeenCalledWith(project.id);
+    expect(count.errorCount).toBe(2);
   });
 
-  it('alertCount$ emits zero when service returns no errors', async () => {
-    getProject.mockReturnValue(of(project));
-    countByProject.mockReturnValue(of({ errorCount: 0 }));
+  it('alertCount$ emits errorCount=0 when project fails to load', async () => {
+    getProject.mockReturnValue(throwError(() => new Error('not found')));
     const fixture = createComponent();
     const component = fixture.componentInstance;
 
     const count = await firstValueFrom(component.alertCount$);
 
     expect(count.errorCount).toBe(0);
+    expect(countByProject).not.toHaveBeenCalled();
   });
 
-  it('alertCount$ emits errorCount=0 when service errors (silent degradation)', async () => {
+  it('alertCount$ emits errorCount=0 when count service errors', async () => {
     getProject.mockReturnValue(of(project));
     countByProject.mockReturnValue(throwError(() => new Error('network')));
     const fixture = createComponent();
@@ -114,7 +126,6 @@ describe('ProjectWorkspaceLayout', () => {
   });
 
   it('badge cap logic: 9+ when errorCount >= 9', () => {
-    // Test the template expression directly via the computed value
     const cap = (n: number) => (n >= 9 ? '9+' : String(n));
     expect(cap(1)).toBe('1');
     expect(cap(8)).toBe('8');
