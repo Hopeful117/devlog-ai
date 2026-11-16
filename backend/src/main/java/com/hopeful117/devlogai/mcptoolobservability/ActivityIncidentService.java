@@ -27,16 +27,18 @@ public class ActivityIncidentService {
         int clampedSize   = Math.clamp(size, 1, 50);
         Instant windowStart = Instant.now().minus(clampedWindow, ChronoUnit.MINUTES);
 
-        long total = repository.countIncidentsByProject(projectId, windowStart);
+        McpToolEventRepository.IncidentCountsProjection counts =
+                repository.summarizeIncidentsByProject(projectId, windowStart);
+        long total      = counts.getTotal();
+        long errorCount = counts.getErrorCount();
+        long warnCount  = counts.getWarnCount();
+
         List<McpToolEventRepository.ActivityIncidentProjection> rows =
                 repository.findIncidentsByProject(projectId, windowStart, clampedPage * clampedSize, clampedSize);
 
         List<ActivityIncidentView> content = rows.stream()
                 .map(p -> toView(p))
                 .toList();
-
-        long errorCount = content.stream().filter(v -> "ERROR".equals(v.severity())).count();
-        long warnCount  = content.stream().filter(v -> "WARN".equals(v.severity())).count();
 
         return new ActivityIncidentPageResponse(
                 content, total, errorCount, warnCount,
