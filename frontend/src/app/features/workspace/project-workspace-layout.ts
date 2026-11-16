@@ -1,16 +1,7 @@
 import { AsyncPipe } from '@angular/common';
 import { Component, inject, OnDestroy } from '@angular/core';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import {
-  catchError,
-  map,
-  of,
-  startWith,
-  Subject,
-  switchMap,
-  takeUntil,
-  timer,
-} from 'rxjs';
+import { catchError, map, of, startWith, Subject, switchMap, takeUntil, timer } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../core/config/app-environment';
 import { ActivityAlertService } from '../mcp-activity/activity-alert.service';
 import { ProjectService } from '../projects/project.service';

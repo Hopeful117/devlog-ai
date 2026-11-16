@@ -20,9 +20,11 @@
         <span>↗</span>Activity
         @if (alertCount$ | async; as ac) {
           @if (ac.errorCount > 0) {
-            <span class="nav-badge nav-badge--error" aria-label="{{ ac.errorCount }} error alerts">{{
-              ac.errorCount >= 9 ? '9+' : ac.errorCount
-            }}</span>
+            <span
+              class="nav-badge nav-badge--error"
+              aria-label="{{ ac.errorCount }} error alerts"
+              >{{ ac.errorCount >= 9 ? '9+' : ac.errorCount }}</span
+            >
           }
         }
       </a>
