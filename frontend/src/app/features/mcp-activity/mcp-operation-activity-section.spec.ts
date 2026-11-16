@@ -123,6 +123,44 @@ describe('McpOperationActivitySection', () => {
       expect(component.displayTime(op)).toBeNull();
     });
   });
+  describe('providerBadge', () => {
+    it('returns CC for claude-code provider', () => {
+      const op: McpOperation = {
+        ...operation('RESPONDED', null),
+        agentProvider: 'claude-code_2-1-325_agent',
+      };
+      expect(component.providerBadge(op)).toBe('CC');
+    });
+
+    it('returns OC for opencode provider', () => {
+      const op: McpOperation = {
+        ...operation('RESPONDED', null),
+        agentProvider: 'opencode_1-18-11',
+      };
+      expect(component.providerBadge(op)).toBe('OC');
+    });
+
+    it('returns CD for claude-desktop provider', () => {
+      const op: McpOperation = {
+        ...operation('RESPONDED', null),
+        agentProvider: 'claude-desktop_1-0-0',
+      };
+      expect(component.providerBadge(op)).toBe('CD');
+    });
+
+    it('returns ? for null provider', () => {
+      const op: McpOperation = { ...operation('RESPONDED', null), agentProvider: null };
+      expect(component.providerBadge(op)).toBe('?');
+    });
+
+    it('returns ? for unrecognized provider', () => {
+      const op: McpOperation = {
+        ...operation('RESPONDED', null),
+        agentProvider: 'some-unknown-agent',
+      };
+      expect(component.providerBadge(op)).toBe('?');
+    });
+  });
 });
 
 function operation(status: McpOperation['status'], startedAt: string | null): McpOperation {
@@ -136,5 +174,7 @@ function operation(status: McpOperation['status'], startedAt: string | null): Mc
     completedAt: null,
     durationMs: null,
     reasonCode: null,
+    agentSessionId: null,
+    agentProvider: null,
   };
 }

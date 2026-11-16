@@ -114,6 +114,16 @@ class McpOperationServiceTest {
             String status, Integer generation,
             Instant startedAt, Instant completedAt,
             Integer durationMs, String reasonCode) {
+        return projection(instanceId, operationId, toolName, status, generation,
+                startedAt, completedAt, durationMs, reasonCode, null, null);
+    }
+
+    private static McpToolEventRepository.McpOperationProjection projection(
+            String instanceId, String operationId, String toolName,
+            String status, Integer generation,
+            Instant startedAt, Instant completedAt,
+            Integer durationMs, String reasonCode,
+            String agentSessionId, String agentProvider) {
         return new McpToolEventRepository.McpOperationProjection() {
             public String getInstanceId() { return instanceId; }
             public String getOperationId() { return operationId; }
@@ -124,6 +134,39 @@ class McpOperationServiceTest {
             public Instant getCompletedAt() { return completedAt; }
             public Integer getDurationMs() { return durationMs; }
             public String getReasonCode() { return reasonCode; }
+            public String getAgentSessionId() { return agentSessionId; }
+            public String getAgentProvider() { return agentProvider; }
         };
+    }
+
+    @Test
+    void listByProjectMapsAgentSessionIdentity() {
+        String sessionId = "cc7d159d-a138-4b73-b14e-1e7279d013ab";
+        String provider = "claude-code_2-1-325_agent";
+        McpToolEventRepository.McpOperationProjection proj = projection(
+                "inst-1", "op-1", "get_engineering_context",
+                "RESPONDED", 1, Instant.now(), Instant.now(), 500, null,
+                sessionId, provider);
+        McpToolEventRepository repo = mockRepo(List.of(proj), 1L);
+        McpOperationService service = new McpOperationService(repo);
+
+        McpOperationView view = service.listByProject(UUID.randomUUID(), 0, 20).content().getFirst();
+
+        assertThat(view.agentSessionId()).isEqualTo(sessionId);
+        assertThat(view.agentProvider()).isEqualTo(provider);
+    }
+
+    @Test
+    void listByProjectMapsNullAgentIdentity() {
+        McpToolEventRepository.McpOperationProjection proj = projection(
+                "inst-1", "op-1", "search_project_history",
+                "ACTIVE", 1, Instant.now(), null, null, null);
+        McpToolEventRepository repo = mockRepo(List.of(proj), 1L);
+        McpOperationService service = new McpOperationService(repo);
+
+        McpOperationView view = service.listByProject(UUID.randomUUID(), 0, 20).content().getFirst();
+
+        assertThat(view.agentSessionId()).isNull();
+        assertThat(view.agentProvider()).isNull();
     }
 }

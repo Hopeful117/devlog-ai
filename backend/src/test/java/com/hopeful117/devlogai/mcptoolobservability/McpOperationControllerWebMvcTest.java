@@ -29,7 +29,7 @@ class McpOperationControllerWebMvcTest extends ControllerWebMvcTestSupport {
                         "RESPONDED", 1,
                         Instant.parse("2026-01-01T12:00:00Z"),
                         Instant.parse("2026-01-01T12:00:01Z"),
-                        1050, null)),
+                        1050, null, null, null)),
                 1L, 0, 20);
         when(service.listByProject(eq(projectId), eq(0), eq(20))).thenReturn(response);
         CoreProjectAuthorizationService authService = mock(CoreProjectAuthorizationService.class);

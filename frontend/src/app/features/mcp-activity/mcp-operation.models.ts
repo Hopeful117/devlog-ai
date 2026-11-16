@@ -10,6 +10,8 @@ export interface McpOperation {
   readonly completedAt: string | null;
   readonly durationMs: number | null;
   readonly reasonCode: string | null;
+  readonly agentSessionId: string | null;
+  readonly agentProvider: string | null;
 }
 
 export interface McpOperationPage {

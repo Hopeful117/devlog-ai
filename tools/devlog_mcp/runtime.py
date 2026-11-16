@@ -159,11 +159,21 @@ def required_configuration() -> dict[str, str]:
 class ToolEventPusher:
     """Best-effort HTTP push of tool-call events to the Core backend."""
 
-    def __init__(self, base_url: str, project_slug: str, instance_id: str, token_getter: Any) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        project_slug: str,
+        instance_id: str,
+        token_getter: Any,
+        agent_session_id: str | None = None,
+        agent_provider: str | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._project_slug = project_slug
         self._instance_id = instance_id
         self._token_getter = token_getter
+        self._agent_session_id = agent_session_id
+        self._agent_provider = agent_provider
 
     def push(self, fields: dict[str, Any]) -> None:
         if not self._project_slug:
@@ -174,6 +184,10 @@ class ToolEventPusher:
             "projectSlug": self._project_slug,
             "occurredAt": datetime.now(timezone.utc).isoformat(),
         }
+        if self._agent_session_id:
+            body_data["agentSessionId"] = self._agent_session_id
+        if self._agent_provider:
+            body_data["agentProvider"] = self._agent_provider
         body = json.dumps(body_data).encode("utf-8")
         threading.Thread(target=self._post, args=(body,), daemon=True).start()
 
@@ -288,8 +302,15 @@ def validate_configuration(configuration: dict[str, str]) -> None:
             raise RuntimeError("CONFIGURATION_INVALID: renewal timing is invalid")
 
 
-def write_manifest(directory: Path, instance_id: str, parent_pid: int, parent_start: str | None) -> None:
-    manifest = {
+def write_manifest(
+    directory: Path,
+    instance_id: str,
+    parent_pid: int,
+    parent_start: str | None,
+    agent_session_id: str | None = None,
+    agent_provider: str | None = None,
+) -> None:
+    manifest: dict[str, Any] = {
         "instanceId": instance_id,
         "launcherPid": os.getpid(),
         "launcherStartTime": process_start_time(os.getpid()),
@@ -298,6 +319,10 @@ def write_manifest(directory: Path, instance_id: str, parent_pid: int, parent_st
         "createdAt": datetime.now(timezone.utc).isoformat(),
         "state": "STARTING",
     }
+    if agent_session_id:
+        manifest["agentSessionId"] = agent_session_id
+    if agent_provider:
+        manifest["agentProvider"] = agent_provider
     (directory / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
@@ -335,6 +360,8 @@ class RuntimeSession:
             project_slug=configuration.get("project_slug", ""),
             instance_id=getattr(writer, "instance_id", ""),
             token_getter=lambda: self.lease.token,
+            agent_session_id=configuration.get("agent_session_id"),
+            agent_provider=configuration.get("agent_provider"),
         )
 
     def _new_operation_id(self) -> str:
@@ -854,9 +881,19 @@ def main() -> int:
     writer = EventWriter(directory, instance_id)
     parent_pid = os.getppid()
     parent_start = process_start_time(parent_pid)
+    agent_session_id = env("CLAUDE_CODE_SESSION_ID") or None
+    agent_provider = env("AI_AGENT") or None
     configuration = required_configuration()
-    write_manifest(directory, instance_id, parent_pid, parent_start)
-    writer.write("LAUNCHER_STARTED", launcherPid=os.getpid(), parentPid=parent_pid)
+    configuration["agent_session_id"] = agent_session_id or ""
+    configuration["agent_provider"] = agent_provider or ""
+    write_manifest(directory, instance_id, parent_pid, parent_start,
+                   agent_session_id=agent_session_id, agent_provider=agent_provider)
+    launcher_fields: dict[str, Any] = {"launcherPid": os.getpid(), "parentPid": parent_pid}
+    if agent_session_id:
+        launcher_fields["agentSessionId"] = agent_session_id
+    if agent_provider:
+        launcher_fields["agentProvider"] = agent_provider
+    writer.write("LAUNCHER_STARTED", **launcher_fields)
 
     try:
         validate_configuration(configuration)

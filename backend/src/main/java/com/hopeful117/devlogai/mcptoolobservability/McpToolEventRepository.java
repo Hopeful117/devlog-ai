@@ -19,10 +19,10 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
     @Query(value = """
             INSERT INTO mcp_tool_events (id, project_id, instance_id, operation_id, tool_name,
                 event_type, status, generation, duration_ms, reason_code, schema_version,
-                occurred_at, received_at)
+                occurred_at, received_at, agent_session_id, agent_provider)
             VALUES (:id, :projectId, :instanceId, :operationId, :toolName,
                 :eventType, :status, :generation, :durationMs, :reasonCode, :schemaVersion,
-                :occurredAt, :receivedAt)
+                :occurredAt, :receivedAt, :agentSessionId, :agentProvider)
             ON CONFLICT (instance_id, operation_id, event_type) DO NOTHING
             """, nativeQuery = true)
     void insertIfAbsent(
@@ -38,7 +38,9 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
             @Param("reasonCode") String reasonCode,
             @Param("schemaVersion") String schemaVersion,
             @Param("occurredAt") Instant occurredAt,
-            @Param("receivedAt") Instant receivedAt);
+            @Param("receivedAt") Instant receivedAt,
+            @Param("agentSessionId") String agentSessionId,
+            @Param("agentProvider") String agentProvider);
 
     @Query(value = """
             WITH terminals AS (
@@ -49,14 +51,17 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
                     occurred_at   AS completed_at,
                     duration_ms,
                     reason_code,
-                    tool_name     AS terminal_tool_name
+                    tool_name     AS terminal_tool_name,
+                    agent_session_id,
+                    agent_provider
                 FROM mcp_tool_events
                 WHERE project_id = :projectId
                   AND event_type IN ('MCP_TOOL_RESPONDED', 'MCP_TOOL_FAILED', 'MCP_TOOL_INTERRUPTED')
                 ORDER BY instance_id, operation_id, occurred_at DESC, event_type ASC
             ),
             starts AS (
-                SELECT instance_id, operation_id, tool_name, occurred_at AS started_at, generation
+                SELECT instance_id, operation_id, tool_name, occurred_at AS started_at, generation,
+                       agent_session_id, agent_provider
                 FROM mcp_tool_events
                 WHERE project_id = :projectId
                   AND event_type = 'MCP_TOOL_STARTED'
@@ -70,12 +75,15 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
                 s.started_at,
                 t.completed_at,
                 t.duration_ms,
-                t.reason_code
+                t.reason_code,
+                COALESCE(s.agent_session_id,     t.agent_session_id)   AS agent_session_id,
+                COALESCE(s.agent_provider,       t.agent_provider)     AS agent_provider
             FROM starts s
             FULL OUTER JOIN terminals t
                 ON s.instance_id = t.instance_id AND s.operation_id = t.operation_id
             ORDER BY s.started_at DESC NULLS LAST,
-                     COALESCE(s.operation_id, t.operation_id) ASC
+                     COALESCE(s.operation_id, t.operation_id) ASC,
+                     COALESCE(s.instance_id,  t.instance_id)  ASC
             LIMIT :size OFFSET :offset
             """, nativeQuery = true)
     List<McpOperationProjection> findOperationsByProject(
@@ -100,5 +108,7 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
         Instant getCompletedAt();
         Integer getDurationMs();
         String getReasonCode();
+        String getAgentSessionId();
+        String getAgentProvider();
     }
 }

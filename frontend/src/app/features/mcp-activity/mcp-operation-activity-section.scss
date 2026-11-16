@@ -108,3 +108,33 @@
   min-width: 5rem;
   text-align: right;
 }
+
+.mcp-event-provider {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  flex-shrink: 0;
+  cursor: default;
+
+  &.provider--cc {
+    background: var(--color-info-subtle, #dbeafe);
+    color: var(--color-info, #2563eb);
+  }
+
+  &.provider--oc {
+    background: var(--color-success-subtle, #dcfce7);
+    color: var(--color-success, #16a34a);
+  }
+
+  &.provider--cd {
+    background: var(--color-warning-subtle, #fef9c3);
+    color: var(--color-warning, #ca8a04);
+  }
+
+  &.provider--\? {
+    background: var(--color-neutral-subtle, #f3f4f6);
+    color: var(--color-text-muted, #6b7280);
+  }
+}
