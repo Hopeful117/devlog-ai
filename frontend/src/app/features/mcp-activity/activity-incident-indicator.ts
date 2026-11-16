@@ -1,6 +1,6 @@
 import { AsyncPipe } from '@angular/common';
 import { Component, inject, Input, OnDestroy } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, map, Observable, of, Subject, switchMap, takeUntil, timer } from 'rxjs';
 import { APP_ENVIRONMENT } from '../../core/config/app-environment';
 import { ActivityIncidentService } from './activity-incident.service';
@@ -20,6 +20,7 @@ interface IncidentSummary {
 export class ActivityIncidentIndicator implements OnDestroy {
   @Input({ required: true }) projectId = '';
   private readonly service = inject(ActivityIncidentService);
+  private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly intervalMs = inject(APP_ENVIRONMENT).analysisPollingIntervalMs;
   private readonly destroyed$ = new Subject<void>();
@@ -46,9 +47,9 @@ export class ActivityIncidentIndicator implements OnDestroy {
   );
 
   navigateToAlerts(): void {
-    void this.router.navigate([], {
+    void this.router.navigate(['../activity'], {
+      relativeTo: this.route,
       queryParams: { view: 'alerts' },
-      queryParamsHandling: 'merge',
     });
   }
 

@@ -322,7 +322,7 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
             )
             SELECT *
             FROM grouped
-            ORDER BY last_occurred_at DESC NULLS LAST, has_error DESC
+            ORDER BY last_occurred_at DESC NULLS LAST, has_error DESC, tool_name NULLS LAST, reason_code NULLS LAST
             LIMIT :size OFFSET :offset
             """, nativeQuery = true)
     List<ActivityIncidentProjection> findIncidentsByProject(
@@ -332,11 +332,16 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
             @Param("size") int size);
 
     @Query(value = """
-            SELECT COUNT(*) FROM (
-                SELECT tool_name, reason_code
+            SELECT
+                COUNT(*)                                  AS total,
+                COUNT(*) FILTER (WHERE has_error)         AS error_count,
+                COUNT(*) FILTER (WHERE NOT has_error)     AS warn_count
+            FROM (
+                SELECT tool_name, reason_code,
+                       BOOL_OR(status = 'FAILED' OR reason_code = 'MCP_PROCESS_FAILED') AS has_error
                 FROM (
                     SELECT DISTINCT ON (instance_id, operation_id)
-                        tool_name, reason_code
+                        tool_name, reason_code, status
                     FROM mcp_tool_events
                     WHERE project_id = :projectId
                       AND event_type IN ('MCP_TOOL_FAILED', 'MCP_TOOL_INTERRUPTED')
@@ -347,9 +352,15 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
                 GROUP BY tool_name, reason_code
             ) sub
             """, nativeQuery = true)
-    long countIncidentsByProject(
+    IncidentCountsProjection summarizeIncidentsByProject(
             @Param("projectId") UUID projectId,
             @Param("windowStart") Instant windowStart);
+
+    interface IncidentCountsProjection {
+        long getTotal();
+        long getErrorCount();
+        long getWarnCount();
+    }
 
     interface ActivityIncidentProjection {
         String getToolName();

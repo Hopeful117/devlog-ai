@@ -15,7 +15,7 @@ class ActivityIncidentServiceTest {
     @Test
     void listByProjectReturnsEmptyWhenNoRows() {
         McpToolEventRepository repo = mock(McpToolEventRepository.class);
-        when(repo.countIncidentsByProject(any(), any())).thenReturn(0L);
+        when(repo.summarizeIncidentsByProject(any(), any())).thenReturn(counts(0, 0, 0));
         when(repo.findIncidentsByProject(any(), any(), anyInt(), anyInt())).thenReturn(List.of());
         ActivityIncidentService service = new ActivityIncidentService(repo);
 
@@ -30,7 +30,7 @@ class ActivityIncidentServiceTest {
     @Test
     void listByProjectClampsWindowMinutes() {
         McpToolEventRepository repo = mock(McpToolEventRepository.class);
-        when(repo.countIncidentsByProject(any(), any())).thenReturn(0L);
+        when(repo.summarizeIncidentsByProject(any(), any())).thenReturn(counts(0, 0, 0));
         when(repo.findIncidentsByProject(any(), any(), anyInt(), anyInt())).thenReturn(List.of());
         ActivityIncidentService service = new ActivityIncidentService(repo);
 
@@ -42,7 +42,7 @@ class ActivityIncidentServiceTest {
     @Test
     void listByProjectClampsWindowMinutesMin() {
         McpToolEventRepository repo = mock(McpToolEventRepository.class);
-        when(repo.countIncidentsByProject(any(), any())).thenReturn(0L);
+        when(repo.summarizeIncidentsByProject(any(), any())).thenReturn(counts(0, 0, 0));
         when(repo.findIncidentsByProject(any(), any(), anyInt(), anyInt())).thenReturn(List.of());
         ActivityIncidentService service = new ActivityIncidentService(repo);
 
@@ -54,7 +54,7 @@ class ActivityIncidentServiceTest {
     @Test
     void listByProjectClampsSize() {
         McpToolEventRepository repo = mock(McpToolEventRepository.class);
-        when(repo.countIncidentsByProject(any(), any())).thenReturn(0L);
+        when(repo.summarizeIncidentsByProject(any(), any())).thenReturn(counts(0, 0, 0));
         when(repo.findIncidentsByProject(any(), any(), anyInt(), anyInt())).thenReturn(List.of());
         ActivityIncidentService service = new ActivityIncidentService(repo);
 
@@ -66,7 +66,7 @@ class ActivityIncidentServiceTest {
     @Test
     void listByProjectAssignsErrorSeverity() {
         McpToolEventRepository repo = mock(McpToolEventRepository.class);
-        when(repo.countIncidentsByProject(any(), any())).thenReturn(1L);
+        when(repo.summarizeIncidentsByProject(any(), any())).thenReturn(counts(1, 1, 0));
         when(repo.findIncidentsByProject(any(), any(), anyInt(), anyInt()))
                 .thenReturn(List.of(projection("tool", null, 3, true, "inst1/op1,inst2/op2")));
         ActivityIncidentService service = new ActivityIncidentService(repo);
@@ -81,7 +81,7 @@ class ActivityIncidentServiceTest {
     @Test
     void listByProjectAssignsWarnSeverity() {
         McpToolEventRepository repo = mock(McpToolEventRepository.class);
-        when(repo.countIncidentsByProject(any(), any())).thenReturn(1L);
+        when(repo.summarizeIncidentsByProject(any(), any())).thenReturn(counts(1, 0, 1));
         when(repo.findIncidentsByProject(any(), any(), anyInt(), anyInt()))
                 .thenReturn(List.of(projection("tool", "MCP_REAUTH_REQUIRED", 2, false, "inst1/op1")));
         ActivityIncidentService service = new ActivityIncidentService(repo);
@@ -139,6 +139,14 @@ class ActivityIncidentServiceTest {
             String toolName, String reasonCode, long count, boolean hasError, String recentRaw) {
         Instant now = Instant.now();
         return projectionWithDates(toolName, reasonCode, count, hasError, recentRaw, now, now);
+    }
+
+    private static McpToolEventRepository.IncidentCountsProjection counts(long total, long error, long warn) {
+        return new McpToolEventRepository.IncidentCountsProjection() {
+            public long getTotal()      { return total; }
+            public long getErrorCount() { return error; }
+            public long getWarnCount()  { return warn; }
+        };
     }
 
     private static McpToolEventRepository.ActivityIncidentProjection projectionWithDates(

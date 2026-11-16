@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom, of, throwError } from 'rxjs';
 import { vi } from 'vitest';
 import { ActivityIncident, ActivityIncidentPage } from './activity-incident.models';
@@ -52,6 +52,7 @@ describe('ActivityIncidentIndicator', () => {
         { provide: APP_ENVIRONMENT, useValue: TEST_ENV },
         { provide: ActivityIncidentService, useValue: service },
         { provide: Router, useValue: { navigate } },
+        { provide: ActivatedRoute, useValue: {} },
       ],
     });
     const fixture = TestBed.createComponent(ActivityIncidentIndicator);
@@ -95,9 +96,9 @@ describe('ActivityIncidentIndicator', () => {
   it('navigateToAlerts calls router.navigate with view=alerts queryParam', () => {
     setup();
     component.navigateToAlerts();
-    expect(navigate).toHaveBeenCalledWith([], {
+    expect(navigate).toHaveBeenCalledWith(['../activity'], {
+      relativeTo: {},
       queryParams: { view: 'alerts' },
-      queryParamsHandling: 'merge',
     });
   });
 
