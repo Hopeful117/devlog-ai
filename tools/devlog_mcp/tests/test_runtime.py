@@ -1109,3 +1109,87 @@ class RuntimeTests(unittest.TestCase):
 
         # All operations and reservations must be released
         self.assertEqual(session.operations, {})
+
+    def test_push_session_lifecycle_event_emits_to_session_events_endpoint(self) -> None:
+        import time as _time
+        posted_urls: list[str] = []
+        posted_bodies: list[dict] = []
+
+        class Response:
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                return False
+            def read(self):
+                return b""
+
+        def fake_urlopen(request, timeout=None):
+            posted_urls.append(request.full_url)
+            posted_bodies.append(json.loads(request.data))
+            return Response()
+
+        with patch.object(runtime.urllib.request, "urlopen", side_effect=fake_urlopen):
+            pusher = runtime.ToolEventPusher(
+                base_url="http://localhost:18080",
+                project_slug="devlog-ai",
+                instance_id="inst-1",
+                token_getter=lambda: "test-token",
+                agent_session_id="cc7d159d-a138-4b73-b14e-1e7279d013ab",
+                agent_provider="claude-code",
+            )
+            pusher.push_session_lifecycle_event("SESSION_LIFECYCLE_ENDED")
+            deadline = _time.monotonic() + 1
+            while not posted_urls and _time.monotonic() < deadline:
+                _time.sleep(0.01)
+
+        self.assertEqual(len(posted_urls), 1)
+        self.assertIn("/api/v1/mcp/session-events", posted_urls[0])
+        body = posted_bodies[0]
+        self.assertEqual(body["eventType"], "SESSION_LIFECYCLE_ENDED")
+        self.assertEqual(body["agentSessionId"], "cc7d159d-a138-4b73-b14e-1e7279d013ab")
+        self.assertEqual(body["projectSlug"], "devlog-ai")
+        self.assertEqual(body["agentProvider"], "claude-code")
+
+    def test_push_session_lifecycle_event_does_nothing_without_session_id(self) -> None:
+        import time as _time
+        called: list[bool] = []
+
+        def fake_urlopen(request, timeout=None):
+            called.append(True)
+            raise AssertionError("Should not be called")
+
+        with patch.object(runtime.urllib.request, "urlopen", side_effect=fake_urlopen):
+            pusher = runtime.ToolEventPusher(
+                base_url="http://localhost:18080",
+                project_slug="devlog-ai",
+                instance_id="inst-1",
+                token_getter=lambda: "test-token",
+                agent_session_id=None,
+                agent_provider=None,
+            )
+            pusher.push_session_lifecycle_event("SESSION_LIFECYCLE_ENDED")
+            _time.sleep(0.05)
+
+        self.assertEqual(called, [])
+
+    def test_push_session_lifecycle_event_does_nothing_without_project_slug(self) -> None:
+        import time as _time
+        called: list[bool] = []
+
+        def fake_urlopen(request, timeout=None):
+            called.append(True)
+            raise AssertionError("Should not be called")
+
+        with patch.object(runtime.urllib.request, "urlopen", side_effect=fake_urlopen):
+            pusher = runtime.ToolEventPusher(
+                base_url="http://localhost:18080",
+                project_slug="",
+                instance_id="inst-1",
+                token_getter=lambda: "test-token",
+                agent_session_id="some-session",
+                agent_provider=None,
+            )
+            pusher.push_session_lifecycle_event("SESSION_LIFECYCLE_ENDED")
+            _time.sleep(0.05)
+
+        self.assertEqual(called, [])

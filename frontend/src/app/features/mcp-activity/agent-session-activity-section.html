@@ -40,14 +40,29 @@
               @if (session.failedCount > 0) {
                 <span class="session-failures">{{ session.failedCount }} fail</span>
               }
-              @if (isActive(session)) {
+              @if (session.lifecycleStatus === 'ENDED') {
+                <span
+                  class="session-lifecycle session-lifecycle--ended"
+                  title="Session ended — observed terminal signal"
+                  >ended</span
+                >
+              } @else if (session.lifecycleStatus === 'ACTIVE_TOOL') {
                 <span
                   class="session-active"
                   [title]="
-                    session.activeOperationCount +
-                    ' operation(s) without observed terminal event — session lifecycle unknown'
+                    session.activeOperationCount + ' operation(s) without observed terminal event'
                   "
                   >{{ session.activeOperationCount }} pending</span
+                >
+              } @else if (session.lifecycleStatus === 'IDLE') {
+                <span
+                  class="session-lifecycle session-lifecycle--idle"
+                  [title]="
+                    'No activity observed since ' +
+                    (session.lastObservedAt | date: 'HH:mm') +
+                    ' — session lifecycle unknown'
+                  "
+                  >idle {{ session.lastObservedAt | date: 'HH:mm' }}</span
                 >
               } @else {
                 <time

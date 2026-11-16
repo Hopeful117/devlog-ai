@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.mcptoolobservability;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -15,9 +16,10 @@ class AgentSessionServiceTest {
     @Test
     void listByProjectClampsPageSize() {
         McpToolEventRepository repo = mock(McpToolEventRepository.class);
+        McpSessionLifecycleEventRepository lifecycleRepo = mock(McpSessionLifecycleEventRepository.class);
         when(repo.countSessionsByProject(any())).thenReturn(0L);
         when(repo.findSessionsByProject(any(), anyInt(), anyInt())).thenReturn(List.of());
-        AgentSessionService service = new AgentSessionService(repo);
+        AgentSessionService service = new AgentSessionService(repo, lifecycleRepo);
 
         AgentSessionPageResponse result = service.listByProject(UUID.randomUUID(), 0, 999);
 
@@ -28,6 +30,7 @@ class AgentSessionServiceTest {
     @Test
     void listByProjectMapsAllFields() {
         McpToolEventRepository repo = mock(McpToolEventRepository.class);
+        McpSessionLifecycleEventRepository lifecycleRepo = mock(McpSessionLifecycleEventRepository.class);
         String sessionId = "cc7d159d-a138-4b73-b14e-1e7279d013ab";
         Instant first = Instant.parse("2026-01-01T10:00:00Z");
         Instant last  = Instant.parse("2026-01-01T11:00:00Z");
@@ -35,7 +38,8 @@ class AgentSessionServiceTest {
                 sessionId, "claude-code", first, last, 10, 8, 1, 0, 1);
         when(repo.countSessionsByProject(any())).thenReturn(1L);
         when(repo.findSessionsByProject(any(), anyInt(), anyInt())).thenReturn(List.of(proj));
-        AgentSessionService service = new AgentSessionService(repo);
+        when(lifecycleRepo.hasEndedEvent(any(), any())).thenReturn(false);
+        AgentSessionService service = new AgentSessionService(repo, lifecycleRepo);
 
         AgentSessionPageResponse result = service.listByProject(UUID.randomUUID(), 0, 20);
 
@@ -55,14 +59,68 @@ class AgentSessionServiceTest {
     @Test
     void listByProjectFiltersNullSessions() {
         McpToolEventRepository repo = mock(McpToolEventRepository.class);
+        McpSessionLifecycleEventRepository lifecycleRepo = mock(McpSessionLifecycleEventRepository.class);
         when(repo.countSessionsByProject(any())).thenReturn(0L);
         when(repo.findSessionsByProject(any(), anyInt(), anyInt())).thenReturn(List.of());
-        AgentSessionService service = new AgentSessionService(repo);
+        AgentSessionService service = new AgentSessionService(repo, lifecycleRepo);
 
         AgentSessionPageResponse result = service.listByProject(UUID.randomUUID(), 0, 20);
 
         assertThat(result.totalSessions()).isEqualTo(0);
         assertThat(result.content()).isEmpty();
+    }
+
+    @Test
+    void computeLifecycleStatusEnded() {
+        Instant last = Instant.now().minusSeconds(60);
+        String status = AgentSessionService.computeLifecycleStatus(
+                true, 0, last, Instant.now(),
+                Duration.ofMinutes(10), Duration.ofMinutes(2));
+        assertThat(status).isEqualTo("ENDED");
+    }
+
+    @Test
+    void computeLifecycleStatusActiveTool() {
+        Instant last = Instant.now().minusSeconds(30);
+        String status = AgentSessionService.computeLifecycleStatus(
+                false, 1, last, Instant.now(),
+                Duration.ofMinutes(10), Duration.ofMinutes(2));
+        assertThat(status).isEqualTo("ACTIVE_TOOL");
+    }
+
+    @Test
+    void computeLifecycleStatusIdle() {
+        Instant last = Instant.now().minusSeconds(700);
+        String status = AgentSessionService.computeLifecycleStatus(
+                false, 0, last, Instant.now(),
+                Duration.ofMinutes(10), Duration.ofMinutes(2));
+        assertThat(status).isEqualTo("IDLE");
+    }
+
+    @Test
+    void computeLifecycleStatusUnknownWhenNullLastObserved() {
+        String status = AgentSessionService.computeLifecycleStatus(
+                false, 0, null, Instant.now(),
+                Duration.ofMinutes(10), Duration.ofMinutes(2));
+        assertThat(status).isEqualTo("UNKNOWN");
+    }
+
+    @Test
+    void computeLifecycleStatusUnknownBetweenActiveToolAndIdle() {
+        Instant last = Instant.now().minusSeconds(300);
+        String status = AgentSessionService.computeLifecycleStatus(
+                false, 0, last, Instant.now(),
+                Duration.ofMinutes(10), Duration.ofMinutes(2));
+        assertThat(status).isEqualTo("UNKNOWN");
+    }
+
+    @Test
+    void computeLifecycleStatusEndedTakesPrecedenceOverActiveTool() {
+        Instant last = Instant.now().minusSeconds(10);
+        String status = AgentSessionService.computeLifecycleStatus(
+                true, 2, last, Instant.now(),
+                Duration.ofMinutes(10), Duration.ofMinutes(2));
+        assertThat(status).isEqualTo("ENDED");
     }
 
     private static McpToolEventRepository.AgentSessionProjection projection(

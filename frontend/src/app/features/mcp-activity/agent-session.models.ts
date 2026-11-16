@@ -8,6 +8,7 @@ export interface AgentSession {
   readonly failedCount: number;
   readonly interruptedCount: number;
   readonly activeOperationCount: number;
+  readonly lifecycleStatus: string;
 }
 
 export interface AgentSessionPage {

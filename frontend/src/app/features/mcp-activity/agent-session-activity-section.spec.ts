@@ -19,6 +19,7 @@ function session(overrides: Partial<AgentSession> = {}): AgentSession {
     failedCount: 1,
     interruptedCount: 0,
     activeOperationCount: 0,
+    lifecycleStatus: 'UNKNOWN',
     ...overrides,
   };
 }
@@ -73,14 +74,6 @@ describe('AgentSessionActivitySection', () => {
 
   it('abbreviates session id to 8 characters', () => {
     expect(component.shortId(session())).toBe('cc7d159d');
-  });
-
-  it('reports active when activeOperationCount > 0', () => {
-    expect(component.isActive(session({ activeOperationCount: 2 }))).toBe(true);
-  });
-
-  it('reports not active when activeOperationCount is 0', () => {
-    expect(component.isActive(session({ activeOperationCount: 0 }))).toBe(false);
   });
 
   it('closes detail when same session clicked twice', () => {

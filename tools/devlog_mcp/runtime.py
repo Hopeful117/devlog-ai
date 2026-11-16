@@ -213,6 +213,42 @@ class ToolEventPusher:
             except Exception:
                 pass
 
+    def push_session_lifecycle_event(self, event_type: str) -> None:
+        if not self._project_slug or not self._agent_session_id:
+            return
+        body_data: dict[str, Any] = {
+            "projectSlug": self._project_slug,
+            "agentSessionId": self._agent_session_id,
+            "eventType": event_type,
+            "occurredAt": datetime.now(timezone.utc).isoformat(),
+        }
+        if self._agent_provider:
+            body_data["agentProvider"] = self._agent_provider
+        body = json.dumps(body_data).encode("utf-8")
+        threading.Thread(target=self._post_session_event, args=(body,), daemon=True).start()
+
+    def _post_session_event(self, body: bytes) -> None:
+        try:
+            token = self._token_getter()
+            url = f"{self._base_url}/api/v1/mcp/session-events"
+            request = urllib.request.Request(
+                url,
+                data=body,
+                method="POST",
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {token}",
+                },
+            )
+            with urllib.request.urlopen(request, timeout=5):
+                pass
+        except Exception:
+            try:
+                sys.stderr.write("MCP_COMPANION_PUSH_FAILED\n")
+                sys.stderr.flush()
+            except Exception:
+                pass
+
 
 class TokenLease:
     def __init__(self, token: str, expires_at: float):
@@ -820,6 +856,7 @@ class RuntimeSession:
                 chunk = sys.stdin.buffer.read1(65536)
                 if not chunk:
                     self.stop_requested.set()
+                    self.pusher.push_session_lifecycle_event("SESSION_LIFECYCLE_ENDED")
                     self.stop_child("STDIN_CLOSED")
                     return
                 buffer += chunk
