@@ -38,7 +38,7 @@ class AgentSessionServiceTest {
                 sessionId, "claude-code", first, last, 10, 8, 1, 0, 1);
         when(repo.countSessionsByProject(any())).thenReturn(1L);
         when(repo.findSessionsByProject(any(), anyInt(), anyInt())).thenReturn(List.of(proj));
-        when(lifecycleRepo.hasEndedEvent(any(), any())).thenReturn(false);
+        when(lifecycleRepo.findEndedSessionIds(any(), any())).thenReturn(List.of());
         AgentSessionService service = new AgentSessionService(repo, lifecycleRepo);
 
         AgentSessionPageResponse result = service.listByProject(UUID.randomUUID(), 0, 20);
@@ -121,6 +121,51 @@ class AgentSessionServiceTest {
                 true, 2, last, Instant.now(),
                 Duration.ofMinutes(10), Duration.ofMinutes(2));
         assertThat(status).isEqualTo("ENDED");
+    }
+
+
+    @Test
+    void listByProjectUsesBatchQueryForEndedSessions() {
+        McpToolEventRepository repo = mock(McpToolEventRepository.class);
+        McpSessionLifecycleEventRepository lifecycleRepo = mock(McpSessionLifecycleEventRepository.class);
+        String sid1 = "session-aaa";
+        String sid2 = "session-bbb";
+        Instant first = Instant.parse("2026-01-01T10:00:00Z");
+        Instant last  = Instant.parse("2026-01-01T11:00:00Z");
+        when(repo.countSessionsByProject(any())).thenReturn(2L);
+        when(repo.findSessionsByProject(any(), anyInt(), anyInt())).thenReturn(List.of(
+                projection(sid1, "claude-code", first, last, 5, 5, 0, 0, 0),
+                projection(sid2, "claude-code", first, last, 3, 2, 1, 0, 0)
+        ));
+        when(lifecycleRepo.findEndedSessionIds(any(), any())).thenReturn(List.of(sid1));
+        AgentSessionService service = new AgentSessionService(repo, lifecycleRepo);
+
+        AgentSessionPageResponse result = service.listByProject(UUID.randomUUID(), 0, 20);
+
+        // Batch query called exactly once, not once per session
+        verify(lifecycleRepo, times(1)).findEndedSessionIds(any(), any());
+        assertThat(result.content()).hasSize(2);
+        assertThat(result.content().stream()
+                .filter(v -> v.agentSessionId().equals(sid1))
+                .findFirst().orElseThrow()
+                .lifecycleStatus()).isEqualTo("ENDED");
+        assertThat(result.content().stream()
+                .filter(v -> v.agentSessionId().equals(sid2))
+                .findFirst().orElseThrow()
+                .lifecycleStatus()).isNotEqualTo("ENDED");
+    }
+
+    @Test
+    void listByProjectSkipsBatchQueryWhenNoSessions() {
+        McpToolEventRepository repo = mock(McpToolEventRepository.class);
+        McpSessionLifecycleEventRepository lifecycleRepo = mock(McpSessionLifecycleEventRepository.class);
+        when(repo.countSessionsByProject(any())).thenReturn(0L);
+        when(repo.findSessionsByProject(any(), anyInt(), anyInt())).thenReturn(List.of());
+        AgentSessionService service = new AgentSessionService(repo, lifecycleRepo);
+
+        service.listByProject(UUID.randomUUID(), 0, 20);
+
+        verifyNoInteractions(lifecycleRepo);
     }
 
     private static McpToolEventRepository.AgentSessionProjection projection(
