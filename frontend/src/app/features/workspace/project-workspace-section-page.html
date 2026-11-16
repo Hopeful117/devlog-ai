@@ -24,7 +24,30 @@
             ><button type="button" disabled>Roadmap</button>
           </div>
           <app-project-analyses-section [projectId]="view.project.id" />
-          <app-mcp-operation-activity-section [projectId]="view.project.id" />
+          <div class="mcp-activity-tabs" role="tablist" aria-label="MCP activity view">
+            <button
+              role="tab"
+              type="button"
+              [class.active]="activityView === 'operations'"
+              [attr.aria-selected]="activityView === 'operations'"
+              (click)="activityView = 'operations'"
+            >
+              All Operations</button
+            ><button
+              role="tab"
+              type="button"
+              [class.active]="activityView === 'sessions'"
+              [attr.aria-selected]="activityView === 'sessions'"
+              (click)="activityView = 'sessions'"
+            >
+              Sessions
+            </button>
+          </div>
+          @if (activityView === 'operations') {
+            <app-mcp-operation-activity-section [projectId]="view.project.id" />
+          } @else {
+            <app-agent-session-activity-section [projectId]="view.project.id" />
+          }
         }
         @case ('knowledge') {
           <header class="page-header">
