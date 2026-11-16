@@ -180,6 +180,31 @@ class AgentSessionPostgresIntegrationTest {
         assertThat(result.content().getFirst().toolName()).isEqualTo("tool-a");
     }
 
+    @Test
+    void sessionPaginationIsDeterministicWhenSameLastObservedAt() {
+        UUID projectId = insertProject();
+        String inst = "inst-" + projectId;
+        Instant sameTime = Instant.parse("2026-01-01T12:00:00Z");
+        // Three sessions all with the same last-observed timestamp
+        String sessionA = "aaa-" + UUID.randomUUID();
+        String sessionB = "bbb-" + UUID.randomUUID();
+        String sessionC = "ccc-" + UUID.randomUUID();
+        insertEvent(projectId, inst, "op-a", "tool", "MCP_TOOL_STARTED", "ACTIVE", 1, null, null, sameTime, sessionA, "cc");
+        insertEvent(projectId, inst, "op-b", "tool", "MCP_TOOL_STARTED", "ACTIVE", 1, null, null, sameTime, sessionB, "cc");
+        insertEvent(projectId, inst, "op-c", "tool", "MCP_TOOL_STARTED", "ACTIVE", 1, null, null, sameTime, sessionC, "cc");
+
+        // Page 1 of size 2 and page 2 of size 2 must together yield all 3 sessions without duplicates
+        AgentSessionPageResponse page1 = service.listByProject(projectId, 0, 2);
+        AgentSessionPageResponse page2 = service.listByProject(projectId, 1, 2);
+
+        assertThat(page1.content()).hasSize(2);
+        assertThat(page2.content()).hasSize(1);
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        page1.content().forEach(s -> ids.add(s.agentSessionId()));
+        page2.content().forEach(s -> ids.add(s.agentSessionId()));
+        assertThat(ids).containsExactlyInAnyOrder(sessionA, sessionB, sessionC);
+    }
+
     // --- helpers ---
 
     private UUID insertProject() {

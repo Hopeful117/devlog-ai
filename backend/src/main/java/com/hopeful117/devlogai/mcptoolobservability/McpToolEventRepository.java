@@ -140,7 +140,7 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
                 COUNT(*) FILTER (WHERE status = 'ACTIVE')             AS active_operation_count
             FROM op_level
             GROUP BY agent_session_id
-            ORDER BY MAX(time_max) DESC NULLS LAST
+            ORDER BY MAX(time_max) DESC NULLS LAST, agent_session_id ASC
             LIMIT :size OFFSET :offset
             """, nativeQuery = true)
     List<AgentSessionProjection> findSessionsByProject(
