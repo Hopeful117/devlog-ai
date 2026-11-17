@@ -4,7 +4,9 @@ import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
 import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
 import org.springframework.ai.mcp.annotation.McpTool;
+import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;
+import org.springframework.lang.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -48,12 +50,17 @@ public class CompanionAppTool {
 
     @McpTool(
             name = "open_devlog_companion",
-            description = "Opens the DevLog Companion interface showing recent MCP tool activity for the devlog-ai project.",
+            description = "Opens the DevLog Companion interface showing recent MCP tool activity for a DevLog project.",
             metaProvider = DevlogCompanionMetaProvider.class
     )
-    public String openDevlogCompanion(McpSyncRequestContext requestContext) {
+    public String openDevlogCompanion(
+            @McpToolParam(description = "Slug of the DevLog project to show activity for "
+                    + "(defaults to 'devlog-ai' when not provided)", required = false)
+            @Nullable String projectSlug,
+            McpSyncRequestContext requestContext) {
+        String slug = (projectSlug != null && !projectSlug.isBlank()) ? projectSlug : "devlog-ai";
         if (principalProvider == null) {
-            return openDevlogCompanionUnauthenticated();
+            return openDevlogCompanionUnauthenticated(slug);
         }
         var principal = principalProvider.currentPrincipal(requestContext)
                 .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
@@ -62,7 +69,7 @@ public class CompanionAppTool {
         }
         try {
             var project = projectClient.getProjectContextAuthenticated(
-                    "devlog-ai",
+                    slug,
                     principal.bearerToken(),
                     principal.delegationToken() != null ? principal.delegationToken() : "");
             UUID projectId = project.id();
@@ -72,27 +79,27 @@ public class CompanionAppTool {
                     principal.bearerToken(),
                     principal.delegationToken() != null ? principal.delegationToken() : "");
 
-            return buildPayload(raw);
+            return buildPayload(slug, raw);
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}";
         }
     }
 
-    private String openDevlogCompanionUnauthenticated() {
+    private String openDevlogCompanionUnauthenticated(String slug) {
         try {
-            var project = projectClient.getProjectContext("devlog-ai");
+            var project = projectClient.getProjectContext(slug);
             UUID projectId = project.id();
             String raw = companionClient.listMcpOperations(projectId, 0, 15);
-            return buildPayload(raw);
+            return buildPayload(slug, raw);
         } catch (Exception e) {
             return "{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}";
         }
     }
 
-    private String buildPayload(String raw) throws Exception {
+    private String buildPayload(String slug, String raw) throws Exception {
         JsonNode page = objectMapper.readTree(raw);
         ObjectNode payload = objectMapper.createObjectNode();
-        payload.put("projectSlug", "devlog-ai");
+        payload.put("projectSlug", slug);
         payload.put("totalOperations", page.path("totalOperations").asLong());
         payload.put("asOf", Instant.now().toString());
         ArrayNode ops = objectMapper.createArrayNode();

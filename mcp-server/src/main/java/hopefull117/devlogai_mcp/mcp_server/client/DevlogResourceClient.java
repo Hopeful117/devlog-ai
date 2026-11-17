@@ -1,6 +1,7 @@
 package hopefull117.devlogai_mcp.mcp_server.client;
 
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.service.annotation.GetExchange;
 import org.springframework.web.service.annotation.HttpExchange;
@@ -53,6 +54,13 @@ public interface DevlogResourceClient {
             @PathVariable("projectId") UUID projectId,
             @RequestParam("query") String query,
             @RequestParam(value = "limit", required = false) Integer limit);
+
+    @GetExchange("/project-history/projects/{projectId}/commits/search")
+    String searchProjectHistoryAuthenticated(
+            @PathVariable("projectId") UUID projectId,
+            @RequestParam("query") String query,
+            @RequestParam(value = "limit", required = false) Integer limit,
+            @RequestHeader("Authorization") String authorization);
 
     @GetExchange("/evidence/resolve")
     String resolveEvidence(
