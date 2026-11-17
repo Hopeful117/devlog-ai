@@ -31,7 +31,10 @@ class ServerInfoResourceTest {
         assertThat(names(result.path("tools"))).containsExactly(
                 "analyze_story_context",
                 "devlog_story_agent",
+                "get_devlog_context_trace",
                 "get_engineering_context",
+                "open_devlog_companion",
+                "register_project",
                 "search_project_history",
                 "story_context_agent_follow_up_authenticated",
                 "story_context_agent_get_projection",
@@ -42,6 +45,7 @@ class ServerInfoResourceTest {
         assertThat(result.path("prompts").isArray()).isTrue();
         assertThat(result.path("prompts")).isEmpty();
         assertThat(names(result.path("resources"))).containsExactly(
+                "devlog-companion-app",
                 "evidence-resolution",
                 "project-commit-context",
                 "project-context",
