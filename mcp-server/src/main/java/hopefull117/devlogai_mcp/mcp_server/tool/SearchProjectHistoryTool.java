@@ -2,9 +2,12 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogResourceClient;
 import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
+import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
+import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -14,7 +17,6 @@ import org.springframework.stereotype.Component;
  * belongs to the commit-context resource referenced in each match.
  */
 @Component
-@RequiredArgsConstructor
 public class SearchProjectHistoryTool {
 
     static final int DEFAULT_LIMIT = 20;
@@ -22,6 +24,21 @@ public class SearchProjectHistoryTool {
 
     private final DevlogResourceClient resourceClient;
     private final ResourceSupport support;
+    private final McpAuthenticatedPrincipalProvider principalProvider;
+
+    public SearchProjectHistoryTool(DevlogResourceClient resourceClient, ResourceSupport support) {
+        this(resourceClient, support, null);
+    }
+
+    @Autowired
+    public SearchProjectHistoryTool(
+            DevlogResourceClient resourceClient,
+            ResourceSupport support,
+            McpAuthenticatedPrincipalProvider principalProvider) {
+        this.resourceClient = resourceClient;
+        this.support = support;
+        this.principalProvider = principalProvider;
+    }
 
     @McpTool(
             name = "search_project_history",
@@ -41,19 +58,32 @@ public class SearchProjectHistoryTool {
 
             @McpToolParam(description = "Maximum number of results returned (default 20, "
                     + "maximum 100)", required = false)
-            Integer limit
+            Integer limit,
+
+            McpSyncRequestContext requestContext
     ) {
         var projectId = support.requireProjectId(projectSlug);
         if (query == null || query.isBlank()) {
-            throw ResourceSupport.invalidParams(
-                    "query must not be blank");
+            throw ResourceSupport.invalidParams("query must not be blank");
         }
         if (limit != null && (limit < 1 || limit > MAX_LIMIT)) {
             throw ResourceSupport.invalidParams(
                     "limit must be between 1 and %d".formatted(MAX_LIMIT));
         }
+        String trimmedQuery = query.strip();
+        String notFound = "Project '%s' not found".formatted(projectSlug);
+
+        if (principalProvider != null) {
+            var principal = principalProvider.currentPrincipal(requestContext).orElse(null);
+            if (principal != null && principal.bearerToken() != null && !principal.bearerToken().isBlank()) {
+                String auth = principal.bearerToken();
+                return support.getScoped(
+                        () -> resourceClient.searchProjectHistoryAuthenticated(projectId, trimmedQuery, limit, auth),
+                        notFound);
+            }
+        }
         return support.getScoped(
-                () -> resourceClient.searchProjectHistory(projectId, query.strip(), limit),
-                "Project '%s' not found".formatted(projectSlug));
+                () -> resourceClient.searchProjectHistory(projectId, trimmedQuery, limit),
+                notFound);
     }
 }

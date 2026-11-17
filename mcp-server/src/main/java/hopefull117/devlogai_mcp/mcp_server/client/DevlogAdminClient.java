@@ -3,11 +3,13 @@ package hopefull117.devlogai_mcp.mcp_server.client;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.service.annotation.GetExchange;
 import org.springframework.web.service.annotation.HttpExchange;
 import org.springframework.web.service.annotation.PostExchange;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Mutation-capable client for DevLog backend endpoints not covered by the
@@ -42,5 +44,12 @@ public interface DevlogAdminClient {
     String createSourceAuthenticated(
             @RequestHeader("Authorization") String authorization,
             @RequestBody Map<String, Object> request
+    );
+
+    @PostExchange("/project-history/repositories/{repositoryId}/imports")
+    String importProjectHistoryAuthenticated(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("repositoryId") UUID repositoryId,
+            @RequestParam(value = "revision", required = false) String revision
     );
 }

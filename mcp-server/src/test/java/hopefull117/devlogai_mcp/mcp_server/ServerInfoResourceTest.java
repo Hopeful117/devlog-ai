@@ -39,7 +39,8 @@ class ServerInfoResourceTest {
                 "story_context_agent_follow_up_authenticated",
                 "story_context_agent_get_projection",
                 "story_context_agent_get_snapshot_authenticated",
-                "story_context_agent_submit_task");
+                "story_context_agent_submit_task",
+                "sync_project_history");
         assertThat(values(result.path("tools"), "description"))
                 .allSatisfy(description -> assertThat(description).isNotBlank());
         assertThat(result.path("prompts").isArray()).isTrue();

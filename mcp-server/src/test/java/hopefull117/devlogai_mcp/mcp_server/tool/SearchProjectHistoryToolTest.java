@@ -58,7 +58,7 @@ class SearchProjectHistoryToolTest {
         when(resourceClient.searchProjectHistory(PROJECT_ID, "Markdown Rendering", null))
                 .thenReturn(payload);
 
-        String result = tool.searchProjectHistory(SLUG, "  Markdown Rendering  ", null);
+        String result = tool.searchProjectHistory(SLUG, "  Markdown Rendering  ", null, null);
 
         assertThat(result)
                 .contains("\"totalMatches\":1")
@@ -72,28 +72,28 @@ class SearchProjectHistoryToolTest {
         when(resourceClient.searchProjectHistory(PROJECT_ID, "engine", 5))
                 .thenReturn("{\"results\":[]}");
 
-        tool.searchProjectHistory(SLUG, "engine", 5);
+        tool.searchProjectHistory(SLUG, "engine", 5, null);
 
         verify(resourceClient).searchProjectHistory(PROJECT_ID, "engine", 5);
     }
 
     @Test
     void shouldRejectBlankQuery() {
-        assertThatThrownBy(() -> tool.searchProjectHistory(SLUG, "   ", null))
+        assertThatThrownBy(() -> tool.searchProjectHistory(SLUG, "   ", null, null))
                 .isInstanceOf(McpError.class);
     }
 
     @Test
     void shouldRejectInvalidLimit() {
-        assertThatThrownBy(() -> tool.searchProjectHistory(SLUG, "engine", 0))
+        assertThatThrownBy(() -> tool.searchProjectHistory(SLUG, "engine", 0, null))
                 .isInstanceOf(McpError.class);
-        assertThatThrownBy(() -> tool.searchProjectHistory(SLUG, "engine", 101))
+        assertThatThrownBy(() -> tool.searchProjectHistory(SLUG, "engine", 101, null))
                 .isInstanceOf(McpError.class);
     }
 
     @Test
     void shouldRejectUnknownProject() {
-        assertThatThrownBy(() -> tool.searchProjectHistory("unknown", "engine", null))
+        assertThatThrownBy(() -> tool.searchProjectHistory("unknown", "engine", null, null))
                 .isInstanceOf(McpError.class)
                 .hasMessageContaining("Project 'unknown' not found");
     }
