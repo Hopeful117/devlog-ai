@@ -95,7 +95,7 @@ public class RegisterProjectTool {
         }
 
         String projectJson = bearerToken != null
-                ? adminClient.createProjectAuthenticated("Bearer " + bearerToken, projectRequest)
+                ? adminClient.createProjectAuthenticated(bearerToken, projectRequest)
                 : adminClient.createProject(projectRequest);
 
         JsonNode project = objectMapper.readTree(projectJson);
@@ -120,7 +120,7 @@ public class RegisterProjectTool {
             sourceRequest.put("provider", provider);
 
             String sourceJson = bearerToken != null
-                    ? adminClient.createSourceAuthenticated("Bearer " + bearerToken, sourceRequest)
+                    ? adminClient.createSourceAuthenticated(bearerToken, sourceRequest)
                     : adminClient.createSource(sourceRequest);
 
             result.set("source", objectMapper.readTree(sourceJson));
