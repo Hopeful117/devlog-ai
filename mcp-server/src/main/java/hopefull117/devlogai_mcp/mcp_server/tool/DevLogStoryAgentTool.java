@@ -2,6 +2,7 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
+import hopefull117.devlogai_mcp.mcp_server.service.McpToolObservabilityService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
 import org.springframework.ai.mcp.annotation.McpArg;
@@ -13,6 +14,7 @@ import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProv
 import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +39,20 @@ public class DevLogStoryAgentTool {
     private final long pollTimeoutMs;
     private final long pollIntervalMs;
     private final McpAuthenticatedPrincipalProvider principalProvider;
+    private final McpToolObservabilityService observability;
 
     public DevLogStoryAgentTool(DevlogProjectContextClient client, ObjectMapper objectMapper) {
-        this(client, objectMapper, DEFAULT_POLL_TIMEOUT_MS, DEFAULT_POLL_INTERVAL_MS, () -> java.util.Optional.empty());
+        this(client, objectMapper, DEFAULT_POLL_TIMEOUT_MS, DEFAULT_POLL_INTERVAL_MS,
+                () -> java.util.Optional.empty(), null);
+    }
+
+    public DevLogStoryAgentTool(
+            DevlogProjectContextClient client,
+            ObjectMapper objectMapper,
+            long pollTimeoutMs,
+            long pollIntervalMs,
+            McpAuthenticatedPrincipalProvider principalProvider) {
+        this(client, objectMapper, pollTimeoutMs, pollIntervalMs, principalProvider, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -48,7 +61,8 @@ public class DevLogStoryAgentTool {
             ObjectMapper objectMapper,
             @Value("${devlog.story-agent.poll.timeout-ms:180000}") long pollTimeoutMs,
             @Value("${devlog.story-agent.poll.interval-ms:2000}") long pollIntervalMs,
-            McpAuthenticatedPrincipalProvider principalProvider) {
+            McpAuthenticatedPrincipalProvider principalProvider,
+            @Nullable McpToolObservabilityService observability) {
         if (pollTimeoutMs < 0 || pollTimeoutMs > MAX_POLL_TIMEOUT_MS || pollIntervalMs < 0) {
             throw new IllegalArgumentException("Story Agent polling timeout must be between 0 and 180000 ms");
         }
@@ -57,6 +71,7 @@ public class DevLogStoryAgentTool {
         this.pollTimeoutMs = pollTimeoutMs;
         this.pollIntervalMs = pollIntervalMs;
         this.principalProvider = principalProvider;
+        this.observability = observability;
     }
 
     public String execute(
@@ -86,8 +101,13 @@ public class DevLogStoryAgentTool {
             McpSyncRequestContext requestContext) {
         var principal = principalProvider.currentPrincipal(requestContext)
                 .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
-        return execute(projectSlug, storyId, intent, question, files, guidance, idempotencyKey,
-                principal);
+        String operationId = observability != null ? observability.newOperationId() : null;
+        Instant startedAt = Instant.now();
+        String result = execute(projectSlug, storyId, intent, question, files, guidance, idempotencyKey, principal);
+        if (observability != null && operationId != null) {
+            observability.recordCompletion(projectSlug, operationId, "devlog_story_agent", startedAt, result);
+        }
+        return result;
     }
 
     private String execute(
