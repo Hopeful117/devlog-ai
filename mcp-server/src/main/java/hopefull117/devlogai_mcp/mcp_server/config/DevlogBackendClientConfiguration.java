@@ -1,5 +1,6 @@
 package hopefull117.devlogai_mcp.mcp_server.config;
 
+import hopefull117.devlogai_mcp.mcp_server.client.DevlogAdminClient;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogResourceClient;
 import hopefull117.devlogai_mcp.mcp_server.companion.DevlogCompanionClient;
@@ -29,6 +30,13 @@ public class DevlogBackendClientConfiguration {
             @Value("${devlog.backend.base-url}") String baseUrl
     ) {
         return buildClient(baseUrl, DevlogResourceClient.class);
+    }
+
+    @Bean
+    DevlogAdminClient devlogAdminClient(
+            @Value("${devlog.backend.base-url}") String baseUrl
+    ) {
+        return buildClient(baseUrl, DevlogAdminClient.class);
     }
 
     @Bean
