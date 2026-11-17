@@ -73,7 +73,7 @@ public class ProjectProfileServiceImpl implements ProjectProfileService {
                 .orElseThrow(() -> new EntityNotFoundException("Project profile", analysisId));
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override @Transactional(readOnly = true, noRollbackFor = EntityNotFoundException.class)
     public ProjectProfileResponse getLatestByProject(UUID projectId) {
         return profileRepository.findFirstByProjectIdOrderByGeneratedAtDescIdDesc(projectId)
                 .map(this::toResponse)
