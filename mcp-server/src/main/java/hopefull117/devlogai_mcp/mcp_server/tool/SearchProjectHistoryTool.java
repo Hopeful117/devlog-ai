@@ -76,7 +76,7 @@ public class SearchProjectHistoryTool {
         if (principalProvider != null) {
             var principal = principalProvider.currentPrincipal(requestContext).orElse(null);
             if (principal != null && principal.bearerToken() != null && !principal.bearerToken().isBlank()) {
-                String auth = "Bearer " + principal.bearerToken();
+                String auth = principal.bearerToken();
                 return support.getScoped(
                         () -> resourceClient.searchProjectHistoryAuthenticated(projectId, trimmedQuery, limit, auth),
                         notFound);

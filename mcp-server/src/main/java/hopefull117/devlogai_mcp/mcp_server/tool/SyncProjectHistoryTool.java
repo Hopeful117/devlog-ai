@@ -59,7 +59,7 @@ public class SyncProjectHistoryTool {
         if (principalProvider != null) {
             var principal = principalProvider.currentPrincipal(requestContext).orElse(null);
             if (principal != null && principal.bearerToken() != null && !principal.bearerToken().isBlank()) {
-                return doSync(projectSlug, revision, "Bearer " + principal.bearerToken());
+                return doSync(projectSlug, revision, principal.bearerToken());
             }
         }
         throw ResourceSupport.unauthenticated("Authentication is required to sync project history");
