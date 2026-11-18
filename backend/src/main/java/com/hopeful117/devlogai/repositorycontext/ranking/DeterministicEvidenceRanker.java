@@ -8,6 +8,8 @@ import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceCriterion;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 import org.springframework.stereotype.Component;
 
+import org.springframework.beans.factory.annotation.Value;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -24,6 +26,15 @@ import java.util.LinkedHashMap;
 public class DeterministicEvidenceRanker implements EvidenceRanker {
     static final String POLICY_VERSION = "multi-criteria-v2";
 
+    private final RetrievalFusionService fusionService;
+
+    @Value("${devlog.retrieval.fusion.k:60}")
+    private int fusionK = 60;
+
+    public DeterministicEvidenceRanker(RetrievalFusionService fusionService) {
+        this.fusionService = fusionService;
+    }
+
     @Override
     public List<RepositoryEvidence> rank(
             List<RepositoryEvidence> evidence,
@@ -38,8 +49,18 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
                 + Objects.toString(guidance.outputContext(), "");
         TermModel guidanceTerms = termModel(guidanceQuery, evidence,
                 request.contextPlan().precisionPolicy().maximumCommonTermPercentage());
+        List<RepositoryEvidence> semanticCandidates = evidence.stream()
+                .filter(e -> "SEMANTIC_RETRIEVAL".equals(e.provenance().sourceType()))
+                .toList();
+        List<RepositoryEvidence> lexicalRanked = evidence.stream()
+                .filter(e -> !"SEMANTIC_RETRIEVAL".equals(e.provenance().sourceType()))
+                .sorted(Comparator.comparingInt(
+                        (RepositoryEvidence e) -> semanticTerms.score(e)).reversed())
+                .toList();
+        Map<String, Integer> compositeScores =
+                fusionService.fuse(lexicalRanked, semanticCandidates, fusionK);
         return evidence.stream().map(value -> rank(
-                        value, request, semanticTerms, guidanceTerms))
+                        value, request, semanticTerms, guidanceTerms, compositeScores))
                 .sorted(Comparator.comparingInt(RepositoryEvidence::relevanceScore).reversed()
                         .thenComparing(value -> value.layer().ordinal())
                         .thenComparing(RepositoryEvidence::reference))
@@ -50,12 +71,13 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
             RepositoryEvidence evidence,
             ContextRequest request,
             TermModel semanticTerms,
-            TermModel guidanceTerms
+            TermModel guidanceTerms,
+            Map<String, Integer> compositeScores
     ) {
         Map<EvidenceCriterion, Integer> criteria =
                 new EnumMap<>(EvidenceCriterion.class);
         criteria.put(EvidenceCriterion.SEMANTIC_RELEVANCE,
-                semanticRelevance(evidence, semanticTerms));
+                semanticRelevance(evidence, semanticTerms, compositeScores));
         criteria.put(EvidenceCriterion.ARCHITECTURAL_RELEVANCE,
                 architecturalRelevance(evidence));
         criteria.put(EvidenceCriterion.HISTORICAL_RELEVANCE,
@@ -88,9 +110,10 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
 
     private int semanticRelevance(
             RepositoryEvidence evidence,
-            TermModel terms
+            TermModel terms,
+            Map<String, Integer> compositeScores
     ) {
-        int score = terms.score(evidence);
+        int score = compositeScores.getOrDefault(evidence.reference(), terms.score(evidence));
         if (evidence.layer() == RepositoryContextLayer.CURRENT_ANALYSIS && score < 90)
             score = 90;
         return score;
