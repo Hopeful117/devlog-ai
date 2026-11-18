@@ -5,6 +5,8 @@ import com.hopeful117.devlogai.insight.entity.InsightSeverity;
 import com.hopeful117.devlogai.insight.entity.InsightStatus;
 import com.hopeful117.devlogai.insight.entity.InsightType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Pageable;
 
 import java.util.Collection;
@@ -52,5 +54,18 @@ public interface InsightRepository extends JpaRepository<Insight, UUID> {
             UUID projectId,
             InsightType type,
             InsightSeverity severity
+    );
+
+    @Query(value = """
+            SELECT * FROM insights
+            WHERE project_id = :projectId
+              AND search_vector @@ plainto_tsquery('english', :query)
+            ORDER BY ts_rank(search_vector, plainto_tsquery('english', :query)) DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<Insight> findByProjectIdAndFullText(
+            @Param("projectId") UUID projectId,
+            @Param("query") String query,
+            @Param("limit") int limit
     );
 }
