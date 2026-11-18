@@ -1,7 +1,7 @@
 {
   "name": "devlog-companion",
   "version": "0.2.0",
-  "description": "DevLog Companion — activity band and pane that reacts to DevLog MCP tool calls in real time",
+  "description": "DevLog Companion — persistent presence panel with avatar, 5-state indicator, and 3-tab navigation (Now / Context / History)",
   "author": {
     "name": "devlog-ai"
   },

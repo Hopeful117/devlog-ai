@@ -18,6 +18,8 @@ declare module 'claude-code' {
         loading: boolean
         error: string | null
       } | null
+      view: 'now' | 'context' | 'history'
+      disconnected: boolean
     }
   }
 }
