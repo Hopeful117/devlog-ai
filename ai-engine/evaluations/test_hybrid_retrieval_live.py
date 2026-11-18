@@ -86,7 +86,8 @@ class TestRunLive:
     def test_recommendation_is_valid(self) -> None:
         report = run_live()
         assert report["aggregate"]["recommendation"] in {
-            "ENABLE_HYBRID", "LEXICAL_SUFFICIENT", "COMPOSITION_BOTTLENECK"
+            "ENABLE_HYBRID", "LEXICAL_SUFFICIENT", "COMPOSITION_BOTTLENECK",
+            "INSUFFICIENT_EVIDENCE",
         }
 
     def test_hybrid_outperforms_lexical_on_fixture_corpus(self) -> None:

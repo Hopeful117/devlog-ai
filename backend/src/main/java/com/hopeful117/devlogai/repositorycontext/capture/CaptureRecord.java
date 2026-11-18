@@ -19,6 +19,7 @@ public record CaptureRecord(
         boolean truncated,
         long latencyMs,
         String contextDigest,
+        String condition,
         List<String> expectedEvidence,
         List<CandidateCapture> candidates
 ) {

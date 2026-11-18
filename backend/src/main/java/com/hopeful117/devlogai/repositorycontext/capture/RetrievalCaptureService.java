@@ -36,6 +36,9 @@ public class RetrievalCaptureService {
     @Value("${devlog.retrieval.capture.output-dir:evaluations/captures/live}")
     private String outputDir;
 
+    @Value("${devlog.retrieval.semantic.enabled:false}")
+    private boolean semanticEnabled;
+
     private final ObjectMapper objectMapper;
 
     public RetrievalCaptureService(ObjectMapper objectMapper) {
@@ -66,6 +69,10 @@ public class RetrievalCaptureService {
         } catch (Exception e) {
             log.warn("Retrieval capture failed and was suppressed: {}", e.getMessage(), e);
         }
+    }
+
+    private String determineCondition() {
+        return semanticEnabled ? "HYBRID_EXPERIMENT" : "LEXICAL_CONTROL";
     }
 
     private void doCaptureUnchecked(
@@ -131,6 +138,7 @@ public class RetrievalCaptureService {
                 ctx.truncated(),
                 latencyMs,
                 ctx.contextDigest(),
+                determineCondition(),
                 List.of(),
                 candidates
         );
