@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AiUserConfigurationPostgresIntegrationTest {
     @Container
     @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("pgvector/pgvector:pg17");
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -40,7 +40,7 @@ class AiUserConfigurationPostgresIntegrationTest {
                 String.class, id)).isEqualTo("{}");
         assertThat(jdbc.queryForObject(
                  "select version from flyway_schema_history where success order by installed_rank desc limit 1",
-                 String.class)).isEqualTo("81");
+                 String.class)).isEqualTo("83");
         assertThat(jdbc.queryForObject("""
                 select target_output_tokens
                 from story_context_completion_policies

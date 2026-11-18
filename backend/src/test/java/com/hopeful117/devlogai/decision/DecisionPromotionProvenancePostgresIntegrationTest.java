@@ -31,7 +31,7 @@ class DecisionPromotionProvenancePostgresIntegrationTest {
     @Container
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:17-alpine");
+            new PostgreSQLContainer<>("pgvector/pgvector:pg17");
 
     @Autowired
     private JdbcTemplate jdbc;

@@ -27,7 +27,7 @@ class HistoricalKnowledgeRepositoryPostgresIntegrationTest {
     @Container
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>("postgres:17-alpine");
+            new PostgreSQLContainer<>("pgvector/pgvector:pg17");
 
     @Autowired private AnalysisRepository analysisRepository;
     @Autowired private FactRepository factRepository;
