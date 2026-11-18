@@ -11,9 +11,11 @@ import com.hopeful117.devlogai.knowledge.relation.entity.KnowledgeRelationType;
 import com.hopeful117.devlogai.knowledge.relation.repository.KnowledgeRelationRepository;
 import com.hopeful117.devlogai.proposal.entity.ProposalType;
 import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
+import com.hopeful117.devlogai.retrieval.event.InsightAcceptedEvent;
 import com.hopeful117.devlogai.validation.entity.Validation;
 import com.hopeful117.devlogai.insight.service.InsightSimilarityService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -26,6 +28,7 @@ public class InsightPromotionService {
     private final InsightRepository insightRepository;
     private final KnowledgeRelationRepository knowledgeRelationRepository;
     private final InsightSimilarityService similarityService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public PromotionResult promote(ValidatableProposal proposal, Validation validation, InsightSeverity severity) {
         if (proposal.getType() != ProposalType.INSIGHT) {
@@ -53,6 +56,7 @@ public class InsightPromotionService {
                 .sourceType(InsightPayloadSupport.optionalText(payload, "insightType"))
                 .build();
         Insight savedInsight = insightRepository.save(insight);
+        eventPublisher.publishEvent(new InsightAcceptedEvent(savedInsight.getProject().getId(), savedInsight.getId()));
         createEnrichmentRelationIfNeeded(proposal, savedInsight);
 
         SimilarityAssessment assessment = assessSemanticSimilarity(savedInsight);

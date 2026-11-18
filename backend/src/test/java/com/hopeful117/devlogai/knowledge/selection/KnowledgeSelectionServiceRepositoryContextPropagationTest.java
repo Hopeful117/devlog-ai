@@ -35,6 +35,7 @@ import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.ObjectMapper;
 
@@ -92,7 +93,8 @@ class KnowledgeSelectionServiceRepositoryContextPropagationTest {
                 new AdrStatusParser(),
                 new DocumentBudgetPolicy(5, 4000, 12000),
                 new DocumentPriorityComparator(),
-                new EvidenceFactory());
+                new EvidenceFactory(),
+                mock(ApplicationEventPublisher.class));
 
         ContextPlan contextPlan = new ContextPlan(
                 "context-plan-v1",

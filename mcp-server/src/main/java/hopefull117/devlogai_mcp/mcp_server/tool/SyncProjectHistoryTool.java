@@ -59,14 +59,15 @@ public class SyncProjectHistoryTool {
         if (principalProvider != null) {
             var principal = principalProvider.currentPrincipal(requestContext).orElse(null);
             if (principal != null && principal.bearerToken() != null && !principal.bearerToken().isBlank()) {
-                return doSync(projectSlug, revision, principal.bearerToken());
+                return doSync(projectSlug, revision, principal.bearerToken(), requestContext);
             }
         }
         throw ResourceSupport.unauthenticated("Authentication is required to sync project history");
     }
 
-    private String doSync(String projectSlug, @Nullable String revision, String authorization) {
-        var projectId = support.requireProjectId(projectSlug);
+    private String doSync(String projectSlug, @Nullable String revision, String authorization,
+            McpSyncRequestContext requestContext) {
+        var projectId = support.requireProjectId(projectSlug, requestContext);
         var repositoryId = support.requireActiveSourceId(projectId, projectSlug);
         try {
             return adminClient.importProjectHistoryAuthenticated(authorization, repositoryId, revision);

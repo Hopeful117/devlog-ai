@@ -89,4 +89,22 @@ public interface RetrievalDocumentRepository extends JpaRepository<RetrievalDocu
         sb.append("]");
         return findByProjectIdAndSimilarityNative(projectId, sb.toString(), limit, maxDistance);
     }
+
+    /**
+     * Clears the embedding and embedding_model for all documents of a given source type
+     * and model, triggering re-indexing on the next BackfillJob run.
+     * Used by operators when changing the embedding model version.
+     * Native query required because embedding is @Transient and invisible to JPQL.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE retrieval_documents
+               SET embedding = NULL,
+                   embedding_model = NULL
+             WHERE source_type = :sourceType
+               AND embedding_model = :oldEmbeddingModel
+            """, nativeQuery = true)
+    void markEmbeddingStaleBySourceType(
+            @Param("sourceType") String sourceType,
+            @Param("oldEmbeddingModel") String oldEmbeddingModel);
 }

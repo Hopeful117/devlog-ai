@@ -2,6 +2,7 @@ package com.hopeful117.devlogai.story.service;
 
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.retrieval.event.StoryStatusChangedEvent;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.story.dto.request.CompleteStoryRequest;
@@ -13,7 +14,9 @@ import com.hopeful117.devlogai.story.entity.StoryStatus;
 import com.hopeful117.devlogai.story.mapper.EngineeringStoryMapper;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -26,6 +29,7 @@ public class EngineeringStoryServiceImpl implements EngineeringStoryService {
     private final EngineeringStoryRepository storyRepository;
     private final ProjectRepository projectRepository;
     private final EngineeringStoryMapper storyMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     public EngineeringStoryResponse register(CreateEngineeringStoryRequest request) {
@@ -41,6 +45,7 @@ public class EngineeringStoryServiceImpl implements EngineeringStoryService {
     }
 
     @Override
+    @Transactional
     public EngineeringStoryResponse startImplementation(UUID storyId, UUID projectId, StartStoryRequest request) {
         EngineeringStory story = requireStoryInProject(storyId, projectId);
         requireStatus(story, StoryStatus.REGISTERED);
@@ -49,10 +54,12 @@ public class EngineeringStoryServiceImpl implements EngineeringStoryService {
         story.setStatus(StoryStatus.IN_PROGRESS);
 
         EngineeringStory saved = storyRepository.save(story);
+        eventPublisher.publishEvent(new StoryStatusChangedEvent(saved.getProject().getId(), saved.getId()));
         return storyMapper.toResponse(saved);
     }
 
     @Override
+    @Transactional
     public EngineeringStoryResponse complete(UUID storyId, UUID projectId, CompleteStoryRequest request) {
         EngineeringStory story = requireStoryInProject(storyId, projectId);
         requireStatus(story, StoryStatus.IN_PROGRESS);
@@ -62,6 +69,7 @@ public class EngineeringStoryServiceImpl implements EngineeringStoryService {
         story.setCompletedAt(Instant.now());
 
         EngineeringStory saved = storyRepository.save(story);
+        eventPublisher.publishEvent(new StoryStatusChangedEvent(saved.getProject().getId(), saved.getId()));
         return storyMapper.toResponse(saved);
     }
 

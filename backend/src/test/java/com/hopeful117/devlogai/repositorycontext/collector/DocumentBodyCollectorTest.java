@@ -22,6 +22,7 @@ import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -60,6 +61,7 @@ class DocumentBodyCollectorTest {
     @Mock private EngineeringStoryRepository storyRepository;
     @Mock private DocumentReferenceExtractor referenceExtractor;
     @Mock private DocumentBudgetPolicy budgetPolicy;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     private DocumentPriorityComparator priorityComparator;
     private DocumentBodyCollector collector;
@@ -76,7 +78,7 @@ class DocumentBodyCollectorTest {
         collector = new DocumentBodyCollector(
                 contentReader, sourceRepository, workspaceManager, storyRepository,
                 referenceExtractor, new AdrStatusParser(), budgetPolicy,
-                priorityComparator, new EvidenceFactory());
+                priorityComparator, new EvidenceFactory(), eventPublisher);
         lenient().when(budgetPolicy.maxCharactersPerDocument()).thenReturn(4000);
         lenient().when(budgetPolicy.maxSelectedDocuments()).thenReturn(5);
         lenient().when(budgetPolicy.maxTotalCharacters()).thenReturn(12000);

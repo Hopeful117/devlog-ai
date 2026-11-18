@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +33,9 @@ class DecisionServiceTest {
 
     @Mock
     DecisionMapper decisionMapper;
+
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     DecisionServiceImpl decisionService;
@@ -256,12 +260,17 @@ class DecisionServiceTest {
         request.setRationale("New Rationale");
         request.setConsequences("New Consequences");
 
+        UUID projectId = UUID.randomUUID();
+        Project project = new Project();
+        project.setId(projectId);
         Decision savedDecision = new Decision();
+        savedDecision.setId(id);
+        savedDecision.setProject(project);
 
         DecisionResponse response =
                 new DecisionResponse(
                         id,
-                        UUID.randomUUID(),
+                        projectId,
                         null,
                         "New Title",
                         "New Context",

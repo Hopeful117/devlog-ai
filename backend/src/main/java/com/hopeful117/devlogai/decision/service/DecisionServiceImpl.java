@@ -8,60 +8,48 @@ import com.hopeful117.devlogai.decision.mapper.DecisionMapper;
 import com.hopeful117.devlogai.decision.repository.DecisionRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
+import com.hopeful117.devlogai.retrieval.event.DecisionChangedEvent;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
 @RequiredArgsConstructor
 @Service
-public class DecisionServiceImpl implements  DecisionService{
+public class DecisionServiceImpl implements DecisionService {
 
     private static final String DECISION = "Decision";
 
     private final DecisionRepository decisionRepository;
-
     private final ProjectRepository projectRepository;
-
     private final DecisionMapper decisionMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
 
 
     @Override
+    @Transactional
     public DecisionResponse create(CreateDecisionRequest request) {
-
         Project project = projectRepository.findById(request.getProjectId())
-                .orElseThrow(() ->
-                        new EntityNotFoundException(
-                                "Project",
-                                request.getProjectId()
-                        )
-                );
-
+                .orElseThrow(() -> new EntityNotFoundException("Project", request.getProjectId()));
 
         Decision decision = decisionMapper.toEntity(request);
-
         decision.setProject(project);
 
-
-        Decision savedDecision =
-                decisionRepository.save(decision);
-
-
+        Decision savedDecision = decisionRepository.save(decision);
+        eventPublisher.publishEvent(new DecisionChangedEvent(savedDecision.getProject().getId(), savedDecision.getId()));
         return decisionMapper.toResponse(savedDecision);
     }
 
     @Override
+    @Transactional
     public DecisionResponse update(UUID id, UpdateDecisionRequest request) {
         Decision decision = decisionRepository.findById(id)
-                .orElseThrow(() ->
-                        new EntityNotFoundException(
-                                DECISION,
-                                id
-                        )
-                );
+                .orElseThrow(() -> new EntityNotFoundException(DECISION, id));
 
         decision.setTitle(request.getTitle());
         decision.setContext(request.getContext());
@@ -70,6 +58,7 @@ public class DecisionServiceImpl implements  DecisionService{
         decision.setConsequences(request.getConsequences());
 
         Decision savedDecision = decisionRepository.save(decision);
+        eventPublisher.publishEvent(new DecisionChangedEvent(savedDecision.getProject().getId(), savedDecision.getId()));
         return decisionMapper.toResponse(savedDecision);
     }
 
