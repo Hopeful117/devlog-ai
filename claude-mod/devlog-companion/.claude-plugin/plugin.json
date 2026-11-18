@@ -1,0 +1,10 @@
+{
+  "name": "devlog-companion",
+  "version": "0.2.0",
+  "description": "DevLog Companion — activity band and pane that reacts to DevLog MCP tool calls in real time",
+  "author": {
+    "name": "devlog-ai"
+  },
+  "types": "./types/index.d.ts",
+  "keywords": ["devlog", "companion", "activity", "mcp"]
+}
