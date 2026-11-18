@@ -116,9 +116,13 @@ class KnowledgeSelectionServiceRepositoryContextPropagationTest {
                 new SelectedFileContentEnricher.EnrichmentResult(
                         invocation.getArgument(1), List.of()));
 
+        com.hopeful117.devlogai.repositorycontext.capture.RetrievalCaptureService captureService =
+                new com.hopeful117.devlogai.repositorycontext.capture.RetrievalCaptureService(new ObjectMapper());
+        org.springframework.test.util.ReflectionTestUtils.setField(captureService, "enabled", false);
         RepositoryContextEngine repositoryContextEngine = new RepositoryContextEngine(
                 List.of(documentCollector), contextIntelligence, ranker, selector,
                 symbolEnricher, contentEnricher, new ObjectMapper(),
+                captureService,
                 60, 500, 20, 6000);
         AnalysisExecutionDiagnosticRepository diagnostics =
                 mock(AnalysisExecutionDiagnosticRepository.class);

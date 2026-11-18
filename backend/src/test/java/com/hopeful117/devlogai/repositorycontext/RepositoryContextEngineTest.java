@@ -289,7 +289,15 @@ class RepositoryContextEngineTest {
         return new RepositoryContextEngine(
                 List.of(collector), intelligence, ranker, selector,
                 symbolEnricher, contentEnricher, objectMapper,
+                noOpCaptureService(),
                 60, 500, 20, 6000);
+    }
+
+    private com.hopeful117.devlogai.repositorycontext.capture.RetrievalCaptureService noOpCaptureService() {
+        com.hopeful117.devlogai.repositorycontext.capture.RetrievalCaptureService svc =
+                new com.hopeful117.devlogai.repositorycontext.capture.RetrievalCaptureService(objectMapper);
+        org.springframework.test.util.ReflectionTestUtils.setField(svc, "enabled", false);
+        return svc;
     }
 
     private ContextPlan contextPlan() {

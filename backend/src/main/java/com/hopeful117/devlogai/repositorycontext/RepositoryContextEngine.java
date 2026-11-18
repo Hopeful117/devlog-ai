@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.analysis.context.AnalysisContext;
 import com.hopeful117.devlogai.insight.entity.Insight;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
 import com.hopeful117.devlogai.intent.model.UserGuidance;
+import com.hopeful117.devlogai.repositorycontext.capture.RetrievalCaptureService;
 import com.hopeful117.devlogai.repositorycontext.collector.RepositoryContextCollector;
 import com.hopeful117.devlogai.repositorycontext.enrichment.SelectedFileContentEnricher;
 import com.hopeful117.devlogai.repositorycontext.enrichment.SelectedJavaSymbolEnricher;
@@ -23,6 +24,7 @@ import java.util.EnumMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class RepositoryContextEngine implements RepositoryContextService {
@@ -34,6 +36,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
     private final SelectedJavaSymbolEnricher symbolEnricher;
     private final SelectedFileContentEnricher contentEnricher;
     private final ObjectMapper objectMapper;
+    private final RetrievalCaptureService captureService;
     private final RepositoryContext.ContextBudget budget;
 
     public RepositoryContextEngine(
@@ -44,6 +47,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
             SelectedJavaSymbolEnricher symbolEnricher,
             SelectedFileContentEnricher contentEnricher,
             ObjectMapper objectMapper,
+            RetrievalCaptureService captureService,
             @Value("${devlog.repository-context.max-evidence-items:60}") int maximumEvidenceItems,
             @Value("${devlog.repository-context.max-summary-characters:500}") int maximumSummaryCharacters,
             @Value("${devlog.repository-context.max-history-items:20}") int maximumHistoryItems,
@@ -59,6 +63,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
         this.symbolEnricher = symbolEnricher;
         this.contentEnricher = contentEnricher;
         this.objectMapper = objectMapper;
+        this.captureService = captureService;
         this.budget = new RepositoryContext.ContextBudget(maximumEvidenceItems,
                 maximumSummaryCharacters, maximumHistoryItems, maximumTokens);
     }
@@ -119,6 +124,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
             List<RepositoryEvidence> additionalCandidates,
             RepositoryRevisionScope revisionScope
     ) {
+        long startNano = System.nanoTime();
         ContextPlan contextPlan = contextIntelligence.plan(context, intent);
         ContextRequest request = new ContextRequest(
                 context, intent, guidance, validatedInsights, contextPlan, budget, revisionScope);
@@ -162,11 +168,17 @@ public class RepositoryContextEngine implements RepositoryContextService {
         warnings.addAll(contentEnrichment.warnings());
         String digest = digest(contextPlan, selected, byLayer, diagnostics,
                 selection, warnings);
-        return new RepositoryContext(VERSION, contextPlan.primaryProfile(),
+        RepositoryContext repositoryContext = new RepositoryContext(VERSION, contextPlan.primaryProfile(),
                 contextPlan.profileKeys(), contextPlan.planVersion(),
                 contextPlan.explanations(), selected, byLayer, diagnostics, budget,
                 selection.usedTokens(), candidates.size(), discarded, truncated,
                 selection.decisions(), warnings, digest, candidateMetadata);
+        long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNano);
+        String revision = revisionScope != null ? revisionScope.resolvedRevision() : "";
+        String projectSlug = context.project() != null ? context.project().slug() : "";
+        captureService.capture(intent.objective(), projectSlug, revision,
+                repositoryContext, ranked, latencyMs);
+        return repositoryContext;
     }
 
     private String digest(

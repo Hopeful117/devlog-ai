@@ -1,0 +1,67 @@
+{
+  "protocolVersion": "story-0206-live-capture/v1",
+  "capturedAt": "2026-11-18T00:00:00Z",
+  "scenarioId": "vocabulary-gap-adr-dependency-inversion",
+  "projectSlug": "devlog-ai",
+  "revision": "rev-0206-fixture",
+  "question": "What is the decoupling strategy between Core and AI modules?",
+  "candidateCount": 5,
+  "selectedCount": 2,
+  "estimatedTokens": 900,
+  "truncated": false,
+  "latencyMs": 320,
+  "contextDigest": "aabbcc001122334455667788990011223344556677889900112233445566778899",
+  "expectedEvidence": ["doc:ADR-067@rev-0206-fixture"],
+  "candidates": [
+    {
+      "reference": "doc:ADR-067@rev-0206-fixture",
+      "family": "ADR_DOCUMENT",
+      "trustTier": "HUMAN_AUTHORED",
+      "status": "CURRENT",
+      "sourceType": "SEMANTIC_RETRIEVAL",
+      "relevanceScore": 90,
+      "selected": true,
+      "rejectionReason": null
+    },
+    {
+      "reference": "file:docker-compose.yml@rev-0206-fixture",
+      "family": "CONFIG_FILE",
+      "trustTier": "TECHNICAL_EVIDENCE",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 60,
+      "selected": true,
+      "rejectionReason": null
+    },
+    {
+      "reference": "file:backend/src/main/java/BackendApplication.java@rev-0206-fixture",
+      "family": "SOURCE_FILE",
+      "trustTier": "TECHNICAL_EVIDENCE",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 20,
+      "selected": false,
+      "rejectionReason": "EVIDENCE_ITEM_BUDGET_EXCEEDED"
+    },
+    {
+      "reference": "file:backend/README.md@rev-0206-fixture",
+      "family": "DOCUMENT",
+      "trustTier": "HUMAN_AUTHORED",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 15,
+      "selected": false,
+      "rejectionReason": "EVIDENCE_ITEM_BUDGET_EXCEEDED"
+    },
+    {
+      "reference": "doc:ADR-006@rev-0206-fixture",
+      "family": "ADR_DOCUMENT",
+      "trustTier": "HUMAN_AUTHORED",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 10,
+      "selected": false,
+      "rejectionReason": "EVIDENCE_ITEM_BUDGET_EXCEEDED"
+    }
+  ]
+}
