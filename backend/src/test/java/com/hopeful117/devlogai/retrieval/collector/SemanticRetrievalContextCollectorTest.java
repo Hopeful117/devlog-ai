@@ -174,14 +174,29 @@ class SemanticRetrievalContextCollectorTest {
         assertThat(results.get(1).extractionMetadata()).containsEntry("trustTier", "HUMAN_AUTHORED");
     }
 
+    // --- content population ---
+
+    @Test
+    void semanticDocument_contentPopulatedFromRetrievalDocumentContent() {
+        stubEmbedding();
+        when(repository.findByProjectIdAndSimilarity(any(), any(), anyInt(), anyFloat()))
+                .thenReturn(List.of(documentOf("INSIGHT", UUID.randomUUID(), "TRUSTED")));
+
+        RepositoryEvidence evidence = collector.collect(requestWith("test")).get(0);
+
+        assertThat(evidence.content()).isNotNull();
+        assertThat(evidence.content().status()).isEqualTo(
+                com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.COMPLETE);
+        assertThat(evidence.content().text()).isEqualTo("Content for INSIGHT");
+    }
+
     // --- content included in summary ---
 
     @Test
     void summary_includesTitleAndContent() {
         stubEmbedding();
-        UUID sourceId = UUID.randomUUID();
         when(repository.findByProjectIdAndSimilarity(any(), any(), anyInt(), anyFloat()))
-                .thenReturn(List.of(documentOf("ADR", sourceId, "TRUSTED")));
+                .thenReturn(List.of(documentOf("ADR", UUID.randomUUID(), "TRUSTED")));
 
         RepositoryEvidence evidence = collector.collect(requestWith("test")).get(0);
 
