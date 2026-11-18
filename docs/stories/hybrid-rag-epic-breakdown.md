@@ -14,21 +14,21 @@ dependencies.
 ## Dependency Graph
 
 ```
-0193 (pgvector schema + indexable contract)
+0200 (pgvector schema + indexable contract)
   │
-  ├── 0194 (PostgreSQL full-text — independent, can ship first)
+  ├── 0201 (PostgreSQL full-text — independent, can ship first)
   │
-  ├── 0195 (embedding pipeline)
-  │    └── 0198 (event-driven synchronization)
+  ├── 0202 (embedding pipeline)
+  │    └── 0205 (event-driven synchronization)
   │
-  └── 0196 (semantic retrieval collector)
-       └── 0197 (hybrid fusion RRF)
-                └── 0199 (live evaluation)
+  └── 0203 (semantic retrieval collector)
+       └── 0204 (hybrid fusion RRF)
+                └── 0206 (live evaluation)
 ```
 
 ---
 
-## Story 0193 — Retrieval Foundation: pgvector Schema and Indexable Document Contract
+## Story 0200 — Retrieval Foundation: pgvector Schema and Indexable Document Contract
 
 **Problem**: There is no vector index and no contract for what a
 "retrieval document" is. Before any embedding can be stored or queried,
@@ -50,11 +50,11 @@ the schema and the indexable document model must exist.
 
 **Not in scope**: embedding generation, querying, synchronization.
 
-**Prerequisite for**: 0195, 0196.
+**Prerequisite for**: 0202, 0203.
 
 ---
 
-## Story 0194 — Lexical Improvement: PostgreSQL Full-Text Search
+## Story 0201 — Lexical Improvement: PostgreSQL Full-Text Search
 
 **Problem**: The existing `DeterministicEvidenceRanker` tokenizes at the
 Java level. PostgreSQL native full-text search (tsvector/tsquery) provides
@@ -75,11 +75,11 @@ indexed columns that the Java term model cannot replicate.
 **Not in scope**: embeddings, vector queries.
 
 **Prerequisite for**: nothing (independent improvement).
-**Can ship before**: 0195, 0196.
+**Can ship before**: 0202, 0203.
 
 ---
 
-## Story 0195 — Embedding Pipeline: Python AI Engine Endpoint and Backfill
+## Story 0202 — Embedding Pipeline: Python AI Engine Endpoint and Backfill
 
 **Problem**: There is no embedding service and no way to populate the
 vector index. Before semantic retrieval can function, there must be a way
@@ -102,11 +102,11 @@ to generate and store embeddings for indexed documents.
 - Tests: Python embedding endpoint (mock LLM provider), Java indexing
   service (test double for embedding client), backfill idempotency.
 
-**Prerequisite for**: 0196, 0198.
+**Prerequisite for**: 0203, 0205.
 
 ---
 
-## Story 0196 — Semantic Retrieval Collector
+## Story 0203 — Semantic Retrieval Collector
 
 **Problem**: Even with embeddings stored, the `RepositoryContextEngine`
 does not know how to query them. A new `RepositoryContextCollector` is
@@ -130,11 +130,11 @@ lexical horizon.
 - Tests: vector query correctness, project isolation (no cross-project
   leakage), trust tier mapping, degradation behavior.
 
-**Prerequisite for**: 0197, 0199.
+**Prerequisite for**: 0204, 0206.
 
 ---
 
-## Story 0197 — Hybrid Fusion: RRF Integration
+## Story 0204 — Hybrid Fusion: RRF Integration
 
 **Problem**: Lexical and semantic retrievals produce independently ranked
 candidates. Without fusion, whichever list happens to have higher absolute
@@ -153,13 +153,13 @@ channels.
 - Tests: RRF score monotonicity, channel weight effect, existing ranking
   behavior preserved when semantic collector is disabled.
 
-**Prerequisite for**: 0199.
+**Prerequisite for**: 0206.
 
 ---
 
-## Story 0198 — Synchronization: Event-Driven Index Maintenance
+## Story 0205 — Synchronization: Event-Driven Index Maintenance
 
-**Problem**: The backfill from Story 0195 is a one-time operation. As
+**Problem**: The backfill from Story 0202 is a one-time operation. As
 Insights are accepted, ADRs are updated, and Stories change status, the
 index becomes stale. Event-driven maintenance keeps it current.
 
@@ -180,7 +180,7 @@ index becomes stale. Event-driven maintenance keeps it current.
 
 ---
 
-## Story 0199 — Live Evaluation: Extending Story 0177 with Real Captures
+## Story 0206 — Live Evaluation: Extending Story 0177 with Real Captures
 
 **Problem**: Story 0177's evaluation used fixture candidates, not live
 repository data. The production impact of hybrid retrieval has not been
@@ -214,16 +214,16 @@ that exceeds 15% and without a timeout regression.
 
 | Priority | Story | Reason |
 |----------|-------|--------|
-| 1 | **0194** | Independent, low risk, immediate lexical improvement |
-| 2 | **0193** | Unlocks 0195 and 0196 |
-| 3 | **0195** | Unlocks semantic collector |
-| 4 | **0196** | First end-to-end semantic retrieval |
-| 5 | **0197** | Improves fusion quality |
-| 6 | **0198** | Production readiness |
-| 7 | **0199** | Measurement and validation |
+| 1 | **0201** | Independent, low risk, immediate lexical improvement |
+| 2 | **0200** | Unlocks 0202 and 0203 |
+| 3 | **0202** | Unlocks semantic collector |
+| 4 | **0203** | First end-to-end semantic retrieval |
+| 5 | **0204** | Improves fusion quality |
+| 6 | **0205** | Production readiness |
+| 7 | **0206** | Measurement and validation |
 
-Stories 0193 and 0194 may be authorized and worked in parallel.
-Stories 0195 and 0196 may be authorized and worked in parallel after 0193.
+Stories 0200 and 0201 may be authorized and worked in parallel.
+Stories 0202 and 0203 may be authorized and worked in parallel after 0200.
 
 ## What is Not in This Epic
 

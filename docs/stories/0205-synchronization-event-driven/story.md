@@ -1,13 +1,13 @@
-# Story 0198 — Synchronization: Event-Driven Index Maintenance
+# Story 0205 — Synchronization: Event-Driven Index Maintenance
 
 ## Status
 
-**DESIGN APPROVED** — Requires Story 0195 (embedding pipeline) before
+**DESIGN APPROVED** — Requires Story 0202 (embedding pipeline) before
 implementation. Implementation authorization required.
 
 ## Problem
 
-The backfill job from Story 0195 is a one-time operation. As Insights are
+The backfill job from Story 0202 is a one-time operation. As Insights are
 accepted, Engineering Stories change status, and ADR files are updated, the
 `retrieval_documents` index becomes stale. This story makes the index
 self-maintaining through event-driven listeners and a selective re-indexing
@@ -25,7 +25,7 @@ Keep the retrieval index current without full backfills after each change:
 ## Governing Artifacts
 
 - ADR-080 — Hybrid Retrieval Architecture, D12 (synchronization)
-- Story 0195 — Embedding Pipeline (prerequisite)
+- Story 0202 — Embedding Pipeline (prerequisite)
 
 ## Architectural Constraints
 

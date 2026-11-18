@@ -1,8 +1,8 @@
-# Story 0194 — Lexical Improvement: PostgreSQL Full-Text Search
+# Story 0201 — Lexical Improvement: PostgreSQL Full-Text Search
 
 ## Status
 
-**DESIGN APPROVED** — Independent of Stories 0193/0195/0196. Can ship first.
+**DESIGN APPROVED** — Independent of Stories 0200/0202/0203. Can ship first.
 Implementation authorization required before any code is written.
 
 ## Problem

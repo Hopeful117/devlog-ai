@@ -1,13 +1,13 @@
-# Story 0195 — Embedding Pipeline: Python AI Engine Endpoint and Backfill
+# Story 0202 — Embedding Pipeline: Python AI Engine Endpoint and Backfill
 
 ## Status
 
-**DESIGN APPROVED** — Requires Story 0193 (schema) before implementation.
+**DESIGN APPROVED** — Requires Story 0200 (schema) before implementation.
 Implementation authorization required before any code is written.
 
 ## Problem
 
-The vector index introduced by Story 0193 exists but is empty. Before
+The vector index introduced by Story 0200 exists but is empty. Before
 semantic retrieval can be tested end-to-end, there must be a way to
 generate embeddings for indexed documents and store them. The Python AI
 Engine must expose a stateless embedding endpoint, and Java Core must own
@@ -25,7 +25,7 @@ the lifecycle of embedding requests and storage.
 - ADR-067 — DevLog Engineering Story Context Agent (Python boundary)
 - ADR-080 — Hybrid Retrieval Architecture, D3 (Retrieval Layer placement),
   D4 (embedding generation)
-- Story 0193 — Retrieval Foundation (prerequisite)
+- Story 0200 — Retrieval Foundation (prerequisite)
 
 ## Architectural Constraints
 
@@ -83,8 +83,8 @@ the lifecycle of embedding requests and storage.
 
 ## Out of Scope
 
-- Semantic query execution (Story 0196).
-- Event-driven synchronization (Story 0198).
+- Semantic query execution (Story 0203).
+- Event-driven synchronization (Story 0205).
 - Changes to `RepositoryContextEngine` or existing collectors.
 
 ## Acceptance Criteria
