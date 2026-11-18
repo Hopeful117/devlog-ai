@@ -1,8 +1,8 @@
-# Story 0193 — Retrieval Foundation: pgvector Schema and Indexable Document Contract
+# Story 0200 — Retrieval Foundation: pgvector Schema and Indexable Document Contract
 
 ## Status
 
-**DESIGN APPROVED** — Prerequisite for Stories 0195 and 0196.
+**DESIGN APPROVED** — Prerequisite for Stories 0202 and 0203.
 Implementation authorization required before any code is written.
 
 ## Problem

@@ -1,13 +1,13 @@
-# Story 0196 — Semantic Retrieval Collector
+# Story 0203 — Semantic Retrieval Collector
 
 ## Status
 
-**DESIGN APPROVED** — Requires Stories 0193 and 0195 before implementation.
+**DESIGN APPROVED** — Requires Stories 0200 and 0202 before implementation.
 Implementation authorization required before any code is written.
 
 ## Problem
 
-Even with embeddings stored (Story 0195), the `RepositoryContextEngine` has
+Even with embeddings stored (Story 0202), the `RepositoryContextEngine` has
 no way to query them. This story delivers the first end-to-end semantic
 retrieval path: embed the query, run a pgvector cosine distance search, and
 return candidates as `RepositoryEvidence` items alongside structural ones.
@@ -77,8 +77,8 @@ to the existing pipeline.
 
 ## Out of Scope
 
-- RRF fusion (Story 0197).
-- Event-driven synchronization (Story 0198).
+- RRF fusion (Story 0204).
+- Event-driven synchronization (Story 0205).
 - Changes to `DeterministicEvidenceRanker` weights.
 
 ## Acceptance Criteria

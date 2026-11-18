@@ -1,8 +1,8 @@
-# Story 0199 — Live Evaluation: Extending Story 0177 with Real Captures
+# Story 0206 — Live Evaluation: Extending Story 0177 with Real Captures
 
 ## Status
 
-**DESIGN APPROVED** — Requires Story 0196 (semantic collector) before
+**DESIGN APPROVED** — Requires Story 0203 (semantic collector) before
 implementation. Implementation authorization required.
 
 ## Problem
@@ -29,7 +29,7 @@ Measure the production impact of hybrid retrieval on real candidate sets:
 - ADR-066 — Replayable AI Intent Evaluation Harness
 - ADR-080 — Hybrid Retrieval Architecture
 - Story 0177 — Evaluate Hybrid Retrieval for Story Context (prerequisite)
-- Story 0196 — Semantic Retrieval Collector (prerequisite)
+- Story 0203 — Semantic Retrieval Collector (prerequisite)
 
 ## Architectural Constraints
 

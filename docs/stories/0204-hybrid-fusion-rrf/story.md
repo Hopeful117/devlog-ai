@@ -1,8 +1,8 @@
-# Story 0197 — Hybrid Fusion: RRF Integration
+# Story 0204 — Hybrid Fusion: RRF Integration
 
 ## Status
 
-**DESIGN APPROVED** — Requires Story 0196 before implementation.
+**DESIGN APPROVED** — Requires Story 0203 before implementation.
 Implementation authorization required before any code is written.
 
 ## Problem
@@ -75,7 +75,7 @@ that is better than either channel alone.
 
 - Changes to the five non-semantic criteria.
 - Changes to `BudgetedDiverseEvidenceSelector`.
-- Synchronization (Story 0198).
+- Synchronization (Story 0205).
 
 ## Acceptance Criteria
 
