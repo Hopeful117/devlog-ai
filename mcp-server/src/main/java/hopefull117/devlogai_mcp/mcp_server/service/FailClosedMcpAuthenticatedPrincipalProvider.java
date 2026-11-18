@@ -43,6 +43,14 @@ public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthentic
         this.configuredActorClientId = configuredActorClientId == null ? "" : configuredActorClientId.trim();
         this.configuredDelegationToken = configuredDelegationToken == null ? "" : configuredDelegationToken.trim();
         this.jwtDecoder = jwtDecoder;
+        if (!this.issuer.isBlank() && this.configuredBearerToken.isBlank()) {
+            log.warn("KEYCLOAK_ISSUER_URI is set but DEVLOG_MCP_BEARER_TOKEN is blank — " +
+                     "all MCP backend calls will be unauthenticated");
+        }
+        if (this.issuer.isBlank() && !this.configuredBearerToken.isBlank()) {
+            log.warn("DEVLOG_MCP_BEARER_TOKEN is set but KEYCLOAK_ISSUER_URI is blank — " +
+                     "token validation is disabled; bearer token will be ignored");
+        }
     }
 
     @Override
