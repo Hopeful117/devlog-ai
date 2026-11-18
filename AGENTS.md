@@ -479,4 +479,75 @@ Do not encode temporary implementation state as permanent repository policy.
 
 ---
 
+## 15. MCP Tool Usage Guidelines
+
+This section applies to **all agent types** (Claude Code, Claude claude, custom runners) that interact with DevLog via MCP. It documents which tools exist, how to pick the right one, authentication constraints, and error handling.
+
+### Available MCP Tools
+
+| Tool | Purpose | Transport auth |
+|------|---------|----------------|
+| `devlog_story_agent` | Submit a Story context agent task (investigation, planning, implementation analysis) | Bearer token via `McpSyncRequestContext` transport context |
+| `search_project_history` | Keyword search over imported git commits (messages + changed paths) | Bearer token via `McpSyncRequestContext` transport context |
+| `sync_project_history` | Trigger a git history import for a project's active source | Bearer token (required — unauthenticated calls rejected) |
+| `get_engineering_context` | Retrieve structured `EngineeringContext` for a project + intent | Bearer token via `McpSyncRequestContext` transport context |
+| `analyze_story_context` | Submit a Story-scoped context analysis task | Bearer token via `McpSyncRequestContext` transport context |
+
+### Available MCP Resources (`devlog://…`)
+
+Resources provide read-only access to Stories, Decisions, Insights, Engineering Events, Commits, and Freshness. **Important constraint:** MCP resources do NOT receive a per-request `McpSyncRequestContext` (MCP framework limitation — only Tools do). They rely on `SecurityContextHolder` (populated in HTTP transport) or the statically configured `devlog.security.oidc.bearer-token`. In pure stdio transport without that static token, resources will return 401.
+
+**Consequence:** prefer tools over resources when both can answer the question.
+
+### Tool Selection by Use Case
+
+| Use case | Tool to use |
+|----------|-------------|
+| Start work on an authorized Story | `devlog_story_agent` with `storyId` (UUID) + `intent` |
+| Investigation / planning with no specific Story | `devlog_story_agent` with `intent` and relevant `files` |
+| "Which commits touched this area?" | `search_project_history` |
+| "Is history imported for this project?" | `search_project_history` with a broad query |
+| Trigger history import before first use | `sync_project_history` |
+| Read a specific Story or Decision by URI | Resources (`devlog://projects/{slug}/stories/{uuid}`, etc.) |
+
+### Authentication Architecture
+
+DevLog MCP tools operate in one of two transport modes:
+
+**HTTP transport** (typical in Claude Code desktop app — MCP server reachable over HTTP):
+- Spring Security processes the HTTP `Authorization` header → `SecurityContextHolder` is populated
+- All tools and resources work correctly without special handling
+
+**stdio transport** (some CLI MCP clients):
+- `SecurityContextHolder` is NOT populated (no HTTP request)
+- Each MCP tool call receives a `McpSyncRequestContext` carrying the `authorization` key in its transport context
+- Tools that call `requireProjectId(slug, requestContext)` extract the token correctly
+- Resources fall back to `SecurityContextHolder` (empty) → 401 unless `devlog.security.oidc.bearer-token` is set in the server's environment
+
+**Key invariant:** `devlog_story_agent` does not use `requireProjectId()` — it passes the bearer token directly as a request header. It is not affected by transport mode and is therefore the most reliable entry point.
+
+### Error Handling
+
+| Error | Diagnosis | Action |
+|-------|-----------|--------|
+| `401 UNAUTHORIZED` on first call | Likely intermittent (token refresh, service restart) | Retry once after 5–10 s; if it persists report to the user |
+| Persistent `401` on tools | Transport context missing `authorization` key | Check MCP client configuration; report to the user |
+| Persistent `401` on resources | stdio mode without static token | Set `devlog.security.oidc.bearer-token` in MCP server env, or use tool equivalents |
+| `POLL_TIMEOUT` with `lastKnownStatus=SUBMITTED` | Job still active | Resume with the **same** idempotency key — do not create a new request |
+| `404 / ENTITY_NOT_FOUND` | Story UUID not found in DevLog | One retry omitting `storyId` is permitted; then stop Story-scoped work and report |
+
+### Usage Rules
+
+1. **Call `devlog_story_agent` before any substantial work.** For an authorized Story: include `storyId` (DevLog UUID). For investigation or planning: use `intent` with relevant `files`. Do not substitute filesystem/git reads for DevLog context — this deprives future sessions of accumulated engineering memory.
+
+2. **Call DevLog before writing code, not after.** Once files exist in the worktree, DevLog cannot see them (it indexes only the main branch). The call must precede the first line of implementation.
+
+3. **Provide a stable `idempotencyKey`** for every `devlog_story_agent` call that may need resuming across context windows or session crashes.
+
+4. **Never fabricate project knowledge.** If DevLog returns no context or an error, surface the gap — do not invent architecture, history, or Story decisions from inference.
+
+5. **Skip DevLog only for**: single-file mechanical edits, syntax fixes, simple command lookups — tasks where no Engineering Story, ADR, or historical decision can affect the answer.
+
+---
+
 *Generated from repository evidence. If repository reality contradicts this guide, repository reality wins.*

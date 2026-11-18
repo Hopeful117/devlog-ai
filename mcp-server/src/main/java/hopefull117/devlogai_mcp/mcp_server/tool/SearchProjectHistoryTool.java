@@ -62,7 +62,7 @@ public class SearchProjectHistoryTool {
 
             McpSyncRequestContext requestContext
     ) {
-        var projectId = support.requireProjectId(projectSlug);
+        var projectId = support.requireProjectId(projectSlug, requestContext);
         if (query == null || query.isBlank()) {
             throw ResourceSupport.invalidParams("query must not be blank");
         }

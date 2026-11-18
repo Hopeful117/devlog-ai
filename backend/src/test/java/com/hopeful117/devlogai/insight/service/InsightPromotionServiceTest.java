@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -31,7 +32,7 @@ import static org.mockito.Mockito.*;
 
 /**
  * Integration tests for InsightPromotionService with semantic similarity assessment.
- * 
+ *
  * These tests verify that:
  * 1. Promotion proceeds after exact duplicate guard validation
  * 2. Semantic similarity assessment is computed and returned in the result
@@ -45,6 +46,7 @@ class InsightPromotionServiceTest {
     @Mock InsightRepository repository;
     @Mock KnowledgeRelationRepository relations;
     @Mock InsightSimilarityService similarityService;
+    @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private InsightPromotionService promotionService;

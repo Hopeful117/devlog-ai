@@ -16,12 +16,14 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
 import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
+import com.hopeful117.devlogai.retrieval.event.AdrDocumentProcessedEvent;
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
 import com.hopeful117.devlogai.story.entity.EngineeringStory;
 import com.hopeful117.devlogai.story.repository.EngineeringStoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -66,6 +68,7 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
     private final DocumentBudgetPolicy budgetPolicy;
     private final DocumentPriorityComparator priorityComparator;
     private final EvidenceFactory evidenceFactory;
+    private final ApplicationEventPublisher eventPublisher;
 
     public DocumentBodyCollector(
             SecureRepositoryContentReader contentReader,
@@ -76,7 +79,8 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
             AdrStatusParser adrStatusParser,
             DocumentBudgetPolicy budgetPolicy,
             DocumentPriorityComparator priorityComparator,
-            EvidenceFactory evidenceFactory
+            EvidenceFactory evidenceFactory,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.contentReader = contentReader;
         this.sourceRepository = sourceRepository;
@@ -87,6 +91,7 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
         this.budgetPolicy = budgetPolicy;
         this.priorityComparator = priorityComparator;
         this.evidenceFactory = evidenceFactory;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -294,6 +299,11 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
                 AdrStatusParser.AdrStatusResult parsed = adrStatusParser.parse(contentText);
                 docStatus = parsed.status();
                 supersededBy = parsed.supersededBy();
+                UUID adrSourceId = UUID.nameUUIDFromBytes(
+                        (scope.projectId().toString() + ":" + candidate.path())
+                                .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                eventPublisher.publishEvent(new AdrDocumentProcessedEvent(
+                        scope.projectId(), adrSourceId, candidate.path(), candidate.label(), contentText));
             }
 
             Map<String, String> extractionMeta = buildExtractionMeta(scope, candidate.path(), candidate.kind(),

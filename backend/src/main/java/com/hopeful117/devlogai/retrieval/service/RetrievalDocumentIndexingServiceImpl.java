@@ -10,6 +10,7 @@ import com.hopeful117.devlogai.retrieval.repository.RetrievalDocumentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -34,7 +35,7 @@ public class RetrievalDocumentIndexingServiceImpl implements RetrievalDocumentIn
     private final EmbeddingClientProperties properties;
 
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public IndexingResult index(IndexableDocument document) {
         String contentHash = sha256(document.content());
 

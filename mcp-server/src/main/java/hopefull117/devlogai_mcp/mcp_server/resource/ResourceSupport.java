@@ -5,8 +5,10 @@ import io.modelcontextprotocol.spec.McpSchema.ErrorCodes;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogResourceClient;
 import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
+import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientResponseException;
@@ -55,8 +57,17 @@ public class ResourceSupport {
      * as a clean MCP error, never as a transport failure.
      */
     public UUID requireProjectId(String projectSlug) {
+        return requireProjectId(projectSlug, null);
+    }
+
+    /**
+     * Resolves a project slug to its stable internal id using the per-request
+     * transport context when available, falling back to SecurityContextHolder.
+     * This overload must be used by MCP Tools to avoid 401 errors in stdio transport.
+     */
+    public UUID requireProjectId(String projectSlug, @Nullable McpSyncRequestContext requestContext) {
         try {
-            var project = fetchProjectContext(projectSlug);
+            var project = fetchProjectContext(projectSlug, requestContext);
             if (project == null || project.id() == null) {
                 throw notFound("Project '%s' not found".formatted(projectSlug));
             }
@@ -69,9 +80,12 @@ public class ResourceSupport {
         }
     }
 
-    private com.hopeful117.devlogai.contracts.projectcontext.ProjectContext fetchProjectContext(String projectSlug) {
+    private com.hopeful117.devlogai.contracts.projectcontext.ProjectContext fetchProjectContext(
+            String projectSlug, @Nullable McpSyncRequestContext requestContext) {
         if (principalProvider != null) {
-            var principal = principalProvider.currentPrincipal();
+            var principal = requestContext != null
+                    ? principalProvider.currentPrincipal(requestContext)
+                    : principalProvider.currentPrincipal();
             if (principal.isPresent()) {
                 String token = principal.get().bearerToken();
                 String delegation = principal.get().delegationToken();
