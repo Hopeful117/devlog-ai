@@ -1,0 +1,77 @@
+{
+  "protocolVersion": "story-0206-live-capture/v1",
+  "capturedAt": "2026-11-18T00:02:00Z",
+  "scenarioId": "insight-starved-hybrid-retrieval-recall",
+  "projectSlug": "devlog-ai",
+  "revision": "rev-0206-fixture",
+  "question": "What do we know about recall quality improvements in context retrieval?",
+  "candidateCount": 6,
+  "selectedCount": 2,
+  "estimatedTokens": 1050,
+  "truncated": false,
+  "latencyMs": 380,
+  "contextDigest": "ccddee001122334455667788990011223344556677889900112233445566778899",
+  "expectedEvidence": ["insight:hybrid-recall-validated@rev-0206-fixture"],
+  "candidates": [
+    {
+      "reference": "insight:hybrid-recall-validated@rev-0206-fixture",
+      "family": "VALIDATED_INSIGHT",
+      "trustTier": "TRUSTED",
+      "status": "CURRENT",
+      "sourceType": "SEMANTIC_RETRIEVAL",
+      "relevanceScore": 88,
+      "selected": true,
+      "rejectionReason": null
+    },
+    {
+      "reference": "doc:ADR-080@rev-0206-fixture",
+      "family": "ADR_DOCUMENT",
+      "trustTier": "HUMAN_AUTHORED",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 50,
+      "selected": true,
+      "rejectionReason": null
+    },
+    {
+      "reference": "file:ai-engine/evaluations/hybrid_retrieval.py@rev-0206-fixture",
+      "family": "SOURCE_FILE",
+      "trustTier": "TECHNICAL_EVIDENCE",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 30,
+      "selected": false,
+      "rejectionReason": "EVIDENCE_ITEM_BUDGET_EXCEEDED"
+    },
+    {
+      "reference": "story:0177@rev-0206-fixture",
+      "family": "ROADMAP",
+      "trustTier": "HUMAN_AUTHORED",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 18,
+      "selected": false,
+      "rejectionReason": "EVIDENCE_ITEM_BUDGET_EXCEEDED"
+    },
+    {
+      "reference": "file:backend/src/main/java/com/hopeful117/devlogai/repositorycontext/ranking/DeterministicEvidenceRanker.java@rev-0206-fixture",
+      "family": "SOURCE_FILE",
+      "trustTier": "TECHNICAL_EVIDENCE",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 10,
+      "selected": false,
+      "rejectionReason": "EVIDENCE_ITEM_BUDGET_EXCEEDED"
+    },
+    {
+      "reference": "doc:ADR-066@rev-0206-fixture",
+      "family": "ADR_DOCUMENT",
+      "trustTier": "HUMAN_AUTHORED",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 8,
+      "selected": false,
+      "rejectionReason": "EVIDENCE_ITEM_BUDGET_EXCEEDED"
+    }
+  ]
+}

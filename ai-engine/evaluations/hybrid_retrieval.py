@@ -442,20 +442,299 @@ def run(path: Path = CORPUS_PATH) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Replay Story 0177 retrieval conditions")
     parser.add_argument("--corpus", type=Path, default=CORPUS_PATH)
+    parser.add_argument("--live", action="store_true",
+                        help="Run live-capture evaluation (Story 0206)")
+    parser.add_argument("--captures", type=Path, default=LIVE_CAPTURES_PATH)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
-    report = run(args.corpus)
+    if args.live:
+        report = run_live(args.captures)
+    else:
+        report = run(args.corpus)
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
-        for condition, values in report["aggregate"].items():
-            print(
-                f"{condition}: candidate_recall={values['candidateRecallMean']:.3f} "
-                f"final_recall={values['finalRecallMean']:.3f} "
-                f"noise={values['noiseRateMean']:.3f}"
-            )
+        if args.live:
+            agg = report["aggregate"]
+            print(f"recommendation: {agg.get('recommendation', 'N/A')}")
+            for condition, values in sorted(agg.items()):
+                if condition == "recommendation":
+                    continue
+                print(
+                    f"{condition}: final_recall={values['finalRecallMean']:.3f} "
+                    f"noise={values['noiseRateMean']:.3f} "
+                    f"semantic_only_recall={values['semanticOnlyRecallMean']:.3f}"
+                )
+        else:
+            for condition, values in report["aggregate"].items():
+                print(
+                    f"{condition}: candidate_recall={values['candidateRecallMean']:.3f} "
+                    f"final_recall={values['finalRecallMean']:.3f} "
+                    f"noise={values['noiseRateMean']:.3f}"
+                )
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+# ---------------------------------------------------------------------------
+# Story 0206 — Live capture evaluation
+# ---------------------------------------------------------------------------
+
+LIVE_CAPTURES_PATH = Path(__file__).parent / "captures/live"
+LIVE_PROTOCOL = "story-0206-live-capture/v1"
+LIVE_CONDITIONS = ("LEXICAL_CONTROL", "HYBRID_EXPERIMENT")
+
+
+@dataclass(frozen=True)
+class LiveCandidateCapture:
+    reference: str
+    family: str
+    trust_tier: str | None
+    status: str
+    source_type: str | None
+    relevance_score: int
+    selected: bool
+    rejection_reason: str | None
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> "LiveCandidateCapture":
+        return cls(
+            reference=str(value["reference"]),
+            family=str(value["family"]),
+            trust_tier=value.get("trustTier"),
+            status=str(value.get("status", "CURRENT")),
+            source_type=value.get("sourceType"),
+            relevance_score=int(value["relevanceScore"]),
+            selected=bool(value["selected"]),
+            rejection_reason=value.get("rejectionReason"),
+        )
+
+
+@dataclass(frozen=True)
+class LiveCapture:
+    protocol_version: str
+    scenario_id: str
+    project_slug: str
+    revision: str
+    question: str
+    candidate_count: int
+    selected_count: int
+    estimated_tokens: int
+    truncated: bool
+    latency_ms: int | None
+    context_digest: str
+    expected_evidence: frozenset[str]
+    candidates: tuple[LiveCandidateCapture, ...]
+
+    @classmethod
+    def from_dict(cls, value: dict[str, Any]) -> "LiveCapture":
+        return cls(
+            protocol_version=str(value["protocolVersion"]),
+            scenario_id=str(value["scenarioId"]),
+            project_slug=str(value["projectSlug"]),
+            revision=str(value["revision"]),
+            question=str(value["question"]),
+            candidate_count=int(value["candidateCount"]),
+            selected_count=int(value["selectedCount"]),
+            estimated_tokens=int(value["estimatedTokens"]),
+            truncated=bool(value["truncated"]),
+            latency_ms=(int(value["latencyMs"]) if value.get("latencyMs") is not None else None),
+            context_digest=str(value["contextDigest"]),
+            expected_evidence=frozenset(value.get("expectedEvidence", [])),
+            candidates=tuple(LiveCandidateCapture.from_dict(c) for c in value["candidates"]),
+        )
+
+
+@dataclass(frozen=True)
+class LiveConditionResult:
+    scenario_id: str
+    condition: str
+    selected_references: tuple[str, ...]
+    candidate_recall: float
+    final_recall: float
+    noise_rate: float
+    semantic_only_recall: float
+    lexical_only_recall: float
+    latency_ms: int | None
+    estimated_context_tokens: int
+    truncated: bool
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "scenarioId": self.scenario_id,
+            "condition": self.condition,
+            "selectedReferences": list(self.selected_references),
+            "candidateRecall": self.candidate_recall,
+            "finalRecall": self.final_recall,
+            "noiseRate": self.noise_rate,
+            "semanticOnlyRecall": self.semantic_only_recall,
+            "lexicalOnlyRecall": self.lexical_only_recall,
+            "latencyMs": self.latency_ms,
+            "estimatedContextTokens": self.estimated_context_tokens,
+            "truncated": self.truncated,
+        }
+
+
+def load_live_captures(path: Path = LIVE_CAPTURES_PATH) -> tuple[LiveCapture, ...]:
+    if not path.exists():
+        return ()
+    captures = []
+    for file in sorted(path.glob("*.json")):
+        raw = json.loads(file.read_text(encoding="utf-8"))
+        if raw.get("protocolVersion") != LIVE_PROTOCOL:
+            raise ValueError(
+                f"unsupported live capture protocol in {file}: {raw.get('protocolVersion')!r}"
+            )
+        captures.append(LiveCapture.from_dict(raw))
+    ids = [c.scenario_id for c in captures]
+    if len(ids) != len(set(ids)):
+        raise ValueError("live capture scenario identifiers must be unique")
+    return tuple(captures)
+
+
+def evaluate_live_capture(capture: LiveCapture, condition: str) -> LiveConditionResult:
+    if condition not in LIVE_CONDITIONS:
+        raise ValueError(f"unsupported live condition: {condition}")
+
+    if condition == "LEXICAL_CONTROL":
+        pool = [c for c in capture.candidates if c.source_type != "SEMANTIC_RETRIEVAL"]
+    else:
+        pool = list(capture.candidates)
+
+    pool.sort(key=lambda c: (-c.relevance_score, c.reference))
+    selected = pool[:capture.selected_count]
+    selected_refs = tuple(c.reference for c in selected)
+    all_refs = tuple(c.reference for c in pool)
+    expected = capture.expected_evidence
+
+    candidate_recall = (
+        1.0 if not expected else len(expected & set(all_refs)) / len(expected)
+    )
+    final_recall = (
+        1.0 if not expected else len(expected & set(selected_refs)) / len(expected)
+    )
+    noise_rate = (
+        0.0 if not selected else len(set(selected_refs) - expected) / len(selected_refs)
+    )
+
+    semantic_refs = frozenset(
+        c.reference for c in capture.candidates if c.source_type == "SEMANTIC_RETRIEVAL"
+    )
+    lexical_refs = frozenset(
+        c.reference for c in capture.candidates if c.source_type != "SEMANTIC_RETRIEVAL"
+    )
+    semantic_only_recall = (
+        0.0 if not expected
+        else len(expected & (semantic_refs - lexical_refs)) / len(expected)
+    )
+    lexical_only_recall = (
+        0.0 if not expected
+        else len(expected & (lexical_refs - semantic_refs)) / len(expected)
+    )
+
+    estimated_tokens = sum(
+        max(1, len(_terms(c.reference))) for c in selected
+    )
+
+    return LiveConditionResult(
+        scenario_id=capture.scenario_id,
+        condition=condition,
+        selected_references=selected_refs,
+        candidate_recall=round(candidate_recall, 6),
+        final_recall=round(final_recall, 6),
+        noise_rate=round(noise_rate, 6),
+        semantic_only_recall=round(semantic_only_recall, 6),
+        lexical_only_recall=round(lexical_only_recall, 6),
+        latency_ms=capture.latency_ms,
+        estimated_context_tokens=estimated_tokens,
+        truncated=capture.truncated,
+    )
+
+
+def aggregate_live(results: list[LiveConditionResult]) -> dict[str, Any]:
+    grouped: dict[str, list[LiveConditionResult]] = {}
+    for result in results:
+        grouped.setdefault(result.condition, []).append(result)
+
+    report: dict[str, Any] = {}
+    for condition, values in sorted(grouped.items()):
+        report[condition] = {
+            "scenarioCount": len(values),
+            "candidateRecallMean": round(
+                sum(v.candidate_recall for v in values) / len(values), 6
+            ),
+            "finalRecallMean": round(
+                sum(v.final_recall for v in values) / len(values), 6
+            ),
+            "noiseRateMean": round(
+                sum(v.noise_rate for v in values) / len(values), 6
+            ),
+            "semanticOnlyRecallMean": round(
+                sum(v.semantic_only_recall for v in values) / len(values), 6
+            ),
+            "lexicalOnlyRecallMean": round(
+                sum(v.lexical_only_recall for v in values) / len(values), 6
+            ),
+            "truncationRate": round(
+                sum(v.truncated for v in values) / len(values), 6
+            ),
+        }
+        timings = sorted(v.latency_ms for v in values if v.latency_ms is not None)
+        if timings:
+            report[condition]["latencyP50Ms"] = timings[len(timings) // 2]
+            report[condition]["latencyP95Ms"] = timings[
+                min(len(timings) - 1, int(len(timings) * 0.95))
+            ]
+
+    hybrid = report.get("HYBRID_EXPERIMENT", {})
+    lexical = report.get("LEXICAL_CONTROL", {})
+    hybrid_recall = hybrid.get("finalRecallMean", 0.0)
+    lexical_recall = lexical.get("finalRecallMean", 0.0)
+    hybrid_noise = hybrid.get("noiseRateMean", 0.0)
+
+    hybrid_results = grouped.get("HYBRID_EXPERIMENT", [])
+    lexical_results = grouped.get("LEXICAL_CONTROL", [])
+    improved_scenarios = sum(
+        h.final_recall > l.final_recall
+        for h, l in zip(hybrid_results, lexical_results)
+    )
+
+    if hybrid_recall > lexical_recall and improved_scenarios >= 2 and hybrid_noise <= 0.15:
+        recommendation = "ENABLE_HYBRID"
+    elif hybrid_recall > lexical_recall or improved_scenarios >= 1:
+        if max(hybrid_recall, lexical_recall) < 0.3:
+            recommendation = "COMPOSITION_BOTTLENECK"
+        else:
+            recommendation = "ENABLE_HYBRID"
+    elif max(hybrid_recall, lexical_recall) < 0.3:
+        recommendation = "COMPOSITION_BOTTLENECK"
+    else:
+        recommendation = "LEXICAL_SUFFICIENT"
+
+    report["recommendation"] = recommendation
+    return report
+
+
+def run_live(captures_path: Path = LIVE_CAPTURES_PATH) -> dict[str, Any]:
+    captures = load_live_captures(captures_path)
+    if not captures:
+        return {
+            "protocolVersion": "story-0206-live-evaluation/v1",
+            "captureCount": 0,
+            "results": [],
+            "aggregate": {"recommendation": "COMPOSITION_BOTTLENECK"},
+        }
+    results = [
+        evaluate_live_capture(capture, condition)
+        for capture in captures
+        for condition in LIVE_CONDITIONS
+    ]
+    return {
+        "protocolVersion": "story-0206-live-evaluation/v1",
+        "captureCount": len(captures),
+        "results": [r.as_dict() for r in results],
+        "aggregate": aggregate_live(results),
+    }

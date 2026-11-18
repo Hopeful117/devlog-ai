@@ -1,0 +1,57 @@
+{
+  "protocolVersion": "story-0206-live-capture/v1",
+  "capturedAt": "2026-11-18T00:01:00Z",
+  "scenarioId": "story-zero-candidates-embedding-rollout",
+  "projectSlug": "devlog-ai",
+  "revision": "rev-0206-fixture",
+  "question": "How should we plan the embedding pipeline rollout across environments?",
+  "candidateCount": 4,
+  "selectedCount": 2,
+  "estimatedTokens": 820,
+  "truncated": false,
+  "latencyMs": 410,
+  "contextDigest": "bbccdd001122334455667788990011223344556677889900112233445566778899",
+  "expectedEvidence": ["story:0202@rev-0206-fixture"],
+  "candidates": [
+    {
+      "reference": "story:0202@rev-0206-fixture",
+      "family": "ROADMAP",
+      "trustTier": "HUMAN_AUTHORED",
+      "status": "CURRENT",
+      "sourceType": "SEMANTIC_RETRIEVAL",
+      "relevanceScore": 85,
+      "selected": true,
+      "rejectionReason": null
+    },
+    {
+      "reference": "file:docker-compose.yml@rev-0206-fixture",
+      "family": "CONFIG_FILE",
+      "trustTier": "TECHNICAL_EVIDENCE",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 55,
+      "selected": true,
+      "rejectionReason": null
+    },
+    {
+      "reference": "file:ai-engine/Dockerfile@rev-0206-fixture",
+      "family": "CONFIG_FILE",
+      "trustTier": "TECHNICAL_EVIDENCE",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 25,
+      "selected": false,
+      "rejectionReason": "EVIDENCE_ITEM_BUDGET_EXCEEDED"
+    },
+    {
+      "reference": "file:backend/pom.xml@rev-0206-fixture",
+      "family": "CONFIG_FILE",
+      "trustTier": "TECHNICAL_EVIDENCE",
+      "status": "CURRENT",
+      "sourceType": "STRUCTURAL",
+      "relevanceScore": 10,
+      "selected": false,
+      "rejectionReason": "EVIDENCE_ITEM_BUDGET_EXCEEDED"
+    }
+  ]
+}

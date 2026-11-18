@@ -385,7 +385,9 @@ class RepositoryContextServiceTest {
                 new BudgetedDiverseEvidenceSelector(),
                 symbolEnricher(),
                 enricher,
-                new ObjectMapper(), maximumItems, maximumSummary,
+                new ObjectMapper(),
+                noOpCaptureService(),
+                maximumItems, maximumSummary,
                 maximumHistory, maximumTokens);
     }
 
@@ -421,5 +423,12 @@ class RepositoryContextServiceTest {
                             enriched, selection.decisions(), usedTokens), List.of());
         });
         return enricher;
+    }
+
+    private com.hopeful117.devlogai.repositorycontext.capture.RetrievalCaptureService noOpCaptureService() {
+        com.hopeful117.devlogai.repositorycontext.capture.RetrievalCaptureService svc =
+                new com.hopeful117.devlogai.repositorycontext.capture.RetrievalCaptureService(new ObjectMapper());
+        org.springframework.test.util.ReflectionTestUtils.setField(svc, "enabled", false);
+        return svc;
     }
 }
