@@ -250,9 +250,10 @@ public class ResourceSupport {
             return call.get();
         } catch (HttpClientErrorException.NotFound exception) {
             throw notFound(notFoundMessage);
-        } catch (HttpClientErrorException.Forbidden | HttpClientErrorException.Unauthorized exception) {
-            throw internal("DevLog backend refused access (%s)"
-                    .formatted(exception.getStatusCode()));
+        } catch (HttpClientErrorException.Unauthorized exception) {
+            throw unauthenticated("Authentication is required to access DevLog backend");
+        } catch (HttpClientErrorException.Forbidden exception) {
+            throw internal("DevLog backend refused access (403)");
         } catch (RestClientResponseException exception) {
             HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
             if (status != null && status.is5xxServerError()) {

@@ -5,6 +5,7 @@ import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogResourceClient;
 import hopefull117.devlogai_mcp.mcp_server.client.McpToolEventIngestClient;
 import hopefull117.devlogai_mcp.mcp_server.companion.DevlogCompanionClient;
+import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,42 +22,49 @@ public class DevlogBackendClientConfiguration {
 
     @Bean
     DevlogProjectContextClient devLogProjectContextClient(
-            @Value("${devlog.backend.base-url}") String baseUrl
+            @Value("${devlog.backend.base-url}") String baseUrl,
+            McpAuthenticatedPrincipalProvider principalProvider
     ) {
-        return buildClient(baseUrl, DevlogProjectContextClient.class);
+        return buildClient(baseUrl, DevlogProjectContextClient.class, principalProvider);
     }
 
     @Bean
     DevlogResourceClient devlogResourceClient(
-            @Value("${devlog.backend.base-url}") String baseUrl
+            @Value("${devlog.backend.base-url}") String baseUrl,
+            McpAuthenticatedPrincipalProvider principalProvider
     ) {
-        return buildClient(baseUrl, DevlogResourceClient.class);
+        return buildClient(baseUrl, DevlogResourceClient.class, principalProvider);
     }
 
     @Bean
     DevlogAdminClient devlogAdminClient(
-            @Value("${devlog.backend.base-url}") String baseUrl
+            @Value("${devlog.backend.base-url}") String baseUrl,
+            McpAuthenticatedPrincipalProvider principalProvider
     ) {
-        return buildClient(baseUrl, DevlogAdminClient.class);
+        return buildClient(baseUrl, DevlogAdminClient.class, principalProvider);
     }
 
     @Bean
     DevlogCompanionClient devlogCompanionClient(
-            @Value("${devlog.backend.base-url}") String baseUrl
+            @Value("${devlog.backend.base-url}") String baseUrl,
+            McpAuthenticatedPrincipalProvider principalProvider
     ) {
-        return buildClient(baseUrl, DevlogCompanionClient.class);
+        return buildClient(baseUrl, DevlogCompanionClient.class, principalProvider);
     }
 
     @Bean
     McpToolEventIngestClient mcpToolEventIngestClient(
-            @Value("${devlog.backend.base-url}") String baseUrl
+            @Value("${devlog.backend.base-url}") String baseUrl,
+            McpAuthenticatedPrincipalProvider principalProvider
     ) {
-        return buildClient(baseUrl, McpToolEventIngestClient.class);
+        return buildClient(baseUrl, McpToolEventIngestClient.class, principalProvider);
     }
 
-    private <T> T buildClient(String baseUrl, Class<T> clientType) {
+    private <T> T buildClient(String baseUrl, Class<T> clientType,
+                               McpAuthenticatedPrincipalProvider principalProvider) {
         RestClient restClient = RestClient.builder()
                 .baseUrl(baseUrl)
+                .requestInterceptor(new BearerTokenAuthInterceptor(principalProvider))
                 .requestInterceptor(loggingInterceptor())
                 .build();
 
