@@ -174,6 +174,33 @@ class SemanticRetrievalContextCollectorTest {
         assertThat(results.get(1).extractionMetadata()).containsEntry("trustTier", "HUMAN_AUTHORED");
     }
 
+    // --- content population ---
+
+    @Test
+    void semanticDocument_contentPopulatedFromRetrievalDocumentContent() {
+        stubEmbedding();
+        when(repository.findByProjectIdAndSimilarity(any(), any(), anyInt(), anyFloat()))
+                .thenReturn(List.of(documentOf("INSIGHT", UUID.randomUUID(), "TRUSTED")));
+
+        RepositoryEvidence evidence = collector.collect(requestWith("test")).get(0);
+
+        assertThat(evidence.content()).isNotNull();
+        assertThat(evidence.content().status()).isEqualTo(
+                com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.COMPLETE);
+        assertThat(evidence.content().text()).isEqualTo("Content for INSIGHT");
+    }
+
+    @Test
+    void semanticDocument_summaryRemainsTitle() {
+        stubEmbedding();
+        when(repository.findByProjectIdAndSimilarity(any(), any(), anyInt(), anyFloat()))
+                .thenReturn(List.of(documentOf("ADR", UUID.randomUUID(), "TRUSTED")));
+
+        RepositoryEvidence evidence = collector.collect(requestWith("test")).get(0);
+
+        assertThat(evidence.summary()).isEqualTo("Test document — ADR");
+    }
+
     // --- pgvector failure ---
 
     @Test

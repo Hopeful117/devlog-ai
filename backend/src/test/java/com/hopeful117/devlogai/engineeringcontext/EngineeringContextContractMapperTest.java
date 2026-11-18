@@ -442,6 +442,38 @@ class EngineeringContextContractMapperTest {
     }
 
 
+    @Test
+    void metadata_exposesRejectionReasonCounts() {
+        ProjectContextSnapshot projectSnapshot = projectSnapshotWithSlug();
+        var mappedProject = mock(
+                com.hopeful117.devlogai.contracts.projectcontext.ProjectContext.class);
+        when(projectContextContractMapper.toContract(projectSnapshot))
+                .thenReturn(mappedProject);
+
+        RepositoryContext repositoryContext = mock(RepositoryContext.class);
+        when(repositoryContext.evidence()).thenReturn(List.of());
+        when(repositoryContext.selectionDecisions()).thenReturn(List.of(
+                new SelectionDecision("ref-1", false, "TOKEN_BUDGET_EXCEEDED", 45, 100),
+                new SelectionDecision("ref-2", false, "TOKEN_BUDGET_EXCEEDED", 40, 80),
+                new SelectionDecision("ref-3", false, "INSUFFICIENT_RELEVANCE", 10, 50),
+                new SelectionDecision("ref-4", true, "SELECTED_BY_RANK", 85, 120)
+        ));
+        when(repositoryContext.candidateCount()).thenReturn(4);
+        when(repositoryContext.truncated()).thenReturn(false);
+        when(repositoryContext.usedTokens()).thenReturn(120);
+        when(repositoryContext.contextDigest()).thenReturn("digest");
+        when(repositoryContext.warnings()).thenReturn(List.of());
+
+        EngineeringContext result =
+                mapper.toContract(projectSnapshot, repositoryContext, "intent", List.of(), null, null);
+
+        assertThat(result.metadata().rejectedCount()).isEqualTo(3);
+        assertThat(result.metadata().rejectionReasonCounts())
+                .containsEntry("TOKEN_BUDGET_EXCEEDED", 2)
+                .containsEntry("INSUFFICIENT_RELEVANCE", 1)
+                .hasSize(2);
+    }
+
     // ---- trust tier classification for repository document kinds (Story 0119, Subtask 2) ----
 
     @Test

@@ -144,8 +144,8 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
     }
 
     private int recency(Instant occurredAt, Instant analysisCreatedAt) {
-        if (occurredAt == null || analysisCreatedAt == null
-                || occurredAt.isAfter(analysisCreatedAt)) return 0;
+        if (occurredAt == null) return 50;   // stable knowledge without a date — neutral, not a penalty
+        if (analysisCreatedAt == null || occurredAt.isAfter(analysisCreatedAt)) return 0;
         long days = Duration.between(occurredAt, analysisCreatedAt).toDays();
         if (days <= 7) return 100;
         if (days <= 30) return 80;

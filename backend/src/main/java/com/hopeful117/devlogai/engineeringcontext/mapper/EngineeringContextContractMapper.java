@@ -346,6 +346,12 @@ public class EngineeringContextContractMapper {
         List<String> warnings = new ArrayList<>(context.warnings());
         EngineeringContextFreshness freshness =
                 buildFreshness(context, freshnessSummary, warnings);
+        List<RepositoryContext.SelectionDecision> rejections = context.selectionDecisions()
+                .stream().filter(d -> !d.selected()).toList();
+        Map<String, Integer> rejectionReasonCounts = rejections.stream()
+                .collect(Collectors.groupingBy(
+                        RepositoryContext.SelectionDecision::reason,
+                        Collectors.summingInt(d -> 1)));
         return new EngineeringContextMetadata(
                 context.candidateCount(),
                 context.evidence().size(),
@@ -353,7 +359,9 @@ public class EngineeringContextContractMapper {
                 context.usedTokens(),
                 context.contextDigest(),
                 warnings,
-                freshness
+                freshness,
+                rejections.size(),
+                rejectionReasonCounts
         );
     }
 

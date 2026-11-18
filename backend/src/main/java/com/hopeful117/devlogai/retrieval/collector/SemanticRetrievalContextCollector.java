@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.retrieval.collector;
 import com.hopeful117.devlogai.repositorycontext.ContextRequest;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
 import com.hopeful117.devlogai.repositorycontext.collector.EvidenceFactory;
 import com.hopeful117.devlogai.repositorycontext.collector.RepositoryContextCollector;
 import com.hopeful117.devlogai.retrieval.client.EmbeddingClient;
@@ -106,6 +107,12 @@ public class SemanticRetrievalContextCollector implements RepositoryContextColle
                             null, null,
                             doc.getSourceId().toString()),
                     request.budget().maximumSummaryCharacters());
+            if (doc.getContent() != null && !doc.getContent().isBlank()) {
+                evidence = evidence.withContent(new RepositoryEvidenceContent(
+                        RepositoryEvidenceContent.Status.COMPLETE,
+                        doc.getContent(),
+                        null, "semantic-retrieval-v1", collectorVersion(), null));
+            }
             evidence = evidence.withExtractionMetadata(java.util.Map.of(
                     "collectorId", collectorId(),
                     "collectorVersion", collectorVersion(),

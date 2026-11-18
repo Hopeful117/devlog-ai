@@ -169,6 +169,36 @@ class DeterministicEvidenceRankerTest {
         }
     }
 
+    @Test
+    void nullOccurredAt_receivesNeutralRecencyScore_notZero() {
+        RepositoryEvidence evidence = evidenceWithOccurredAt(
+                "adr", "DECISION", "ADR content", "docs/ADR-001.md", null);
+        List<RepositoryEvidence> ranked = ranker.rank(List.of(evidence),
+                requestWithRecencyWeight("ADR", precision()));
+
+        int recency = ranked.get(0).score().criteria().get(EvidenceCriterion.RECENCY);
+        assertEquals(50, recency);
+    }
+
+    @Test
+    void nullOccurredAtAdr_outranks_veryOldDatedAdr() {
+        RepositoryEvidence undated = evidenceWithOccurredAt(
+                "undated", "DECISION", "ADR content", "docs/ADR-001.md", null);
+        RepositoryEvidence old = evidenceWithOccurredAt(
+                "old", "DECISION", "ADR content", "docs/ADR-002.md",
+                Instant.parse("2020-01-01T00:00:00Z"));
+        List<RepositoryEvidence> ranked = ranker.rank(List.of(undated, old),
+                requestWithRecencyWeight("ADR", precision()));
+
+        int undatedRecency = ranked.stream().filter(e -> e.reference().equals("undated"))
+                .findFirst().orElseThrow().score().criteria().get(EvidenceCriterion.RECENCY);
+        int oldRecency = ranked.stream().filter(e -> e.reference().equals("old"))
+                .findFirst().orElseThrow().score().criteria().get(EvidenceCriterion.RECENCY);
+
+        assertTrue(undatedRecency > oldRecency,
+                "Undated ADR should have RECENCY 50, 5-year-old ADR should have RECENCY 10");
+    }
+
     private ContextRequest request(String objective, EvidencePrecisionPolicy policy) {
         return request(objective, policy, null);
     }
@@ -201,6 +231,40 @@ class DeterministicEvidenceRankerTest {
 
     private EvidencePrecisionPolicy precision() {
         return new EvidencePrecisionPolicy("test", "v1", 50, 0, 25, 100, 75);
+    }
+
+    private ContextRequest requestWithRecencyWeight(
+            String objective, EvidencePrecisionPolicy policy) {
+        AnalysisContext context = mock(AnalysisContext.class);
+        AnalysisContext.AnalysisSnapshot analysis = mock(AnalysisContext.AnalysisSnapshot.class);
+        when(context.analysis()).thenReturn(analysis);
+        when(analysis.createdAt()).thenReturn(Instant.parse("2026-08-08T12:00:00Z"));
+        IntentDefinition intent = mock(IntentDefinition.class);
+        when(intent.id()).thenReturn("engineering-story-preparation");
+        when(intent.objective()).thenReturn(objective);
+        Map<EvidenceCriterion, Integer> weights = Map.of(
+                EvidenceCriterion.SEMANTIC_RELEVANCE, 0,
+                EvidenceCriterion.ARCHITECTURAL_RELEVANCE, 0,
+                EvidenceCriterion.HISTORICAL_RELEVANCE, 0,
+                EvidenceCriterion.RECENCY, 100,
+                EvidenceCriterion.CONFIDENCE, 0,
+                EvidenceCriterion.USER_GUIDANCE_BOOST, 0);
+        var profile = new ContextProfileDefinition("engineering-story-v1",
+                ContextProfile.ENGINEERING_STORY, "v1", weights,
+                List.of(RepositoryContextLayer.RELATED_SOURCE_CODE), 1, 100, policy);
+        var plan = new ContextPlan("v2", List.of(profile), weights,
+                profile.preferredLayers(), 1, policy, List.of());
+        return new ContextRequest(context, intent, null, List.of(), plan,
+                new RepositoryContext.ContextBudget(60, 500, 20, 6000));
+    }
+
+    private RepositoryEvidence evidenceWithOccurredAt(
+            String reference, String kind, String summary, String file, Instant occurredAt) {
+        return new RepositoryEvidence(RepositoryContextLayer.ADR,
+                kind, reference, summary, occurredAt, EvidenceScore.unscored(),
+                List.of(), new RepositoryEvidence.EvidenceProvenance(
+                "CORE_KNOWLEDGE", "repository", file, reference),
+                Map.of(), 10, List.of());
     }
 
     private RepositoryEvidence evidence(
