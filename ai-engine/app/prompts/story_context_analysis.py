@@ -215,7 +215,8 @@ class StoryContextAnalysisPromptBuilder:
                 if follow_up else "Produce a ProviderStoryContextAnalysisResult with all required fields.\n")
              + ("Follow-up evidenceReferences and nextStep evidenceReferences must use only authorized references.\n"
                 if follow_up else "confidence must be exactly one scalar value: HIGH, MEDIUM, or LOW; do not emit a confidence object.\n"
-             "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
+              "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
+             "objectiveUnderstanding.grounding is required when its summary is non-empty. Ground factual or interpretative summaries with authorized evidenceReferences; use RECOMMENDATION only for explicitly advisory content.\n"
             "Classify each finding as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION in outputClassification.\n"
             "ArchitectureFinding, DecisionFinding, HistoricalContextItem, and ImpactedComponentFinding MUST include relationType (EXPLICIT, TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE, or INFERRED_HYPOTHESIS).\n"
             "For V2 causal analysis, build one causalAssessment for the exact Core-owned causalQuestion. Select only bounded LINE_RANGE or SECTION locators over authorized repository evidence; do not fabricate resolved content or digests.\n"

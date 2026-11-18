@@ -991,17 +991,13 @@ class AnalyzeStoryContextUseCaseTest {
                         CONTEXT_DIGEST, "story-context-analysis-prompt-v1", "mock",
                         "deterministic-v1", "b".repeat(64), INTENT_ID, "v1",
                         List.of(), Map.of());
+        StoryContextAnalysisResult.ObjectiveUnderstanding objective =
+                new StoryContextAnalysisResult.ObjectiveUnderstanding(
+                        "Understand the Story", List.of(), List.of(), List.of(), grounding);
         StoryContextAnalysisResult.OutputClassification classification =
-                new StoryContextAnalysisResult.OutputClassification(List.of(
-                        new StoryContextAnalysisResult.OutputClassification.ClassificationEntry(
-                                "architectureFindings[0]",
-                                StoryContextAnalysisResult.OutputClassification.Classification.FACTUAL_EXTRACTION,
-                                true,
-                                "Directly grounded"
-                        )
-                ));
+                outputClassification(List.of("objectiveUnderstanding", "architectureFindings[0]"));
         return new StoryContextAnalysisResult(
-                new StoryContextAnalysisResult.ObjectiveUnderstanding("Understand the Story"),
+                objective,
                 List.of(finding), List.of(), List.of(), List.of(), List.of(), List.of(),
                 List.of(), List.of(), List.of(), StoryContextAnalysisResult.Confidence.HIGH,
                 provenance, classification);
@@ -1022,11 +1018,38 @@ class AnalyzeStoryContextUseCaseTest {
             List<StoryContextAnalysisResult.ConstraintFinding> constraints
     ) {
         StoryContextAnalysisResult base = groundedResult(CANONICAL_REFERENCE);
+        java.util.List<String> classifiedReferences = new java.util.ArrayList<>();
+        classifiedReferences.add("objectiveUnderstanding");
+        addClassificationReferences(classifiedReferences, "architectureFindings", architecture.size());
+        addClassificationReferences(classifiedReferences, "decisionFindings", decisions.size());
+        addClassificationReferences(classifiedReferences, "evidenceFindings", evidence.size());
+        addClassificationReferences(classifiedReferences, "historicalContext", history.size());
+        addClassificationReferences(classifiedReferences, "constraintFindings", constraints.size());
+        addClassificationReferences(classifiedReferences, "impactedComponentFindings", impacted.size());
+        StoryContextAnalysisResult.OutputClassification outputClassification =
+                outputClassification(classifiedReferences);
         return new StoryContextAnalysisResult(
                  base.objectiveUnderstanding(), architecture, decisions, evidence, history, constraints,
                  impacted, base.uncertainties(), base.missingInformation(), base.implementationQuestions(),
                  base.implementationPreparation(),
-                 base.confidence(), base.provenance(), base.outputClassification(), List.of(), null);
+                 base.confidence(), base.provenance(), outputClassification, List.of(), null);
+    }
+
+    private StoryContextAnalysisResult.OutputClassification outputClassification(
+            List<String> references) {
+        return new StoryContextAnalysisResult.OutputClassification(references.stream()
+                .map(reference -> new StoryContextAnalysisResult.OutputClassification.ClassificationEntry(
+                        reference,
+                        StoryContextAnalysisResult.OutputClassification.Classification.FACTUAL_EXTRACTION,
+                        true,
+                        "Directly grounded"))
+                .toList());
+    }
+
+    private void addClassificationReferences(List<String> references, String field, int count) {
+        for (int index = 0; index < count; index++) {
+            references.add(field + "[" + index + "]");
+        }
     }
 
     private StoryContextAnalysisResult resultWithCausalClaims(

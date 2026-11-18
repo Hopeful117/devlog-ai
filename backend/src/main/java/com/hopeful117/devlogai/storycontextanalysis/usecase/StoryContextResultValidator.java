@@ -6,6 +6,7 @@ import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysis
 
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.Set;
 
 /** Coordinates authoritative validation of the structured Story Context result. */
@@ -26,6 +27,7 @@ public final class StoryContextResultValidator {
             throw new IllegalStateException("Context digest mismatch: expected " + expectedDigest + ", got " + actualDigest);
         }
 
+        validateObjectiveUnderstanding(result.objectiveUnderstanding(), allowedRefSet);
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.architectureFindings(), allowedRefSet, true);
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.decisionFindings(), allowedRefSet, true);
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.evidenceFindings(), allowedRefSet, false);
@@ -48,6 +50,7 @@ public final class StoryContextResultValidator {
                 }
             }
         }
+        validateOutputClassification(result);
         for (StoryContextAnalysisResult.OutputClassification.ClassificationEntry entry
                 : result.outputClassification().entries()) {
             if (!Set.of("FACTUAL_EXTRACTION", "AI_INTERPRETATION", "RECOMMENDATION")
@@ -55,10 +58,103 @@ public final class StoryContextResultValidator {
                 throw new IllegalStateException("Invalid output classification: " + entry.classification());
             }
         }
-        if (!Set.of("HIGH", "MEDIUM", "LOW").contains(result.confidence().name())) {
+            if (!Set.of("HIGH", "MEDIUM", "LOW").contains(result.confidence().name())) {
             throw new IllegalStateException("Invalid confidence level: " + result.confidence());
         }
         return result;
+    }
+
+    private static void validateOutputClassification(StoryContextAnalysisResult result) {
+        Map<String, StoryContextAnalysisResult.GroundingMetadata> groundingByReference = new LinkedHashMap<>();
+        if (result.objectiveUnderstanding() != null
+                && result.objectiveUnderstanding().grounding() != null) {
+            groundingByReference.put("objectiveUnderstanding", result.objectiveUnderstanding().grounding());
+        }
+        addGroundings(groundingByReference, "architectureFindings", result.architectureFindings());
+        addGroundings(groundingByReference, "decisionFindings", result.decisionFindings());
+        addGroundings(groundingByReference, "evidenceFindings", result.evidenceFindings());
+        addGroundings(groundingByReference, "historicalContext", result.historicalContext());
+        addGroundings(groundingByReference, "constraintFindings", result.constraintFindings());
+        addGroundings(groundingByReference, "impactedComponentFindings", result.impactedComponentFindings());
+
+        Set<String> classifiedReferences = new HashSet<>();
+        for (StoryContextAnalysisResult.OutputClassification.ClassificationEntry entry
+                : result.outputClassification().entries()) {
+            if (!classifiedReferences.add(entry.findingReference())) {
+                throw new IllegalStateException(
+                        "Output classification contains duplicate item: " + entry.findingReference());
+            }
+            StoryContextAnalysisResult.GroundingMetadata grounding = groundingByReference.get(entry.findingReference());
+            if (grounding == null) {
+                throw new IllegalStateException(
+                        "Output classification references unknown item: " + entry.findingReference());
+            }
+            if (!entry.classification().name().equals(grounding.classification())
+                    || entry.grounded() != grounding.grounded()) {
+                throw new IllegalStateException(
+                        "Output classification disagrees with grounding: " + entry.findingReference());
+            }
+        }
+        if (!classifiedReferences.containsAll(groundingByReference.keySet())) {
+            Set<String> missing = new HashSet<>(groundingByReference.keySet());
+            missing.removeAll(classifiedReferences);
+            throw new IllegalStateException("Output classification omits items: " + missing);
+        }
+    }
+
+    private static void addGroundings(
+            Map<String, StoryContextAnalysisResult.GroundingMetadata> target,
+            String field,
+            java.util.List<? extends Object> findings) {
+        for (int index = 0; index < findings.size(); index++) {
+            Object finding = findings.get(index);
+            try {
+                Object grounding = finding.getClass().getMethod("grounding").invoke(finding);
+                target.put(field + "[" + index + "]",
+                        (StoryContextAnalysisResult.GroundingMetadata) grounding);
+            } catch (ReflectiveOperationException exception) {
+                throw new IllegalStateException("Unable to inspect output classification target", exception);
+            }
+        }
+    }
+
+    static void validateObjectiveUnderstanding(
+            StoryContextAnalysisResult.ObjectiveUnderstanding objective,
+            Set<String> allowedRefSet) {
+        if (objective == null) {
+            throw new IllegalStateException("Objective understanding is required");
+        }
+        if (objective.grounding() == null) {
+            if (!objective.summary().isBlank()) {
+                throw new IllegalStateException(
+                        "Objective understanding summary requires grounding metadata");
+            }
+            return;
+        }
+        String classification = objective.grounding().classification();
+        if (!Set.of("FACTUAL_EXTRACTION", "AI_INTERPRETATION", "RECOMMENDATION")
+                .contains(classification)) {
+            throw new IllegalStateException("Invalid objective understanding classification: " + classification);
+        }
+        for (EvidenceRef evidenceRef : objective.grounding().evidenceReferences()) {
+            if (!allowedRefSet.contains(evidenceRef.reference())) {
+                throw new IllegalStateException(
+                        "Objective understanding references unauthorized evidence: " + evidenceRef.reference());
+            }
+        }
+        if (objective.summary().isBlank()) return;
+        boolean requiresEvidence = Set.of("FACTUAL_EXTRACTION", "AI_INTERPRETATION")
+                .contains(classification);
+        if (requiresEvidence && (!objective.grounding().grounded()
+                || objective.grounding().evidenceReferences().isEmpty())) {
+            throw new IllegalStateException(
+                    "Objective understanding factual or interpretative summary must be grounded");
+        }
+        if (objective.grounding().grounded()
+                && objective.grounding().evidenceReferences().isEmpty()) {
+            throw new IllegalStateException(
+                    "Grounded objective understanding requires evidence references");
+        }
     }
 
     static void validateImplementationPreparation(
