@@ -22,7 +22,7 @@ class ActivityAlertPostgresIntegrationTest {
 
     @Container
     @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("pgvector/pgvector:pg17");
 
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ActivityAlertService alertService;

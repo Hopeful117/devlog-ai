@@ -99,7 +99,7 @@ class StoryContextCoreIntegrationTest {
 
     @Container
     @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("pgvector/pgvector:pg17");
 
     @Autowired private AnalyzeStoryContextUseCase useCase;
     @Autowired private com.hopeful117.devlogai.storycontextanalysis.usecase.StoryContextInvestigationActionService actionService;

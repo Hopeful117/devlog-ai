@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @Testcontainers
 class GitCommitEvidenceResolverPostgresIntegrationTest {
     @Container @ServiceConnection
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
+    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("pgvector/pgvector:pg17");
 
     @Autowired JdbcTemplate jdbc;
     @Autowired ProjectCommitRepository commits;
