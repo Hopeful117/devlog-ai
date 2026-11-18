@@ -4,6 +4,8 @@ import io.modelcontextprotocol.spec.McpError;
 import io.modelcontextprotocol.spec.McpSchema.ErrorCodes;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogResourceClient;
+import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -25,15 +27,27 @@ public class ResourceSupport {
     private final DevlogProjectContextClient projectContextClient;
     private final DevlogResourceClient resourceClient;
     private final ObjectMapper objectMapper;
+    private final McpAuthenticatedPrincipalProvider principalProvider;
 
     public ResourceSupport(
             DevlogProjectContextClient projectContextClient,
             DevlogResourceClient resourceClient,
             ObjectMapper objectMapper
     ) {
+        this(projectContextClient, resourceClient, objectMapper, null);
+    }
+
+    @Autowired
+    public ResourceSupport(
+            DevlogProjectContextClient projectContextClient,
+            DevlogResourceClient resourceClient,
+            ObjectMapper objectMapper,
+            McpAuthenticatedPrincipalProvider principalProvider
+    ) {
         this.projectContextClient = projectContextClient;
         this.resourceClient = resourceClient;
         this.objectMapper = objectMapper;
+        this.principalProvider = principalProvider;
     }
 
     /**
@@ -42,7 +56,7 @@ public class ResourceSupport {
      */
     public UUID requireProjectId(String projectSlug) {
         try {
-            var project = projectContextClient.getProjectContext(projectSlug);
+            var project = fetchProjectContext(projectSlug);
             if (project == null || project.id() == null) {
                 throw notFound("Project '%s' not found".formatted(projectSlug));
             }
@@ -53,6 +67,22 @@ public class ResourceSupport {
             throw internal("DevLog backend failed while resolving project '%s' (%s)"
                     .formatted(projectSlug, exception.getStatusCode()));
         }
+    }
+
+    private com.hopeful117.devlogai.contracts.projectcontext.ProjectContext fetchProjectContext(String projectSlug) {
+        if (principalProvider != null) {
+            var principal = principalProvider.currentPrincipal();
+            if (principal.isPresent()) {
+                String token = principal.get().bearerToken();
+                String delegation = principal.get().delegationToken();
+                if (token != null && !token.isBlank()) {
+                    return projectContextClient.getProjectContextAuthenticated(
+                            projectSlug, token,
+                            delegation != null ? delegation : "");
+                }
+            }
+        }
+        return projectContextClient.getProjectContext(projectSlug);
     }
 
     /**
