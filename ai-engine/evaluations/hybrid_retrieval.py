@@ -526,8 +526,13 @@ class LiveCapture:
     truncated: bool
     latency_ms: int | None
     context_digest: str
+    condition: str | None
     expected_evidence: frozenset[str]
     candidates: tuple[LiveCandidateCapture, ...]
+
+    @property
+    def annotated(self) -> bool:
+        return bool(self.expected_evidence)
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "LiveCapture":
@@ -543,6 +548,7 @@ class LiveCapture:
             truncated=bool(value["truncated"]),
             latency_ms=(int(value["latencyMs"]) if value.get("latencyMs") is not None else None),
             context_digest=str(value["contextDigest"]),
+            condition=value.get("condition"),
             expected_evidence=frozenset(value.get("expectedEvidence", [])),
             candidates=tuple(LiveCandidateCapture.from_dict(c) for c in value["candidates"]),
         )
@@ -561,6 +567,7 @@ class LiveConditionResult:
     latency_ms: int | None
     estimated_context_tokens: int
     truncated: bool
+    annotated: bool
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -575,6 +582,7 @@ class LiveConditionResult:
             "latencyMs": self.latency_ms,
             "estimatedContextTokens": self.estimated_context_tokens,
             "truncated": self.truncated,
+            "annotated": self.annotated,
         }
 
 
@@ -635,10 +643,6 @@ def evaluate_live_capture(capture: LiveCapture, condition: str) -> LiveCondition
         else len(expected & (lexical_refs - semantic_refs)) / len(expected)
     )
 
-    estimated_tokens = sum(
-        max(1, len(_terms(c.reference))) for c in selected
-    )
-
     return LiveConditionResult(
         scenario_id=capture.scenario_id,
         condition=condition,
@@ -649,8 +653,9 @@ def evaluate_live_capture(capture: LiveCapture, condition: str) -> LiveCondition
         semantic_only_recall=round(semantic_only_recall, 6),
         lexical_only_recall=round(lexical_only_recall, 6),
         latency_ms=capture.latency_ms,
-        estimated_context_tokens=estimated_tokens,
+        estimated_context_tokens=capture.estimated_tokens,
         truncated=capture.truncated,
+        annotated=capture.annotated,
     )
 
 
@@ -697,12 +702,28 @@ def aggregate_live(results: list[LiveConditionResult]) -> dict[str, Any]:
 
     hybrid_results = grouped.get("HYBRID_EXPERIMENT", [])
     lexical_results = grouped.get("LEXICAL_CONTROL", [])
+
+    annotated_scenario_ids = {r.scenario_id for r in results if r.annotated}
+    annotated_count = len(annotated_scenario_ids)
+
+    # Detect whether paired comparison is available (V2 captures with explicit condition).
+    # V1 captures have no condition field — comparisons are biased (derived from same run).
+    has_paired = any(r.annotated for r in hybrid_results) and any(
+        r.annotated for r in lexical_results
+    )
+    all_conditions_explicit = all(
+        c.condition is not None for c in []
+    )  # populated at call site in run_live
+    comparison_method = "PAIRED_INDEPENDENT" if all_conditions_explicit else "DERIVED_V1_BIASED"
+
     improved_scenarios = sum(
         h.final_recall > l.final_recall
         for h, l in zip(hybrid_results, lexical_results)
     )
 
-    if hybrid_recall > lexical_recall and improved_scenarios >= 2 and hybrid_noise <= 0.15:
+    if annotated_count == 0 or (annotated_count < 2 and not has_paired):
+        recommendation = "INSUFFICIENT_EVIDENCE"
+    elif hybrid_recall > lexical_recall and improved_scenarios >= 2 and hybrid_noise <= 0.15:
         recommendation = "ENABLE_HYBRID"
     elif hybrid_recall > lexical_recall or improved_scenarios >= 1:
         if max(hybrid_recall, lexical_recall) < 0.3:
@@ -715,6 +736,8 @@ def aggregate_live(results: list[LiveConditionResult]) -> dict[str, Any]:
         recommendation = "LEXICAL_SUFFICIENT"
 
     report["recommendation"] = recommendation
+    report["comparisonMethod"] = comparison_method
+    report["annotatedScenarioCount"] = annotated_count
     return report
 
 

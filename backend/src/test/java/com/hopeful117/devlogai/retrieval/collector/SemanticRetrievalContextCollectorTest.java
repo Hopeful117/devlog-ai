@@ -190,15 +190,36 @@ class SemanticRetrievalContextCollectorTest {
         assertThat(evidence.content().text()).isEqualTo("Content for INSIGHT");
     }
 
+    // --- content included in summary ---
+
     @Test
-    void semanticDocument_summaryRemainsTitle() {
+    void summary_includesTitleAndContent() {
         stubEmbedding();
         when(repository.findByProjectIdAndSimilarity(any(), any(), anyInt(), anyFloat()))
                 .thenReturn(List.of(documentOf("ADR", UUID.randomUUID(), "TRUSTED")));
 
         RepositoryEvidence evidence = collector.collect(requestWith("test")).get(0);
 
-        assertThat(evidence.summary()).isEqualTo("Test document — ADR");
+        assertThat(evidence.summary()).contains("Test document — ADR");
+        assertThat(evidence.summary()).contains("Content for ADR");
+    }
+
+    @Test
+    void summary_titleOnly_whenContentIsNull() {
+        stubEmbedding();
+        RetrievalDocument doc = RetrievalDocument.builder()
+                .id(UUID.randomUUID()).projectId(PROJECT_ID)
+                .sourceType("ADR").sourceId(UUID.randomUUID())
+                .trustTier("TRUSTED").status("CURRENT")
+                .title("Title only").content(null)
+                .contentHash("hash").indexedAt(Instant.now()).metadata(Map.of())
+                .build();
+        when(repository.findByProjectIdAndSimilarity(any(), any(), anyInt(), anyFloat()))
+                .thenReturn(List.of(doc));
+
+        RepositoryEvidence evidence = collector.collect(requestWith("test")).get(0);
+
+        assertThat(evidence.summary()).isEqualTo("Title only");
     }
 
     // --- pgvector failure ---

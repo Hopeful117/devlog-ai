@@ -101,7 +101,7 @@ public class SemanticRetrievalContextCollector implements RepositoryContextColle
                             layerFor(doc.getSourceType()),
                             doc.getSourceType(),
                             doc.getSourceType().toLowerCase() + ":" + doc.getSourceId(),
-                            doc.getTitle(),
+                            buildSummary(doc, request.budget().maximumSummaryCharacters()),
                             doc.getIndexedAt(),
                             List.of(),
                             null, null,
@@ -138,6 +138,15 @@ public class SemanticRetrievalContextCollector implements RepositoryContextColle
             sb.append(p);
         });
         return sb.toString().trim();
+    }
+
+    private String buildSummary(RetrievalDocument doc, int maxChars) {
+        String content = doc.getContent();
+        if (content == null || content.isBlank()) {
+            return doc.getTitle();
+        }
+        String combined = doc.getTitle() + " — " + content;
+        return combined.length() <= maxChars ? combined : combined.substring(0, maxChars);
     }
 
     private RepositoryContextLayer layerFor(String sourceType) {

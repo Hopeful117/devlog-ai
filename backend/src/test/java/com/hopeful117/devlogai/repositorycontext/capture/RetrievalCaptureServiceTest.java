@@ -26,8 +26,13 @@ class RetrievalCaptureServiceTest {
     Path tempDir;
 
     private RetrievalCaptureService buildService(boolean enabled, Path outputDir) {
+        return buildService(enabled, false, outputDir);
+    }
+
+    private RetrievalCaptureService buildService(boolean enabled, boolean semanticEnabled, Path outputDir) {
         RetrievalCaptureService service = new RetrievalCaptureService(objectMapper);
         ReflectionTestUtils.setField(service, "enabled", enabled);
+        ReflectionTestUtils.setField(service, "semanticEnabled", semanticEnabled);
         ReflectionTestUtils.setField(service, "outputDir", outputDir.toString());
         return service;
     }
@@ -76,6 +81,24 @@ class RetrievalCaptureServiceTest {
 
         String json = Files.readString(Files.list(tempDir).findFirst().orElseThrow());
         assertThat(json).contains("\"candidateCount\":2");
+    }
+
+    @Test
+    void condition_is_lexical_control_when_semantic_disabled() throws IOException {
+        RetrievalCaptureService service = buildService(true, false, tempDir);
+        service.capture("query", "proj", "rev", minimalContext(List.of()), List.of(), 10L);
+
+        String json = Files.readString(Files.list(tempDir).findFirst().orElseThrow());
+        assertThat(json).contains("\"condition\":\"LEXICAL_CONTROL\"");
+    }
+
+    @Test
+    void condition_is_hybrid_experiment_when_semantic_enabled() throws IOException {
+        RetrievalCaptureService service = buildService(true, true, tempDir);
+        service.capture("query", "proj", "rev", minimalContext(List.of()), List.of(), 10L);
+
+        String json = Files.readString(Files.list(tempDir).findFirst().orElseThrow());
+        assertThat(json).contains("\"condition\":\"HYBRID_EXPERIMENT\"");
     }
 
     @Test
