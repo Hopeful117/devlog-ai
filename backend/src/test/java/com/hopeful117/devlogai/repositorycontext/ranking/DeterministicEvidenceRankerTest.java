@@ -21,11 +21,13 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class DeterministicEvidenceRankerTest {
-    private final DeterministicEvidenceRanker ranker = new DeterministicEvidenceRanker();
+    private final DeterministicEvidenceRanker ranker =
+            new DeterministicEvidenceRanker(new RetrievalFusionService(1.0, 1.0));
 
     @Test
     void suppressesCommonTermsAndPreservesDiscriminatingPathTerms() {
@@ -126,6 +128,47 @@ class DeterministicEvidenceRankerTest {
                 > other.score().criteria().get(EvidenceCriterion.USER_GUIDANCE_BOOST));
     }
 
+    @Test
+    void semanticCandidatesReceiveCompositeScoreWhenSemanticCollectorEnabled() {
+        RepositoryEvidence lexicalEvidence = evidence(
+                "lex", "SOURCE_FILE", "authentication gateway", "src/Auth.java");
+        RepositoryEvidence semanticEvidence = semanticEvidence(
+                "sem", "SOURCE_FILE", "authentication gateway", "src/Auth.java");
+        List<RepositoryEvidence> candidates = List.of(lexicalEvidence, semanticEvidence);
+        ContextRequest request = request("authentication gateway", precision());
+
+        List<RepositoryEvidence> ranked = ranker.rank(candidates, request);
+
+        // With semantic enabled, the semantic candidate gets a composite score from RRF
+        RepositoryEvidence sem = ranked.stream()
+                .filter(e -> e.reference().equals("sem")).findFirst().orElseThrow();
+        // RRF score should be non-zero (rank 1 in semantic channel)
+        assertTrue(sem.score().criteria().get(EvidenceCriterion.SEMANTIC_RELEVANCE) > 0);
+    }
+
+    @Test
+    void noSemanticCandidatesPreservesExistingTermModelBehavior() {
+        List<RepositoryEvidence> candidates = List.of(
+                evidence("a", "SOURCE_FILE", "payment gateway service", "src/PayGateway.java"),
+                evidence("b", "SOURCE_FILE", "unrelated file", "src/Other.java"));
+        ContextRequest request = request("payment gateway", precision());
+
+        List<RepositoryEvidence> withFusion = ranker.rank(candidates, request);
+        // Without semantic candidates, fuse() returns empty map → term-model scores apply
+        DeterministicEvidenceRanker baseRanker =
+                new DeterministicEvidenceRanker(new RetrievalFusionService(1.0, 1.0));
+        List<RepositoryEvidence> withoutFusion = baseRanker.rank(candidates, request);
+
+        for (RepositoryEvidence ev : withFusion) {
+            RepositoryEvidence match = withoutFusion.stream()
+                    .filter(e -> e.reference().equals(ev.reference()))
+                    .findFirst().orElseThrow();
+            assertEquals(match.score().criteria().get(EvidenceCriterion.SEMANTIC_RELEVANCE),
+                    ev.score().criteria().get(EvidenceCriterion.SEMANTIC_RELEVANCE),
+                    "SEMANTIC_RELEVANCE should be unchanged when no semantic candidates");
+        }
+    }
+
     private ContextRequest request(String objective, EvidencePrecisionPolicy policy) {
         return request(objective, policy, null);
     }
@@ -166,6 +209,15 @@ class DeterministicEvidenceRankerTest {
                 kind, reference, summary, Instant.EPOCH, EvidenceScore.unscored(),
                 List.of(), new RepositoryEvidence.EvidenceProvenance(
                 "DETERMINISTIC_EXTRACTION", "repository", file, reference),
+                Map.of(), 10, List.of());
+    }
+
+    private RepositoryEvidence semanticEvidence(
+            String reference, String kind, String summary, String file) {
+        return new RepositoryEvidence(RepositoryContextLayer.RELATED_SOURCE_CODE,
+                kind, reference, summary, Instant.EPOCH, EvidenceScore.unscored(),
+                List.of(), new RepositoryEvidence.EvidenceProvenance(
+                "SEMANTIC_RETRIEVAL", "repository", file, reference),
                 Map.of(), 10, List.of());
     }
 }

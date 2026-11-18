@@ -381,7 +381,7 @@ class RepositoryContextServiceTest {
         return new RepositoryContextEngine(
                 collectors,
                 new DeterministicContextIntelligence(),
-                new DeterministicEvidenceRanker(),
+                new DeterministicEvidenceRanker(new com.hopeful117.devlogai.repositorycontext.ranking.RetrievalFusionService(1.0, 1.0)),
                 new BudgetedDiverseEvidenceSelector(),
                 symbolEnricher(),
                 enricher,
