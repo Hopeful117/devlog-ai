@@ -80,6 +80,11 @@ services:
       DEVLOG_AI_TRACE_LEVEL: ${DEVLOG_AI_TRACE_LEVEL:-NORMAL}
       DEVLOG_AI_TRACE_DIAGNOSTIC_RETENTION: ${DEVLOG_AI_TRACE_DIAGNOSTIC_RETENTION:-7d}
 
+      RETRIEVAL_LEXICAL_FULLTEXT_ENABLED: ${RETRIEVAL_LEXICAL_FULLTEXT_ENABLED:-true}
+      RETRIEVAL_SEMANTIC_ENABLED: ${RETRIEVAL_SEMANTIC_ENABLED:-true}
+      RETRIEVAL_BACKFILL_ENABLED: ${RETRIEVAL_BACKFILL_ENABLED:-false}
+      RETRIEVAL_CAPTURE_ENABLED: ${RETRIEVAL_CAPTURE_ENABLED:-false}
+
     ports:
       - "${BACKEND_PORT:-18080}:8080"
 
@@ -157,7 +162,7 @@ services:
       start_period: 5s
 
   postgres:
-    image: postgres:17
+    image: pgvector/pgvector:pg17
     container_name: devlog-postgres
     restart: unless-stopped
 

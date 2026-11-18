@@ -174,6 +174,39 @@ class SemanticRetrievalContextCollectorTest {
         assertThat(results.get(1).extractionMetadata()).containsEntry("trustTier", "HUMAN_AUTHORED");
     }
 
+    // --- content included in summary ---
+
+    @Test
+    void summary_includesTitleAndContent() {
+        stubEmbedding();
+        UUID sourceId = UUID.randomUUID();
+        when(repository.findByProjectIdAndSimilarity(any(), any(), anyInt(), anyFloat()))
+                .thenReturn(List.of(documentOf("ADR", sourceId, "TRUSTED")));
+
+        RepositoryEvidence evidence = collector.collect(requestWith("test")).get(0);
+
+        assertThat(evidence.summary()).contains("Test document — ADR");
+        assertThat(evidence.summary()).contains("Content for ADR");
+    }
+
+    @Test
+    void summary_titleOnly_whenContentIsNull() {
+        stubEmbedding();
+        RetrievalDocument doc = RetrievalDocument.builder()
+                .id(UUID.randomUUID()).projectId(PROJECT_ID)
+                .sourceType("ADR").sourceId(UUID.randomUUID())
+                .trustTier("TRUSTED").status("CURRENT")
+                .title("Title only").content(null)
+                .contentHash("hash").indexedAt(Instant.now()).metadata(Map.of())
+                .build();
+        when(repository.findByProjectIdAndSimilarity(any(), any(), anyInt(), anyFloat()))
+                .thenReturn(List.of(doc));
+
+        RepositoryEvidence evidence = collector.collect(requestWith("test")).get(0);
+
+        assertThat(evidence.summary()).isEqualTo("Title only");
+    }
+
     // --- pgvector failure ---
 
     @Test
