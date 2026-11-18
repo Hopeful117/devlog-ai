@@ -56,7 +56,7 @@ public class McpToolObservabilityService {
             String toolName,
             Instant startedAt,
             String resultJson) {
-        record("COMPLETED", projectSlug, operationId, toolName, startedAt, resultJson, null);
+        record("MCP_TOOL_RESPONDED", "RESPONDED", projectSlug, operationId, toolName, startedAt, resultJson, null);
     }
 
     /**
@@ -69,11 +69,12 @@ public class McpToolObservabilityService {
             String toolName,
             Instant startedAt,
             String reasonCode) {
-        record("FAILED", projectSlug, operationId, toolName, startedAt, null, reasonCode);
+        record("MCP_TOOL_FAILED", "FAILED", projectSlug, operationId, toolName, startedAt, null, reasonCode);
     }
 
     private void record(
             String eventType,
+            String status,
             String projectSlug,
             String operationId,
             String toolName,
@@ -104,7 +105,7 @@ public class McpToolObservabilityService {
                             operationId,
                             toolName,
                             eventType,
-                            eventType,   // status mirrors eventType
+                            status,
                             0,
                             "1.0",
                             durationMs,

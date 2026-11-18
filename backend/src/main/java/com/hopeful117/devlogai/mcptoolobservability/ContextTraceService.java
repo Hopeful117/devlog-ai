@@ -69,13 +69,8 @@ public class ContextTraceService {
             intent = extractString(task.getIntentSnapshot(), "intent");
         }
 
-        // Locate the McpOperationView for operation metadata
-        List<McpToolEventRepository.McpOperationProjection> ops =
-                eventRepository.findOperationsByProject(projectId, 0, 200);
-        McpToolEventRepository.McpOperationProjection op = ops.stream()
-                .filter(p -> instanceId.equals(p.getInstanceId()) && operationId.equals(p.getOperationId()))
-                .findFirst()
-                .orElse(null);
+        McpToolEventRepository.SingleOperationProjection op =
+                eventRepository.findSingleOperation(projectId, instanceId, operationId);
 
         // Synthesis snapshot may carry investigationStopReason
         String investigationStopReason = null;

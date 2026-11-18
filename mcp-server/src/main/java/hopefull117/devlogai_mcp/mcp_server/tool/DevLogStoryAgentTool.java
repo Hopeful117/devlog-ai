@@ -103,11 +103,18 @@ public class DevLogStoryAgentTool {
                 .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
         String operationId = observability != null ? observability.newOperationId() : null;
         Instant startedAt = Instant.now();
-        String result = execute(projectSlug, storyId, intent, question, files, guidance, idempotencyKey, principal);
-        if (observability != null && operationId != null) {
-            observability.recordCompletion(projectSlug, operationId, "devlog_story_agent", startedAt, result);
+        try {
+            String result = execute(projectSlug, storyId, intent, question, files, guidance, idempotencyKey, principal);
+            if (observability != null && operationId != null) {
+                observability.recordCompletion(projectSlug, operationId, "devlog_story_agent", startedAt, result);
+            }
+            return result;
+        } catch (RuntimeException e) {
+            if (observability != null && operationId != null) {
+                observability.recordFailure(projectSlug, operationId, "devlog_story_agent", startedAt, "TOOL_EXECUTION_FAILED");
+            }
+            throw e;
         }
-        return result;
     }
 
     private String execute(
