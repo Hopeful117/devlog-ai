@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -62,4 +63,30 @@ public interface RetrievalDocumentRepository extends JpaRepository<RetrievalDocu
             @Param("indexedAt") Instant indexedAt,
             @Param("metadata") String metadata
     );
+
+    @Query(value = """
+            SELECT * FROM retrieval_documents
+            WHERE project_id = :projectId
+              AND status = 'CURRENT'
+              AND embedding IS NOT NULL
+              AND (embedding <=> CAST(:queryEmbedding AS vector)) <= :maxDistance
+            ORDER BY embedding <=> CAST(:queryEmbedding AS vector)
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<RetrievalDocument> findByProjectIdAndSimilarityNative(
+            @Param("projectId") UUID projectId,
+            @Param("queryEmbedding") String queryEmbedding,
+            @Param("limit") int limit,
+            @Param("maxDistance") double maxDistance);
+
+    default List<RetrievalDocument> findByProjectIdAndSimilarity(
+            UUID projectId, float[] queryEmbedding, int limit, float maxDistance) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < queryEmbedding.length; i++) {
+            if (i > 0) sb.append(",");
+            sb.append(queryEmbedding[i]);
+        }
+        sb.append("]");
+        return findByProjectIdAndSimilarityNative(projectId, sb.toString(), limit, maxDistance);
+    }
 }

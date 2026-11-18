@@ -161,6 +161,107 @@ class RetrievalDocumentPostgresIntegrationTest {
                 projectId, "INSIGHT", sourceId, "different-hash")).isFalse();
     }
 
+    // --- similarity search ---
+
+    @Test
+    void similaritySearch_returnsCandidateCloseToQueryVector() {
+        UUID projectId = insertProject();
+        UUID sourceId = UUID.randomUUID();
+
+        // Insert a document with a known embedding: [1, 0, 0, ..., 0] (1536 dims)
+        float[] docVector = new float[1536];
+        docVector[0] = 1.0f;
+        insertDocumentWithEmbedding(projectId, sourceId, "INSIGHT", "Bounded context isolation", docVector);
+
+        // Query with the same vector → cosine distance = 0 (identical direction)
+        float[] queryVector = new float[1536];
+        queryVector[0] = 1.0f;
+
+        var results = repository.findByProjectIdAndSimilarity(projectId, queryVector, 10, 0.5f);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).getSourceId()).isEqualTo(sourceId);
+    }
+
+    @Test
+    void similaritySearch_excludesCandidateBeyondMaxDistance() {
+        UUID projectId = insertProject();
+
+        // Insert a document with [1, 0, ..., 0]
+        float[] docVector = new float[1536];
+        docVector[0] = 1.0f;
+        insertDocumentWithEmbedding(projectId, UUID.randomUUID(), "INSIGHT", "Title A", docVector);
+
+        // Query with [0, 1, 0, ..., 0] → cosine distance = 1.0 (orthogonal)
+        float[] queryVector = new float[1536];
+        queryVector[1] = 1.0f;
+
+        var results = repository.findByProjectIdAndSimilarity(projectId, queryVector, 10, 0.5f);
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    void similaritySearch_respectsProjectIsolation() {
+        UUID projectA = insertProject();
+        UUID projectB = insertProject();
+
+        float[] vector = new float[1536];
+        vector[0] = 1.0f;
+        insertDocumentWithEmbedding(projectA, UUID.randomUUID(), "INSIGHT", "Project A insight", vector);
+
+        float[] queryVector = new float[1536];
+        queryVector[0] = 1.0f;
+
+        var fromB = repository.findByProjectIdAndSimilarity(projectB, queryVector, 10, 0.5f);
+
+        assertThat(fromB).isEmpty();
+    }
+
+    @Test
+    void similaritySearch_excludesDocumentsWithNullEmbedding() {
+        UUID projectId = insertProject();
+        UUID sourceId = UUID.randomUUID();
+
+        repository.save(RetrievalDocument.builder()
+                .projectId(projectId)
+                .sourceType("INSIGHT")
+                .sourceId(sourceId)
+                .trustTier("TRUSTED")
+                .status("CURRENT")
+                .title("No embedding yet")
+                .content("Content")
+                .contentHash("hash-no-emb")
+                .indexedAt(Instant.now())
+                .metadata(Map.of())
+                .build());
+
+        float[] queryVector = new float[1536];
+        queryVector[0] = 1.0f;
+
+        var results = repository.findByProjectIdAndSimilarity(projectId, queryVector, 10, 0.5f);
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
+    void similaritySearch_excludesSupersededDocuments() {
+        UUID projectId = insertProject();
+        UUID sourceId = UUID.randomUUID();
+
+        float[] vector = new float[1536];
+        vector[0] = 1.0f;
+        insertDocumentWithEmbeddingAndStatus(projectId, sourceId, "INSIGHT", "Superseded insight",
+                vector, "SUPERSEDED");
+
+        float[] queryVector = new float[1536];
+        queryVector[0] = 1.0f;
+
+        var results = repository.findByProjectIdAndSimilarity(projectId, queryVector, 10, 0.5f);
+
+        assertThat(results).isEmpty();
+    }
+
     // --- helper ---
 
     private UUID insertProject() {
@@ -171,5 +272,32 @@ class RetrievalDocumentPostgresIntegrationTest {
                 VALUES (?, ?, ?, '', 'ACTIVE', ?, ?)
                 """, id, "Retrieval Test " + id, "retrieval-test-" + id, now, now);
         return id;
+    }
+
+    private void insertDocumentWithEmbedding(UUID projectId, UUID sourceId,
+            String sourceType, String title, float[] vector) {
+        insertDocumentWithEmbeddingAndStatus(projectId, sourceId, sourceType, title, vector, "CURRENT");
+    }
+
+    private void insertDocumentWithEmbeddingAndStatus(UUID projectId, UUID sourceId,
+            String sourceType, String title, float[] vector, String status) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < vector.length; i++) {
+            if (i > 0) sb.append(",");
+            sb.append(vector[i]);
+        }
+        sb.append("]");
+        String vectorStr = sb.toString();
+
+        OffsetDateTime now = OffsetDateTime.now();
+        jdbc.update("""
+                INSERT INTO retrieval_documents
+                    (id, project_id, source_type, source_id, trust_tier, status,
+                     title, content, content_hash, embedding, embedding_model, indexed_at, metadata)
+                VALUES (gen_random_uuid(), ?, ?, ?, 'TRUSTED', ?,
+                        ?, 'Content', ?, CAST(? AS vector), 'text-embedding-3-small', ?, '{}'::jsonb)
+                """,
+                projectId, sourceType, sourceId, status,
+                title, "hash-" + sourceId, vectorStr, now);
     }
 }
