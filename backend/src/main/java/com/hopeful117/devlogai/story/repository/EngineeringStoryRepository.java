@@ -67,6 +67,19 @@ public interface EngineeringStoryRepository extends JpaRepository<EngineeringSto
             @Param("fetchLimit") int fetchLimit
     );
 
+    @Query(value = """
+            SELECT * FROM engineering_stories
+            WHERE project_id = :projectId
+              AND search_vector @@ plainto_tsquery('english', :query)
+            ORDER BY ts_rank(search_vector, plainto_tsquery('english', :query)) DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<EngineeringStory> findByProjectIdAndFullText(
+            @Param("projectId") UUID projectId,
+            @Param("query") String query,
+            @Param("limit") int limit
+    );
+
     interface StoryCommitReferenceProjection {
         UUID getStoryId();
 
