@@ -12,6 +12,7 @@ from app.providers.gemini import GeminiLlmProvider
 from app.providers.anthropic import AnthropicLlmProvider
 from app.providers.openrouter import OpenRouterLlmProvider
 from app.providers.chatgpt import OpenAiChatGptProvider
+from app.services.embedding_service import EmbeddingService
 from app.services.insight_generation_service import InsightGenerationService
 from app.services.task_processing_service import AiTaskProcessingService
 from app.services.deliverable_generation_service import DeliverableGenerationService
@@ -131,6 +132,22 @@ def get_credential_store() -> EncryptedCredentialStore:
 @lru_cache
 def get_credential_resolver() -> ProviderCredentialResolver:
     return ProviderCredentialResolver(get_binding_registry(), get_credential_store())
+
+
+def get_embedding_service() -> EmbeddingService:
+    settings = get_settings()
+    if settings.llm_provider == "openai":
+        if settings.llm_api_key is None:
+            raise ValueError("LLM_API_KEY is required for the OpenAI embedding provider")
+        from app.providers.openai import OpenAiLlmProvider
+        provider = OpenAiLlmProvider(
+            api_key=settings.llm_api_key,
+            model=settings.llm_model,
+            timeout_seconds=settings.llm_timeout_seconds,
+            max_output_tokens=settings.llm_max_output_tokens,
+        )
+        return EmbeddingService(provider=provider)
+    return EmbeddingService(provider=build_llm_provider(settings))
 
 
 @lru_cache

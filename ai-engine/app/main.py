@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.ai_tasks import router as ai_tasks_router
+from app.api.embeddings import router as embeddings_router
 from app.api.health import router as health_router
 from app.api.deliverables import router as deliverables_router
 from app.api.bindings import router as bindings_router
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     application.add_middleware(RequestLoggingMiddleware)
     application.include_router(health_router)
     application.include_router(ai_tasks_router, prefix="/api/v1")
+    application.include_router(embeddings_router, prefix="/api/v1")
     application.include_router(deliverables_router, prefix="/api/v1")
     application.include_router(bindings_router, prefix="/api/v1")
     application.include_router(chatgpt_auth_router, prefix="/api/v1")

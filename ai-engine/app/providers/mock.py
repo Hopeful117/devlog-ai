@@ -45,6 +45,14 @@ class MockLlmProvider:
             raw_output = raw_output.model_dump(mode="json", by_alias=True)
         return response_model.model_validate(raw_output)
 
+    @property
+    def embedding_model_identifier(self) -> str:
+        return "mock-embedding-v1"
+
+    async def embed(self, texts: list[str], model: str) -> list[list[float]]:
+        """Returns deterministic zero vectors (1536 dimensions)."""
+        return [[0.0] * 1536 for _ in texts]
+
     async def generate_structured_with_trace(
         self, request: Prompt, response_model: type[StructuredOutput]
     ) -> ProviderGenerationResult:

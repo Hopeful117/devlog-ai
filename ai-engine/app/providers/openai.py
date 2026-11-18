@@ -130,6 +130,14 @@ class OpenAiLlmProvider:
         return False
 
     @property
+    def embedding_model_identifier(self) -> str:
+        return self._model
+
+    async def embed(self, texts: list[str], model: str) -> list[list[float]]:
+        response = await self._client.embeddings.create(input=texts, model=model)
+        return [item.embedding for item in response.data]
+
+    @property
     def provider_name(self) -> str:
         return "openai"
 
