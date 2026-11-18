@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "name": "missing-objective-grounding",
+      "mutation": "removeObjectiveGrounding",
+      "expectedDeterministicGrounding": false
+    },
+    {
+      "name": "unauthorized-objective-reference",
+      "mutation": "replaceObjectiveReference",
+      "expectedDeterministicGrounding": false
+    },
+    {
+      "name": "truncated-objective-summary",
+      "mutation": "truncateObjectiveSummary",
+      "expectedDeterministicGrounding": false
+    },
+    {
+      "name": "insufficient-finding-evidence",
+      "mutation": "removeFindingEvidence",
+      "expectedDeterministicGrounding": false
+    },
+    {
+      "name": "missing-classification-entry",
+      "mutation": "removeClassificationEntry",
+      "expectedDeterministicGrounding": false
+    },
+    {
+      "name": "duplicate-classification-entry",
+      "mutation": "duplicateClassificationEntry",
+      "expectedDeterministicGrounding": false
+    },
+    {
+      "name": "complementary-evidence",
+      "mutation": "none",
+      "expectedDeterministicGrounding": true
+    }
+  ]
+}

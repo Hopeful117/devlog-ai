@@ -6,6 +6,16 @@
     "analysisResult": {
       "objectiveUnderstanding": {
         "summary": "The deployment configuration declares a backend service dependency and environment reference to the ai-engine service.",
+        "grounding": {
+          "evidenceReferences": [
+            {
+              "reference": "docker-compose.yml",
+              "resource": "devlog://projects/test-project/commits/abc123/files/docker-compose.yml"
+            }
+          ],
+          "classification": "FACTUAL_EXTRACTION",
+          "grounded": true
+        },
         "keyDomains": [
           "backend",
           "ai-engine"
@@ -67,7 +77,7 @@
         "promptVersion": "story-context-analysis-prompt-v1",
         "provider": "mock",
         "modelIdentifier": "deterministic-v1",
-        "promptContentDigest": "5aab32c770010b66e8fb347616d02a2e1a45b9d30d55f52dbdeca1f2ced1113f",
+        "promptContentDigest": "4030ee98d73349b90f65e4e6c9a49449ee06183ae9204e72ab2014764a54122d",
         "intentId": "engineering-story-context-analysis",
         "intentVersion": "v1",
         "guidanceKeys": [],
@@ -76,13 +86,19 @@
       "outputClassification": {
         "entries": [
           {
-            "findingReference": "architectureFindings.0",
+            "findingReference": "objectiveUnderstanding",
+            "classification": "FACTUAL_EXTRACTION",
+            "grounded": true,
+            "rationale": "Objective summary is directly observed in docker-compose.yml"
+          },
+          {
+            "findingReference": "architectureFindings[0]",
             "classification": "FACTUAL_EXTRACTION",
             "grounded": true,
             "rationale": "Directly observed in docker-compose.yml"
           },
           {
-            "findingReference": "evidenceFindings.0",
+            "findingReference": "evidenceFindings[0]",
             "classification": "FACTUAL_EXTRACTION",
             "grounded": true,
             "rationale": "Directly observed in docker-compose.yml"
@@ -97,8 +113,8 @@
     "provider": "mock",
     "model": "deterministic-v1",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "dc541e5d6207867141581d2e5a1ea4ccbf388ec40f487772683fdad5fa7b4f9f",
-    "schemaDigest": "2dc45cd54a73d5f1ede6394194fc5187b9062d850e8dbb810ca32e6863df4db7"
+    "promptContentDigest": "4030ee98d73349b90f65e4e6c9a49449ee06183ae9204e72ab2014764a54122d",
+    "schemaDigest": "08d139d65a411e1cf545ded1073188b049fa29047fe9a142d5c516fda8898e06"
   },
   "qualitativeGrounding": {
     "status": "REVIEWED",
