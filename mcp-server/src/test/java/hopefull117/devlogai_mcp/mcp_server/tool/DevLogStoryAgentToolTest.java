@@ -14,8 +14,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -235,6 +237,30 @@ class DevLogStoryAgentToolTest {
                 .isEqualTo(taskId.toString());
         verify(client).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test", "");
         verify(client).getStoryContextAgentResultAuthenticated(taskId, "Bearer test", "");
+    }
+
+    @Test
+    void recordsFailureEventWhenSubmissionThrows() {
+        DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
+        hopefull117.devlogai_mcp.mcp_server.service.McpToolObservabilityService observability =
+                mock(hopefull117.devlogai_mcp.mcp_server.service.McpToolObservabilityService.class);
+        when(observability.newOperationId()).thenReturn("obs-op-001");
+        DevLogStoryAgentTool tool = new DevLogStoryAgentTool(
+                client, new ObjectMapper(), 25_000, 2_000, principalProvider(), observability);
+
+        when(client.submitStoryContextAgentTask(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new RuntimeException("backend unreachable"));
+
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () ->
+                tool.execute("devlog-ai", null, "intent", null, null, null, null, (org.springframework.ai.mcp.annotation.context.McpSyncRequestContext) null));
+
+        verify(observability).recordFailure(
+                eq("devlog-ai"),
+                eq("obs-op-001"),
+                eq("devlog_story_agent"),
+                any(),
+                eq("TOOL_EXECUTION_FAILED"));
+        verify(observability, never()).recordCompletion(any(), any(), any(), any(), any());
     }
 
     private static McpAuthenticatedPrincipalProvider principalProvider() {

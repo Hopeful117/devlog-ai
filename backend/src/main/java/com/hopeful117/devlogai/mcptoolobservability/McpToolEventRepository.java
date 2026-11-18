@@ -43,6 +43,53 @@ public interface McpToolEventRepository extends JpaRepository<McpToolEvent, UUID
         String getOperationId();
     }
 
+    @Query(value = """
+            WITH terminals AS (
+                SELECT DISTINCT ON (instance_id, operation_id)
+                    instance_id, operation_id, status,
+                    occurred_at AS completed_at, duration_ms,
+                    tool_name AS terminal_tool_name, reason_code
+                FROM mcp_tool_events
+                WHERE project_id = :projectId
+                  AND instance_id = :instanceId
+                  AND operation_id = :operationId
+                  AND event_type IN ('MCP_TOOL_RESPONDED', 'MCP_TOOL_FAILED', 'MCP_TOOL_INTERRUPTED')
+                ORDER BY instance_id, operation_id, occurred_at DESC, event_type ASC
+            ),
+            starts AS (
+                SELECT instance_id, operation_id, tool_name, occurred_at AS started_at
+                FROM mcp_tool_events
+                WHERE project_id = :projectId
+                  AND instance_id = :instanceId
+                  AND operation_id = :operationId
+                  AND event_type = 'MCP_TOOL_STARTED'
+            )
+            SELECT
+                COALESCE(s.tool_name,            t.terminal_tool_name) AS tool_name,
+                COALESCE(t.status,               'ACTIVE')             AS status,
+                s.started_at,
+                t.completed_at,
+                t.duration_ms,
+                t.reason_code
+            FROM starts s
+            FULL OUTER JOIN terminals t
+                ON s.instance_id = t.instance_id AND s.operation_id = t.operation_id
+            LIMIT 1
+            """, nativeQuery = true)
+    SingleOperationProjection findSingleOperation(
+            @Param("projectId") UUID projectId,
+            @Param("instanceId") String instanceId,
+            @Param("operationId") String operationId);
+
+    interface SingleOperationProjection {
+        String getToolName();
+        String getStatus();
+        java.time.Instant getStartedAt();
+        java.time.Instant getCompletedAt();
+        Integer getDurationMs();
+        String getReasonCode();
+    }
+
     @Modifying
     @Query(value = """
             INSERT INTO mcp_tool_events (id, project_id, instance_id, operation_id, tool_name,

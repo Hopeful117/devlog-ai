@@ -2,11 +2,13 @@ package com.hopeful117.devlogai.mcptoolobservability;
 
 import com.hopeful117.devlogai.authorization.*;
 import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -70,6 +72,78 @@ class McpOperationControllerWebMvcTest extends ControllerWebMvcTestSupport {
                 mock(ContextTraceService.class)));
 
         mvc.perform(get("/api/v1/projects/{id}/mcp-operations", projectId))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void contextTraceByAiTaskIdReturnsView() throws Exception {
+        UUID aiTaskId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        ContextTraceService traceService = mock(ContextTraceService.class);
+        CoreProjectAuthorizationService authService = mock(CoreProjectAuthorizationService.class);
+        when(traceService.findProjectIdByAiTaskId(aiTaskId)).thenReturn(projectId);
+        when(authService.isAuthorized(any(AuthenticatedPrincipal.class), eq(projectId), any()))
+                .thenReturn(true);
+        ContextTraceView view = new ContextTraceView(
+                "inst-1", "op-1", "devlog_story_agent", "RESPONDED",
+                Instant.parse("2026-01-01T12:00:00Z"), Instant.parse("2026-01-01T12:00:02Z"),
+                2050, aiTaskId, "devlog-ai", null, "investigate story 42",
+                List.of(), "ctx-digest", "proj-digest", "FRESH", null,
+                List.of(), Map.of(), null, null, null, true);
+        when(traceService.getContextTraceByAiTaskId(eq(projectId), eq(aiTaskId))).thenReturn(view);
+        MockMvc mvc = mockMvc(new McpOperationController(
+                r -> Optional.of(humanPrincipal()), authService,
+                mock(McpOperationService.class), traceService));
+
+        mvc.perform(get("/api/v1/context-traces/{id}", aiTaskId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.toolName").value("devlog_story_agent"))
+                .andExpect(jsonPath("$.status").value("RESPONDED"))
+                .andExpect(jsonPath("$.durationMs").value(2050))
+                .andExpect(jsonPath("$.projectSlug").value("devlog-ai"))
+                .andExpect(jsonPath("$.contextAvailable").value(true));
+    }
+
+    @Test
+    void contextTraceByAiTaskIdReturns401WhenNoPrincipal() throws Exception {
+        MockMvc mvc = mockMvc(new McpOperationController(
+                r -> Optional.empty(),
+                mock(CoreProjectAuthorizationService.class),
+                mock(McpOperationService.class),
+                mock(ContextTraceService.class)));
+
+        mvc.perform(get("/api/v1/context-traces/{id}", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void contextTraceByAiTaskIdReturns404WhenTaskNotFound() throws Exception {
+        UUID aiTaskId = UUID.randomUUID();
+        ContextTraceService traceService = mock(ContextTraceService.class);
+        when(traceService.findProjectIdByAiTaskId(aiTaskId)).thenReturn(null);
+        MockMvc mvc = mockMvc(new McpOperationController(
+                r -> Optional.of(humanPrincipal()),
+                mock(CoreProjectAuthorizationService.class),
+                mock(McpOperationService.class), traceService));
+
+        mvc.perform(get("/api/v1/context-traces/{id}", aiTaskId))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void contextTraceByAiTaskIdReturns404WhenPrincipalNotAuthorizedForProject() throws Exception {
+        UUID aiTaskId = UUID.randomUUID();
+        UUID projectId = UUID.randomUUID();
+        ContextTraceService traceService = mock(ContextTraceService.class);
+        CoreProjectAuthorizationService authService = mock(CoreProjectAuthorizationService.class);
+        when(traceService.findProjectIdByAiTaskId(aiTaskId)).thenReturn(projectId);
+        when(authService.isAuthorized(any(AuthenticatedPrincipal.class), eq(projectId), any()))
+                .thenReturn(false);
+        MockMvc mvc = mockMvc(new McpOperationController(
+                r -> Optional.of(humanPrincipal()), authService,
+                mock(McpOperationService.class), traceService));
+
+        mvc.perform(get("/api/v1/context-traces/{id}", aiTaskId))
                 .andExpect(status().isNotFound());
     }
 
