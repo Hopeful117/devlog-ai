@@ -523,6 +523,28 @@ class StoryContextAnalysisGenerationService:
             + output.impacted_component_findings
         )
 
+        objective_grounding = output.objective_understanding.grounding
+        if output.objective_understanding.summary.strip() and objective_grounding is None:
+            raise StoryContextAnalysisMissingEvidenceError(
+                "objectiveUnderstanding.summary requires grounding metadata"
+            )
+        if objective_grounding is not None:
+            objective_refs = {er.reference for er in objective_grounding.evidence_references}
+            unknown_objective = objective_refs - allowed_refs
+            if unknown_objective:
+                raise StoryContextAnalysisUnknownReferenceError(
+                    f"Objective understanding references unknown evidence: {sorted(unknown_objective)}"
+                )
+            if objective_grounding.classification in {"FACTUAL_EXTRACTION", "AI_INTERPRETATION"}:
+                if not objective_grounding.grounded or not objective_refs:
+                    raise StoryContextAnalysisMissingEvidenceError(
+                        "Grounded objective understanding requires evidence references"
+                    )
+            elif objective_grounding.grounded and not objective_refs:
+                raise StoryContextAnalysisMissingEvidenceError(
+                    "Grounded objective understanding requires evidence references"
+                )
+
         causal_assessment = getattr(output, "causal_assessment", None)
         if grounding_contract.get("causalContractVersion") == "V2":
             self._validate_v2_assessment(causal_assessment, output, allowed_refs, grounding_contract)
@@ -632,6 +654,61 @@ class StoryContextAnalysisGenerationService:
                     raise StoryContextAnalysisRelationTypeError(
                         f"Finding {finding.title} has invalid relationType: {finding.grounding.relation_type.value}"
                     )
+
+        valid_classification_references = {"objectiveUnderstanding"}
+        for field_name, findings in (
+            ("architectureFindings", output.architecture_findings),
+            ("decisionFindings", output.decision_findings),
+            ("evidenceFindings", output.evidence_findings),
+            ("historicalContext", output.historical_context),
+            ("constraintFindings", output.constraint_findings),
+            ("impactedComponentFindings", output.impacted_component_findings),
+        ):
+            valid_classification_references.update(
+                f"{field_name}[{index}]" for index in range(len(findings))
+            )
+        grounding_by_reference = {
+            "objectiveUnderstanding": output.objective_understanding.grounding,
+        }
+        for field_name, findings in (
+            ("architectureFindings", output.architecture_findings),
+            ("decisionFindings", output.decision_findings),
+            ("evidenceFindings", output.evidence_findings),
+            ("historicalContext", output.historical_context),
+            ("constraintFindings", output.constraint_findings),
+            ("impactedComponentFindings", output.impacted_component_findings),
+        ):
+            grounding_by_reference.update(
+                {
+                    f"{field_name}[{index}]": finding.grounding
+                    for index, finding in enumerate(findings)
+                }
+            )
+
+        classified_references: set[str] = set()
+        for entry in output.output_classification.entries:
+            if entry.finding_reference not in valid_classification_references:
+                raise StoryContextAnalysisOutputValidationError(
+                    f"outputClassification references unknown item: {entry.finding_reference}"
+                )
+            if entry.finding_reference in classified_references:
+                raise StoryContextAnalysisOutputValidationError(
+                    f"outputClassification contains duplicate item: {entry.finding_reference}"
+                )
+            classified_references.add(entry.finding_reference)
+            grounding = grounding_by_reference.get(entry.finding_reference)
+            if grounding is None or (
+                entry.classification != grounding.classification
+                or entry.grounded != grounding.grounded
+            ):
+                raise StoryContextAnalysisOutputValidationError(
+                    f"outputClassification disagrees with grounding: {entry.finding_reference}"
+                )
+        missing_classifications = set(grounding_by_reference) - classified_references
+        if missing_classifications:
+            raise StoryContextAnalysisOutputValidationError(
+                f"outputClassification omits items: {sorted(missing_classifications)}"
+            )
 
         for unc in output.uncertainties:
             for er in unc.related_evidence:
