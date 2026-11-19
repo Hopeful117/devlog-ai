@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "DevLog Frontend",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /home/ludo/workspace/devlog-ai/frontend && npm start"],
+      "port": 4200,
+      "url": "http://localhost:4200"
+    }
+  ]
+}

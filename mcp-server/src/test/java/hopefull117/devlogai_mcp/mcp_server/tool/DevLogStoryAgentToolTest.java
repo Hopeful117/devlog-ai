@@ -259,8 +259,51 @@ class DevLogStoryAgentToolTest {
                 eq("obs-op-001"),
                 eq("devlog_story_agent"),
                 any(),
-                eq("TOOL_EXECUTION_FAILED"));
+                eq("TOOL_EXECUTION_FAILED"),
+                any(McpAuthenticatedPrincipalProvider.McpPrincipal.class));
         verify(observability, never()).recordCompletion(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void usesRequestScopedPrincipalForBackendAndObservability() {
+        DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
+        hopefull117.devlogai_mcp.mcp_server.service.McpToolObservabilityService observability =
+                mock(hopefull117.devlogai_mcp.mcp_server.service.McpToolObservabilityService.class);
+        McpAuthenticatedPrincipalProvider.McpPrincipal ambient = new McpAuthenticatedPrincipalProvider.McpPrincipal(
+                "ambient", McpAuthenticatedPrincipalProvider.PrincipalKind.SYSTEM,
+                "ambient", "Bearer ambient", "delegation-ambient");
+        McpAuthenticatedPrincipalProvider.McpPrincipal request = new McpAuthenticatedPrincipalProvider.McpPrincipal(
+                "request", McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN,
+                "request", "Bearer request", "delegation-request");
+        McpAuthenticatedPrincipalProvider principals = new McpAuthenticatedPrincipalProvider() {
+            @Override
+            public java.util.Optional<McpPrincipal> currentPrincipal() {
+                return java.util.Optional.of(ambient);
+            }
+
+            @Override
+            public java.util.Optional<McpPrincipal> currentPrincipal(
+                    org.springframework.ai.mcp.annotation.context.McpSyncRequestContext requestContext) {
+                return java.util.Optional.of(request);
+            }
+        };
+        DevLogStoryAgentTool tool = new DevLogStoryAgentTool(
+                client, new ObjectMapper(), 25_000, 2_000, principals, observability);
+        when(observability.newOperationId()).thenReturn("obs-op-request");
+        when(client.submitStoryContextAgentTask(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new RuntimeException("backend unreachable"));
+
+        org.springframework.ai.mcp.annotation.context.McpSyncRequestContext requestContext =
+                mock(org.springframework.ai.mcp.annotation.context.McpSyncRequestContext.class);
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () ->
+                tool.execute("devlog-ai", null, "intent", null, null, null, null, requestContext));
+
+        verify(client).submitStoryContextAgentTask(
+                eq("devlog-ai"), eq((UUID) null), eq("Bearer request"), eq(null),
+                eq("delegation-request"), any());
+        verify(observability).recordFailure(
+                eq("devlog-ai"), eq("obs-op-request"), eq("devlog_story_agent"),
+                any(), eq("TOOL_EXECUTION_FAILED"), eq(request));
     }
 
     private static McpAuthenticatedPrincipalProvider principalProvider() {

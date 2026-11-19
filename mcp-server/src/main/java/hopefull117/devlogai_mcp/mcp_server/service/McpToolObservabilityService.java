@@ -56,7 +56,20 @@ public class McpToolObservabilityService {
             String toolName,
             Instant startedAt,
             String resultJson) {
-        record("MCP_TOOL_RESPONDED", "RESPONDED", projectSlug, operationId, toolName, startedAt, resultJson, null);
+        record("MCP_TOOL_RESPONDED", "RESPONDED", projectSlug, operationId, toolName, startedAt,
+                resultJson, null, null);
+    }
+
+    /** Records a completion using the principal resolved from the MCP request. */
+    public void recordCompletion(
+            String projectSlug,
+            String operationId,
+            String toolName,
+            Instant startedAt,
+            String resultJson,
+            McpAuthenticatedPrincipalProvider.McpPrincipal principal) {
+        record("MCP_TOOL_RESPONDED", "RESPONDED", projectSlug, operationId, toolName, startedAt,
+                resultJson, null, principal);
     }
 
     /**
@@ -69,7 +82,20 @@ public class McpToolObservabilityService {
             String toolName,
             Instant startedAt,
             String reasonCode) {
-        record("MCP_TOOL_FAILED", "FAILED", projectSlug, operationId, toolName, startedAt, null, reasonCode);
+        record("MCP_TOOL_FAILED", "FAILED", projectSlug, operationId, toolName, startedAt,
+                null, reasonCode, null);
+    }
+
+    /** Records a failure using the principal resolved from the MCP request. */
+    public void recordFailure(
+            String projectSlug,
+            String operationId,
+            String toolName,
+            Instant startedAt,
+            String reasonCode,
+            McpAuthenticatedPrincipalProvider.McpPrincipal principal) {
+        record("MCP_TOOL_FAILED", "FAILED", projectSlug, operationId, toolName, startedAt,
+                null, reasonCode, principal);
     }
 
     private void record(
@@ -80,9 +106,12 @@ public class McpToolObservabilityService {
             String toolName,
             Instant startedAt,
             String resultJson,
-            String reasonCode) {
+            String reasonCode,
+            McpAuthenticatedPrincipalProvider.McpPrincipal requestPrincipal) {
         try {
-            var principal = principalProvider.currentPrincipal();
+            var principal = requestPrincipal == null
+                    ? principalProvider.currentPrincipal()
+                    : java.util.Optional.of(requestPrincipal);
             if (principal.isEmpty()) {
                 log.debug("MCP observability: no configured principal — skipping ingest for {}/{}", toolName, operationId);
                 return;

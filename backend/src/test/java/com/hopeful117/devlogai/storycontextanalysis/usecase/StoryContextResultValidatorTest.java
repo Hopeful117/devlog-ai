@@ -28,6 +28,50 @@ class StoryContextResultValidatorTest {
     }
 
     @Test
+    void acceptsGroundedObjectiveUnderstanding() {
+        var grounding = new StoryContextAnalysisResult.GroundingMetadata(
+                List.of(EVIDENCE), "FACTUAL_EXTRACTION", true,
+                StoryContextAnalysisResult.RelationType.EXPLICIT);
+        var objective = new StoryContextAnalysisResult.ObjectiveUnderstanding(
+                "The deployment declares the service dependency", List.of(), List.of(), List.of(), grounding);
+
+        assertDoesNotThrow(() -> StoryContextResultValidator.validateObjectiveUnderstanding(
+                objective, Set.of("docker-compose.yml")));
+    }
+
+    @Test
+    void rejectsUngroundedObjectiveUnderstanding() {
+        var grounding = new StoryContextAnalysisResult.GroundingMetadata(
+                List.of(), "FACTUAL_EXTRACTION", false, null);
+        var objective = new StoryContextAnalysisResult.ObjectiveUnderstanding(
+                "The deployment declares the service dependency", List.of(), List.of(), List.of(), grounding);
+
+        assertThrows(IllegalStateException.class, () -> StoryContextResultValidator.validateObjectiveUnderstanding(
+                objective, Set.of("docker-compose.yml")));
+    }
+
+    @Test
+    void rejectsObjectiveSummaryWithoutGroundingMetadata() {
+        var objective = new StoryContextAnalysisResult.ObjectiveUnderstanding(
+                "The deployment declares the service dependency", List.of(), List.of(), List.of(), null);
+
+        assertThrows(IllegalStateException.class, () -> StoryContextResultValidator.validateObjectiveUnderstanding(
+                objective, Set.of("docker-compose.yml")));
+    }
+
+    @Test
+    void rejectsUnauthorizedObjectiveUnderstandingEvidence() {
+        var grounding = new StoryContextAnalysisResult.GroundingMetadata(
+                List.of(EVIDENCE), "FACTUAL_EXTRACTION", true,
+                StoryContextAnalysisResult.RelationType.EXPLICIT);
+        var objective = new StoryContextAnalysisResult.ObjectiveUnderstanding(
+                "The deployment declares the service dependency", List.of(), List.of(), List.of(), grounding);
+
+        assertThrows(IllegalStateException.class, () -> StoryContextResultValidator.validateObjectiveUnderstanding(
+                objective, Set.of("other.yml")));
+    }
+
+    @Test
     void rejectsUngroundedImplementationPreparation() {
         var preparation = new StoryContextAnalysisResult.ImplementationPreparation(
                 List.of(new StoryContextAnalysisResult.ImplementationFile(
