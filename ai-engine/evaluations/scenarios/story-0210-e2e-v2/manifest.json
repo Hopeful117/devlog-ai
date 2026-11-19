@@ -1,0 +1,74 @@
+{
+  "protocolVersion": "story-0210-e2e/v2",
+  "evaluationVersion": "story-0210-e2e-v2",
+  "targetRevisionSource": "CLI_REQUIRED_FULL_SHA",
+  "repetitions": 3,
+  "conditions": ["DIRECT_CONTEXT_OAUTH", "DEVLOG_ASSISTED_OAUTH"],
+  "negativeControls": [
+    {
+      "controlId": "0210-out-of-scope-file",
+      "kind": "OUT_OF_SCOPE_FILE",
+      "expectedOutcome": "REJECTED"
+    },
+    {
+      "controlId": "0210-wrong-revision",
+      "kind": "WRONG_REVISION",
+      "expectedOutcome": "REJECTED"
+    },
+    {
+      "controlId": "0210-superseded-document",
+      "kind": "SUPERSEDED_DOCUMENT",
+      "expectedOutcome": "REJECTED_OR_ABSTAINED"
+    },
+    {
+      "controlId": "0210-unknown-reference",
+      "kind": "UNKNOWN_EVIDENCE_REFERENCE",
+      "expectedOutcome": "REJECTED"
+    }
+  ],
+  "scenarios": [
+    {
+      "scenarioId": "0210-targeted-implementation",
+      "questionKind": "TARGETED",
+      "question": "Which component owns the backend to ai-engine dependency and where is it configured?",
+      "files": ["docker-compose.yml"],
+      "expectedEvidence": ["docker-compose.yml"],
+      "expectedAbstention": false
+    },
+    {
+      "scenarioId": "0210-multi-source-architecture",
+      "questionKind": "MULTI_SOURCE_ARCHITECTURE",
+      "question": "How does the Story Context Agent preserve Java Core authority while using the Python AI Engine?",
+      "files": [
+        "docs/decisions/ADR-067.md",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/controller/StoryContextAgentProtocolController.java"
+      ],
+      "expectedEvidence": ["docs/decisions/ADR-067.md", "StoryContextAgentProtocolController.java"],
+      "expectedAbstention": false
+    },
+    {
+      "scenarioId": "0210-historical-decision",
+      "questionKind": "HISTORICAL_DECISION",
+      "question": "What did the response-quality work change, and which behavior remains governed by Core?",
+      "files": ["docs/stories/0209-agent-response-quality-evidence-grounding/story.md"],
+      "expectedEvidence": ["docs/stories/0209-agent-response-quality-evidence-grounding/story.md"],
+      "expectedAbstention": false
+    },
+    {
+      "scenarioId": "0210-insufficient-evidence",
+      "questionKind": "INSUFFICIENT_EVIDENCE",
+      "question": "Which production incident caused the current MCP observability design to be introduced?",
+      "files": [],
+      "expectedEvidence": [],
+      "expectedAbstention": true
+    },
+    {
+      "scenarioId": "0210-truncated-context",
+      "questionKind": "TRUNCATED_CONTEXT",
+      "question": "What exact provider-visible evidence proves every projected reference was used in the answer?",
+      "files": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/service/StoryContextAgentCallbackFacade.java"],
+      "expectedEvidence": ["StoryContextAgentCallbackFacade.java"],
+      "expectedAbstention": true
+    }
+  ]
+}
