@@ -240,3 +240,6 @@ class EvaluationResult(EvaluationModel):
     overall_quality: OverallQuality = Field(alias="overallQuality")
     gate_result: GateResult = Field(alias="gateResult")
     counters: EvaluationCounters
+    response_quality_dimensions: dict[str, bool] = Field(
+        alias="responseQualityDimensions", default_factory=dict
+    )

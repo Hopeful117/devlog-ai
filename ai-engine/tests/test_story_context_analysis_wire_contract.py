@@ -11,6 +11,7 @@ from app.prompts.story_context_analysis import StoryContextAnalysisPromptBuilder
 import app.services.story_context_analysis_generation_service as generation_module
 from app.providers.chatgpt import ChatGptProviderError
 from app.schemas.story_context_analysis import (
+    GroundingMetadata,
     ProviderStoryContextAnalysisResult,
     StoryContextAnalysisResult,
     provider_result_to_internal,
@@ -21,7 +22,13 @@ from evaluations.loader import load_scenario
 
 def _result() -> StoryContextAnalysisResult:
     return StoryContextAnalysisResult.model_validate({
-        "objectiveUnderstanding": {},
+        "objectiveUnderstanding": {
+            "grounding": {
+                "evidenceReferences": [],
+                "classification": "RECOMMENDATION",
+                "grounded": False,
+            }
+        },
         "confidence": {"level": "HIGH", "rationale": "bounded"},
         "provenance": {
             "contextDigest": "a" * 64,
@@ -34,9 +41,9 @@ def _result() -> StoryContextAnalysisResult:
         },
         "outputClassification": {
             "entries": [{
-                "findingReference": "finding-1",
-                "classification": "FACTUAL_EXTRACTION",
-                "grounded": True,
+                "findingReference": "objectiveUnderstanding",
+                "classification": "RECOMMENDATION",
+                "grounded": False,
                 "rationale": "bounded",
             }]
         },
@@ -49,12 +56,30 @@ def test_core_callback_serializes_confidence_as_canonical_enum_string():
     assert payload["confidence"] == "HIGH"
     assert payload["outputClassification"] == {
         "entries": [{
-            "findingReference": "finding-1",
-            "classification": "FACTUAL_EXTRACTION",
-            "grounded": True,
+            "findingReference": "objectiveUnderstanding",
+            "classification": "RECOMMENDATION",
+            "grounded": False,
             "rationale": "bounded",
         }]
     }
+
+
+def test_objective_understanding_preserves_explicit_grounding():
+    objective = _result().objective_understanding.model_copy(
+        update={
+            "grounding": GroundingMetadata.model_validate({
+                "evidenceReferences": [{"reference": "docker-compose.yml"}],
+                "classification": "FACTUAL_EXTRACTION",
+                "grounded": True,
+            })
+        }
+    )
+    result = _result().model_copy(update={"objective_understanding": objective})
+
+    grounding = result.model_dump(by_alias=True, mode="json")["objectiveUnderstanding"]["grounding"]
+    assert grounding["evidenceReferences"][0]["reference"] == "docker-compose.yml"
+    assert grounding["classification"] == "FACTUAL_EXTRACTION"
+    assert grounding["grounded"] is True
 
 
 def test_python_keeps_confidence_rationale_internally():

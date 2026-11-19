@@ -93,7 +93,8 @@ public record StoryContextAnalysisResult(
             String summary,
             List<String> keyDomains,
             List<String> primaryTechnologies,
-            List<String> architecturalPatterns
+            List<String> architecturalPatterns,
+            GroundingMetadata grounding
     ) {
         public ObjectiveUnderstanding {
             summary = summary != null ? summary : "";
@@ -101,10 +102,16 @@ public record StoryContextAnalysisResult(
             primaryTechnologies = primaryTechnologies != null ? List.copyOf(primaryTechnologies) : List.of();
             architecturalPatterns = architecturalPatterns != null ? List.copyOf(architecturalPatterns) : List.of();
         }
+
+        public ObjectiveUnderstanding(String summary, List<String> keyDomains,
+                                      List<String> primaryTechnologies,
+                                      List<String> architecturalPatterns) {
+            this(summary, keyDomains, primaryTechnologies, architecturalPatterns, null);
+        }
         
         // Backward compatibility constructor for compact constructor
         public ObjectiveUnderstanding(String summary) {
-            this(summary, List.of(), List.of(), List.of());
+            this(summary, List.of(), List.of(), List.of(), null);
         }
     }
 

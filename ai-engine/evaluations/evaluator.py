@@ -534,6 +534,7 @@ def _evaluate_story_context_analysis(
         overall_quality=overall_quality,
         gate_result=gate_result,
         counters=counters,
+        response_quality_dimensions=_story_context_response_quality(analysis_result),
     )
 
 
@@ -548,6 +549,36 @@ def _deterministic_grounding_passes_story_context(
 
     analysis_result = replay.output.analysis_result
 
+    objective = analysis_result.objective_understanding
+    objective_grounding = objective.grounding
+    if objective_grounding is not None:
+        if objective_grounding.classification not in {
+            "FACTUAL_EXTRACTION",
+            "AI_INTERPRETATION",
+            "RECOMMENDATION",
+        }:
+            return False
+    if objective.summary.strip():
+        if objective_grounding is None:
+            return False
+        objective_refs = {
+            reference.reference
+            for reference in objective_grounding.evidence_references
+        }
+        if not objective_refs.issubset(allowed_evidence):
+            return False
+        if objective_grounding.classification in {
+            "FACTUAL_EXTRACTION",
+            "AI_INTERPRETATION",
+        } and (not objective_grounding.grounded or not objective_refs):
+            return False
+        if objective_grounding.grounded and not objective_refs:
+            return False
+
+    grounding_by_reference = {
+        "objectiveUnderstanding": objective_grounding,
+    }
+
     all_findings = (
         analysis_result.architecture_findings
         + analysis_result.decision_findings
@@ -561,6 +592,48 @@ def _deterministic_grounding_passes_story_context(
         finding_refs = {er.reference for er in finding.grounding.evidence_references}
         if not finding_refs.issubset(allowed_evidence):
             return False
+        if finding.grounding.classification not in {
+            "FACTUAL_EXTRACTION",
+            "AI_INTERPRETATION",
+            "RECOMMENDATION",
+        }:
+            return False
+        if finding.grounding.classification in {
+            "FACTUAL_EXTRACTION",
+            "AI_INTERPRETATION",
+        } and (not finding.grounding.grounded or not finding_refs):
+            return False
+
+    for field_name, findings in (
+        ("architectureFindings", analysis_result.architecture_findings),
+        ("decisionFindings", analysis_result.decision_findings),
+        ("evidenceFindings", analysis_result.evidence_findings),
+        ("historicalContext", analysis_result.historical_context),
+        ("constraintFindings", analysis_result.constraint_findings),
+        ("impactedComponentFindings", analysis_result.impacted_component_findings),
+    ):
+        grounding_by_reference.update(
+            {
+                f"{field_name}[{index}]": finding.grounding
+                for index, finding in enumerate(findings)
+            }
+        )
+
+    classified_references: set[str] = set()
+    for entry in analysis_result.output_classification.entries:
+        grounding = grounding_by_reference.get(entry.finding_reference)
+        if grounding is None:
+            return False
+        if entry.finding_reference in classified_references:
+            return False
+        classified_references.add(entry.finding_reference)
+        if (
+            entry.classification != grounding.classification
+            or entry.grounded != grounding.grounded
+        ):
+            return False
+    if set(grounding_by_reference) - classified_references:
+        return False
 
     for unc in analysis_result.uncertainties:
         for er in unc.related_evidence:
@@ -630,6 +703,46 @@ def _counters_story_context(
         trust_violation_count=int(trust_safety == TrustSafety.VIOLATION),
         execution_failure_count=0,
     )
+
+
+def _story_context_response_quality(
+    analysis_result: StoryContextAnalysisResult,
+) -> dict[str, bool]:
+    decision_findings = analysis_result.decision_findings
+    historical_context = analysis_result.historical_context
+    evidence_references = {
+        evidence.reference
+        for finding in (
+            analysis_result.architecture_findings
+            + decision_findings
+            + analysis_result.evidence_findings
+            + historical_context
+            + analysis_result.constraint_findings
+            + analysis_result.impacted_component_findings
+        )
+        for evidence in finding.grounding.evidence_references
+    }
+    return {
+        "architectureDecisionUnderstanding": bool(
+            analysis_result.architecture_findings or decision_findings
+        ),
+        "componentHistoryReconstruction": bool(historical_context),
+        "mandatoryConstraintPreservation": bool(analysis_result.constraint_findings),
+        "currentHistoricalDecisionDistinction": bool(
+            decision_findings and historical_context
+        ),
+        "complementaryEvidenceSources": len(evidence_references) >= 2,
+        "semanticCompleteness": all(
+            (
+                analysis_result.architecture_findings,
+                decision_findings,
+                analysis_result.evidence_findings,
+                historical_context,
+                analysis_result.constraint_findings,
+                analysis_result.impacted_component_findings,
+            )
+        ),
+    }
 
 
 def _valid_raw_deltas(raw_proposals: list[Any]) -> list[KnowledgeDeltaType]:

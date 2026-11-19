@@ -466,6 +466,13 @@ class StoryContextCoreIntegrationTest {
     private AiTaskResultRequest completedCallback(AiTask task) {
         @SuppressWarnings("unchecked")
         Map<String, Object> scope = (Map<String, Object>) task.getContextSnapshot().get("scope");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> groundingContract =
+                (Map<String, Object>) task.getContextSnapshot().get("groundingContract");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> groundingReference =
+                (Map<String, Object>) ((List<?>) groundingContract.get("allowedGroundingReferences")).getFirst();
+        String authorizedReference = String.valueOf(groundingReference.get("ref"));
         String projectSlug = String.valueOf(scope.get("projectSlug"));
         String storyId = String.valueOf(scope.get("storyId"));
         PromptExecutionMetadata metadata = new PromptExecutionMetadata(
@@ -476,13 +483,23 @@ class StoryContextCoreIntegrationTest {
                  (Map<String, Object>) task.getContextSnapshot().get("freshness"),
                  String.valueOf(task.getContextSnapshot().get("groundingDigest")));
         var result = new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult(
-                new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.ObjectiveUnderstanding("Q1 Core flow"),
+                new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.ObjectiveUnderstanding(
+                        "Q1 Core flow", List.of(), List.of(), List.of(),
+                        new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.GroundingMetadata(
+                                List.of(new com.hopeful117.devlogai.contracts.engineeringcontext.EvidenceRef(
+                                        authorizedReference, "docs/q1.md")),
+                                "FACTUAL_EXTRACTION", true,
+                                com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.RelationType.EXPLICIT)),
                 List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
                 com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.Confidence.LOW,
                 new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.Provenance(
                         task.getContextDigest(), metadata.promptVersion(), PROVIDER, MODEL, "c".repeat(64),
                         "engineering-story-context-analysis", "v1", List.of(), Map.of()),
-                new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.OutputClassification(List.of()));
+                 new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.OutputClassification(List.of(
+                         new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.OutputClassification.ClassificationEntry(
+                                 "objectiveUnderstanding",
+                                 com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.OutputClassification.Classification.FACTUAL_EXTRACTION,
+                                 true, "Directly grounded"))));
         return new AiTaskResultRequest(task.getCorrelationId(), "q1-scripted-job", AiTaskResultStatus.COMPLETED,
                 Instant.now(), List.of(), null, metadata, null, result);
     }

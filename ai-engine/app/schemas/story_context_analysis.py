@@ -88,6 +88,7 @@ class ObjectiveUnderstanding(StoryContextAnalysisContractModel):
     key_domains: list[str] = Field(default_factory=list, alias="keyDomains")
     primary_technologies: list[str] = Field(default_factory=list, alias="primaryTechnologies")
     architectural_patterns: list[str] = Field(default_factory=list, alias="architecturalPatterns")
+    grounding: GroundingMetadata | None = None
 
 
 class ArchitectureFinding(StoryContextAnalysisContractModel):
