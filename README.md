@@ -34,10 +34,20 @@ OpenAPI documentation, and traceable Deliverables generated from human-validated
 - Generate traceable user-facing Deliverables exclusively from human-validated Insights.
 - Build bounded, ranked Repository Context from multi-module source/test/configuration paths, Git
   history, changed files, ADRs, project documentation, and validated knowledge.
+- Optionally index repository evidence in PostgreSQL/pgvector and combine lexical and semantic
+  retrieval with deterministic reciprocal-rank fusion.
 - Provide Engineering Story Context so external engineering workflows can use repository evidence
   for discovery and prioritization before verifying exact behavior in the current repository.
 - Enrich a bounded set of selected source and test evidence with revision-traceable text while
   keeping configuration content excluded and the repository authoritative.
+- Expose Core capabilities through the MCP Server, including project-scoped engineering context,
+  Story Agent operations, history search, resources, delegation, and bounded runtime observability.
+- Configure user-authorized ChatGPT OAuth or separately enrolled provider credentials without
+  sending provider secrets through Core callbacks, MCP responses, prompts, or browser storage.
+
+Capabilities that depend on deployment configuration or provider availability are explicitly
+feature-flagged. The Mock provider remains available for deterministic local tests; it is not the
+default Docker runtime.
 
 ## Knowledge pipeline
 
@@ -87,10 +97,12 @@ verification.
 | Component    | Technology                    | Responsibility                                           |
 | ------------ | ----------------------------- | -------------------------------------------------------- |
 | Core backend | Java 21, Spring Boot 4.1, JPA | Domain model, collection, orchestration, validation, API |
-| AI Engine    | Python 3.12, FastAPI          | Intent-driven structured interpretation                  |
+| AI Engine    | Python 3.12, FastAPI          | Intent-driven structured interpretation and provider boundary |
 | Frontend     | Angular 22, RxJS, SCSS        | Reactive project workspace and Human-in-the-Loop review  |
-| Database     | PostgreSQL 17, Flyway         | Durable domain state and migration history               |
-| Runtime      | Docker Compose                | Local orchestration of all services                      |
+| MCP Server   | Java, Spring AI MCP           | Agent tools/resources and delegated Core access          |
+| Database     | PostgreSQL 17, pgvector, Flyway | Durable state, migrations, and optional retrieval index |
+| Identity     | Keycloak 26                   | Local OIDC authentication and project authorization      |
+| Runtime      | Docker Compose                | Local orchestration of all five services                 |
 
 Important documentation:
 
@@ -98,10 +110,11 @@ Important documentation:
 - [Knowledge model](docs/knowledge-model.md)
 - [Pipeline](docs/pipeline.md)
 - [Logging policy](docs/logging-policy.md)
-- [Architecture Decision Records](docs/decisions/)
 - [AI Engine documentation](ai-engine/README.md)
 - [Frontend documentation](frontend/README.md)
 - [Manual MVP test guide](frontend/docs/manual-mvp-test.md)
+- [Architecture Decision Records](docs/decisions/)
+- [Roadmap](docs/roadmap.md)
 
 ## Quick start with Docker
 
@@ -109,9 +122,10 @@ Important documentation:
 
 - Docker Engine with the Compose plugin
 - Git, only for cloning this repository
-- Approximately 2 GB of free memory for the four services
+- Approximately 3 GB of free memory for the five services
 
-No LLM API key is required for the default deterministic mock provider.
+The default Docker runtime uses the user-authorized ChatGPT OAuth provider. Select the Mock
+provider explicitly when you need a deterministic credential-free environment.
 
 ### Installation
 
@@ -122,8 +136,11 @@ docker compose up --build -d
 docker compose ps
 ```
 
-Wait until `frontend`, `postgres`, and `ai-engine` are healthy and the backend is running. Flyway
-applies the database migrations automatically when the backend starts.
+Wait until `frontend`, `postgres`, `ai-engine`, and `keycloak` are healthy and the backend is
+running. Flyway applies the database migrations automatically when the backend starts. The frontend
+requires a local Keycloak login; the imported development realm provides the local OIDC clients. For
+the first local login, create a development user in the Keycloak admin console at
+`http://devlog.localhost:18084/admin` using the local administrator credentials.
 
 Available services:
 
@@ -135,10 +152,13 @@ Available services:
 | OpenAPI JSON     | http://localhost:18080/v3/api-docs      |
 | AI Engine health | http://localhost:18081/health           |
 | PostgreSQL       | `localhost:18082`                       |
+| Keycloak         | http://devlog.localhost:18084           |
 
-Docker Compose starts the complete frontend, PostgreSQL, Java Core, and AI Engine runtime. The
-frontend serves its production build, supports Angular deep links, and forwards same-origin `/api`
-requests to Java Core through the internal Compose network.
+Docker Compose starts the complete frontend, PostgreSQL, Java Core, AI Engine, and Keycloak runtime.
+The frontend serves its production build, supports Angular deep links, and forwards same-origin
+`/api` requests to Java Core through the internal Compose network. Keycloak imports the development
+realm from `docker/keycloak/devlog-realm.json`; do not use its default local credentials in a
+production deployment.
 
 Useful commands:
 
@@ -211,6 +231,40 @@ Main settings:
 | `POSTGRES_USER`              | `devlog`       | Database user                       |
 | `POSTGRES_PASSWORD`          | `devlog`       | Local database password             |
 
+### Authentication and credentials
+
+Local application authentication is provided by Keycloak. The Compose realm is imported from
+`docker/keycloak/devlog-realm.json`; its development administrator defaults to `admin` / `admin` and
+must be replaced outside local development. The frontend uses the `devlog-core` OIDC client and the
+backend validates the `devlog-core` audience. MCP delegation uses a separate configured actor client
+and agent principal.
+
+ChatGPT OAuth credentials remain inside the AI Engine credential store. Core receives only bounded
+status and an opaque binding; OAuth access tokens, refresh tokens, authorization codes, and API keys
+must never be placed in `.env.example`, URLs, logs, prompts, callbacks, or browser storage. Provider
+configuration and credential enrollment are available from `/settings/ai` when the corresponding
+provider is enabled.
+
+Additional provider credentials supported by the AI Engine include OpenAI API keys, Gemini, Anthropic,
+and OpenRouter. User-configured credentials use encrypted AI Engine storage and do not silently fall
+back to another provider or credential.
+
+### Retrieval configuration
+
+PostgreSQL runs the `pgvector/pgvector:pg17` image. Retrieval remains optional and independently
+configurable:
+
+| Variable                         | Compose default | Purpose                                      |
+| -------------------------------- | --------------- | -------------------------------------------- |
+| `RETRIEVAL_LEXICAL_FULLTEXT_ENABLED` | `true`      | Enable lexical retrieval                     |
+| `RETRIEVAL_SEMANTIC_ENABLED`     | `true`          | Enable semantic retrieval when embeddings work |
+| `RETRIEVAL_BACKFILL_ENABLED`     | `false`         | Enable embedding backfill                    |
+| `RETRIEVAL_CAPTURE_ENABLED`      | `false`         | Capture bounded live evaluation data         |
+
+The effective backend defaults can also be overridden by the Spring configuration. If semantic
+retrieval is unavailable, the deterministic lexical/context pipeline remains authoritative; no
+semantic result is treated as trusted knowledge.
+
 Collector limits can be adjusted with `COLLECTION_MAX_FILES`, `COLLECTION_MAX_FILE_SIZE`,
 `COLLECTION_MAX_TOTAL_BYTES`, `COLLECTION_MAX_FACTS_PER_TYPE`, and
 `COLLECTION_COLLECTOR_TIMEOUT`.
@@ -238,13 +292,17 @@ resulting Insights. Decisions still use one `POST /api/v1/validations` per propo
 bulk or automatic validation. The reviewer UUID is an explicitly generated local MVP identity,
 kept only in browser session storage and never represented as authentication. The direct
 `/proposals/{id}` API and `/proposals/:id` UI route remain the audit surfaces.
-7. Open a Proposal, inspect its rationale and evidence, then explicitly accept or reject it.
-8. Confirm that only a Core-accepted Proposal appears as an immutable validated Insight.
+8. Open a Proposal, inspect its rationale and evidence, then explicitly accept or reject it.
+9. Confirm that only a Core-accepted Proposal appears as an immutable validated Insight.
 
-The frontend calls Java Core exclusively. It never contacts the Python service directly, constructs
-prompts, accepts Proposals automatically, or exposes provider credentials. The default Mock provider
+The frontend calls Java Core exclusively for analysis workflow. It does not construct prompts, accept
+Proposals automatically, or expose provider credentials. When the Mock provider is selected, it
 identifies itself as `mock` / `deterministic-v1` and returns zero Proposals unless deterministic test
 output is configured.
+
+With the default OAuth provider, connect an eligible ChatGPT account from `/settings/ai` before
+launching an analysis. OAuth consent and provider eligibility are external prerequisites; use
+`LLM_PROVIDER=mock` for a credential-free local workflow.
 
 Project names and descriptions can be edited from the project cockpit. Editing preserves the
 project UUID and slug, so existing project URLs remain stable. Permanent deletion is a separate
@@ -252,7 +310,7 @@ danger-zone action that requires entering the exact project name. It removes the
 DevLog-owned database records through transactional PostgreSQL cascades; it never deletes connected
 remote Git repositories or filesystem workspaces.
 
-For a complete Mock/OpenAI walkthrough and troubleshooting, use the
+For a complete Mock/provider walkthrough and troubleshooting, use the
 [manual MVP test guide](frontend/docs/manual-mvp-test.md).
 
 ## Running an analysis through the API
@@ -278,6 +336,23 @@ Project management also exposes:
 
 Unknown projects use the standard `404 ENTITY_NOT_FOUND` response. Invalid updates return the
 standard validation contract, and duplicate project names return `409 RESOURCE_CONFLICT`.
+
+The versioned REST API is grouped by domain rather than by frontend screen. The main surfaces are:
+
+| Area | Representative endpoints |
+| ---- | ------------------------- |
+| Projects and Sources | `/api/v1/projects`, `/api/v1/sources` |
+| Analyses and AI tasks | `/api/v1/analyses`, `/api/v1/ai-tasks` |
+| Proposals and validation | `/api/v1/proposals`, `/api/v1/validations`, `/api/v1/insights` |
+| Deliverables | `/api/v1/deliverables` |
+| Stories and change briefings | `/api/v1/projects/{projectId}/stories`, `/api/v1/projects/{projectSlug}/stories/{storyId}/change-briefing` |
+| Decisions, milestones, artifacts, challenges | `/api/v1/decisions`, `/api/v1/milestones`, `/api/v1/artifacts`, `/api/v1/challenges` |
+| Timeline and project context | `/api/v1/projects/{projectId}/timeline`, `/api/v1/projects/{projectSlug}/context` |
+| History and evidence | `/api/v1/project-history`, `/api/v1/evidence/resolve` |
+| AI configuration | `/api/v1/ai/catalog`, `/api/v1/ai/configuration` |
+
+Swagger is the authoritative request and response contract for these APIs. The examples below focus
+on the smallest complete workflows rather than reproducing the full endpoint catalog.
 
 Project Understanding uses `POST /api/v1/projects/{projectId}/understanding-executions`. Its body
 contains `sourceId`, optional `targetRevision`, and optional `userGuidance`. The Source must be an
@@ -407,6 +482,27 @@ For findings requiring corrective action, dedicated remediation endpoints are av
 
 ### Engineering Story Context
 
+The current asynchronous Story Agent protocol is exposed through versioned Core endpoints:
+
+```text
+GET  /api/v1/story-context-agent/projects/{projectSlug}/context
+POST /api/v1/story-context-agent/projects/{projectSlug}/tasks
+POST /api/v1/story-context-agent/tasks/{aiTaskId}/callback
+GET  /api/v1/story-context-agent/tasks/{aiTaskId}/snapshot
+GET  /api/v1/story-context-agent/tasks/{aiTaskId}/result
+POST /api/v1/story-context-agent/tasks/{aiTaskId}/investigation/actions
+POST /api/v1/story-context-agent/snapshots/{snapshotId}/follow-up
+```
+
+The protocol creates bounded, project-authorized context tasks and supports callbacks, snapshots,
+results, bounded investigation actions, and follow-up requests. AI output remains transient until
+Core validates the response; the current repository remains authoritative for implementation details.
+The direct `POST /api/v1/projects/{projectSlug}/story-agent` adapter is also available for the
+DevLog Story Agent integration.
+
+The following endpoint is the older compatibility projection and remains useful for direct bounded
+HTTP access:
+
 Complete Engineering Stories should be submitted in a JSON request body so their size is not
 limited by the HTTP request target:
 
@@ -506,6 +602,19 @@ An analysis may include optional, structured User Guidance without changing its 
 
 Guidance only controls emphasis and presentation. It cannot introduce Insight categories, alter
 the output schema, weaken grounding rules, or override the selected Intent.
+
+## MCP integration
+
+The MCP Server is a thin transport adapter over Java Core capabilities. It exposes project-scoped
+engineering context, Story Agent operations, project history search, and read-only resources for
+Stories, Decisions, Insights, Engineering Events, commits, and freshness. It does not construct a
+second context model and is not the authority for evidence identity, authorization, trust promotion,
+or repository state.
+
+MCP access uses bearer authentication and, where configured, Keycloak-backed delegation. The actor
+client, agent principal, and allowed projects are deployment settings. OAuth provider tokens and
+repository credentials never appear in MCP requests, responses, traces, or resources. The MCP module
+is built separately from Core and follows the same authorization and trust boundaries.
 
 ## Importing deterministic project history
 
@@ -641,11 +750,14 @@ The serialized score also retains uncapped semantic and guidance match strength 
 post-selection allocation when several files saturate the same capped criterion. This precision
 does not change global evidence ranking or diverse selection.
 
-For V1, semantic relevance is a deterministic lexical and metadata comparison. It does not use
-embeddings or a vector store. Evidence confidence describes the reliability of its deterministic
-source (for example Git or validated knowledge); it is not model confidence, business severity, or
-a truth probability. Every snapshot records the profile composition, policy versions, criterion
-values, weights, final score and explanations.
+The baseline scoring policy remains deterministic lexical and metadata comparison. In addition, the
+current repository contains an optional embedding index in PostgreSQL/pgvector, a semantic retrieval
+collector, and reciprocal-rank fusion with lexical results. Embeddings and semantic retrieval are
+feature-flagged and may be disabled when the configured embedding provider is unavailable. Evidence
+confidence describes the reliability of its deterministic source (for example Git or validated
+knowledge); it is not model confidence, business severity, or a truth probability. Every snapshot
+records the profile composition, policy versions, criterion values, weights, final score and
+explanations.
 
 ## Generating Deliverables
 
@@ -794,9 +906,15 @@ Common failure boundaries:
 - a connection failure means the configured SonarQube server is unavailable;
 - a failed Quality Gate is a real quality result and must not be reported as successful validation.
 
-The GitHub workflow in `.github/workflows/quality.yml` runs backend Maven tests and JaCoCo coverage
-on hosted runners. It does not submit to the developer's local SonarQube instance. Connecting CI to
-a securely reachable SonarQube service is a separate infrastructure decision.
+The GitHub workflow in `.github/workflows/quality.yml` runs four quality jobs on pull requests:
+
+- backend Maven tests, JaCoCo coverage, and uploaded test artifacts;
+- frontend lint, formatting, headless unit tests with coverage, and production build;
+- Playwright SPA smoke tests against a static production build;
+- an aggregate quality gate that fails when any required job fails or is cancelled.
+
+It does not submit to the developer's local SonarQube instance. Connecting CI to a securely
+reachable SonarQube service is a separate infrastructure decision.
 
 ## Project status and next steps
 
@@ -804,18 +922,21 @@ Implemented foundations include the domain model, deterministic repository colle
 reporting, immutable project profiles, AnalysisContext construction, deterministic knowledge
 selection, intent-driven AI processing, human validation, production-oriented correlation logging,
 immutable Insight promotion, and a reactive Angular dashboard covering the first complete
-Project-to-Insight workflow. They also include validated-Insight-based Deliverable generation and a
-bounded Repository Context Engine used by the Engineering Story Context API.
+Project-to-Insight workflow. They also include validated-Insight-based Deliverable generation,
+deterministic Git history and Engineering Event workflows, optional pgvector-backed hybrid retrieval,
+MCP agent capabilities, Keycloak-backed application access, and bounded Story Agent context APIs.
 
-The main remaining product work is:
+The main remaining product work and limitations are:
 
 - richer editable/exportable projections built from generated Deliverables;
-- authentication-backed reviewer identity and authorization;
+- authenticated reviewer attribution in proposal validation; application authentication and project
+  authorization are implemented, but the current MVP reviewer identity remains browser-local;
 - richer comparison and document-projection interfaces;
 - durable AI job execution instead of in-process background tasks;
 - credential management for private repositories;
 - production deployment, monitoring, and backup configuration;
-- vector retrieval and local-model support, if justified by future ADRs.
+- local-model support, if justified by a future ADR;
+- provider eligibility, OAuth consent, and external service availability outside DevLog's control.
 
 The authoritative roadmap is maintained in [docs/roadmap.md](docs/roadmap.md). Architectural changes
 must remain consistent with the accepted ADRs in [docs/decisions](docs/decisions/).
