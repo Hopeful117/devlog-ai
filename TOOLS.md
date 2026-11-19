@@ -5,6 +5,18 @@
 This document describes the local MCP actor and delegation configuration. It
 contains no bearer, delegation token, OAuth token or other secret value.
 
+## Repository mapping
+
+The canonical DevLog project mapping for this repository is:
+
+```text
+repository: devlog-ai
+projectSlug: devlog-ai
+```
+
+Agents must use this mapping for DevLog preflight requests. A repository Story number is not a
+DevLog Story UUID and must not be sent as `storyId` without a verified mapping.
+
 ## MCP actor
 
 The MCP runtime authenticates as a technical Keycloak client. Core identifies

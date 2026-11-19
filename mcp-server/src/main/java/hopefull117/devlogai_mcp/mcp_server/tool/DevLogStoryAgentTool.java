@@ -106,12 +106,14 @@ public class DevLogStoryAgentTool {
         try {
             String result = execute(projectSlug, storyId, intent, question, files, guidance, idempotencyKey, principal);
             if (observability != null && operationId != null) {
-                observability.recordCompletion(projectSlug, operationId, "devlog_story_agent", startedAt, result);
+                observability.recordCompletion(projectSlug, operationId, "devlog_story_agent", startedAt,
+                        result, principal);
             }
             return result;
         } catch (RuntimeException e) {
             if (observability != null && operationId != null) {
-                observability.recordFailure(projectSlug, operationId, "devlog_story_agent", startedAt, "TOOL_EXECUTION_FAILED");
+                observability.recordFailure(projectSlug, operationId, "devlog_story_agent", startedAt,
+                        "TOOL_EXECUTION_FAILED", principal);
             }
             throw e;
         }
@@ -190,10 +192,13 @@ public class DevLogStoryAgentTool {
                 break;
             }
             latestExecution = executionWithStatus(latestExecution, taskStatus);
-            if ("FAILED".equals(stringValue(taskStatus.get("status")))) {
+            String taskStatusValue = stringValue(taskStatus.get("status"));
+            if ("FAILED".equals(taskStatusValue)
+                    || "NOT_ESTABLISHED".equals(taskStatusValue)
+                    || "TIMED_OUT".equals(taskStatusValue)) {
                 return latestExecution;
             }
-            if ("COMPLETED".equals(stringValue(taskStatus.get("status")))) {
+            if ("COMPLETED".equals(taskStatusValue)) {
                 try {
                             StoryContextAnalysisResponse analysis = callUntil(deadline,
                                     () -> client.getStoryContextAgentResultAuthenticated(taskId, bearerToken,
@@ -350,7 +355,10 @@ public class DevLogStoryAgentTool {
     }
 
     private boolean isTerminal(String status) {
-        return "COMPLETED".equals(status) || "FAILED".equals(status);
+        return "COMPLETED".equals(status)
+                || "FAILED".equals(status)
+                || "NOT_ESTABLISHED".equals(status)
+                || "TIMED_OUT".equals(status);
     }
 
     private String stringValue(Object value) {

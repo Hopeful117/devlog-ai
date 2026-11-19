@@ -544,9 +544,13 @@ DevLog MCP tools operate in one of two transport modes:
 
 3. **Provide a stable `idempotencyKey`** for every `devlog_story_agent` call that may need resuming across context windows or session crashes.
 
-4. **Never fabricate project knowledge.** If DevLog returns no context or an error, surface the gap — do not invent architecture, history, or Story decisions from inference.
+4. **Never fabricate project knowledge.** If DevLog returns no context or an error, surface the gap with a visible `DEVLOG_CONTEXT_ERROR` — do not invent architecture, history, or Story decisions from inference.
 
 5. **Skip DevLog only for**: single-file mechanical edits, syntax fixes, simple command lookups — tasks where no Engineering Story, ADR, or historical decision can affect the answer.
+
+6. **Use an orchestrator handoff for delegated exploration.** The parent agent must complete the DevLog preflight before delegating substantial work and pass a `DEVLOG_PREFLIGHT` summary containing the status, task/snapshot identity, freshness, bounds, warnings, trust tiers, and limitations. An exploration agent must reject a missing handoff with `DEVLOG_PREFLIGHT_REQUIRED`.
+
+7. **Report the preflight.** Final reports must state which DevLog tools were used, what they contributed, whether the context was fresh or bounded, and which conclusions rely only on repository evidence.
 
 ---
 
