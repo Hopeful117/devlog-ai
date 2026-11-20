@@ -75,7 +75,8 @@ public class SyncProjectHistoryTool {
             throw ResourceSupport.notFound(
                     "No repository source found for project '%s'".formatted(projectSlug));
         } catch (HttpClientErrorException.Unauthorized e) {
-            throw ResourceSupport.unauthenticated("Authentication is required to sync project history");
+            throw ResourceSupport.coreAuthenticationFailed(
+                    "Authentication is required to sync project history");
         } catch (HttpClientErrorException.Forbidden e) {
             throw ResourceSupport.notFound(
                     "Project '%s' not found or access denied".formatted(projectSlug));

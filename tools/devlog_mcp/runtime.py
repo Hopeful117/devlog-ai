@@ -47,6 +47,13 @@ DEVLOG_CORRELATION_TOOLS = frozenset({
     "story_context_agent_follow_up_authenticated",
 })
 
+RETRY_SAFE_TOOLS = frozenset({
+    "get_engineering_context",
+    "search_project_history",
+    "story_context_agent_get_projection",
+    "story_context_agent_get_snapshot_authenticated",
+})
+
 
 def _extract_devlog_correlation_id(message: Any) -> str | None:
     """Best-effort extraction of aiTaskId from a DevLog tool MCP response."""
@@ -79,6 +86,7 @@ class ToolOperation:
     retry_count: int
     raw_payload: bytes
     started_at: float
+    retry_safe: bool
     tool_name: str | None = None
     response_correlation_id: str | None = None
 
@@ -668,10 +676,14 @@ class RuntimeSession:
             if terminal_event is not None:
                 self._emit_terminal_event(*terminal_event)
 
-    def is_transport_auth_failure(self, message: Any) -> bool:
+    @staticmethod
+    def is_transport_auth_failure(message: Any) -> bool:
         if not isinstance(message, dict) or not isinstance(message.get("error"), dict):
             return False
         error = message["error"]
+        data = error.get("data")
+        if data is not None and (not isinstance(data, dict) or data.get("source") != "TRANSPORT"):
+            return False
         return error.get("code") == -32600 and error.get("message") == "Authentication is required"
 
     def retry_authentication(self, message: Any) -> bool:
@@ -681,11 +693,23 @@ class RuntimeSession:
         if identifier is None:
             return False
         terminal_event: tuple[ToolOperation, str, int, str | None] | None = None
+        raw: bytes | None = None
+        operation_id: str | None = None
         with self.lock:
             operation = self.outstanding.get(identifier)
             if not isinstance(operation, ToolOperation):
                 return False
-            if operation.retry_count >= 1:
+            if not operation.retry_safe:
+                if self._finish_operation_locked(operation, TOOL_FAILED, operation.current_generation):
+                    terminal_event = (
+                        operation,
+                        TOOL_FAILED,
+                        operation.current_generation,
+                        "MCP_RETRY_NOT_IDEMPOTENT",
+                    )
+                raw = None
+                operation_id = None
+            elif operation.retry_count >= 1:
                 if self._finish_operation_locked(operation, TOOL_FAILED, operation.current_generation):
                     terminal_event = (operation, TOOL_FAILED, operation.current_generation, "MCP_REAUTH_REQUIRED")
             else:
@@ -694,6 +718,8 @@ class RuntimeSession:
                 operation_id = operation.operation_id
         if terminal_event is not None:
             self._emit_terminal_event(*terminal_event)
+            return False
+        if raw is None or operation_id is None:
             return False
         try:
             self.renew_if_needed(force=True, retry_operation_id=operation_id)
@@ -853,6 +879,7 @@ class RuntimeSession:
                         retry_count=0,
                         raw_payload=raw,
                         started_at=time.monotonic(),
+                        retry_safe=tool_name is None or tool_name in RETRY_SAFE_TOOLS,
                         tool_name=tool_name,
                     )
                     self.outstanding[identifier] = operation

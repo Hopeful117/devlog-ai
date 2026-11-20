@@ -104,6 +104,24 @@ class SyncProjectHistoryToolTest {
                 .hasMessageContaining("Project 'unknown' not found");
     }
 
+    @Test
+    void mapsBackendUnauthorizedAsCoreAuthentication() {
+        when(adminClient.importProjectHistoryAuthenticated("Bearer test", SOURCE_ID, null))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.UNAUTHORIZED, "Unauthorized",
+                        null, null, StandardCharsets.UTF_8));
+
+        SyncProjectHistoryTool tool = new SyncProjectHistoryTool(
+                adminClient, support, principalProvider());
+
+        assertThatThrownBy(() -> tool.syncProjectHistory(SLUG, null, null))
+                .isInstanceOf(McpError.class)
+                .satisfies(exception -> {
+                    McpError error = (McpError) exception;
+                    assertThat(error.getJsonRpcError().data())
+                            .isEqualTo(java.util.Map.of("source", "CORE", "category", "CORE_AUTHENTICATION"));
+                });
+    }
+
     private static McpAuthenticatedPrincipalProvider principalProvider() {
         return () -> java.util.Optional.of(new McpAuthenticatedPrincipalProvider.McpPrincipal(
                 "test-principal", McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN,
