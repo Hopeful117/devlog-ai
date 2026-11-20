@@ -55,8 +55,9 @@ une matrice commune.
 3. [Story 0213 - Politique des appels MCP vers Core](../../stories/0213-mcp-core-call-policy/story.md)
 4. [Story 0214 - Idempotence et securite du rejeu](../../stories/0214-mcp-idempotency-replay-safety/story.md)
 5. [Story 0215 - Diagnostics et experience agent/operator MCP](../../stories/0215-mcp-diagnostics-agent-operator-experience/story.md)
-6. Story a definir - Validation de resilience
-7. Story a definir - Documentation et runbooks
+6. [Story 0216 - Validation de resilience MCP](../../stories/0216-mcp-resilience-validation/story.md)
+7. [Story 0217 - Retry borne des erreurs 429 et respect de Retry-After](../../stories/0217-mcp-rate-limit-retry-after/story.md)
+8. [Story 0218 - Documentation et runbooks operateur MCP](../../stories/0218-mcp-documentation-runbooks/story.md)
 
 Les Stories 0172 et 0174 sont des dependances a reconcilier, pas des travaux a
 dupliquer.
@@ -70,6 +71,9 @@ dupliquer.
 5. Formaliser l'idempotence et le rejeu.
 6. Ajouter diagnostics, alertes et runbooks.
 7. Executer la matrice de resilience.
+8. Implementer le retry borne des erreurs `429` et la prise en compte de
+   `Retry-After`.
+9. Finaliser la documentation et les runbooks.
 
 ## Hors perimetre
 

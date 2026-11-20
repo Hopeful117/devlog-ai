@@ -183,10 +183,15 @@ If the token endpoint times out or returns `502`, `503` or `504` during a
 renewal, the supervisor performs one additional token acquisition after the
 configured bounded backoff (`DEVLOG_MCP_TOKEN_RETRY_BACKOFF_SECONDS`, default
 one second). This token acquisition retry does not replay the MCP operation.
-Client errors, `500`, `401`, `403`, `404`, `409` and `429` are terminal in this
-runtime; `429` remains reserved for the idempotency policy Story. The retry is
-reported as `TOKEN_RENEWAL_RETRY` with bounded metadata and is visible through
-the read-only status command.
+Client errors, `500`, `401`, `403` and `404` remain terminal for token
+acquisition. A Core `429` is handled separately from bearer renewal: the
+runtime may perform one bounded retry for an explicitly replay-safe operation.
+The Core adapter does not retry. A valid `Retry-After` value is propagated as
+bounded `retryAfterSeconds`, capped at 60 seconds; an absent, invalid, expired
+or excessive value uses the bounded one-second fallback. The operation is not
+retried when it is a mutation without an authoritative idempotency guarantee,
+or when its result is ambiguous. The retry is reported with bounded metadata
+and is visible through the read-only status command.
 
 Renewal events include `TOKEN_EXPIRED`, `TOKEN_RENEWAL_STARTED`,
 `TOKEN_RENEWAL_RETRY`, `TOKEN_RENEWAL_SUCCEEDED` and `TOKEN_RENEWAL_FAILED`. The read-only status
@@ -196,13 +201,113 @@ authorization, human delegation and AI Engine provider OAuth.
 
 Runtime and Core failures expose only bounded diagnostic metadata: `source`,
 `category`, `code`, `layer`, `retryable`, `action`, and when applicable
-`attempt`/`maxAttempts`. Recommended actions are allowlisted and do not
-authorize an automatic retry. `retryable` means that an automatic retry is
-permitted from the current boundary; it does not mean that every caller may
-retry without applying the operation-specific policy. `status --json` projects the last failure and
-`doctor --json` reports configuration, backend and token-endpoint checks.
+`attempt`/`maxAttempts`. A Core `429` response may additionally carry the
+bounded `retryAfterSeconds` metadata; the status projections expose only their
+allowlisted diagnostic fields. Recommended actions are allowlisted and do not
+authorize an automatic retry. `retryable` means that
+an automatic retry is permitted from the current boundary; it does not mean
+that every caller may retry without applying the operation-specific policy.
+`status --json` projects the last failure and `doctor --json` reports
+configuration, backend and token-endpoint checks.
 Neither command exposes bearer values, delegation proofs, payloads, prompts,
 provider responses or backend error bodies.
+
+## MCP operator runbook
+
+### Initial read-only diagnosis
+
+Run both commands from the repository root:
+
+```bash
+python3 tools/devlog_mcp/status.py status --json
+python3 tools/devlog_mcp/status.py doctor --json
+```
+
+Record only the available `instanceId`, `operationId`, `generation`, `status`,
+`reasonCode`, `source`, `category`, `code`, `layer`, `retryable`, `action`,
+`attempt`, `maxAttempts`, timestamp and the result of the checks. Do not copy
+bearers, client secrets, delegation tokens, prompts, JSON-RPC payloads,
+repository content, provider responses or backend response bodies into an
+issue, prompt, log or escalation.
+
+### Recovery matrix
+
+| Signal or code | Interpretation | Safe operator action | Escalation condition | Do not do |
+|---|---|---|---|---|
+| `MCP_REAUTH_REQUIRED` | Transport renewal or authentication failed | Run `doctor`, verify local non-secret configuration, then start a fresh MCP session | Escalate with bounded transport diagnostics if a fresh session fails | Replay an ambiguous mutation |
+| `CORE_AUTHENTICATION_FAILED` | Core rejected authentication | Verify the configured Core access path | Escalate if Core continues rejecting valid configured access | Treat it as bearer expiry or repeatedly renew the bearer |
+| `CORE_AUTHORIZATION_FAILED` | Core rejected project or scope authorization | Verify project access and the human delegation scope | Escalate to the project/delegation owner when scope is correct but access remains denied | Bypass or broaden the delegation |
+| `CORE_CONFLICT` | Core reports a conflicting or already-changing operation | Reconcile the operation status using correlation metadata | Escalate when the authoritative operation status cannot be determined | Replay the operation blindly |
+| `CORE_RESOURCE_NOT_FOUND` | The referenced Core resource is absent or the identifier is wrong | Check the resource identifier and project scope | Escalate when the identifier is verified but the resource remains absent | Retry the same invalid identifier |
+| `FUNCTIONAL_ERROR` | Core rejected the operation parameters | Review the documented operation contract and correct the request | Escalate when valid parameters are rejected unexpectedly | Retry unchanged parameters |
+| `DELEGATION_FAILED` | Delegation is absent, expired or revoked | Ask the human owner for a new bounded delegation | Escalate to the human owner if renewal or revocation state is unclear | Reuse an expired or revoked token |
+| `PROVIDER_FAILED` | Provider authentication or configuration failed | Check provider configuration without exposing credentials | Escalate to the provider or project owner after non-secret checks | Copy provider credentials or responses into diagnostics |
+| `RATE_LIMITED` | Core rate limit was reached | Allow the one bounded runtime retry, then wait before a new read-only attempt | Escalate when rate limiting persists after the bounded policy and safe wait | Launch concurrent retries or replay a mutation |
+| `TRANSIENT_INFRASTRUCTURE` | Timeout or transient backend/transport failure | Run `doctor`, check service availability and retry only an explicitly safe operation | Escalate when bounded recovery fails or operation status is ambiguous | Replay an ambiguous operation |
+| `MCP_RETRY_NOT_IDEMPOTENT` | The runtime refused a retry without an idempotency guarantee | Reconcile operation status and create a new reviewed operation only if safe | Escalate when the business effect cannot be determined | Resend the original operation |
+| `MCP_PROCESS_FAILED` | The owned MCP child exited or became inaccessible | Collect `status` and `doctor`, then start a fresh session | Escalate with instance and generation metadata if restart fails | Kill a process whose ownership is not proven |
+| `MCP_INSTANCE_STOPPING` | The runtime is stopping intentionally | Wait for shutdown or start a new session if needed | Escalate only if the instance remains stopping unexpectedly | Treat the expected interruption alone as an incident |
+| `MCP_HANDSHAKE_FAILED` or `PROTOCOL_INVALID` | MCP session negotiation or protocol validation failed | Check the MCP client and preserve bounded correlation metadata | Escalate when a fresh session cannot establish a valid protocol connection | Copy raw payloads or backend messages into the report |
+| `KEYCLOAK_UNREACHABLE` | The token endpoint is unreachable | Check the token endpoint with `doctor` and retry token acquisition only under its bounded policy | Escalate when the endpoint remains unavailable | Replay an MCP operation |
+| `PARENT_PROCESS_GONE` | The owned parent process is no longer available | Collect `status` and `doctor`, then restart the owned runtime | Escalate when the new owned runtime cannot start | Retry an ambiguous operation |
+| `MCP_JAR_MISSING` or `CONFIGURATION_INVALID` | Required local runtime configuration is invalid or missing | Correct non-secret local configuration and rerun `doctor` | Escalate when configuration is correct but startup still fails | Add credentials to logs or repository files |
+| `TOKEN_ENDPOINT_TIMEOUT` or `TOKEN_ENDPOINT_5XX` | Token acquisition failed transiently | Allow the one bounded token-acquisition retry, then check `doctor` | Escalate when token acquisition still fails | Replay the MCP operation as part of token recovery |
+| `TOKEN_ENDPOINT_REJECTED` | Token endpoint rejected authentication | Start a fresh authenticated runtime using verified non-secret configuration | Escalate when authentication remains rejected | Reuse stale credentials or replay an ambiguous operation |
+| `TOKEN_RESPONSE_INVALID` | Token endpoint returned an invalid response shape | Check the token endpoint and non-secret runtime configuration | Escalate when the endpoint remains invalid after configuration checks | Copy token responses or retry an MCP mutation |
+| `CORE_INTERNAL_ERROR` | Core returned an internal failure | Preserve bounded correlation metadata and wait for service recovery before a new safe attempt | Escalate with correlation metadata when the failure persists | Replay an ambiguous mutation |
+| `MCP_UNKNOWN_DIAGNOSTIC` | Runtime received an unclassified diagnostic | Preserve bounded correlation metadata and escalate | Escalate immediately because no safe recovery is classified | Infer a retry policy from the unknown code |
+| `MCP_JSONRPC_ERROR` | MCP protocol or unclassified response failure | Preserve bounded correlation metadata | Escalate when the client or runtime cannot establish a valid protocol session | Copy raw payloads or backend messages into the report |
+
+### Rate limiting and `Retry-After`
+
+The Python runtime is the only retry authority. For a Core `429`, it retries at
+most once and only when the operation is explicitly replay-safe or carries the
+required authoritative idempotency guarantee. The Java MCP adapter never
+performs the retry itself.
+
+`Retry-After` is handled as follows:
+
+- a valid delay or HTTP date is converted to bounded seconds;
+- values above 60 seconds are capped at 60 seconds;
+- an absent, invalid or expired value uses the bounded one-second fallback;
+- the wait is interruptible by runtime shutdown;
+- a second `429` after the replay is terminal for that operation.
+
+Do not manually replay a mutation, a request without an idempotency guarantee,
+or any operation whose previous result is ambiguous. A manual retry, when
+appropriate, must be a new operation reviewed against its business effect, not
+an automatic resend of the previous payload.
+
+### Bearer, Core and delegation recovery
+
+Bearer transport renewal and Core authorization are separate lifecycles. A
+Core `401` or `403` does not prove that the transport bearer expired. Check the
+diagnostic `source` and `category` before taking action. A missing, expired or
+revoked human delegation must be renewed by the human owner; the MCP runtime
+must not renew or expand it automatically.
+
+If `doctor --json` reports a configuration, token endpoint or ownership
+failure, correct only the non-secret local configuration or restart the owned
+runtime. Never place the bearer, client secret or delegation token in a prompt,
+command output, issue or repository file.
+
+### Incident checklist
+
+Collect the following non-sensitive evidence:
+
+1. UTC timestamp and environment.
+2. `instanceId`, `operationId` and `generation`, when present.
+3. Runtime status, `reasonCode`, `source`, `category`, `code`, `layer` and
+   recommended `action`.
+4. Attempt and maximum attempt values, and whether a bounded `429` retry was
+   observed.
+5. The redacted output of `status --json` and `doctor --json`.
+6. The operator action already attempted and the next escalation requested.
+
+Never collect or attach bearer values, client secrets, delegation tokens,
+JSON-RPC payloads, prompts, repository contents, provider responses or raw
+backend bodies. If any such value appears in a local diagnostic, redact it
+before escalation and report only the bounded diagnostic code and correlation.
 
 Runtime tests use only the Python standard library:
 

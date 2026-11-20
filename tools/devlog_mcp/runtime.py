@@ -38,6 +38,8 @@ DEFAULT_RENEWAL_COOLDOWN_SECONDS = 10
 DEFAULT_MINIMUM_LEASE_SECONDS = 5
 DEFAULT_TOKEN_RETRY_BACKOFF_SECONDS = 1
 MAX_TOKEN_RETRY_BACKOFF_SECONDS = 60
+DEFAULT_RATE_LIMIT_RETRY_BACKOFF_SECONDS = 1
+MAX_RATE_LIMIT_RETRY_SECONDS = 60
 TOOL_SCHEMA_VERSION = "mcp-tool-observability-v1"
 TOOL_ACTIVE = "ACTIVE"
 TOOL_RESPONDED = "RESPONDED"
@@ -218,6 +220,9 @@ class ToolOperation:
     retry_safe: bool
     tool_name: str | None = None
     response_correlation_id: str | None = None
+    rate_limit_retry_count: int = 0
+    rate_limit_retry_in_progress: bool = False
+    rate_limit_retry_sent: bool = False
 
 
 def state_root() -> Path:
@@ -835,8 +840,10 @@ class RuntimeSession:
                 with self.lock:
                     if generation != self.generation:
                         continue
-                    auth_failure = self.is_transport_auth_failure(message)
+                auth_failure = self.is_transport_auth_failure(message)
                 if auth_failure and self.retry_authentication(message):
+                    continue
+                if self.is_rate_limited(message) and self.retry_rate_limited(message):
                     continue
                 with self.lock:
                     if generation != self.generation:
@@ -996,6 +1003,116 @@ class RuntimeSession:
             self.stop_child("MCP_REAUTH_REQUIRED")
             return False
 
+    @staticmethod
+    def is_rate_limited(message: Any) -> bool:
+        if not isinstance(message, dict) or not isinstance(message.get("error"), dict):
+            return False
+        data = message["error"].get("data")
+        return isinstance(data, dict) and data.get("source") == "CORE" and data.get("category") == "RATE_LIMITED"
+
+    @staticmethod
+    def rate_limit_retry_delay(message: Any) -> float:
+        data = message.get("error", {}).get("data", {}) if isinstance(message, dict) else {}
+        value = data.get("retryAfterSeconds") if isinstance(data, dict) else None
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+            return DEFAULT_RATE_LIMIT_RETRY_BACKOFF_SECONDS
+        return min(float(value), MAX_RATE_LIMIT_RETRY_SECONDS)
+
+    def retry_rate_limited(self, message: Any) -> bool:
+        if not self.is_rate_limited(message):
+            return False
+        identifier = self.request_id(message)
+        if identifier is None:
+            return False
+        terminal_event: tuple[ToolOperation, str, int, str | None] | None = None
+        raw: bytes | None = None
+        operation_id: str | None = None
+        delay = self.rate_limit_retry_delay(message)
+        with self.lock:
+            operation = self.outstanding.get(identifier)
+            if not isinstance(operation, ToolOperation):
+                return False
+            if operation.rate_limit_retry_in_progress:
+                if not operation.rate_limit_retry_sent:
+                    return True
+                if self._finish_operation_locked(operation, TOOL_FAILED, operation.current_generation):
+                    terminal_event = (operation, TOOL_FAILED, operation.current_generation, "RATE_LIMITED")
+                raw = None
+                operation_id = None
+            elif (
+                not operation.retry_safe
+                or operation.tool_name is None
+                or operation.rate_limit_retry_count >= 1
+            ):
+                if self._finish_operation_locked(operation, TOOL_FAILED, operation.current_generation):
+                    terminal_event = (
+                        operation,
+                        TOOL_FAILED,
+                        operation.current_generation,
+                        "MCP_RETRY_NOT_IDEMPOTENT" if not operation.retry_safe else "RATE_LIMITED",
+                    )
+            else:
+                operation.rate_limit_retry_count += 1
+                operation.rate_limit_retry_in_progress = True
+                operation.rate_limit_retry_sent = False
+                raw = operation.raw_payload
+                operation_id = operation.operation_id
+        if terminal_event is not None:
+            self._emit_terminal_event(*terminal_event)
+            return False
+        if raw is None or operation_id is None:
+            return False
+        self.writer.write(
+            "MCP_RATE_LIMIT_RETRY",
+            severity="WARN",
+            code="RATE_LIMITED",
+            attempt=1,
+            maxAttempts=1,
+            delaySeconds=delay,
+        )
+        try:
+            if self.stop_requested.wait(timeout=delay):
+                raise RuntimeError("MCP_INSTANCE_STOPPING")
+            with self.lock:
+                current = self.operations.get(operation_id)
+                if current is None or current.state != TOOL_ACTIVE or current.operation_id != operation_id:
+                    return False
+                if current.current_generation != self.generation or self.stop_requested.is_set():
+                    state = TOOL_INTERRUPTED if self.stop_requested.is_set() else TOOL_FAILED
+                    reason_code = "MCP_INSTANCE_STOPPING" if state == TOOL_INTERRUPTED else "RATE_LIMITED"
+                    if self._finish_operation_locked(current, state, current.current_generation):
+                        terminal_event = (current, state, current.current_generation, reason_code)
+                    raw = None
+                    operation_id = None
+            if terminal_event is not None:
+                self._emit_terminal_event(*terminal_event)
+                return False
+            if raw is None or operation_id is None:
+                return False
+            with self.lock:
+                current = self.operations.get(operation_id)
+                if current is None or current.state != TOOL_ACTIVE:
+                    return False
+                current.rate_limit_retry_sent = True
+            self.forward(raw, json.loads(raw), retry_operation_id=operation_id, skip_renewal=True)
+            with self.lock:
+                current = self.operations.get(operation_id)
+                if current is not None:
+                    current.rate_limit_retry_in_progress = False
+            return True
+        except (OSError, RuntimeError, ValueError, urllib.error.URLError, TimeoutError):
+            terminal_event = None
+            with self.lock:
+                current = self.operations.get(operation_id)
+                if current is not None:
+                    state = TOOL_INTERRUPTED if self.stop_requested.is_set() else TOOL_FAILED
+                    reason_code = "MCP_INSTANCE_STOPPING" if state == TOOL_INTERRUPTED else "RATE_LIMITED"
+                    if self._finish_operation_locked(current, state, current.current_generation):
+                        terminal_event = (current, state, current.current_generation, reason_code)
+            if terminal_event is not None:
+                self._emit_terminal_event(*terminal_event)
+            return False
+
     def consume_initialize_response(self, message: Any, generation: int | None = None) -> bool:
         if generation is not None and generation != self.generation:
             return True
@@ -1093,8 +1210,15 @@ class RuntimeSession:
             self.writer.write("TOKEN_RENEWAL_FAILED", severity="ERROR", code=code)
             raise RuntimeError("MCP_REAUTH_REQUIRED") from exception
 
-    def forward(self, raw: bytes, message: Any, retry_operation_id: str | None = None) -> None:
-        self.renew_if_needed(retry_operation_id=retry_operation_id)
+    def forward(
+        self,
+        raw: bytes,
+        message: Any,
+        retry_operation_id: str | None = None,
+        skip_renewal: bool = False,
+    ) -> None:
+        if not skip_renewal:
+            self.renew_if_needed(retry_operation_id=retry_operation_id)
         child = self.child
         if child is None or child.stdin is None:
             raise RuntimeError("MCP_PROCESS_FAILED")
@@ -1116,7 +1240,7 @@ class RuntimeSession:
                     if isinstance(raw_name, str) and raw_name:
                         tool_name = raw_name[:128]
             with self.lock:
-                if self.stop_requested.is_set() and retry_operation_id is None:
+                if self.stop_requested.is_set():
                     raise RuntimeError("MCP_INSTANCE_STOPPING")
                 existing = self.outstanding.get(identifier)
                 if existing is not None:
@@ -1127,6 +1251,8 @@ class RuntimeSession:
                     existing.current_generation = self.generation
                     operation = existing
                 else:
+                    if retry_operation_id is not None:
+                        raise RuntimeError("MCP_PROTOCOL_INVALID")
                     operation = ToolOperation(
                         operation_id=self._new_operation_id(),
                         request_id=identifier,
@@ -1154,7 +1280,7 @@ class RuntimeSession:
                 with self.lock:
                     if operation.state != TOOL_ACTIVE:
                         raise RuntimeError("MCP_INSTANCE_STOPPING")
-                    if self.stop_requested.is_set() and retry_operation_id is None:
+                    if self.stop_requested.is_set():
                         raise RuntimeError("MCP_INSTANCE_STOPPING")
             try:
                 child.stdin.write(raw)
