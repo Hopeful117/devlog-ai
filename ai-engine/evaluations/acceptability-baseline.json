@@ -1,0 +1,147 @@
+{
+  "version": "story-0210-acceptability-baseline-v1",
+  "cases": [
+    {
+      "name": "complete-grounded",
+      "expected": "ACCEPTABLE",
+      "rawOutput": {
+        "executionStatus": "COMPLETED",
+        "semanticEligibility": "SEMANTICALLY_ELIGIBLE",
+        "acceptability": {
+          "groundingStatus": "GROUNDED",
+          "freshness": "FRESH",
+          "revisionPinned": true,
+          "expectedEvidenceCount": 1,
+          "coveredEvidenceCount": 1,
+          "contradictionCount": 0,
+          "truncated": false,
+          "principalConclusionCovered": true,
+          "nextStepPresent": true
+        },
+        "finalResponse": {
+          "answerText": "The evidence establishes the current behavior.",
+          "abstention": false,
+          "claims": [{
+            "text": "The current behavior is established.",
+            "claimType": "FACT",
+            "references": ["file:docs/current.md#L1"]
+          }]
+        },
+        "evidence": [{"reference": "file:docs/current.md#L1"}]
+      }
+    },
+    {
+      "name": "known-verification-limit",
+      "expected": "BOUNDED",
+      "rawOutput": {
+        "executionStatus": "COMPLETED",
+        "semanticEligibility": "SEMANTICALLY_ELIGIBLE",
+        "acceptability": {
+          "groundingStatus": "GROUNDED",
+          "freshness": "FRESH",
+          "revisionPinned": true,
+          "expectedEvidenceCount": 1,
+          "coveredEvidenceCount": 1,
+          "contradictionCount": 0,
+          "truncated": false,
+          "principalConclusionCovered": true,
+          "nextStepPresent": true
+        },
+        "finalResponse": {
+          "answerText": "The answer is usable with a targeted check.",
+          "abstention": false,
+          "uncertainties": [{"description": "Verify the current deployment."}]
+        }
+      }
+    },
+    {
+      "name": "insufficient-evidence",
+      "expected": "INSUFFICIENT",
+      "rawOutput": {
+        "executionStatus": "COMPLETED",
+        "semanticEligibility": "SEMANTICALLY_ELIGIBLE",
+        "acceptability": {
+          "groundingStatus": "GROUNDED",
+          "freshness": "FRESH",
+          "revisionPinned": true,
+          "expectedEvidenceCount": 2,
+          "coveredEvidenceCount": 1,
+          "contradictionCount": 0,
+          "truncated": false,
+          "principalConclusionCovered": true,
+          "nextStepPresent": true
+        },
+        "finalResponse": {"answerText": "The evidence is insufficient.", "abstention": true}
+      }
+    },
+    {
+      "name": "unknown-freshness",
+      "expected": "STALE_OR_UNKNOWN",
+      "rawOutput": {
+        "executionStatus": "COMPLETED",
+        "semanticEligibility": "SEMANTICALLY_ELIGIBLE",
+        "acceptability": {
+          "groundingStatus": "GROUNDED",
+          "freshness": "UNKNOWN",
+          "revisionPinned": false,
+          "expectedEvidenceCount": 1,
+          "coveredEvidenceCount": 1,
+          "contradictionCount": 0,
+          "truncated": false,
+          "principalConclusionCovered": true,
+          "nextStepPresent": true
+        },
+        "finalResponse": {"answerText": "The current state is unknown.", "abstention": false}
+      }
+    },
+    {
+      "name": "truncated-principal-conclusion",
+      "expected": "INSUFFICIENT",
+      "rawOutput": {
+        "executionStatus": "COMPLETED",
+        "semanticEligibility": "SEMANTICALLY_ELIGIBLE",
+        "acceptability": {
+          "groundingStatus": "GROUNDED",
+          "freshness": "FRESH",
+          "revisionPinned": true,
+          "expectedEvidenceCount": 1,
+          "coveredEvidenceCount": 1,
+          "contradictionCount": 0,
+          "truncated": true,
+          "principalConclusionCovered": false,
+          "nextStepPresent": true
+        },
+        "finalResponse": {"answerText": "The conclusion is not established.", "abstention": false}
+      }
+    },
+    {
+      "name": "contradictory-evidence",
+      "expected": "INSUFFICIENT",
+      "rawOutput": {
+        "executionStatus": "COMPLETED",
+        "semanticEligibility": "SEMANTICALLY_ELIGIBLE",
+        "acceptability": {
+          "groundingStatus": "GROUNDED",
+          "freshness": "FRESH",
+          "revisionPinned": true,
+          "expectedEvidenceCount": 1,
+          "coveredEvidenceCount": 1,
+          "contradictionCount": 1,
+          "truncated": false,
+          "principalConclusionCovered": true,
+          "nextStepPresent": true
+        },
+        "finalResponse": {"answerText": "The evidence conflicts.", "abstention": false}
+      }
+    },
+    {
+      "name": "provider-incomplete",
+      "expected": "NOT_EVALUATED",
+      "rawOutput": {
+        "executionStatus": "PROVIDER_INCOMPLETE",
+        "semanticEligibility": "NOT_EVALUATED",
+        "finalResponse": {"abstention": false}
+      }
+    }
+  ]
+}

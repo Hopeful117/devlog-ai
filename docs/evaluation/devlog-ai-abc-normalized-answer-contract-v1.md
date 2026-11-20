@@ -38,6 +38,7 @@ content.
 | `evidenceReferences` | References cited by the response, including locator, revision source, and resolution status |
 | `limitations` | Explicit uncertainty/missing-information descriptions or stated limitations |
 | `abstention` | Explicit boolean only; `null` means not expressed |
+| `acceptability` | Evaluation-only deterministic status, reason, and semantic-evaluation flag |
 | `normalizationWarnings` | Missing, partial, unresolved, or contradictory information found during normalization |
 | `rawArtifact` | RAW observation identity, hash, and preservation metadata |
 | `derivedSha256` | Hash of the complete normalized artifact before this field is added |
@@ -57,6 +58,18 @@ content.
   the execution revision.
 - Oracle support is evaluated later and is never represented as a normalization
   status.
+
+## Acceptability Semantics
+
+`acceptability` is derived only from explicit observation metadata. Its status is
+one of `ACCEPTABLE`, `BOUNDED`, `INSUFFICIENT`, `STALE_OR_UNKNOWN`, `FAILED`, or
+`NOT_EVALUATED`. Technical failures, incomplete provider output, invalid
+captures and missing semantic eligibility are `NOT_EVALUATED` and remain outside
+the semantic denominator. The evaluator does not infer acceptability from prose,
+confidence text or citation count.
+
+The status is evaluation-only and does not alter the production response
+contract, Core acceptance, trust model or human oracle review.
 
 ## Extraction Boundary
 

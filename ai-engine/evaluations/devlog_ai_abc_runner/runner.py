@@ -273,6 +273,7 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
         _write_json_exclusive(observation_root / "trace" / "events.json", trace)
         derived = _normalize(condition, envelope)
         _write_json_exclusive(observation_root / "derived" / "normalized.json", derived)
+        acceptability = derived.get("acceptability", {})
         status = {
             "observationId": observation_id,
             "condition": condition,
@@ -287,6 +288,7 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
             "simulatedProviderCalls": envelope["rawOutput"].get("simulatedProviderCalls", 0),
             "externalProviderCalls": envelope["rawOutput"].get("externalProviderCalls", 0),
             "externalNetworkCalls": envelope["rawOutput"].get("externalNetworkCalls", 0),
+            "acceptabilityStatus": acceptability.get("status", "NOT_EVALUATED"),
             "error": error,
         }
         _write_json_exclusive(observation_root / "status.json", status)
@@ -315,6 +317,7 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
         "externalProviderCalls": sum(item["externalProviderCalls"] for item in results),
         "externalNetworkCalls": sum(item["externalNetworkCalls"] for item in results),
         "observations": results,
+        "acceptabilityCounts": _acceptability_counts(results),
         "replay": "READY",
         "semanticQualityEvaluated": False,
         "integrationStatus": (
@@ -326,6 +329,14 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
     _write_json_exclusive(run_root / "integrity-report.json", integrity)
     _write_json_exclusive(run_root / "execution-summary.json", summary)
     return RunResult(run_root=run_root, summary=summary, integrity=integrity)
+
+
+def _acceptability_counts(results: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for result in results:
+        status = result["acceptabilityStatus"]
+        counts[status] = counts.get(status, 0) + 1
+    return counts
 
 
 def run_integration_simulation(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path) -> RunResult:
