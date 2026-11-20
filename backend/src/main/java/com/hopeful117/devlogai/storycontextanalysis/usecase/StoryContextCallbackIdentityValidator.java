@@ -86,7 +86,8 @@ public class StoryContextCallbackIdentityValidator {
     private static void validateSnapshotScope(AiTask task) {
         Object raw = taskSnapshotScope(task);
         if (!(raw instanceof Map<?, ?> scope)) throw new IllegalStateException("AI task snapshot scope is missing");
-        Set<String> keys = Set.of("projectSlug", "storyId", "intent", "files", "question");
+        Set<String> keys = Set.of("projectSlug", "storyId", "intent", "files", "question",
+                "project", "projectId", "sourceId", "resolvedRevision", "revisionSource", "resolutionState");
         if (!scope.keySet().stream().allMatch(keys::contains)
                 || scope.get("projectSlug") == null || scope.get("files") == null) {
             throw new IllegalStateException("AI task snapshot scope is incomplete or inconsistent");
@@ -97,9 +98,15 @@ public class StoryContextCallbackIdentityValidator {
         }
         Object projection = task.getSelectedKnowledgeSnapshot();
         if (projection instanceof Map<?, ?> p && p.get("request") instanceof Map<?, ?> request
-                && !Objects.equals(scope, request)) {
+                && !requestScopeMatches(scope, request)) {
             throw new IllegalStateException("AI task snapshot scope does not match request scope");
         }
+    }
+
+    private static boolean requestScopeMatches(Map<?, ?> scope, Map<?, ?> request) {
+        Set<String> requestKeys = Set.of("projectSlug", "storyId", "intent", "files", "question");
+        return requestKeys.stream().allMatch(key -> !scope.containsKey(key)
+                ? !request.containsKey(key) : Objects.equals(scope.get(key), request.get(key)));
     }
 
     private static Object taskSnapshotScope(AiTask task) {
