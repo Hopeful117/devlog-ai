@@ -81,7 +81,7 @@ public class CompanionAppTool {
 
             return buildPayload(slug, raw);
         } catch (Exception e) {
-            return "{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}";
+            return "{\"error\":\"COMPANION_UNAVAILABLE\"}";
         }
     }
 
@@ -92,7 +92,7 @@ public class CompanionAppTool {
             String raw = companionClient.listMcpOperations(projectId, 0, 15);
             return buildPayload(slug, raw);
         } catch (Exception e) {
-            return "{\"error\":\"" + e.getMessage().replace("\"", "'") + "\"}";
+            return "{\"error\":\"COMPANION_UNAVAILABLE\"}";
         }
     }
 

@@ -27,10 +27,16 @@ class BearerTokenAuthInterceptor implements ClientHttpRequestInterceptor {
     @Override
     public ClientHttpResponse intercept(HttpRequest request, byte[] body,
                                         ClientHttpRequestExecution execution) throws IOException {
-        if (request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION) == null) {
+        if (request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION) == null
+                || request.getHeaders().getFirst("X-DevLog-Delegation") == null) {
             principalProvider.currentPrincipal().ifPresent(principal -> {
-                request.getHeaders().set(HttpHeaders.AUTHORIZATION, principal.bearerToken());
-                if (!principal.delegationToken().isBlank()) {
+                if (principal.bearerToken() != null && !principal.bearerToken().isBlank()) {
+                    if (request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION) == null) {
+                        request.getHeaders().set(HttpHeaders.AUTHORIZATION, principal.bearerToken());
+                    }
+                }
+                if (request.getHeaders().getFirst("X-DevLog-Delegation") == null
+                        && principal.delegationToken() != null && !principal.delegationToken().isBlank()) {
                     request.getHeaders().set("X-DevLog-Delegation", principal.delegationToken());
                 }
             });

@@ -1,21 +1,17 @@
 package hopefull117.devlogai_mcp.mcp_server.resource;
 
 import io.modelcontextprotocol.spec.McpError;
-import io.modelcontextprotocol.spec.McpSchema.ErrorCodes;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogResourceClient;
 import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
+import hopefull117.devlogai_mcp.mcp_server.service.CoreCallPolicy;
 import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -73,13 +69,12 @@ public class ResourceSupport {
                 throw notFound("Project '%s' not found".formatted(projectSlug));
             }
             return project.id();
-        } catch (HttpClientErrorException.NotFound exception) {
-            throw notFound("Project '%s' not found".formatted(projectSlug));
-        } catch (HttpClientErrorException.Unauthorized exception) {
-            throw coreAuthenticationFailed("Authentication is required to access DevLog backend");
-        } catch (RestClientResponseException exception) {
-            throw internal("DevLog backend failed while resolving project '%s' (%s)"
-                    .formatted(projectSlug, exception.getStatusCode()));
+        } catch (McpError error) {
+            throw error;
+        } catch (Exception exception) {
+            throw CoreCallPolicy.map(exception,
+                    "Project '%s' not found".formatted(projectSlug), true,
+                    "resolving the project");
         }
     }
 
@@ -113,19 +108,11 @@ public class ResourceSupport {
     public String getAuthorizedSnapshot(Supplier<String> call, String notFoundMessage) {
         try {
             return call.get();
-        } catch (HttpClientErrorException.Unauthorized exception) {
-            throw coreAuthenticationFailed("Authentication is required");
-        } catch (HttpClientErrorException.NotFound exception) {
-            throw notFound(notFoundMessage);
-        } catch (HttpClientErrorException.Forbidden exception) {
-            throw notFound(notFoundMessage);
-        } catch (RestClientResponseException exception) {
-            HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
-            if (status != null && status.is5xxServerError()) {
-                throw internal("DevLog backend failed while reading the Story Context snapshot");
-            }
-            throw internal("DevLog backend rejected the Story Context snapshot request (%s)"
-                    .formatted(exception.getStatusCode()));
+        } catch (McpError error) {
+            throw error;
+        } catch (Exception exception) {
+            throw CoreCallPolicy.map(exception, notFoundMessage, true,
+                    "reading the Story Context snapshot");
         }
     }
 
@@ -133,18 +120,11 @@ public class ResourceSupport {
     public String submitAuthorizedSnapshot(Supplier<String> call, String notFoundMessage) {
         try {
             return call.get();
-        } catch (HttpClientErrorException.Unauthorized exception) {
-            throw coreAuthenticationFailed("Authentication is required");
-        } catch (HttpClientErrorException.NotFound | HttpClientErrorException.Forbidden exception) {
-            throw notFound(notFoundMessage);
-        } catch (HttpClientErrorException.BadRequest | HttpClientErrorException.Conflict exception) {
-            throw invalidParams("The follow-up request was rejected");
-        } catch (RestClientResponseException exception) {
-            HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
-            if (status != null && status.is5xxServerError()) {
-                throw internal("DevLog backend failed while submitting the Story Context follow-up");
-            }
-            throw internal("DevLog backend rejected the Story Context follow-up request");
+        } catch (McpError error) {
+            throw error;
+        } catch (Exception exception) {
+            throw CoreCallPolicy.map(exception, notFoundMessage, true,
+                    "submitting the Story Context follow-up");
         }
     }
 
@@ -265,50 +245,28 @@ public class ResourceSupport {
     private String get(Supplier<String> call, String notFoundMessage) {
         try {
             return call.get();
-        } catch (HttpClientErrorException.NotFound exception) {
-            throw notFound(notFoundMessage);
-        } catch (HttpClientErrorException.Unauthorized exception) {
-            throw coreAuthenticationFailed("Authentication is required to access DevLog backend");
-        } catch (HttpClientErrorException.Forbidden exception) {
-            throw internal("DevLog backend refused access (403)");
-        } catch (RestClientResponseException exception) {
-            HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
-            if (status != null && status.is5xxServerError()) {
-                throw internal("DevLog backend failed (%s)".formatted(exception.getStatusCode()));
-            }
-            throw internal("DevLog backend rejected the request (%s): %s"
-                    .formatted(exception.getStatusCode(), notFoundMessage));
+        } catch (McpError error) {
+            throw error;
+        } catch (Exception exception) {
+            throw CoreCallPolicy.map(exception, notFoundMessage, false,
+                    "reading the resource");
         }
     }
 
-    public static McpError notFound(String message) {
-        return McpError.builder(ErrorCodes.RESOURCE_NOT_FOUND)
-                .message(message)
-                .build();
+    public static io.modelcontextprotocol.spec.McpError notFound(String message) {
+        return CoreCallPolicy.notFound(message);
     }
 
-    public static McpError invalidParams(String message) {
-        return McpError.builder(ErrorCodes.INVALID_PARAMS)
-                .message(message)
-                .build();
+    public static io.modelcontextprotocol.spec.McpError invalidParams(String message) {
+        return CoreCallPolicy.invalidParams(message);
     }
 
-    public static McpError unauthenticated(String message) {
-        return McpError.builder(ErrorCodes.INVALID_REQUEST)
-                .message(message)
-                .build();
+    public static io.modelcontextprotocol.spec.McpError unauthenticated(String message) {
+        return CoreCallPolicy.unauthenticated(message);
     }
 
-    public static McpError coreAuthenticationFailed(String message) {
-        return McpError.builder(ErrorCodes.INVALID_REQUEST)
-                .message(message)
-                .data(Map.of("source", "CORE", "category", "CORE_AUTHENTICATION"))
-                .build();
+    public static io.modelcontextprotocol.spec.McpError coreAuthenticationFailed(String message) {
+        return CoreCallPolicy.coreAuthenticationFailed(message);
     }
 
-    private static McpError internal(String message) {
-        return McpError.builder(ErrorCodes.INTERNAL_ERROR)
-                .message(message)
-                .build();
-    }
 }

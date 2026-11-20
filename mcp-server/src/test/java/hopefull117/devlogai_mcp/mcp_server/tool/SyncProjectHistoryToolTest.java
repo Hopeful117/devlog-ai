@@ -122,6 +122,38 @@ class SyncProjectHistoryToolTest {
                 });
     }
 
+    @Test
+    void mapsBackendForbiddenAsCoreAuthorizationForMutation() {
+        when(adminClient.importProjectHistoryAuthenticated("Bearer test", SOURCE_ID, null))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.FORBIDDEN, "Forbidden",
+                        null, null, StandardCharsets.UTF_8));
+
+        SyncProjectHistoryTool tool = new SyncProjectHistoryTool(
+                adminClient, support, principalProvider());
+
+        assertThatThrownBy(() -> tool.syncProjectHistory(SLUG, null, null))
+                .isInstanceOf(McpError.class)
+                .satisfies(exception -> {
+                    McpError error = (McpError) exception;
+                    assertThat(error.getJsonRpcError().data())
+                            .isEqualTo(java.util.Map.of("source", "CORE", "category", "CORE_AUTHORIZATION"));
+                    assertThat(error.getJsonRpcError().message()).doesNotContain("not found");
+                });
+    }
+
+    @Test
+    void preservesExistingMcpErrorFromMutationClient() {
+        McpError expected = ResourceSupport.invalidParams("already mapped");
+        when(adminClient.importProjectHistoryAuthenticated("Bearer test", SOURCE_ID, null))
+                .thenThrow(expected);
+
+        SyncProjectHistoryTool tool = new SyncProjectHistoryTool(
+                adminClient, support, principalProvider());
+
+        assertThatThrownBy(() -> tool.syncProjectHistory(SLUG, null, null))
+                .isSameAs(expected);
+    }
+
     private static McpAuthenticatedPrincipalProvider principalProvider() {
         return () -> java.util.Optional.of(new McpAuthenticatedPrincipalProvider.McpPrincipal(
                 "test-principal", McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN,

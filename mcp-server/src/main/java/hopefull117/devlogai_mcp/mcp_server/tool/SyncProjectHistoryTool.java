@@ -3,13 +3,14 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogAdminClient;
 import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
 import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
+import hopefull117.devlogai_mcp.mcp_server.service.CoreCallPolicy;
+import io.modelcontextprotocol.spec.McpError;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 
 /**
  * Triggers a deterministic history import for the active Git source of a
@@ -71,15 +72,12 @@ public class SyncProjectHistoryTool {
         var repositoryId = support.requireActiveSourceId(projectId, projectSlug);
         try {
             return adminClient.importProjectHistoryAuthenticated(authorization, repositoryId, revision);
-        } catch (HttpClientErrorException.NotFound e) {
-            throw ResourceSupport.notFound(
-                    "No repository source found for project '%s'".formatted(projectSlug));
-        } catch (HttpClientErrorException.Unauthorized e) {
-            throw ResourceSupport.coreAuthenticationFailed(
-                    "Authentication is required to sync project history");
-        } catch (HttpClientErrorException.Forbidden e) {
-            throw ResourceSupport.notFound(
-                    "Project '%s' not found or access denied".formatted(projectSlug));
+        } catch (McpError error) {
+            throw error;
+        } catch (Exception exception) {
+            throw CoreCallPolicy.map(exception,
+                    "Project '%s' not found or access denied".formatted(projectSlug), false,
+                    "syncing project history");
         }
     }
 }

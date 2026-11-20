@@ -148,7 +148,8 @@ public class McpToolObservabilityService {
             log.debug("MCP observability: ingested {} for tool={} operationId={} correlationId={}",
                     eventType, toolName, operationId, correlationId);
         } catch (Exception e) {
-            log.debug("MCP observability: ingest failed for {}/{}: {}", toolName, operationId, e.getMessage());
+            log.debug("MCP observability: ingest failed for {}/{} exceptionType={}",
+                    toolName, operationId, e.getClass().getName());
         }
     }
 
