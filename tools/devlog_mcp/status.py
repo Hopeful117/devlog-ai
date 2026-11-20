@@ -42,6 +42,7 @@ def last_renewal_event(directory: Path) -> dict | None:
     renewal_events = {
         "TOKEN_EXPIRED",
         "TOKEN_RENEWAL_STARTED",
+        "TOKEN_RENEWAL_RETRY",
         "TOKEN_RENEWAL_SUCCEEDED",
         "TOKEN_RENEWAL_FAILED",
     }
@@ -57,6 +58,44 @@ def last_renewal_event(directory: Path) -> dict | None:
                 if key in event
             }
     return None
+
+
+def last_event_matching(directory: Path, events: set[str]) -> dict | None:
+    try:
+        lines = (directory / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    bounded_fields = (
+        "timestamp",
+        "event",
+        "severity",
+        "code",
+        "reasonCode",
+        "attempt",
+        "maxAttempts",
+    )
+    for line in reversed(lines):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("event") in events:
+            return {key: event[key] for key in bounded_fields if key in event}
+    return None
+
+
+def last_renewal_retry(directory: Path) -> dict | None:
+    return last_event_matching(directory, {"TOKEN_RENEWAL_RETRY"})
+
+
+def last_failure(directory: Path) -> dict | None:
+    return last_event_matching(
+        directory,
+        {
+            "TOKEN_RENEWAL_FAILED",
+            "MCP_TOOL_FAILED",
+        },
+    )
 
 
 def instance_status(directory: Path) -> dict:
@@ -75,6 +114,8 @@ def instance_status(directory: Path) -> dict:
         "childAlive": child_alive,
         "lastEvent": last_event(directory),
         "lastRenewalEvent": last_renewal_event(directory),
+        "lastRenewalRetry": last_renewal_retry(directory),
+        "lastFailure": last_failure(directory),
         "manifest": manifest,
     }
 

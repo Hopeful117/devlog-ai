@@ -83,6 +83,155 @@ class RuntimeTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "TOKEN_RESPONSE_INVALID"):
                     runtime.acquire_token(configuration)
 
+    def test_token_endpoint_timeout_is_retried_once(self) -> None:
+        class Writer:
+            def __init__(self):
+                self.events = []
+
+            def write(self, event, **fields):
+                self.events.append((event, fields))
+
+        with tempfile.TemporaryDirectory() as directory:
+            writer = Writer()
+            session = runtime.RuntimeSession(
+                {"token_retry_backoff_seconds": "0"},
+                Path(directory),
+                writer,
+                runtime.TokenLease("old-token", time.time() + 3600),
+            )
+            renewed = runtime.TokenLease("new-token", time.time() + 3600)
+            with patch.object(
+                runtime,
+                "acquire_token",
+                side_effect=[TimeoutError("token endpoint timed out"), renewed],
+            ) as acquire, patch.object(
+                session.stop_requested, "wait", return_value=False
+            ) as wait:
+                result = session.acquire_token_with_retry()
+
+        self.assertIs(result, renewed)
+        self.assertEqual(acquire.call_count, 2)
+        wait.assert_called_once_with(timeout=0.0)
+        self.assertEqual(writer.events[0][0], "TOKEN_RENEWAL_RETRY")
+        self.assertEqual(writer.events[0][1]["code"], "TOKEN_ENDPOINT_TIMEOUT")
+        self.assertEqual(writer.events[0][1]["attempt"], 1)
+        self.assertEqual(writer.events[0][1]["maxAttempts"], 1)
+
+    def test_token_endpoint_500_is_terminal_without_retry(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        error = runtime.urllib.error.HTTPError(
+            "https://keycloak.invalid/token", 500, "server error", {}, None
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"token_retry_backoff_seconds": "0"},
+                Path(directory),
+                Writer(),
+                runtime.TokenLease("old-token", time.time() + 3600),
+            )
+            with patch.object(runtime, "acquire_token", side_effect=error) as acquire:
+                with self.assertRaises(runtime.urllib.error.HTTPError) as raised:
+                    session.acquire_token_with_retry()
+
+        acquire.assert_called_once()
+        self.assertEqual(raised.exception.code, 500)
+
+    def test_token_endpoint_502_is_retried_once(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        error = runtime.urllib.error.HTTPError(
+            "https://keycloak.invalid/token", 502, "bad gateway", {}, None
+        )
+        renewed = runtime.TokenLease("new-token", time.time() + 3600)
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"token_retry_backoff_seconds": "0"},
+                Path(directory),
+                Writer(),
+                runtime.TokenLease("old-token", time.time() + 3600),
+            )
+            with patch.object(
+                runtime, "acquire_token", side_effect=[error, renewed]
+            ) as acquire, patch.object(runtime.time, "sleep"):
+                result = session.acquire_token_with_retry()
+
+        self.assertIs(result, renewed)
+        self.assertEqual(acquire.call_count, 2)
+
+    def test_token_endpoint_transient_classification_is_bounded(self) -> None:
+        for status in (502, 503, 504):
+            error = runtime.urllib.error.HTTPError(
+                "https://keycloak.invalid/token", status, "gateway error", {}, None
+            )
+            self.assertTrue(runtime.RuntimeSession.is_transient_token_error(error))
+
+        self.assertTrue(
+            runtime.RuntimeSession.is_transient_token_error(
+                runtime.urllib.error.URLError(TimeoutError("timed out"))
+            )
+        )
+        self.assertFalse(
+            runtime.RuntimeSession.is_transient_token_error(
+                runtime.urllib.error.URLError(ConnectionRefusedError())
+            )
+        )
+        self.assertFalse(
+            runtime.RuntimeSession.is_transient_token_error(
+                runtime.urllib.error.HTTPError(
+                    "https://keycloak.invalid/token", 429, "rate limited", {}, None
+                )
+            )
+        )
+
+    def test_token_retry_backoff_rejects_excessive_value(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"token_retry_backoff_seconds": str(runtime.MAX_TOKEN_RETRY_BACKOFF_SECONDS + 1)},
+                Path(directory),
+                Writer(),
+                runtime.TokenLease("token", time.time() + 3600),
+            )
+            with self.assertRaisesRegex(RuntimeError, "CONFIGURATION_INVALID"):
+                _ = session.token_retry_backoff
+
+    def test_shutdown_during_renewal_does_not_start_replacement_child(self) -> None:
+        class Writer:
+            def __init__(self):
+                self.events = []
+
+            def write(self, event, **fields):
+                self.events.append((event, fields))
+
+        with tempfile.TemporaryDirectory() as directory:
+            writer = Writer()
+            session = runtime.RuntimeSession(
+                {"token_retry_backoff_seconds": "0"},
+                Path(directory),
+                writer,
+                runtime.TokenLease("old-token", time.time() + 3600),
+            )
+            renewed = runtime.TokenLease("new-token", time.time() + 3600)
+            session.stop_requested.set()
+            with patch.object(session, "acquire_token_with_retry", return_value=renewed), patch.object(
+                session, "start_child"
+            ) as start_child, patch.object(session, "stop_child") as stop_child:
+                with self.assertRaisesRegex(RuntimeError, "MCP_REAUTH_REQUIRED"):
+                    session._renew(force=True)
+
+        start_child.assert_not_called()
+        stop_child.assert_not_called()
+        failed = [event for event in writer.events if event[0] == "TOKEN_RENEWAL_FAILED"]
+        self.assertEqual(failed[-1][1]["code"], "MCP_INSTANCE_STOPPING")
+
     def test_acquire_token_rejects_non_object_and_non_finite_expiry(self) -> None:
         class Response:
             def __init__(self, body):
@@ -441,6 +590,27 @@ class RuntimeTests(unittest.TestCase):
                 renew.assert_not_called()
 
         self.assertFalse(runtime.RuntimeSession.is_transport_auth_failure(message))
+
+    def test_structured_jsonrpc_errors_keep_layer_specific_diagnostics(self) -> None:
+        for category, expected in (
+            ("CORE_AUTHENTICATION", "CORE_AUTHENTICATION_FAILED"),
+            ("CORE_AUTHORIZATION", "CORE_AUTHORIZATION_FAILED"),
+            ("DELEGATION_AUTHENTICATION", "DELEGATION_FAILED"),
+            ("PROVIDER_AUTHENTICATION", "PROVIDER_FAILED"),
+        ):
+            message = {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "error": {"data": {"source": "STRUCTURED", "category": category}},
+            }
+            self.assertEqual(runtime.RuntimeSession.jsonrpc_error_reason(message), expected)
+
+        self.assertEqual(
+            runtime.RuntimeSession.jsonrpc_error_reason(
+                {"jsonrpc": "2.0", "id": 1, "error": {"message": "failed"}}
+            ),
+            "MCP_JSONRPC_ERROR",
+        )
 
     def test_non_idempotent_tool_is_not_replayed_after_transport_auth_failure(self) -> None:
         class Writer:

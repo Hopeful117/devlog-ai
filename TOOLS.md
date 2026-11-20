@@ -177,8 +177,17 @@ reacquire the bearer and retry that same request once. A second authentication
 failure is returned unchanged and is not retried. Authorization, delegation and
 provider errors do not enter this retry path.
 
+If the token endpoint times out or returns `502`, `503` or `504` during a
+renewal, the supervisor performs one additional token acquisition after the
+configured bounded backoff (`DEVLOG_MCP_TOKEN_RETRY_BACKOFF_SECONDS`, default
+one second). This token acquisition retry does not replay the MCP operation.
+Client errors, `500`, `401`, `403`, `404`, `409` and `429` are terminal in this
+runtime; `429` remains reserved for the idempotency policy Story. The retry is
+reported as `TOKEN_RENEWAL_RETRY` with bounded metadata and is visible through
+the read-only status command.
+
 Renewal events include `TOKEN_EXPIRED`, `TOKEN_RENEWAL_STARTED`,
-`TOKEN_RENEWAL_SUCCEEDED` and `TOKEN_RENEWAL_FAILED`. The read-only status
+`TOKEN_RENEWAL_RETRY`, `TOKEN_RENEWAL_SUCCEEDED` and `TOKEN_RENEWAL_FAILED`. The read-only status
 command exposes the last renewal event without exposing expiry claims, bearer
 values, client secrets or response bodies. Renewal is independent from Core
 authorization, human delegation and AI Engine provider OAuth.
