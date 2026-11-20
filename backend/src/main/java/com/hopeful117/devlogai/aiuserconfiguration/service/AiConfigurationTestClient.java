@@ -3,7 +3,6 @@ package com.hopeful117.devlogai.aiuserconfiguration.service;
 import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 import com.hopeful117.devlogai.aiuserconfiguration.model.AiConfigurationTestStatus;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiEngineBindingRequestSigner;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -22,15 +21,23 @@ import java.util.Map;
 import java.util.UUID;
 
 @Component
-@RequiredArgsConstructor
 public class AiConfigurationTestClient {
     private static final String TEST_PATH = "/api/v1/ai/configuration/test";
 
-    @Qualifier("aiEngineRestClient")
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     @Value("${devlog.service-auth.secret:}") private String serviceSecret;
+
+    public AiConfigurationTestClient(
+            @Qualifier("aiEngineRestClient") RestClient restClient,
+            ObjectMapper objectMapper,
+            Clock clock
+    ) {
+        this.restClient = restClient;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+    }
 
     public Result test(String provider, AiAuthenticationMethod authenticationMethod,
                        String model, String credentialHandle) {

@@ -2,7 +2,6 @@ package com.hopeful117.devlogai.retrieval.client;
 
 import com.hopeful117.devlogai.retrieval.client.dto.EmbeddingRequest;
 import com.hopeful117.devlogai.retrieval.client.dto.EmbeddingResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -14,12 +13,14 @@ import java.util.List;
 import java.util.Optional;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class RestEmbeddingClient implements EmbeddingClient {
 
-    @Qualifier("embeddingRestClient")
     private final RestClient restClient;
+
+    public RestEmbeddingClient(@Qualifier("embeddingRestClient") RestClient restClient) {
+        this.restClient = restClient;
+    }
 
     @Override
     public Optional<EmbeddingResponse> embed(List<String> texts, String model) {
