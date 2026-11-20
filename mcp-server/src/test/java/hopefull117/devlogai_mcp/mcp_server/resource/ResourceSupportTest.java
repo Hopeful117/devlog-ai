@@ -8,6 +8,8 @@ import io.modelcontextprotocol.spec.McpError;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import tools.jackson.databind.ObjectMapper;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 
@@ -119,6 +121,29 @@ class ResourceSupportTest {
                             .contains("\"category\":\"CORE_AUTHENTICATION\"")
                             .contains("\"source\":\"CORE\"");
                 });
+    }
+
+    @Test
+    void mapsCoreTimeoutAndServerFailureAtResourceBoundary() {
+        ResourceSupport support = new ResourceSupport(projectContextClient, resourceClient, objectMapper);
+
+        for (RuntimeException failure : List.of(
+                new ResourceAccessException("backend timeout"),
+                HttpServerErrorException.create(HttpStatus.BAD_GATEWAY, "Bad Gateway",
+                        org.springframework.http.HttpHeaders.EMPTY, new byte[0], null))) {
+            assertThatThrownBy(() -> support.getScoped(() -> {
+                throw failure;
+            }, "resource not found"))
+                    .isInstanceOf(McpError.class)
+                    .satisfies(exception -> {
+                        McpError error = (McpError) exception;
+                        assertThat(error.getJsonRpcError().data())
+                                .isEqualTo(java.util.Map.of(
+                                        "source", "CORE", "category", "TRANSIENT_INFRASTRUCTURE",
+                                        "code", "TRANSIENT_INFRASTRUCTURE", "layer", "CORE",
+                                        "retryable", false, "action", "RETRY_ONLY_IF_OPERATION_SAFE"));
+                    });
+        }
     }
 
     @Test

@@ -591,6 +591,279 @@ class RuntimeTests(unittest.TestCase):
 
         self.assertFalse(runtime.RuntimeSession.is_transport_auth_failure(message))
 
+    def test_rate_limit_retry_uses_bounded_metadata_and_keeps_operation_identity(self) -> None:
+        class Writer:
+            def __init__(self):
+                self.events = []
+
+            def write(self, event, **fields):
+                self.events.append((event, fields))
+
+        class Child:
+            stdin = io.BytesIO()
+
+        message = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {"data": {"source": "CORE", "category": "RATE_LIMITED", "retryAfterSeconds": 5}},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            writer = Writer()
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), writer, runtime.TokenLease("token", time.time() + 3600)
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_engineering_context"}}\n'
+            session.forward(raw, json.loads(raw))
+            operation_id = next(iter(session.operations))
+            with patch.object(session.stop_requested, "wait", return_value=False) as wait:
+                self.assertTrue(session.retry_rate_limited(message))
+
+        wait.assert_called_once_with(timeout=5.0)
+        self.assertEqual(session.operations[operation_id].rate_limit_retry_count, 1)
+        self.assertEqual(session.child.stdin.getvalue(), raw + raw)
+        self.assertEqual(writer.events[0][0], "MCP_TOOL_STARTED")
+        self.assertEqual(writer.events[-1][0], "MCP_RATE_LIMIT_RETRY")
+
+    def test_rate_limit_retry_does_not_renew_bearer(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        message = {"jsonrpc": "2.0", "id": 1, "error": {
+            "data": {"source": "CORE", "category": "RATE_LIMITED", "retryAfterSeconds": 1}
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600)
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_engineering_context"}}\n'
+            session.forward(raw, json.loads(raw))
+            with patch.object(session, "renew_if_needed") as renew, patch.object(
+                session.stop_requested, "wait", return_value=False
+            ):
+                self.assertTrue(session.retry_rate_limited(message))
+
+        renew.assert_not_called()
+
+    def test_rate_limit_retry_rejects_non_idempotent_operation(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        message = {"jsonrpc": "2.0", "id": 1, "error": {
+            "data": {"source": "CORE", "category": "RATE_LIMITED", "retryAfterSeconds": 1}
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600)
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"register_project"}}\n'
+            session.forward(raw, json.loads(raw))
+            with patch.object(session.stop_requested, "wait") as wait:
+                self.assertFalse(session.retry_rate_limited(message))
+
+        wait.assert_not_called()
+        self.assertEqual(session.child.stdin.getvalue(), raw)
+
+    def test_rate_limit_retry_falls_back_and_stop_interrupts_wait(self) -> None:
+        message = {"error": {"data": {"source": "CORE", "category": "RATE_LIMITED"}}}
+        self.assertEqual(runtime.RuntimeSession.rate_limit_retry_delay(message), 1)
+        self.assertEqual(
+            runtime.RuntimeSession.rate_limit_retry_delay(
+                {"error": {"data": {"retryAfterSeconds": 1000}}}
+            ),
+            60,
+        )
+
+    def test_rate_limit_retry_stop_interrupts_without_replay(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        message = {"jsonrpc": "2.0", "id": 1, "error": {
+            "data": {"source": "CORE", "category": "RATE_LIMITED", "retryAfterSeconds": 5}
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600)
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_engineering_context"}}\n'
+            session.forward(raw, json.loads(raw))
+            session.stop_requested.set()
+            with patch.object(session.stop_requested, "wait", return_value=True):
+                self.assertFalse(session.retry_rate_limited(message))
+
+        self.assertEqual(session.child.stdin.getvalue(), raw)
+        self.assertNotIn(1, session.outstanding)
+
+    def test_rate_limit_retry_serializes_concurrent_responses(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        message = {"jsonrpc": "2.0", "id": 1, "error": {
+            "data": {"source": "CORE", "category": "RATE_LIMITED", "retryAfterSeconds": 1}
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600)
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_engineering_context"}}\n'
+            session.forward(raw, json.loads(raw))
+            entered = threading.Event()
+            release = threading.Event()
+
+            def wait(**kwargs):
+                entered.set()
+                release.wait(timeout=2)
+                return False
+
+            first = threading.Thread(target=session.retry_rate_limited, args=(message,))
+            with patch.object(session.stop_requested, "wait", side_effect=wait):
+                first.start()
+                self.assertTrue(entered.wait(timeout=1))
+                self.assertTrue(session.retry_rate_limited(message))
+                release.set()
+                first.join(timeout=2)
+
+        self.assertEqual(session.child.stdin.getvalue(), raw + raw)
+        self.assertEqual(len(session.operations), 1)
+
+    def test_second_rate_limit_after_replay_is_terminal(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        message = {"jsonrpc": "2.0", "id": 1, "error": {
+            "data": {"source": "CORE", "category": "RATE_LIMITED", "retryAfterSeconds": 1}
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600)
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_engineering_context"}}\n'
+            session.forward(raw, json.loads(raw))
+            with patch.object(session.stop_requested, "wait", return_value=False):
+                self.assertTrue(session.retry_rate_limited(message))
+            self.assertFalse(session.retry_rate_limited(message))
+
+        self.assertEqual(session.child.stdin.getvalue(), raw + raw)
+        self.assertEqual(len(session.operations), 0)
+
+    def test_rate_limit_retry_does_not_replay_after_terminalization(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        message = {"jsonrpc": "2.0", "id": 1, "error": {
+            "data": {"source": "CORE", "category": "RATE_LIMITED", "retryAfterSeconds": 1}
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600)
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_engineering_context"}}\n'
+            session.forward(raw, json.loads(raw))
+            operation = next(iter(session.operations.values()))
+
+            def terminalize_then_continue(**kwargs):
+                with session.lock:
+                    session._finish_operation_locked(operation, runtime.TOOL_FAILED, session.generation)
+                return False
+
+            with patch.object(session.stop_requested, "wait", side_effect=terminalize_then_continue):
+                self.assertFalse(session.retry_rate_limited(message))
+
+        self.assertEqual(session.child.stdin.getvalue(), raw)
+        self.assertEqual(len(session.operations), 0)
+
+    def test_rate_limit_retry_terminalizes_after_generation_change(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        message = {"jsonrpc": "2.0", "id": 1, "error": {
+            "data": {"source": "CORE", "category": "RATE_LIMITED", "retryAfterSeconds": 1}
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600)
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_engineering_context"}}\n'
+            session.forward(raw, json.loads(raw))
+            original_generation = session.generation
+
+            def advance_generation(**kwargs):
+                session.generation = original_generation + 1
+                return False
+
+            with patch.object(session.stop_requested, "wait", side_effect=advance_generation):
+                self.assertFalse(session.retry_rate_limited(message))
+
+        self.assertEqual(session.child.stdin.getvalue(), raw)
+        self.assertEqual(len(session.operations), 0)
+
+    def test_rate_limit_retry_rejects_non_tool_requests(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        message = {"jsonrpc": "2.0", "id": 1, "error": {
+            "data": {"source": "CORE", "category": "RATE_LIMITED"}
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600)
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n'
+            session.forward(raw, json.loads(raw))
+            with patch.object(session.stop_requested, "wait") as wait:
+                self.assertFalse(session.retry_rate_limited(message))
+
+        wait.assert_not_called()
+
     def test_structured_jsonrpc_errors_keep_layer_specific_diagnostics(self) -> None:
         for category, expected in (
             ("CORE_AUTHENTICATION", "CORE_AUTHENTICATION_FAILED"),
@@ -638,6 +911,106 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(explicit["category"], "FUNCTIONAL")
         self.assertEqual(explicit["layer"], "CORE")
         self.assertEqual(explicit["action"], "CHECK_RESOURCE_IDENTIFIER")
+
+    def test_resilience_matrix_keeps_non_transport_failures_terminal(self) -> None:
+        cases = (
+            ("CORE_AUTHENTICATION", "CORE_AUTHENTICATION_FAILED"),
+            ("CORE_AUTHORIZATION", "CORE_AUTHORIZATION_FAILED"),
+            ("DELEGATION_AUTHENTICATION", "DELEGATION_FAILED"),
+            ("PROVIDER_AUTHENTICATION", "PROVIDER_FAILED"),
+            ("FUNCTIONAL", "FUNCTIONAL_ERROR"),
+            ("PROTOCOL", "PROTOCOL_INVALID"),
+            ("RATE_LIMITED", "RATE_LIMITED"),
+            ("TRANSIENT_INFRASTRUCTURE", "TRANSIENT_INFRASTRUCTURE"),
+        )
+        for category, expected_code in cases:
+            with self.subTest(category=category):
+                message = {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "error": {"data": {"source": "MATRIX", "category": category}},
+                }
+                diagnostic = runtime.RuntimeSession.jsonrpc_diagnostic(message)
+                self.assertEqual(diagnostic["code"], expected_code)
+                self.assertFalse(diagnostic["retryable"])
+                self.assertFalse(runtime.RuntimeSession.is_transport_auth_failure(message))
+
+    def test_resilience_matrix_classifies_token_failures_without_live_endpoint(self) -> None:
+        cases = (
+            (runtime.urllib.error.HTTPError("https://invalid/token", 502, "bad gateway", {}, None), True),
+            (runtime.urllib.error.HTTPError("https://invalid/token", 503, "unavailable", {}, None), True),
+            (runtime.urllib.error.HTTPError("https://invalid/token", 429, "rate limited", {}, None), False),
+            (runtime.urllib.error.URLError(TimeoutError("timeout")), True),
+            (runtime.urllib.error.URLError(ConnectionRefusedError()), False),
+        )
+        for error, expected_transient in cases:
+            with self.subTest(error=type(error).__name__):
+                self.assertEqual(
+                    runtime.RuntimeSession.is_transient_token_error(error),
+                    expected_transient,
+                )
+
+    def test_ambiguous_non_idempotent_mutation_is_sent_once(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            def __init__(self):
+                self.stdin = io.BytesIO()
+
+        with tempfile.TemporaryDirectory() as directory:
+            child = Child()
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600),
+            )
+            session.child = child
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"register_project"}}\n'
+            session.forward(raw, json.loads(raw))
+            failure = {"jsonrpc": "2.0", "id": 1, "error": {
+                "code": -32600, "message": "Authentication is required"
+            }}
+            with patch.object(session, "renew_if_needed") as renew:
+                self.assertFalse(session.retry_authentication(failure))
+                renew.assert_not_called()
+
+        self.assertEqual(child.stdin.getvalue(), raw)
+
+    def test_idempotent_replay_keeps_operation_identity(self) -> None:
+        class Writer:
+            def __init__(self):
+                self.events = []
+
+            def write(self, event, **fields):
+                self.events.append((event, fields))
+
+        class Child:
+            stdin = io.BytesIO()
+
+        with tempfile.TemporaryDirectory() as directory:
+            writer = Writer()
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600),
+            )
+            session.writer = writer
+            session.child = Child()
+            request = {
+                "jsonrpc": "2.0", "id": 7, "method": "tools/call",
+                "params": {"name": "devlog_story_agent", "arguments": {"idempotencyKey": "matrix-1"}},
+            }
+            raw = json.dumps(request).encode()
+            session.forward(raw, request)
+            operation_id = next(iter(session.operations.values())).operation_id
+            failure = {"jsonrpc": "2.0", "id": 7, "error": {
+                "code": -32600, "message": "Authentication is required"
+            }}
+            with patch.object(session, "renew_if_needed"):
+                self.assertTrue(session.retry_authentication(failure))
+
+        self.assertIn(operation_id, session.operations)
+        self.assertEqual(session.operations[operation_id].operation_id, operation_id)
 
     def test_unknown_event_code_gets_bounded_fallback_diagnostic(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -810,6 +1183,49 @@ class RuntimeTests(unittest.TestCase):
         self.assertNotIn("payload-secret", content)
         self.assertNotIn("result-secret", content)
         self.assertIn('"schemaVersion": "mcp-tool-observability-v1"', content)
+
+    def test_tool_event_push_contains_only_bounded_fields(self) -> None:
+        class Writer:
+            instance_id = "instance-1"
+
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        pushed = []
+        completed = threading.Event()
+
+        def capture(body):
+            pushed.append(body)
+            completed.set()
+
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {
+                    "renewal_margin_seconds": "30",
+                    "renewal_cooldown_seconds": "10",
+                    "project_slug": "devlog-ai",
+                },
+                Path(directory), Writer(), runtime.TokenLease("secret-token", time.time() + 3600),
+            )
+            session.child = Child()
+            with patch.object(session.pusher, "_post", side_effect=capture):
+                raw = b'{"jsonrpc":"2.0","id":"secret-id","method":"tools/call","params":{"secret":"payload-secret"}}\n'
+                session.forward(raw, json.loads(raw))
+                session.observe_response(
+                    {"jsonrpc": "2.0", "id": "secret-id", "result": {"secret": "result-secret"}},
+                    generation=session.generation,
+                )
+                self.assertTrue(completed.wait(timeout=1))
+
+        body = b"".join(pushed)
+        self.assertNotIn(b"secret-token", body)
+        self.assertNotIn(b"payload-secret", body)
+        self.assertNotIn(b"result-secret", body)
+        self.assertNotIn(b"secret-id", body)
+        self.assertIn(b"operationId", body)
 
     def test_flush_failure_releases_operation_and_emits_failure(self) -> None:
         class Writer:
