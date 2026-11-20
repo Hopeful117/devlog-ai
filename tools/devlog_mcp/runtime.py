@@ -57,6 +57,23 @@ RETRY_SAFE_TOOLS = frozenset({
     "story_context_agent_get_snapshot_authenticated",
 })
 
+IDEMPOTENT_RETRY_TOOLS = frozenset({
+    "devlog_story_agent",
+})
+
+
+def _tool_has_idempotency_key(message: Any, tool_name: str | None) -> bool:
+    if tool_name not in IDEMPOTENT_RETRY_TOOLS or not isinstance(message, dict):
+        return False
+    params = message.get("params")
+    arguments = params.get("arguments") if isinstance(params, dict) else None
+    key = arguments.get("idempotencyKey") if isinstance(arguments, dict) else None
+    return isinstance(key, str) and bool(key.strip())
+
+
+def _is_retry_safe_tool(message: Any, tool_name: str | None) -> bool:
+    return tool_name is None or tool_name in RETRY_SAFE_TOOLS or _tool_has_idempotency_key(message, tool_name)
+
 
 def _extract_devlog_correlation_id(message: Any) -> str | None:
     """Best-effort extraction of aiTaskId from a DevLog tool MCP response."""
@@ -972,7 +989,7 @@ class RuntimeSession:
                         retry_count=0,
                         raw_payload=raw,
                         started_at=time.monotonic(),
-                        retry_safe=tool_name is None or tool_name in RETRY_SAFE_TOOLS,
+                        retry_safe=_is_retry_safe_tool(message, tool_name),
                         tool_name=tool_name,
                     )
                     self.outstanding[identifier] = operation

@@ -110,6 +110,10 @@ class StdioProtocolHygieneTest {
             JsonNode storyAgent = findTool(toolsListResponse, "devlog_story_agent");
             assertThat(storyAgent.path("inputSchema").path("required").toString())
                     .doesNotContain("storyId");
+            assertThat(storyAgent.path("inputSchema").path("required").toString())
+                    .contains("idempotencyKey");
+            assertThat(storyAgent.path("inputSchema").path("properties").path("idempotencyKey").path("type")
+                    .asText()).isEqualTo("string");
 
             writeJsonLine(stdin, """
                     {"jsonrpc":"2.0","id":5,"method":"prompts/list","params":{}}

@@ -122,12 +122,19 @@ public class StoryContextSubmissionService {
     @Transactional
     public UUID submit(PreparedStoryContext prepared, Map<String, Object> guidance,
                        String submissionDigest, String idempotencyKeyHash) {
-        return submit(prepared, guidance, submissionDigest, idempotencyKeyHash, null, null);
+        return submit(prepared, guidance, submissionDigest, idempotencyKeyHash, null, null, null);
     }
 
     @Transactional
     public UUID submit(PreparedStoryContext prepared, Map<String, Object> guidance,
                        String submissionDigest, String idempotencyKeyHash,
+                       AuthenticatedPrincipal principal, String provider) {
+        return submit(prepared, guidance, submissionDigest, idempotencyKeyHash, null, principal, provider);
+    }
+
+    @Transactional
+    public UUID submit(PreparedStoryContext prepared, Map<String, Object> guidance,
+                       String submissionDigest, String idempotencyKeyHash, String idempotencyScopeHash,
                        AuthenticatedPrincipal principal, String provider) {
         String projectSlug = prepared.projectSlug();
         UUID storyId = prepared.storyId();
@@ -163,6 +170,7 @@ public class StoryContextSubmissionService {
         task.setProjectionDigest(projectionDigest);
         task.setSubmissionDigest(submissionDigest);
         task.setIdempotencyKeyHash(idempotencyKeyHash);
+        task.setIdempotencyScopeHash(idempotencyScopeHash);
         Map<String, Object> snapshot = buildExecutionSnapshot(
                 task, canonicalContext, projection, projectionDigest, projectSlug, storyId,
                 requestedIntent, files, prepared.question(), guidance, groundingContract, submissionDigest);

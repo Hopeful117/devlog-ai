@@ -252,7 +252,7 @@ class DevLogStoryAgentToolTest {
                 .thenThrow(new RuntimeException("backend unreachable"));
 
         org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () ->
-                tool.execute("devlog-ai", null, "intent", null, null, null, null, (org.springframework.ai.mcp.annotation.context.McpSyncRequestContext) null));
+                tool.execute("devlog-ai", null, "intent", null, null, null, "request-1", (org.springframework.ai.mcp.annotation.context.McpSyncRequestContext) null));
 
         verify(observability).recordFailure(
                 eq("devlog-ai"),
@@ -296,14 +296,26 @@ class DevLogStoryAgentToolTest {
         org.springframework.ai.mcp.annotation.context.McpSyncRequestContext requestContext =
                 mock(org.springframework.ai.mcp.annotation.context.McpSyncRequestContext.class);
         org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () ->
-                tool.execute("devlog-ai", null, "intent", null, null, null, null, requestContext));
+                tool.execute("devlog-ai", null, "intent", null, null, null, "request-1", requestContext));
 
         verify(client).submitStoryContextAgentTask(
-                eq("devlog-ai"), eq((UUID) null), eq("Bearer request"), eq(null),
-                eq("delegation-request"), any());
+                eq("devlog-ai"), eq((UUID) null), eq("Bearer request"), eq("request-1"),
+                 eq("delegation-request"), any());
         verify(observability).recordFailure(
                 eq("devlog-ai"), eq("obs-op-request"), eq("devlog_story_agent"),
                 any(), eq("TOOL_EXECUTION_FAILED"), eq(request));
+    }
+
+    @Test
+    void rejectsMissingIdempotencyKeyBeforeBackendSubmission() {
+        DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
+        DevLogStoryAgentTool tool = new DevLogStoryAgentTool(
+                client, new ObjectMapper(), 25_000, 2_000, principalProvider());
+
+        org.junit.jupiter.api.Assertions.assertThrows(io.modelcontextprotocol.spec.McpError.class, () ->
+                tool.execute("devlog-ai", null, "intent", null, null, " "));
+
+        verify(client, never()).submitStoryContextAgentTask(any(), any(), any(), any(), any(), any());
     }
 
     private static McpAuthenticatedPrincipalProvider principalProvider() {
