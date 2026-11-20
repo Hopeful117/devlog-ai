@@ -6,7 +6,6 @@ import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.ai.engine.exception.AIEngineCommunicationException;
 import com.hopeful117.devlogai.ai.engine.dto.DeliverableGenerationRequest;
 import com.hopeful117.devlogai.ai.engine.dto.DeliverableGenerationResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -20,12 +19,14 @@ import static com.hopeful117.devlogai.shared.logging.CorrelationIdFilter.HEADER_
 import static com.hopeful117.devlogai.shared.logging.CorrelationIdFilter.MDC_KEY;
 
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class RestAIEngineClient implements AIEngineClient {
 
-    @Qualifier("aiEngineRestClient")
     private final RestClient restClient;
+
+    public RestAIEngineClient(@Qualifier("aiEngineRestClient") RestClient restClient) {
+        this.restClient = restClient;
+    }
 
     @Override
     public AiTaskSubmissionResponse submit(PromptRequest request) {

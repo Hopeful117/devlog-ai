@@ -1,7 +1,6 @@
 package com.hopeful117.devlogai.aicredentialbinding.service;
 
 import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialAssociation;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -18,7 +17,6 @@ import com.hopeful117.devlogai.aicatalog.model.AiAuthenticationMethod;
 import com.hopeful117.devlogai.aicredentialbinding.model.AiCredentialAssociationState;
 
 @Component
-@RequiredArgsConstructor
 public class AiEngineCredentialAssociationClient {
     private static final String VERIFY_PATH = "/api/v1/ai/bindings/credentials/verify";
     private static final String REVOKE_PATH = "/api/v1/ai/bindings/credentials/revoke";
@@ -27,12 +25,21 @@ public class AiEngineCredentialAssociationClient {
     private static final String COMPLETION_COMPENSATE_PATH = "/api/v1/auth/chatgpt/completion/compensate";
     private static final String API_KEY_COMPENSATE_PATH = "/api/v1/auth/api-key/compensate";
 
-    @Qualifier("aiEngineRestClient")
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     @Value("${devlog.service-auth.secret:}")
     private String serviceSecret;
+
+    public AiEngineCredentialAssociationClient(
+            @Qualifier("aiEngineRestClient") RestClient restClient,
+            ObjectMapper objectMapper,
+            Clock clock
+    ) {
+        this.restClient = restClient;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+    }
 
     public VerificationResult verify(AiCredentialAssociation association) {
         if (serviceSecret == null || serviceSecret.isBlank()) {

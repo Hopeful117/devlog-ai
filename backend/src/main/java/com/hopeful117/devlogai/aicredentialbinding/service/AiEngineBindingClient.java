@@ -1,7 +1,6 @@
 package com.hopeful117.devlogai.aicredentialbinding.service;
 
 import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBinding;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -15,16 +14,24 @@ import java.util.UUID;
 
 /** Registers only opaque binding metadata with the AI Engine over signed HTTP. */
 @Component
-@RequiredArgsConstructor
 public class AiEngineBindingClient {
     private static final String REGISTER_PATH = "/api/v1/ai/bindings/register";
 
-    @Qualifier("aiEngineRestClient")
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final Clock clock;
     @Value("${devlog.service-auth.secret:}")
     private String serviceSecret;
+
+    public AiEngineBindingClient(
+            @Qualifier("aiEngineRestClient") RestClient restClient,
+            ObjectMapper objectMapper,
+            Clock clock
+    ) {
+        this.restClient = restClient;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
+    }
 
     public void register(AiCredentialBinding binding) {
         if (serviceSecret == null || serviceSecret.isBlank()) {
