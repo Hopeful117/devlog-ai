@@ -2,7 +2,9 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogAdminClient;
 import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
+import hopefull117.devlogai_mcp.mcp_server.service.CoreCallPolicy;
 import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
+import io.modelcontextprotocol.spec.McpError;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.context.McpSyncRequestContext;
@@ -77,8 +79,15 @@ public class RegisterProjectTool {
         if (principal.bearerToken() == null || principal.bearerToken().isBlank()) {
             throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
         }
-        return doRegisterProject(name, description, repositoryUrl, defaultBranch,
-                principal.bearerToken());
+        try {
+            return doRegisterProject(name, description, repositoryUrl, defaultBranch,
+                    principal.bearerToken());
+        } catch (McpError error) {
+            throw error;
+        } catch (Exception exception) {
+            throw CoreCallPolicy.map(exception, "Project registration failed", false,
+                    "registering the project");
+        }
     }
 
     private String doRegisterProject(

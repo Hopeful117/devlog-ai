@@ -44,7 +44,7 @@ public class GetContextTraceTool {
         try {
             String raw = companionClient.getContextTrace(
                     projectId, instanceId, operationId,
-                    "Bearer " + principal.bearerToken(),
+                    principal.bearerToken(),
                     principal.delegationToken());
             // Return pretty-printed JSON
             Object parsed = objectMapper.readValue(raw, Object.class);
@@ -52,8 +52,7 @@ public class GetContextTraceTool {
         } catch (Exception e) {
             try {
                 return objectMapper.writeValueAsString(java.util.Map.of(
-                        "error", "CONTEXT_TRACE_UNAVAILABLE",
-                        "message", e.getMessage() != null ? e.getMessage() : "Context trace not found"));
+                        "error", "CONTEXT_TRACE_UNAVAILABLE"));
             } catch (Exception ignored) {
                 return "{\"error\":\"CONTEXT_TRACE_UNAVAILABLE\"}";
             }

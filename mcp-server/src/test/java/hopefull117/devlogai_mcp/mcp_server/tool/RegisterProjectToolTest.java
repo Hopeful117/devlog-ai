@@ -1,6 +1,9 @@
 package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogAdminClient;
+import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
+import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
+import io.modelcontextprotocol.spec.McpError;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -8,6 +11,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -124,5 +128,21 @@ class RegisterProjectToolTest {
 
         verify(adminClient).createProject(org.mockito.ArgumentMatchers.argThat(req ->
                 "A great project".equals(req.get("description"))));
+    }
+
+    @Test
+    void preservesExistingMcpErrorFromMutationClient() {
+        McpError expected = ResourceSupport.invalidParams("already mapped");
+        when(adminClient.createProjectAuthenticated(anyString(), any()))
+                .thenThrow(expected);
+        RegisterProjectTool authenticatedTool = new RegisterProjectTool(
+                adminClient, objectMapper, () -> java.util.Optional.of(
+                        new McpAuthenticatedPrincipalProvider.McpPrincipal(
+                                "principal", McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN,
+                                "test", "Bearer test", "")));
+
+        assertThatThrownBy(() -> authenticatedTool.registerProject(
+                "My Project", null, null, null, null))
+                .isSameAs(expected);
     }
 }

@@ -86,9 +86,9 @@ public class DevlogBackendClientConfiguration {
                         elapsedMillis(startedAt));
                 return response;
             } catch (Exception exception) {
-                log.error("DevLog backend request failed method={} uri={} durationMs={} exceptionType={} message={}",
+                log.error("DevLog backend request failed method={} uri={} durationMs={} exceptionType={}",
                         request.getMethod(), request.getURI(), elapsedMillis(startedAt),
-                        exception.getClass().getName(), exception.getMessage(), exception);
+                        exception.getClass().getName());
                 throw exception;
             }
         };
