@@ -70,8 +70,62 @@ class StatusTests(unittest.TestCase):
 
             failure = status.last_failure(path)
             self.assertEqual(failure["reasonCode"], "CORE_AUTHENTICATION_FAILED")
+            self.assertEqual(failure["category"], "CORE_AUTHENTICATION")
+            self.assertEqual(failure["layer"], "CORE")
+            self.assertFalse(failure["retryable"])
+            self.assertEqual(failure["action"], "CHECK_CORE_AUTHORIZATION")
             self.assertNotIn("operationId", failure)
             self.assertNotIn("payload", failure)
+
+    def test_status_projects_allowlisted_diagnostic_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            (path / "events.jsonl").write_text(
+                json.dumps({
+                    "event": "MCP_TOOL_FAILED",
+                    "reasonCode": "CORE_AUTHORIZATION_FAILED",
+                    "category": "CORE_AUTHORIZATION",
+                    "layer": "CORE",
+                    "retryable": False,
+                    "action": "CHECK_PROJECT_ACCESS",
+                    "payload": "must-not-be-projected",
+                }) + "\n",
+                encoding="utf-8",
+            )
+
+            failure = status.last_failure(path)
+            self.assertEqual(failure["category"], "CORE_AUTHORIZATION")
+            self.assertEqual(failure["action"], "CHECK_PROJECT_ACCESS")
+            self.assertFalse(failure["retryable"])
+            self.assertNotIn("payload", failure)
+
+    def test_status_derives_diagnostics_from_code_not_event_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            (path / "events.jsonl").write_text(
+                json.dumps({
+                    "event": "MCP_TOOL_FAILED",
+                    "code": "CORE_AUTHORIZATION_FAILED",
+                    "category": "PROVIDER_AUTHENTICATION",
+                    "layer": "PROVIDER",
+                    "retryable": True,
+                    "action": "EXPOSE_SECRET",
+                }) + "\n",
+                encoding="utf-8",
+            )
+
+            failure = status.last_failure(path)
+            self.assertEqual(failure["category"], "CORE_AUTHORIZATION")
+            self.assertEqual(failure["layer"], "CORE")
+            self.assertFalse(failure["retryable"])
+            self.assertEqual(failure["action"], "CHECK_PROJECT_ACCESS")
+
+    def test_endpoint_status_removes_url_credentials_and_query(self) -> None:
+        result = status.endpoint_status(
+            "https://user:secret@example.test:8443/health?token=secret#fragment"
+        )
+        self.assertEqual(result["url"], "https://example.test:8443/health")
+        self.assertNotIn("secret", json.dumps(result))
 
 
 if __name__ == "__main__":

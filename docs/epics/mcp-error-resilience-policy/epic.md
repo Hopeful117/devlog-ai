@@ -54,7 +54,7 @@ une matrice commune.
 2. [Story 0212 - Retry et renouvellement du runtime MCP](../../stories/0212-mcp-runtime-retry-renewal/story.md)
 3. [Story 0213 - Politique des appels MCP vers Core](../../stories/0213-mcp-core-call-policy/story.md)
 4. [Story 0214 - Idempotence et securite du rejeu](../../stories/0214-mcp-idempotency-replay-safety/story.md)
-5. Story a definir - Diagnostics et experience agent/operateur
+5. [Story 0215 - Diagnostics et experience agent/operator MCP](../../stories/0215-mcp-diagnostics-agent-operator-experience/story.md)
 6. Story a definir - Validation de resilience
 7. Story a definir - Documentation et runbooks
 

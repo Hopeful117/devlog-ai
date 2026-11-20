@@ -110,7 +110,10 @@ class ResourceSupportTest {
                     assertThat(error.getJsonRpcError().message())
                             .isEqualTo("Authentication is required to access DevLog backend");
                     assertThat(error.getJsonRpcError().data())
-                            .isEqualTo(java.util.Map.of("source", "CORE", "category", "CORE_AUTHENTICATION"));
+                            .isEqualTo(java.util.Map.of(
+                                    "source", "CORE", "category", "CORE_AUTHENTICATION",
+                                    "code", "CORE_AUTHENTICATION_FAILED", "layer", "CORE",
+                                    "retryable", false, "action", "CHECK_CORE_AUTHORIZATION"));
                     assertThat(objectMapper.writeValueAsString(error.getJsonRpcError()))
                             .contains("\"data\":")
                             .contains("\"category\":\"CORE_AUTHENTICATION\"")
@@ -152,7 +155,10 @@ class ResourceSupportTest {
                 .satisfies(exception -> {
                     McpError error = (McpError) exception;
                     assertThat(error.getJsonRpcError().data())
-                            .isEqualTo(java.util.Map.of("source", "CORE", "category", "CORE_AUTHENTICATION"));
+                            .isEqualTo(java.util.Map.of(
+                                    "source", "CORE", "category", "CORE_AUTHENTICATION",
+                                    "code", "CORE_AUTHENTICATION_FAILED", "layer", "CORE",
+                                    "retryable", false, "action", "CHECK_CORE_AUTHORIZATION"));
                 });
     }
 

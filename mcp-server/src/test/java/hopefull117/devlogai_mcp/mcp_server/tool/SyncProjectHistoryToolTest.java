@@ -118,7 +118,10 @@ class SyncProjectHistoryToolTest {
                 .satisfies(exception -> {
                     McpError error = (McpError) exception;
                     assertThat(error.getJsonRpcError().data())
-                            .isEqualTo(java.util.Map.of("source", "CORE", "category", "CORE_AUTHENTICATION"));
+                            .isEqualTo(java.util.Map.of(
+                                    "source", "CORE", "category", "CORE_AUTHENTICATION",
+                                    "code", "CORE_AUTHENTICATION_FAILED", "layer", "CORE",
+                                    "retryable", false, "action", "CHECK_CORE_AUTHORIZATION"));
                 });
     }
 
@@ -136,7 +139,10 @@ class SyncProjectHistoryToolTest {
                 .satisfies(exception -> {
                     McpError error = (McpError) exception;
                     assertThat(error.getJsonRpcError().data())
-                            .isEqualTo(java.util.Map.of("source", "CORE", "category", "CORE_AUTHORIZATION"));
+                            .isEqualTo(java.util.Map.of(
+                                    "source", "CORE", "category", "CORE_AUTHORIZATION",
+                                    "code", "CORE_AUTHORIZATION_FAILED", "layer", "CORE",
+                                    "retryable", false, "action", "CHECK_PROJECT_ACCESS"));
                     assertThat(error.getJsonRpcError().message()).doesNotContain("not found");
                 });
     }

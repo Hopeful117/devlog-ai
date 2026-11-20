@@ -44,6 +44,115 @@ TOOL_RESPONDED = "RESPONDED"
 TOOL_FAILED = "FAILED"
 TOOL_INTERRUPTED = "INTERRUPTED"
 
+DIAGNOSTIC_CATALOG: dict[str, dict[str, Any]] = {
+    "CORE_AUTHENTICATION_FAILED": {
+        "category": "CORE_AUTHENTICATION", "layer": "CORE", "retryable": False,
+        "action": "CHECK_CORE_AUTHORIZATION",
+    },
+    "CORE_AUTHORIZATION_FAILED": {
+        "category": "CORE_AUTHORIZATION", "layer": "CORE", "retryable": False,
+        "action": "CHECK_PROJECT_ACCESS",
+    },
+    "CORE_CONFLICT": {
+        "category": "CORE_CONFLICT", "layer": "CORE", "retryable": False,
+        "action": "RECONCILE_OPERATION_STATUS",
+    },
+    "DELEGATION_FAILED": {
+        "category": "DELEGATION_AUTHENTICATION", "layer": "DELEGATION", "retryable": False,
+        "action": "RENEW_OR_REVOKE_DELEGATION",
+    },
+    "PROVIDER_FAILED": {
+        "category": "PROVIDER_AUTHENTICATION", "layer": "PROVIDER", "retryable": False,
+        "action": "CHECK_PROVIDER_CONFIGURATION",
+    },
+    "TRANSIENT_INFRASTRUCTURE": {
+        "category": "TRANSIENT_INFRASTRUCTURE", "layer": "CORE", "retryable": False,
+        "action": "RETRY_ONLY_IF_OPERATION_SAFE",
+    },
+    "RATE_LIMITED": {
+        "category": "RATE_LIMITED", "layer": "CORE", "retryable": False,
+        "action": "WAIT_OR_RETRY_WITH_POLICY",
+    },
+    "MCP_REAUTH_REQUIRED": {
+        "category": "TRANSPORT_AUTH_REJECTED", "layer": "TRANSPORT", "retryable": False,
+        "action": "REAUTHENTICATE_RUNTIME",
+    },
+    "MCP_RETRY_NOT_IDEMPOTENT": {
+        "category": "UNKNOWN", "layer": "TRANSPORT", "retryable": False,
+        "action": "RECONCILE_OPERATION_STATUS",
+    },
+    "MCP_JSONRPC_ERROR": {
+        "category": "UNKNOWN", "layer": "PROTOCOL", "retryable": False,
+        "action": "ESCALATE_WITH_CORRELATION",
+    },
+    "MCP_PROCESS_FAILED": {
+        "category": "TRANSIENT_INFRASTRUCTURE", "layer": "TRANSPORT", "retryable": False,
+        "action": "RESTART_RUNTIME",
+    },
+    "MCP_HANDSHAKE_FAILED": {
+        "category": "PROTOCOL", "layer": "PROTOCOL", "retryable": False,
+        "action": "CHECK_MCP_CLIENT",
+    },
+    "KEYCLOAK_UNREACHABLE": {
+        "category": "TRANSIENT_INFRASTRUCTURE", "layer": "TRANSPORT", "retryable": False,
+        "action": "CHECK_TOKEN_ENDPOINT",
+    },
+    "MCP_JAR_MISSING": {
+        "category": "CONFIGURATION_INVALID", "layer": "TRANSPORT", "retryable": False,
+        "action": "FIX_RUNTIME_CONFIGURATION",
+    },
+    "PARENT_PROCESS_GONE": {
+        "category": "TRANSIENT_INFRASTRUCTURE", "layer": "TRANSPORT", "retryable": False,
+        "action": "RESTART_RUNTIME",
+    },
+    "TOKEN_ENDPOINT_TIMEOUT": {
+        "category": "TRANSIENT_INFRASTRUCTURE", "layer": "TRANSPORT", "retryable": True,
+        "action": "RETRY_TOKEN_ACQUISITION_ONCE",
+    },
+    "TOKEN_ENDPOINT_5XX": {
+        "category": "TRANSIENT_INFRASTRUCTURE", "layer": "TRANSPORT", "retryable": True,
+        "action": "RETRY_TOKEN_ACQUISITION_ONCE",
+    },
+    "TOKEN_ENDPOINT_REJECTED": {
+        "category": "TRANSPORT_AUTH_REJECTED", "layer": "TRANSPORT", "retryable": False,
+        "action": "REAUTHENTICATE_RUNTIME",
+    },
+    "TOKEN_RESPONSE_INVALID": {
+        "category": "PROTOCOL", "layer": "TRANSPORT", "retryable": False,
+        "action": "FIX_RUNTIME_CONFIGURATION",
+    },
+    "PROTOCOL_INVALID": {
+        "category": "PROTOCOL", "layer": "PROTOCOL", "retryable": False,
+        "action": "CHECK_MCP_CLIENT",
+    },
+    "FUNCTIONAL_ERROR": {
+        "category": "FUNCTIONAL", "layer": "CORE", "retryable": False,
+        "action": "CHECK_OPERATION_PARAMETERS",
+    },
+    "CORE_INTERNAL_ERROR": {
+        "category": "UNKNOWN", "layer": "CORE", "retryable": False,
+        "action": "ESCALATE_WITH_CORRELATION",
+    },
+    "CORE_RESOURCE_NOT_FOUND": {
+        "category": "FUNCTIONAL", "layer": "CORE", "retryable": False,
+        "action": "CHECK_RESOURCE_IDENTIFIER",
+    },
+    "MCP_UNKNOWN_DIAGNOSTIC": {
+        "category": "UNKNOWN", "layer": "UNKNOWN", "retryable": False,
+        "action": "ESCALATE_WITH_CORRELATION",
+    },
+    "CONFIGURATION_INVALID": {
+        "category": "CONFIGURATION_INVALID", "layer": "TRANSPORT", "retryable": False,
+        "action": "FIX_RUNTIME_CONFIGURATION",
+    },
+}
+
+NON_DIAGNOSTIC_CODES = frozenset({
+    "NORMAL_EXIT", "STDIN_CLOSED", "TOKEN_RENEWAL_REQUIRED",
+    "INITIALIZE_RESPONSE", "RENEWAL_INITIALIZE_RESPONSE", "TOKEN_RENEWAL",
+    "AUTHENTICATION_RETRY", "CHILD_KILL_REQUIRED", "MCP_INSTANCE_STOPPING",
+})
+
 
 DEVLOG_CORRELATION_TOOLS = frozenset({
     "devlog_story_agent",
@@ -135,6 +244,22 @@ def redact(value: str) -> str:
     return result[:1000]
 
 
+def diagnostic_for_code(code: str | None) -> dict[str, Any]:
+    """Return only allowlisted, non-secret diagnostic metadata."""
+    if not code:
+        return {}
+    diagnostic = DIAGNOSTIC_CATALOG.get(code)
+    if diagnostic is None:
+        return {
+            "code": "MCP_UNKNOWN_DIAGNOSTIC",
+            "category": "UNKNOWN",
+            "layer": "UNKNOWN",
+            "retryable": False,
+            "action": "ESCALATE_WITH_CORRELATION",
+        }
+    return {"code": code, **diagnostic}
+
+
 class EventWriter:
     def __init__(self, directory: Path, instance_id: str):
         directory.mkdir(parents=True, exist_ok=True)
@@ -151,7 +276,10 @@ class EventWriter:
             "severity": severity,
         }
         if code:
-            payload["code"] = code
+            if code in DIAGNOSTIC_CATALOG or code not in NON_DIAGNOSTIC_CODES:
+                payload.update(diagnostic_for_code(code))
+            else:
+                payload["code"] = code
         for key, value in fields.items():
             if value is not None:
                 payload[key] = redact(str(value)) if isinstance(value, str) else value
@@ -496,6 +624,7 @@ class RuntimeSession:
             fields["toolName"] = operation.tool_name
         if reason_code is not None:
             fields["reasonCode"] = reason_code
+            fields.update(diagnostic_for_code(reason_code))
         if operation.response_correlation_id is not None and event_type != "MCP_TOOL_STARTED":
             fields["correlationId"] = operation.response_correlation_id
         duration_ms = max(0, int((time.monotonic() - operation.started_at) * 1000))
@@ -753,7 +882,7 @@ class RuntimeSession:
                             operation,
                             TOOL_FAILED,
                             terminal_generation,
-                            self.jsonrpc_error_reason(message),
+                            self.jsonrpc_diagnostic(message)["code"],
                         )
                 else:
                     terminal_generation = generation if generation is not None else operation.current_generation
@@ -777,9 +906,27 @@ class RuntimeSession:
         return {
             "CORE_AUTHENTICATION": "CORE_AUTHENTICATION_FAILED",
             "CORE_AUTHORIZATION": "CORE_AUTHORIZATION_FAILED",
+            "CORE_CONFLICT": "CORE_CONFLICT",
             "DELEGATION_AUTHENTICATION": "DELEGATION_FAILED",
             "PROVIDER_AUTHENTICATION": "PROVIDER_FAILED",
+            "TRANSIENT_INFRASTRUCTURE": "TRANSIENT_INFRASTRUCTURE",
+            "RATE_LIMITED": "RATE_LIMITED",
+            "PROTOCOL": "PROTOCOL_INVALID",
+            "FUNCTIONAL": "FUNCTIONAL_ERROR",
         }.get(category, "MCP_JSONRPC_ERROR")
+
+    @staticmethod
+    def jsonrpc_diagnostic(message: Any) -> dict[str, Any]:
+        """Project structured JSON-RPC error data without backend details."""
+        if not isinstance(message, dict) or not isinstance(message.get("error"), dict):
+            return diagnostic_for_code("MCP_JSONRPC_ERROR")
+        data = message["error"].get("data")
+        if not isinstance(data, dict):
+            return diagnostic_for_code("MCP_JSONRPC_ERROR")
+        code = data.get("code") if isinstance(data.get("code"), str) else None
+        if code is None:
+            code = RuntimeSession.jsonrpc_error_reason(message)
+        return diagnostic_for_code(code)
 
     @staticmethod
     def is_transport_auth_failure(message: Any) -> bool:
@@ -1116,7 +1263,12 @@ def main() -> int:
         update_manifest(directory, state="FAILED", failureCode="TOKEN_ENDPOINT_REJECTED")
         return 1
     except (urllib.error.URLError, TimeoutError) as exception:
-        writer.write("TOKEN_ACQUISITION_FAILED", severity="ERROR", code="KEYCLOAK_UNREACHABLE", message=str(exception))
+        writer.write(
+            "TOKEN_ACQUISITION_FAILED",
+            severity="ERROR",
+            code="KEYCLOAK_UNREACHABLE",
+            errorType=type(exception).__name__,
+        )
         update_manifest(directory, state="FAILED", failureCode="KEYCLOAK_UNREACHABLE")
         return 1
     except (OSError, RuntimeError) as exception:
@@ -1128,7 +1280,7 @@ def main() -> int:
         else:
             code = message.split(":", 1)[0] if ":" in message else "CONFIGURATION_INVALID"
         event = "DEPENDENCY_CHECK_FAILED" if code in {"CONFIGURATION_INVALID", "MCP_JAR_MISSING"} else "TOKEN_ACQUISITION_FAILED"
-        writer.write(event, severity="ERROR", code=code, message=message)
+        writer.write(event, severity="ERROR", code=code, errorType=type(exception).__name__)
         update_manifest(directory, state="FAILED", failureCode=code)
         return 1
 
