@@ -41,6 +41,7 @@ def test_dry_run_executes_three_isolated_observations_and_replays(tmp_path: Path
     assert result.summary["replay"] == "READY"
     assert result.summary["providerCalls"] == 0
     assert result.summary["networkCalls"] == 0
+    assert result.summary["acceptabilityCounts"] == {"NOT_EVALUATED": 3}
     assert result.integrity["status"] == "PASS"
     assert replay_run(manifest_path=MANIFEST, run_root=result.run_root)["status"] == "PASS"
 
@@ -53,6 +54,7 @@ def test_dry_run_executes_three_isolated_observations_and_replays(tmp_path: Path
         derived = json.loads((observation_root / "derived" / "normalized.json").read_text())
         assert derived["observationId"] == observation_id
         assert derived["semanticEligibility"] == "NOT_EVALUATED"
+        assert derived["acceptability"]["status"] == "NOT_EVALUATED"
 
 
 def test_dry_run_preserves_native_contracts_and_selects_a_b_c(tmp_path: Path) -> None:

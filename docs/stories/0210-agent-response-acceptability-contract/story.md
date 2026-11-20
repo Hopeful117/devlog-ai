@@ -2,11 +2,11 @@
 
 ## Statut
 
-PROPOSED - AWAITING HUMAN REVIEW.
+IMPLEMENTATION COMPLETE - AWAITING HUMAN ACCEPTANCE.
 
-Cette Story fige un contrat et une baseline d'evaluation. Elle n'autorise pas
-l'implementation, la modification des contrats de production, le changement
-des budgets, le commit, le push ou l'acceptation de la Story.
+Cette Story fige un contrat et une baseline d'evaluation. L'implementation
+evaluation-only est completee sous reserve de l'acceptation humaine. Elle ne
+modifie pas les contrats de production, les budgets, le commit ou le push.
 
 ## Objectif
 

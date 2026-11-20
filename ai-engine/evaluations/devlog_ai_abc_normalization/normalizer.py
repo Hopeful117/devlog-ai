@@ -13,6 +13,8 @@ import json
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from evaluations.acceptability import classify_acceptability
+
 
 NORMALIZATION_CONTRACT_VERSION = "devlog-abc-claim-evidence-normalization-v1"
 
@@ -84,6 +86,9 @@ def normalize_story_context(raw: dict[str, Any]) -> dict[str, Any]:
     )
     normalized["limitations"] = _story_limitations(payload)
     normalized["abstention"] = _explicit_abstention(payload, normalized["normalizationWarnings"])
+    normalized["acceptability"] = classify_acceptability(
+        _story_acceptability_observation(envelope.payload, payload, normalized)
+    )
     _finish(normalized, envelope, payload)
     return normalized
 
@@ -106,6 +111,9 @@ def normalize_direct_investigator(raw: dict[str, Any]) -> dict[str, Any]:
     )
     normalized["limitations"] = _direct_limitations(payload)
     normalized["abstention"] = _explicit_abstention(payload, normalized["normalizationWarnings"])
+    normalized["acceptability"] = classify_acceptability(
+        _story_acceptability_observation(envelope.payload, payload, normalized)
+    )
     _finish(normalized, envelope, payload)
     return normalized
 
@@ -361,6 +369,73 @@ def _story_limitations(payload: dict[str, Any]) -> list[str]:
             if isinstance(item, dict) and isinstance(item.get("description"), str):
                 limitations.append(item["description"])
     return _unique_strings(limitations)
+
+
+def _story_acceptability_observation(
+    source_payload: dict[str, Any],
+    payload: dict[str, Any],
+    normalized: dict[str, Any],
+) -> dict[str, Any]:
+    metadata = source_payload.get("acceptability")
+    if not isinstance(metadata, dict):
+        metadata = payload.get("acceptability")
+    metadata = metadata if isinstance(metadata, dict) else {}
+
+    def value(key: str, default: Any = None) -> Any:
+        if key in metadata:
+            return metadata[key]
+        if key in payload:
+            return payload[key]
+        return source_payload.get(key, default)
+
+    def has_value(key: str) -> bool:
+        return key in metadata or key in payload or key in source_payload
+
+    freshness = value("freshness")
+    if isinstance(freshness, dict):
+        freshness = freshness.get("state")
+    freshness = freshness or "UNKNOWN"
+    return {
+        "technicalStatus": normalized["technicalStatus"],
+        "semanticEligibility": normalized["semanticEligibility"],
+        "groundingStatus": value("groundingStatus"),
+        "freshness": freshness,
+        "temporalScope": value("temporalScope", "CURRENT"),
+        "revisionPinned": value("revisionPinned"),
+        "expectedEvidenceCount": value("expectedEvidenceCount", 0),
+        "coveredEvidenceCount": value("coveredEvidenceCount", 0),
+        "contradictionCount": value("contradictionCount", 0),
+        "truncated": value("truncated", False),
+        "principalConclusionCovered": value("principalConclusionCovered", True),
+        "nextStepPresent": value("nextStepPresent"),
+        "abstention": normalized["abstention"],
+        "unauthorizedEvidenceCount": value(
+            "unauthorizedEvidenceCount",
+            sum(
+                reference.get("citationStatus") == "CITED_NOT_RESOLVED"
+                for reference in normalized["evidenceReferences"]
+            ),
+        ),
+        "revisionMismatchCount": sum(
+            reference.get("citationStatus") == "REVISION_MISMATCH"
+            for reference in normalized["evidenceReferences"]
+        ),
+        "metadataComplete": all(
+            has_value(key)
+            for key in (
+                "groundingStatus",
+                "freshness",
+                "expectedEvidenceCount",
+                "coveredEvidenceCount",
+                "contradictionCount",
+                "truncated",
+                "principalConclusionCovered",
+                "nextStepPresent",
+                "revisionPinned",
+            )
+        ) and normalized["abstention"] is not None,
+        "limitations": normalized["limitations"],
+    }
 
 
 def _direct_limitations(payload: dict[str, Any]) -> list[str]:

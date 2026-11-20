@@ -1,6 +1,8 @@
 """Deterministic provider-free tests for the A/B/C evaluation adapters."""
 
 from copy import deepcopy
+import json
+from pathlib import Path
 
 import pytest
 
@@ -172,3 +174,61 @@ def test_partially_structured_story_output_keeps_unknowns_explicit() -> None:
     assert normalized["claims"][0]["claimType"] == "UNCLASSIFIED"
     assert normalized["claims"][0]["evidenceReferences"] == []
     assert "CLAIM_WITHOUT_CITATION" in normalized["normalizationWarnings"]
+
+
+def test_story_context_normalization_exposes_evaluation_only_acceptability() -> None:
+    payload = {
+        "executionStatus": "COMPLETED",
+        "semanticEligibility": "SEMANTICALLY_ELIGIBLE",
+        "groundingStatus": "GROUNDED",
+        "freshness": "FRESH",
+        "acceptability": {
+            "groundingStatus": "GROUNDED",
+            "freshness": "FRESH",
+            "revisionPinned": True,
+            "expectedEvidenceCount": 1,
+            "coveredEvidenceCount": 1,
+            "contradictionCount": 0,
+            "truncated": False,
+            "principalConclusionCovered": True,
+            "nextStepPresent": True,
+        },
+        "finalResponse": {
+            "answerText": "The evidence establishes the bounded conclusion.",
+            "abstention": False,
+            "claims": [{
+                "text": "The bounded conclusion is established.",
+                "claimType": "FACT",
+                "references": ["file:docs/ADR.md#L1-L3"],
+            }],
+        },
+        "evidence": [{"reference": "file:docs/ADR.md#L1-L3"}],
+    }
+
+    normalized = normalize_story_context(raw(payload, treatment="A"))
+
+    assert normalized["acceptability"] == {
+        "status": "ACCEPTABLE",
+        "reason": "EVIDENCE_AND_LIMITS_SUFFICIENT",
+        "semanticEvaluated": True,
+    }
+
+
+def test_story_0210_acceptability_baseline_is_replayable() -> None:
+    fixture_path = Path(__file__).parents[1] / "evaluations" / "acceptability-baseline.json"
+    fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
+    results = []
+
+    for case in fixture["cases"]:
+        payload = case["rawOutput"]
+        normalized = normalize_story_context(raw({**payload}, treatment="A"))
+        results.append(normalized["acceptability"]["status"])
+        assert normalized["acceptability"]["status"] == case["expected"]
+
+    assert {status: results.count(status) for status in set(results)} == {
+        "ACCEPTABLE": 1,
+        "BOUNDED": 1,
+        "INSUFFICIENT": 3,
+        "STALE_OR_UNKNOWN": 1,
+        "NOT_EVALUATED": 1,
+    }
