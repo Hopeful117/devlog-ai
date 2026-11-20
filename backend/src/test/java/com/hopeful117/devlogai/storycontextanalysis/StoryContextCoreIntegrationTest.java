@@ -478,8 +478,7 @@ class StoryContextCoreIntegrationTest {
         PromptExecutionMetadata metadata = new PromptExecutionMetadata(
                 "story-context-analysis-prompt-v1", PROVIDER, MODEL, "a".repeat(64),
                 task.getContextDigest(), null, task.getProjectionDigest(), "sca/v1",
-                Map.of("projectSlug", projectSlug, "storyId", storyId,
-                        "intent", "engineering-story-context-analysis", "files", List.of("docs/q1.md")),
+                scope,
                  (Map<String, Object>) task.getContextSnapshot().get("freshness"),
                  String.valueOf(task.getContextSnapshot().get("groundingDigest")));
         var result = new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult(

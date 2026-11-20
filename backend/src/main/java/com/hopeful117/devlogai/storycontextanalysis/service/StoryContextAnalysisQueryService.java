@@ -46,7 +46,16 @@ public class StoryContextAnalysisQueryService {
         Map<String, Object> investigation = snapshot != null && snapshot.get("investigation") instanceof Map<?, ?> value
                 ? (Map<String, Object>) value : Map.of();
         String stopReason = investigation.get("stopReason") instanceof String value ? value : null;
-        return new StoryContextAnalysisResponse(result, analysis.getContextFreshness(), stopReason);
+        Map<String, Object> executionScope = snapshotMap(snapshot, "executionScope");
+        Map<String, Object> provenance = snapshotMap(snapshot, "provenance");
+        return new StoryContextAnalysisResponse(result, analysis.getContextFreshness(), stopReason,
+                executionScope, provenance);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> snapshotMap(Map<String, Object> snapshot, String key) {
+        if (snapshot == null || !(snapshot.get(key) instanceof Map<?, ?> value)) return null;
+        return (Map<String, Object>) value;
     }
 
     @SuppressWarnings("unchecked")

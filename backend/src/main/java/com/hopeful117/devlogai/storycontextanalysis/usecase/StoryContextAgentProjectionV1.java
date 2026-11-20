@@ -68,7 +68,10 @@ public final class StoryContextAgentProjectionV1 {
         result.put("request", request);
         result.put("requestEcho", new LinkedHashMap<>(request));
         result.put("scope", new LinkedHashMap<>(request));
-        result.put("freshness", freshness(canonical, projectSlug));
+        String revision = canonicalRevisionOrUnknown(canonical);
+        validateScopeRevision(canonical, revision);
+        result.put("executionScope", executionScope(canonical, projectSlug, revision));
+        result.put("freshness", freshness(canonical, projectSlug, mapper));
         result.put("context", context(canonical, mapper));
         result.put("groundingCandidates", grounding(canonical));
         result.put("accounting", accounting(canonical));
@@ -83,7 +86,7 @@ public final class StoryContextAgentProjectionV1 {
         Map<String,Object> x = new LinkedHashMap<>();
         x.put("project", m.convertValue(c.projection().project(), Map.class));
         x.put("sections", c.projection().sections() == null ? List.of() : c.projection().sections());
-        String revision = canonicalRevision(c);
+        String revision = canonicalRevisionOrUnknown(c);
         x.put("repositoryEvidence", c.repositoryContext() == null || c.repositoryContext().evidence() == null
                 ? List.of() : c.repositoryContext().evidence().stream()
                 .map(evidence -> evidenceSnapshot(evidence, revision, m)).toList());
@@ -110,23 +113,73 @@ public final class StoryContextAgentProjectionV1 {
         return snapshot;
     }
 
-    private static Map<String,Object> freshness(CanonicalEngineeringContext c, String project) {
-        String revision = canonicalRevision(c);
-        Object rawState = c.freshness().get("state");
+    private static Map<String,Object> freshness(CanonicalEngineeringContext c, String project,
+                                                 ObjectMapper mapper) {
+        String revision = canonicalRevisionOrUnknown(c);
+        Map<String, Object> result = new LinkedHashMap<>();
+        Object rawSummary = c.freshness().get("summary");
+        if (rawSummary instanceof Map<?, ?> summary) {
+            summary.forEach((key, value) -> {
+                if (key instanceof String stringKey) result.put(stringKey, value);
+            });
+        } else if (rawSummary != null) {
+            result.putAll(mapper.convertValue(rawSummary, Map.class));
+        }
+        Object rawState = result.get("state");
+        if (rawState == null) rawState = result.get("status");
         if (rawState == null) rawState = c.freshness().get("status");
         if (rawState == null) {
-            Object summary = c.freshness().get("summary");
-            if (summary instanceof EngineeringContextFreshness freshness) {
+            if (rawSummary instanceof EngineeringContextFreshness freshness) {
                 rawState = freshness.status();
-            } else if (summary instanceof Map<?, ?> map) {
-                rawState = map.get("status");
             }
         }
         String state = String.valueOf(rawState == null ? "UNKNOWN" : rawState)
                 .toUpperCase(Locale.ROOT);
-        if (!Set.of("FRESH","STALE","UNKNOWN","NOT_ESTABLISHED").contains(state)) state = "UNKNOWN";
-        return Map.of("sourceRevision", Map.of("kind", "PROJECT_REVISION",
-                "project", project, "revision", revision), "state", state);
+        if (!Set.of("CURRENT", "FRESH", "STALE", "PARTIALLY_FRESH", "NO_BASELINE",
+                "UNKNOWN", "NOT_ESTABLISHED").contains(state)) state = "UNKNOWN";
+        result.put("status", result.getOrDefault("status", state));
+        result.put("state", state);
+        result.put("sourceRevision", Map.of("kind", "PROJECT_REVISION",
+                "project", project, "revision", revision));
+        String freshnessRevision = freshnessRevisionOrUnknown(c);
+        if (!"UNKNOWN".equals(revision) && !"UNKNOWN".equals(freshnessRevision)
+                && !revision.equals(freshnessRevision)) {
+            result.put("revisionConsistency", "MISMATCH");
+            result.put("revisionMismatch", Map.of("evidenceRevision", revision,
+                    "freshnessRevision", freshnessRevision));
+        } else {
+            result.put("revisionConsistency", "CONSISTENT");
+        }
+        Object warnings = c.freshness().get("warnings");
+        if (warnings != null) result.put("warnings", warnings);
+        return result;
+    }
+
+    private static Map<String, Object> executionScope(CanonicalEngineeringContext c, String project,
+                                                       String revision) {
+        Map<String, Object> scope = new LinkedHashMap<>();
+        scope.put("project", project);
+        if (c.repositoryContext() != null && c.repositoryContext().revisionScope() != null) {
+            var revisionScope = c.repositoryContext().revisionScope();
+            scope.put("projectId", revisionScope.projectId());
+            scope.put("sourceId", revisionScope.sourceId());
+            scope.put("resolvedRevision", revisionScope.resolvedRevision());
+            scope.put("revisionSource", revisionScope.revisionSource());
+            scope.put("resolutionState", "RESOLVED");
+        } else {
+            scope.put("resolutionState", "UNKNOWN");
+            scope.put("resolvedRevision", "UNKNOWN".equals(revision) ? null : revision);
+        }
+        return scope;
+    }
+
+    private static void validateScopeRevision(CanonicalEngineeringContext c, String revision) {
+        if (c.repositoryContext() == null || c.repositoryContext().revisionScope() == null
+                || "UNKNOWN".equals(revision)) return;
+        String scopedRevision = c.repositoryContext().revisionScope().resolvedRevision();
+        if (!revision.equals(scopedRevision)) {
+            throw new IllegalArgumentException("Execution scope revision does not match evidence revision");
+        }
     }
 
     /** Returns the sole revision owning the complete evidence snapshot. */
@@ -176,6 +229,42 @@ public final class StoryContextAgentProjectionV1 {
         return freshnessRevisions.iterator().next();
     }
 
+    static String canonicalRevisionOrUnknown(CanonicalEngineeringContext c) {
+        try {
+            return canonicalRevision(c);
+        } catch (IllegalArgumentException exception) {
+            String message = exception.getMessage();
+            if (message != null && (message.contains("identity is missing")
+                    || message.contains("not resolvable"))) {
+                return "UNKNOWN";
+            }
+            throw exception;
+        }
+    }
+
+    private static String freshnessRevisionOrUnknown(CanonicalEngineeringContext c) {
+        Object raw = c.freshness().get("sourceRevision");
+        if (raw == null) raw = c.freshness().get("summary");
+        if (raw instanceof EngineeringContextFreshness freshness) return valueOrUnknown(freshness.repositoryRevision());
+        if (raw instanceof ProjectFreshnessSummary summary) {
+            Set<String> revisions = summary.checkedSources().stream()
+                    .map(source -> source.source() == null ? null : source.source().currentRevision())
+                    .filter(Objects::nonNull).filter(value -> !value.isBlank()).collect(java.util.stream.Collectors.toSet());
+            return revisions.size() == 1 ? revisions.iterator().next() : "UNKNOWN";
+        }
+        if (raw instanceof Map<?, ?> map) {
+            Object revision = map.get("revision");
+            if (revision == null) revision = map.get("repositoryRevision");
+            return revision instanceof String value ? valueOrUnknown(value) : "UNKNOWN";
+        }
+        return raw instanceof String value ? valueOrUnknown(value) : "UNKNOWN";
+    }
+
+    private static String valueOrUnknown(String value) {
+        return value == null || value.isBlank() || Set.of("UNKNOWN", "UNSPECIFIED").contains(value)
+                ? "UNKNOWN" : value;
+    }
+
     private static void addRevision(Set<String> revisions, String revision) {
         if (revision == null || revision.isBlank()) return;
         if (Set.of("UNKNOWN", "UNSPECIFIED").contains(revision)) {
@@ -204,8 +293,8 @@ public final class StoryContextAgentProjectionV1 {
                     "ref", ref.reference(), "scope", "PROJECT_REVISION");
             Map<String,Object> source = new LinkedHashMap<>();
             source.put("resource", ref.resource() == null ? ref.reference() : ref.resource());
-            source.put("provenance", c.provenanceByReference().get(ref.reference()));
-            source.put("revision", canonicalRevision(c));
+                source.put("provenance", c.provenanceByReference().get(ref.reference()));
+                source.put("revision", canonicalRevisionOrUnknown(c));
             return Map.of("reference", typed, "source", source,
                     "trust", trust);
         }).toList();

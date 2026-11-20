@@ -422,6 +422,7 @@ class RepositoryContextEngineTest {
         // Post-fix: scope is preserved through collectCandidates() and passed to collectors
         assertNotNull(context);
         assertFalse(context.evidence().isEmpty());
+        assertEquals(revisionScope, context.revisionScope());
     }
 
     @Test

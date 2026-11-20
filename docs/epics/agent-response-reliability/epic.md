@@ -69,7 +69,7 @@ verification ou insuffisante.
 ## Engineering Stories
 
 1. [Story 0210 - Contrat d'acceptabilite agentique et baseline](../../stories/0210-agent-response-acceptability-contract/story.md)
-2. Story a definir - Fraicheur, scope et provenance explicites
+2. [Story 0219 - Freshness, Scope and Provenance Explicitness](../../stories/0219-explicit-freshness-scope-provenance/story.md)
 3. Story a definir - Survie des preuves critiques et loss ledger exploitable
 4. Story a definir - Specificite, abstention et confiance calibree
 5. Story a definir - Evaluation agentique et pilote sur Stories reelles

@@ -77,8 +77,11 @@ public class SearchProjectHistoryTool {
             var principal = principalProvider.currentPrincipal(requestContext).orElse(null);
             if (principal != null && principal.bearerToken() != null && !principal.bearerToken().isBlank()) {
                 String auth = principal.bearerToken();
+                String delegation = principal.delegationToken() == null
+                        ? "" : principal.delegationToken();
                 return support.getScoped(
-                        () -> resourceClient.searchProjectHistoryAuthenticated(projectId, trimmedQuery, limit, auth),
+                        () -> resourceClient.searchProjectHistoryAuthenticated(
+                                projectId, trimmedQuery, limit, auth, delegation),
                         notFound);
             }
         }

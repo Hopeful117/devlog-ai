@@ -327,7 +327,14 @@ public class StoryContextSubmissionService {
         scope.put("intent", intent);
         scope.put("files", files == null ? List.of() : List.copyOf(files));
         if (question != null) scope.put("question", question);
+        if (projection.get("executionScope") instanceof Map<?, ?> executionScope) {
+            executionScope.forEach((key, value) -> {
+                if (key instanceof String stringKey) scope.put(stringKey, value);
+            });
+        }
         snapshot.put("scope", scope);
+        snapshot.put("executionScope", projection.getOrDefault("executionScope", Map.of()));
+        snapshot.put("provenance", provenance(canonical));
         Object requestEcho = projection.get("requestEcho");
         snapshot.put("requestEcho", requestEcho instanceof Map<?, ?> map
                 ? new LinkedHashMap<>(map) : valueMap(canonical.requestEcho()));
@@ -373,6 +380,13 @@ public class StoryContextSubmissionService {
                 .map(e -> e.content() == null ? null : e.content().revision())
                 .filter(java.util.Objects::nonNull).distinct().toList());
         return revisions;
+    }
+
+    private Map<String, Object> provenance(CanonicalEngineeringContext canonical) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        canonical.provenanceByReference().forEach((reference, value) ->
+                result.put(reference, objectMapper.convertValue(value, Map.class)));
+        return result;
     }
 
     private Map<String, Object> budgets(CanonicalEngineeringContext canonical) {

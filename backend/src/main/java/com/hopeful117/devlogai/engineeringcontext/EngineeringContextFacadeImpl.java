@@ -98,9 +98,13 @@ public class EngineeringContextFacadeImpl implements EngineeringContextFacade {
                 "usedTokens", repositoryContext.usedTokens(),
                 "budget", repositoryContext.budget().maximumTokens(),
                 "truncated", repositoryContext.truncated());
+        Map<String, Object> freshnessSnapshot = new java.util.LinkedHashMap<>();
+        freshnessSnapshot.put("summary", freshness);
+        freshnessSnapshot.put("warnings", context.metadata() == null
+                ? List.of() : context.metadata().warnings());
         return new CanonicalEngineeringContext(context, repositoryContext,
                 repositoryContext.contextDigest(), repositoryContext.contextVersion(),
-                context.requestEcho(), Map.of("summary", freshness), accounting, repositoryContext.diagnostics(),
+                context.requestEcho(), freshnessSnapshot, accounting, repositoryContext.diagnostics(),
                 relations, provenance, trust, references);
     }
 }
