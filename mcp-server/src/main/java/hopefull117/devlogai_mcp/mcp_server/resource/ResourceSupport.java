@@ -15,6 +15,7 @@ import org.springframework.web.client.RestClientResponseException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -74,6 +75,8 @@ public class ResourceSupport {
             return project.id();
         } catch (HttpClientErrorException.NotFound exception) {
             throw notFound("Project '%s' not found".formatted(projectSlug));
+        } catch (HttpClientErrorException.Unauthorized exception) {
+            throw coreAuthenticationFailed("Authentication is required to access DevLog backend");
         } catch (RestClientResponseException exception) {
             throw internal("DevLog backend failed while resolving project '%s' (%s)"
                     .formatted(projectSlug, exception.getStatusCode()));
@@ -111,7 +114,7 @@ public class ResourceSupport {
         try {
             return call.get();
         } catch (HttpClientErrorException.Unauthorized exception) {
-            throw unauthenticated("Authentication is required");
+            throw coreAuthenticationFailed("Authentication is required");
         } catch (HttpClientErrorException.NotFound exception) {
             throw notFound(notFoundMessage);
         } catch (HttpClientErrorException.Forbidden exception) {
@@ -131,7 +134,7 @@ public class ResourceSupport {
         try {
             return call.get();
         } catch (HttpClientErrorException.Unauthorized exception) {
-            throw unauthenticated("Authentication is required");
+            throw coreAuthenticationFailed("Authentication is required");
         } catch (HttpClientErrorException.NotFound | HttpClientErrorException.Forbidden exception) {
             throw notFound(notFoundMessage);
         } catch (HttpClientErrorException.BadRequest | HttpClientErrorException.Conflict exception) {
@@ -265,7 +268,7 @@ public class ResourceSupport {
         } catch (HttpClientErrorException.NotFound exception) {
             throw notFound(notFoundMessage);
         } catch (HttpClientErrorException.Unauthorized exception) {
-            throw unauthenticated("Authentication is required to access DevLog backend");
+            throw coreAuthenticationFailed("Authentication is required to access DevLog backend");
         } catch (HttpClientErrorException.Forbidden exception) {
             throw internal("DevLog backend refused access (403)");
         } catch (RestClientResponseException exception) {
@@ -293,6 +296,13 @@ public class ResourceSupport {
     public static McpError unauthenticated(String message) {
         return McpError.builder(ErrorCodes.INVALID_REQUEST)
                 .message(message)
+                .build();
+    }
+
+    public static McpError coreAuthenticationFailed(String message) {
+        return McpError.builder(ErrorCodes.INVALID_REQUEST)
+                .message(message)
+                .data(Map.of("source", "CORE", "category", "CORE_AUTHENTICATION"))
                 .build();
     }
 

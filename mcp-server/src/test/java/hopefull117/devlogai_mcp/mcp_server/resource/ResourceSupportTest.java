@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.HttpClientErrorException;
 import tools.jackson.databind.ObjectMapper;
+import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 
 import java.util.List;
 import java.util.Optional;
@@ -93,5 +94,70 @@ class ResourceSupportTest {
         assertThatThrownBy(() -> support.requireProjectId(SLUG))
                 .isInstanceOf(McpError.class)
                 .hasMessageContaining("not found");
+    }
+
+    @Test
+    void mapsBackendUnauthorizedAsCoreAuthenticationWithProvenance() {
+        ResourceSupport support = new ResourceSupport(projectContextClient, resourceClient, objectMapper);
+        when(resourceClient.listProjectInsights(PROJECT_ID))
+                .thenThrow(HttpClientErrorException.create(HttpStatus.UNAUTHORIZED, "Unauthorized",
+                        org.springframework.http.HttpHeaders.EMPTY, new byte[0], null));
+
+        assertThatThrownBy(() -> support.findActiveInsight(PROJECT_ID, "insight-id"))
+                .isInstanceOf(McpError.class)
+                .satisfies(exception -> {
+                    McpError error = (McpError) exception;
+                    assertThat(error.getJsonRpcError().message())
+                            .isEqualTo("Authentication is required to access DevLog backend");
+                    assertThat(error.getJsonRpcError().data())
+                            .isEqualTo(java.util.Map.of("source", "CORE", "category", "CORE_AUTHENTICATION"));
+                    assertThat(objectMapper.writeValueAsString(error.getJsonRpcError()))
+                            .contains("\"data\":")
+                            .contains("\"category\":\"CORE_AUTHENTICATION\"")
+                            .contains("\"source\":\"CORE\"");
+                });
+    }
+
+    @Test
+    void mapsProjectResolutionUnauthorizedAsCoreAuthentication() {
+        when(projectContextClient.getProjectContext(SLUG))
+                .thenThrow(unauthorized());
+
+        ResourceSupport support = new ResourceSupport(projectContextClient, resourceClient, objectMapper);
+
+        assertCoreAuthentication(() -> support.requireProjectId(SLUG));
+    }
+
+    @Test
+    void mapsAuthorizedSnapshotUnauthorizedAsCoreAuthentication() {
+        ResourceSupport support = new ResourceSupport(projectContextClient, resourceClient, objectMapper);
+
+        assertCoreAuthentication(() -> support.getAuthorizedSnapshot(() -> {
+            throw unauthorized();
+        }, "snapshot not found"));
+    }
+
+    @Test
+    void mapsAuthorizedFollowUpUnauthorizedAsCoreAuthentication() {
+        ResourceSupport support = new ResourceSupport(projectContextClient, resourceClient, objectMapper);
+
+        assertCoreAuthentication(() -> support.submitAuthorizedSnapshot(() -> {
+            throw unauthorized();
+        }, "snapshot not found"));
+    }
+
+    private void assertCoreAuthentication(ThrowingCallable callable) {
+        assertThatThrownBy(callable)
+                .isInstanceOf(McpError.class)
+                .satisfies(exception -> {
+                    McpError error = (McpError) exception;
+                    assertThat(error.getJsonRpcError().data())
+                            .isEqualTo(java.util.Map.of("source", "CORE", "category", "CORE_AUTHENTICATION"));
+                });
+    }
+
+    private static HttpClientErrorException unauthorized() {
+        return HttpClientErrorException.create(HttpStatus.UNAUTHORIZED, "Unauthorized",
+                org.springframework.http.HttpHeaders.EMPTY, new byte[0], null);
     }
 }

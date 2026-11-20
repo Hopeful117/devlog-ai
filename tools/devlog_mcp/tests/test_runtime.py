@@ -408,6 +408,65 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(len(failed), 1)
         self.assertEqual(failed[0][1]["reasonCode"], "MCP_REAUTH_REQUIRED")
 
+    def test_core_authentication_error_does_not_trigger_transport_retry(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        message = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+                "code": -32600,
+                "message": "Authentication is required",
+                "data": {"source": "CORE", "category": "CORE_AUTHENTICATION"},
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory),
+                Writer(),
+                runtime.TokenLease("token", time.time() + 3600),
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_engineering_context"}}\n'
+            session.forward(raw, json.loads(raw))
+            with patch.object(session, "renew_if_needed") as renew:
+                self.assertFalse(session.retry_authentication(message))
+                renew.assert_not_called()
+
+        self.assertFalse(runtime.RuntimeSession.is_transport_auth_failure(message))
+
+    def test_non_idempotent_tool_is_not_replayed_after_transport_auth_failure(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory),
+                Writer(),
+                runtime.TokenLease("token", time.time() + 3600),
+            )
+            session.child = Child()
+            raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"sync_project_history"}}\n'
+            session.forward(raw, json.loads(raw))
+            failure = {"jsonrpc": "2.0", "id": 1, "error": {"code": -32600, "message": "Authentication is required"}}
+            with patch.object(session, "renew_if_needed") as renew:
+                self.assertFalse(session.retry_authentication(failure))
+                renew.assert_not_called()
+
+        self.assertEqual(session.operations, {})
+
     def test_renewal_failure_emits_reauth_failure_and_releases_id(self) -> None:
         class Writer:
             def __init__(self):
@@ -1274,4 +1333,3 @@ class RuntimeTests(unittest.TestCase):
                     runtime.sys.stdin = original_stdin
 
         self.assertEqual(completed, [True], "lifecycle event push must complete before relay_stdin returns")
-
