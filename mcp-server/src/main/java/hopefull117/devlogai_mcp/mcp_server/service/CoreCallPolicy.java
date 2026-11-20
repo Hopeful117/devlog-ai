@@ -34,7 +34,7 @@ public final class CoreCallPolicy {
                 return notFound(notFoundMessage);
             }
             if (status == HttpStatus.BAD_REQUEST) {
-                return invalidParams("DevLog backend rejected the request");
+                return functionalFailure("DevLog backend rejected the request");
             }
             if (status == HttpStatus.CONFLICT) {
                 return coreConflict("DevLog backend rejected the operation");
@@ -45,24 +45,26 @@ public final class CoreCallPolicy {
             if (status != null && status.is5xxServerError()) {
                 return transientInfrastructure("DevLog backend is unavailable");
             }
-            return internal("DevLog backend rejected the request");
+            return coreInternal("DevLog backend rejected the request");
         }
         if (exception instanceof RestClientException) {
             return transientInfrastructure("DevLog backend is unavailable");
         }
-        return internal("DevLog backend failed while " + operation);
+        return coreInternal("DevLog backend failed while " + operation);
     }
 
     public static McpError notFound(String message) {
-        return McpError.builder(ErrorCodes.RESOURCE_NOT_FOUND)
-                .message(message)
-                .build();
+        return categorizedWithErrorCode(ErrorCodes.RESOURCE_NOT_FOUND, message, "FUNCTIONAL",
+                "CORE_RESOURCE_NOT_FOUND", "CHECK_RESOURCE_IDENTIFIER");
     }
 
     public static McpError invalidParams(String message) {
-        return McpError.builder(ErrorCodes.INVALID_PARAMS)
-                .message(message)
-                .build();
+        return functionalFailure(message);
+    }
+
+    private static McpError functionalFailure(String message) {
+        return categorizedWithErrorCode(ErrorCodes.INVALID_PARAMS, message, "FUNCTIONAL",
+                "FUNCTIONAL_ERROR", "CHECK_OPERATION_PARAMETERS");
     }
 
     public static McpError unauthenticated(String message) {
@@ -72,35 +74,75 @@ public final class CoreCallPolicy {
     }
 
     public static McpError coreAuthenticationFailed(String message) {
-        return categorized(message, "CORE_AUTHENTICATION");
+        return categorized(message, "CORE_AUTHENTICATION", "CORE_AUTHENTICATION_FAILED",
+                "CHECK_CORE_AUTHORIZATION");
     }
 
     public static McpError coreAuthorizationFailed(String message) {
-        return categorized(message, "CORE_AUTHORIZATION");
+        return categorized(message, "CORE_AUTHORIZATION", "CORE_AUTHORIZATION_FAILED",
+                "CHECK_PROJECT_ACCESS");
     }
 
     public static McpError rateLimited(String message) {
-        return categorized(message, "RATE_LIMITED");
+        return categorized(message, "RATE_LIMITED", "RATE_LIMITED",
+                "WAIT_OR_RETRY_WITH_POLICY");
     }
 
     public static McpError coreConflict(String message) {
-        return categorized(message, "CORE_CONFLICT");
+        return categorized(message, "CORE_CONFLICT", "CORE_CONFLICT",
+                "RECONCILE_OPERATION_STATUS");
     }
 
     public static McpError transientInfrastructure(String message) {
-        return categorized(message, "TRANSIENT_INFRASTRUCTURE");
+        return categorized(message, "TRANSIENT_INFRASTRUCTURE", "TRANSIENT_INFRASTRUCTURE",
+                "RETRY_ONLY_IF_OPERATION_SAFE");
     }
 
-    private static McpError categorized(String message, String category) {
+    private static McpError categorized(
+            String message,
+            String category,
+            String code,
+            String action
+    ) {
         return McpError.builder(ErrorCodes.INVALID_REQUEST)
                 .message(message)
-                .data(Map.of("source", "CORE", "category", category))
+                .data(Map.of(
+                        "source", "CORE",
+                        "category", category,
+                        "code", code,
+                        "layer", "CORE",
+                        "retryable", false,
+                        "action", action))
                 .build();
     }
 
     private static McpError internal(String message) {
         return McpError.builder(ErrorCodes.INTERNAL_ERROR)
                 .message(message)
+                .build();
+    }
+
+    private static McpError coreInternal(String message) {
+        return categorizedWithErrorCode(ErrorCodes.INTERNAL_ERROR, message, "UNKNOWN",
+                "CORE_INTERNAL_ERROR", "ESCALATE_WITH_CORRELATION");
+    }
+
+    private static McpError categorizedWithErrorCode(
+            int errorCode,
+            String message,
+            String category,
+            String code,
+            String action
+    ) {
+        return McpError.builder(errorCode)
+                .message(message)
+                .data(Map.of(
+                        "source", "CORE",
+                        "category", category,
+                        "code", code,
+                        "layer", "CORE",
+                        "retryable", false,
+                        "action", action))
                 .build();
     }
 }

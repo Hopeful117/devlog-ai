@@ -595,8 +595,14 @@ class RuntimeTests(unittest.TestCase):
         for category, expected in (
             ("CORE_AUTHENTICATION", "CORE_AUTHENTICATION_FAILED"),
             ("CORE_AUTHORIZATION", "CORE_AUTHORIZATION_FAILED"),
+            ("CORE_CONFLICT", "CORE_CONFLICT"),
             ("DELEGATION_AUTHENTICATION", "DELEGATION_FAILED"),
             ("PROVIDER_AUTHENTICATION", "PROVIDER_FAILED"),
+            ("TRANSIENT_INFRASTRUCTURE", "TRANSIENT_INFRASTRUCTURE"),
+            ("RATE_LIMITED", "RATE_LIMITED"),
+            ("PROTOCOL", "PROTOCOL_INVALID"),
+            ("FUNCTIONAL", "FUNCTIONAL_ERROR"),
+            ("UNKNOWN", "MCP_JSONRPC_ERROR"),
         ):
             message = {
                 "jsonrpc": "2.0",
@@ -611,6 +617,38 @@ class RuntimeTests(unittest.TestCase):
             ),
             "MCP_JSONRPC_ERROR",
         )
+
+        diagnostic = runtime.RuntimeSession.jsonrpc_diagnostic({
+            "error": {"data": {"source": "CORE", "category": "CORE_AUTHORIZATION"}}
+        })
+        self.assertEqual(diagnostic["code"], "CORE_AUTHORIZATION_FAILED")
+        self.assertEqual(diagnostic["action"], "CHECK_PROJECT_ACCESS")
+        self.assertNotIn("message", diagnostic)
+
+        explicit = runtime.RuntimeSession.jsonrpc_diagnostic({
+            "error": {"data": {
+                "source": "CORE",
+                "category": "FUNCTIONAL",
+                "code": "CORE_RESOURCE_NOT_FOUND",
+                "layer": "PROVIDER",
+                "action": "EXPOSE_SECRET",
+            }}
+        })
+        self.assertEqual(explicit["code"], "CORE_RESOURCE_NOT_FOUND")
+        self.assertEqual(explicit["category"], "FUNCTIONAL")
+        self.assertEqual(explicit["layer"], "CORE")
+        self.assertEqual(explicit["action"], "CHECK_RESOURCE_IDENTIFIER")
+
+    def test_unknown_event_code_gets_bounded_fallback_diagnostic(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            writer = runtime.EventWriter(Path(directory), "instance-1")
+            writer.write("MCP_PROCESS_EXITED", severity="ERROR", code="UNEXPECTED_FAILURE")
+            event = json.loads((Path(directory) / "events.jsonl").read_text().strip())
+
+        self.assertEqual(event["code"], "MCP_UNKNOWN_DIAGNOSTIC")
+        self.assertEqual(event["category"], "UNKNOWN")
+        self.assertFalse(event["retryable"])
+        self.assertNotIn("message", event)
 
     def test_non_idempotent_tool_is_not_replayed_after_transport_auth_failure(self) -> None:
         class Writer:

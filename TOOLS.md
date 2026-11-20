@@ -194,6 +194,16 @@ command exposes the last renewal event without exposing expiry claims, bearer
 values, client secrets or response bodies. Renewal is independent from Core
 authorization, human delegation and AI Engine provider OAuth.
 
+Runtime and Core failures expose only bounded diagnostic metadata: `source`,
+`category`, `code`, `layer`, `retryable`, `action`, and when applicable
+`attempt`/`maxAttempts`. Recommended actions are allowlisted and do not
+authorize an automatic retry. `retryable` means that an automatic retry is
+permitted from the current boundary; it does not mean that every caller may
+retry without applying the operation-specific policy. `status --json` projects the last failure and
+`doctor --json` reports configuration, backend and token-endpoint checks.
+Neither command exposes bearer values, delegation proofs, payloads, prompts,
+provider responses or backend error bodies.
+
 Runtime tests use only the Python standard library:
 
 ```bash

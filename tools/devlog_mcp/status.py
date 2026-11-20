@@ -8,10 +8,11 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from runtime import process_start_time, state_root
+from runtime import diagnostic_for_code, process_start_time, required_configuration, state_root, validate_configuration
 
 
 def read_json(path: Path) -> dict:
@@ -71,6 +72,10 @@ def last_event_matching(directory: Path, events: set[str]) -> dict | None:
         "severity",
         "code",
         "reasonCode",
+        "category",
+        "layer",
+        "retryable",
+        "action",
         "attempt",
         "maxAttempts",
     )
@@ -80,7 +85,14 @@ def last_event_matching(directory: Path, events: set[str]) -> dict | None:
         except json.JSONDecodeError:
             continue
         if event.get("event") in events:
-            return {key: event[key] for key in bounded_fields if key in event}
+            projected = {key: event[key] for key in bounded_fields if key in event}
+            code = event.get("code") or event.get("reasonCode")
+            if isinstance(code, str):
+                diagnostic = diagnostic_for_code(code)
+                for key in ("code", "category", "layer", "retryable", "action"):
+                    if key in diagnostic:
+                        projected[key] = diagnostic[key]
+            return projected
     return None
 
 
@@ -120,15 +132,58 @@ def instance_status(directory: Path) -> dict:
     }
 
 
-def endpoint_status(url: str) -> dict:
+def endpoint_status(url: str, failure_code: str = "TRANSIENT_INFRASTRUCTURE") -> dict:
+    safe_url = safe_endpoint_url(url)
     try:
         request = urllib.request.Request(url, method="GET")
         with urllib.request.urlopen(request, timeout=3) as response:
-            return {"url": url, "httpStatus": response.status, "reachable": True}
+            return {"url": safe_url, "httpStatus": response.status, "reachable": True}
     except urllib.error.HTTPError as exception:
-        return {"url": url, "httpStatus": exception.code, "reachable": True}
+        code = failure_code if exception.code >= 500 else {
+            401: "CORE_AUTHENTICATION_FAILED",
+            403: "CORE_AUTHORIZATION_FAILED",
+            429: "RATE_LIMITED",
+        }.get(exception.code, "FUNCTIONAL_ERROR")
+        return {"url": safe_url, "httpStatus": exception.code, "reachable": True, **diagnostic_for_code(code)}
     except (urllib.error.URLError, TimeoutError, OSError) as exception:
-        return {"url": url, "reachable": False, "error": type(exception).__name__}
+        return {
+            "url": safe_url,
+            "reachable": False,
+            "error": type(exception).__name__,
+            **diagnostic_for_code(failure_code),
+        }
+
+
+def safe_endpoint_url(url: str) -> str:
+    """Remove userinfo, query and fragment before exposing an endpoint URL."""
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        hostname = parsed.hostname
+        if not parsed.scheme or not hostname:
+            return "<redacted>"
+        netloc = hostname
+        try:
+            if parsed.port is not None:
+                netloc = f"{netloc}:{parsed.port}"
+        except ValueError:
+            return "<redacted>"
+        return urllib.parse.urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))[:256]
+    except (TypeError, ValueError):
+        return "<redacted>"
+
+
+def configuration_status() -> dict:
+    try:
+        validate_configuration(required_configuration())
+        return {"name": "configuration", "ok": True, "action": "NONE"}
+    except RuntimeError as exception:
+        code = str(exception).split(":", 1)[0]
+        return {
+            "name": "configuration",
+            "ok": False,
+            "code": code,
+            **diagnostic_for_code(code),
+        }
 
 
 def main() -> int:
@@ -145,7 +200,11 @@ def main() -> int:
             "KEYCLOAK_TOKEN_ENDPOINT",
             "http://127.0.0.1:18084/realms/devlog/protocol/openid-connect/token",
         )
-        result["checks"] = [endpoint_status(backend + "/actuator/health"), endpoint_status(token)]
+        result["checks"] = [
+            configuration_status(),
+            {"name": "backend", **endpoint_status(backend + "/actuator/health", "TRANSIENT_INFRASTRUCTURE")},
+            {"name": "tokenEndpoint", **endpoint_status(token, "KEYCLOAK_UNREACHABLE")},
+        ]
     if args.as_json:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
