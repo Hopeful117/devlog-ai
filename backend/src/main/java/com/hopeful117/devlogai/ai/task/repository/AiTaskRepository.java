@@ -19,7 +19,10 @@ public interface AiTaskRepository extends JpaRepository<AiTask, UUID> {
 
     Optional<AiTask> findBySubmissionDigest(String submissionDigest);
 
-    Optional<AiTask> findByIdempotencyKeyHash(String idempotencyKeyHash);
+    Optional<AiTask> findByIdempotencyKeyHashAndIdempotencyScopeHash(
+            String idempotencyKeyHash, String idempotencyScopeHash);
+
+    Optional<AiTask> findByIdempotencyKeyHashAndIdempotencyScopeHashIsNull(String idempotencyKeyHash);
 
     Optional<AiTask> findByParentSnapshotId(UUID parentSnapshotId);
 

@@ -637,6 +637,42 @@ class RuntimeTests(unittest.TestCase):
 
         self.assertEqual(session.operations, {})
 
+    def test_story_agent_is_replayed_only_with_caller_idempotency_key(self) -> None:
+        class Writer:
+            def write(self, event, **fields):
+                pass
+
+        class Child:
+            stdin = io.BytesIO()
+
+        failure = {"jsonrpc": "2.0", "id": 1, "error": {
+            "code": -32600, "message": "Authentication is required"
+        }}
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10"},
+                Path(directory), Writer(), runtime.TokenLease("token", time.time() + 3600),
+            )
+            session.child = Child()
+            without_key = {
+                "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "devlog_story_agent", "arguments": {}}
+            }
+            session.forward(json.dumps(without_key).encode(), without_key)
+            with patch.object(session, "renew_if_needed") as renew:
+                self.assertFalse(session.retry_authentication(failure))
+                renew.assert_not_called()
+
+            with_key = {
+                "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                "params": {"name": "devlog_story_agent", "arguments": {
+                    "idempotencyKey": "story-agent-001"
+                }}
+            }
+            session.forward(json.dumps(with_key).encode(), with_key)
+            with patch.object(session, "renew_if_needed"):
+                self.assertTrue(session.retry_authentication({**failure, "id": 2}))
+
     def test_renewal_failure_emits_reauth_failure_and_releases_id(self) -> None:
         class Writer:
             def __init__(self):

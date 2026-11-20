@@ -167,9 +167,11 @@ not force-killed.
 The supervisor keeps the technical bearer as a private, bounded lease. Before
 forwarding a new JSON-RPC request whose lease is expired or near expiry, it
 reacquires the bearer and replaces only the owned Java child. The replacement
-replays only the MCP `initialize` handshake; already-forwarded requests are
-never replayed. If a request is still in flight or renewal cannot complete, the
-runtime fails closed with `MCP_REAUTH_REQUIRED`.
+replays only the MCP `initialize` handshake. Already-forwarded requests are not
+replayed unless the operation is explicitly classified as idempotent; the Story
+Agent requires a caller-provided `idempotencyKey` before it can enter that
+bounded replay path. If a request is still in flight or renewal cannot
+complete, the runtime fails closed with `MCP_REAUTH_REQUIRED`.
 
 When the MCP child returns the explicit bounded authentication error
 `Authentication is required` with JSON-RPC code `-32600`, the supervisor may

@@ -131,7 +131,7 @@ public class AnalyzeStoryContextUseCase {
 
         List<String> requestedFiles = files == null ? List.of() : List.copyOf(files);
         SubmissionIdentity identity = submissionIdentity(
-                projectSlug, storyId, requestedIntent, requestedFiles, null, guidance, idempotencyKey);
+                projectSlug, storyId, requestedIntent, requestedFiles, null, guidance, idempotencyKey, principal);
         Optional<UUID> existingSubmission = existingSubmission(identity);
         if (existingSubmission.isPresent()) {
             return existingSubmission.get();
@@ -156,7 +156,7 @@ public class AnalyzeStoryContextUseCase {
         authorizePrincipal(principal, project, "MCP_STORY_AGENT_EXECUTE");
         SubmissionIdentity identity = submissionIdentity(
                 prepared.projectSlug(), prepared.storyId(), prepared.intent(), prepared.files(),
-                prepared.question(), guidance, idempotencyKey);
+                prepared.question(), guidance, idempotencyKey, principal);
         Optional<UUID> existingSubmission = existingSubmission(identity);
         if (existingSubmission.isPresent()) {
             return existingSubmission.get();
@@ -187,12 +187,14 @@ public class AnalyzeStoryContextUseCase {
             PreparedStoryContext prepared, Map<String, Object> guidance, SubmissionIdentity identity,
             AuthenticatedPrincipal principal, String provider) {
         return submissionService.submit(
-                prepared, guidance, identity.submissionDigest(), identity.idempotencyKeyHash(), principal, provider);
+                prepared, guidance, identity.submissionDigest(), identity.idempotencyKeyHash(),
+                identity.idempotencyScopeHash(), principal, provider);
     }
 
     private SubmissionIdentity submissionIdentity(
             String projectSlug, UUID storyId, String requestedIntent, List<String> files,
-            String question, Map<String, Object> guidance, String idempotencyKey) {
+            String question, Map<String, Object> guidance, String idempotencyKey,
+            AuthenticatedPrincipal principal) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("projectSlug", projectSlug);
         values.put("storyId", storyId == null ? null : storyId.toString());
@@ -200,16 +202,31 @@ public class AnalyzeStoryContextUseCase {
         values.put("question", question);
         values.put("files", files);
         values.put("guidance", guidance == null ? Map.of() : guidance);
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return new SubmissionIdentity(digestService.sha256(digestService.canonicalJson(values)), null, null);
+        }
+        Map<String, Object> scope = new LinkedHashMap<>();
+        scope.put("operation", "story-context-agent");
+        scope.put("projectSlug", projectSlug);
+        scope.put("principalId", principal == null ? "INTERNAL" : principal.principalId());
+        scope.put("principalKind", principal == null ? "INTERNAL" : principal.kind().name());
+        scope.put("technicalActorId", principal == null ? null : principal.technicalActorId());
+        scope.put("delegationGrantId", principal == null ? null : principal.delegationGrantId());
+        scope.put("delegatedProjectId", principal == null ? null : principal.delegatedProjectId());
+        scope.put("delegatedScopes", principal == null ? null : principal.delegatedScopes());
         return new SubmissionIdentity(
                 digestService.sha256(digestService.canonicalJson(values)),
-                idempotencyKey == null || idempotencyKey.isBlank() ? null : digestService.sha256(idempotencyKey));
+                digestService.sha256(idempotencyKey),
+                digestService.sha256(digestService.canonicalJson(scope)));
     }
 
     private Optional<UUID> existingSubmission(SubmissionIdentity identity) {
-        aiTaskRepository.acquireSubmissionLock(identity.idempotencyKeyHash() == null
-                ? identity.submissionDigest() : identity.idempotencyKeyHash());
+        String lockKey = identity.idempotencyKeyHash() == null
+                ? identity.submissionDigest() : identity.idempotencyKeyHash();
+        aiTaskRepository.acquireSubmissionLock(lockKey);
         if (identity.idempotencyKeyHash() != null) {
-            Optional<AiTask> existing = aiTaskRepository.findByIdempotencyKeyHash(identity.idempotencyKeyHash());
+            Optional<AiTask> existing = aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(
+                    identity.idempotencyKeyHash(), identity.idempotencyScopeHash());
             if (existing.isPresent()) {
                 if (!Objects.equals(existing.get().getSubmissionDigest(), identity.submissionDigest())) {
                     throw new com.hopeful117.devlogai.shared.exception.ConflictException(
@@ -217,11 +234,18 @@ public class AnalyzeStoryContextUseCase {
                 }
                 return Optional.of(existing.get().getId());
             }
+            if (aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHashIsNull(
+                    identity.idempotencyKeyHash()).isPresent()) {
+                throw new com.hopeful117.devlogai.shared.exception.ConflictException(
+                        "Idempotency-Key is already bound to a legacy unscoped request");
+            }
+            return Optional.empty();
         }
         return aiTaskRepository.findBySubmissionDigest(identity.submissionDigest()).map(AiTask::getId);
     }
 
-    private record SubmissionIdentity(String submissionDigest, String idempotencyKeyHash) { }
+    private record SubmissionIdentity(
+            String submissionDigest, String idempotencyKeyHash, String idempotencyScopeHash) { }
 
     @Transactional
     public void handleCallback(UUID correlationId, AiTaskResultRequest request) {

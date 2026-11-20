@@ -437,13 +437,57 @@ class AnalyzeStoryContextUseCaseTest {
         when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
         when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
         when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
-        when(aiTaskRepository.findByIdempotencyKeyHash(any())).thenReturn(Optional.of(existing));
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectId), any())).thenReturn(true);
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(any(), any()))
+                .thenReturn(Optional.of(existing));
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                "grant-1", projectId.toString(), "MCP_STORY_AGENT_EXECUTE");
 
         assertThrows(com.hopeful117.devlogai.shared.exception.ConflictException.class,
-                () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null, "same-key"));
+                () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null,
+                        "same-key", principal, "chatgpt"));
+        ArgumentCaptor<String> keyHash = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> scopeHash = ArgumentCaptor.forClass(String.class);
+        verify(aiTaskRepository).findByIdempotencyKeyHashAndIdempotencyScopeHash(
+                keyHash.capture(), scopeHash.capture());
+        assertNotEquals(keyHash.getValue(), scopeHash.getValue());
+        assertEquals(64, scopeHash.getValue().length());
+        verify(aiTaskRepository, never()).findBySubmissionDigest(any());
         verify(engineeringContextFacade, never()).getCanonicalEngineeringContext(
                 any(), any(), any(), any());
         verify(analysisRepository, never()).save(any(Analysis.class));
+    }
+
+    @Test
+    void legacyUnscopedKeyCannotBeReusedAcrossTheScopedContract() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        AiTask legacy = AiTask.builder().id(UUID.randomUUID())
+                .submissionDigest("legacy-request")
+                .idempotencyKeyHash("legacy-key-hash")
+                .build();
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                "grant-1", projectId.toString(), "MCP_STORY_AGENT_EXECUTE");
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectId), any())).thenReturn(true);
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHashIsNull(any()))
+                .thenReturn(Optional.of(legacy));
+
+        assertThrows(com.hopeful117.devlogai.shared.exception.ConflictException.class,
+                () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null,
+                        "legacy-key", principal, "chatgpt"));
+        verify(engineeringContextFacade, never()).getCanonicalEngineeringContext(
+                any(), any(), any(), any());
+        verify(aiTaskRepository, never()).findBySubmissionDigest(any());
     }
 
     @Test

@@ -81,6 +81,7 @@ public class DevLogStoryAgentTool {
             @Nullable List<String> files,
             @Nullable Map<String, Object> guidance,
             @Nullable String idempotencyKey) {
+        requireIdempotencyKey(idempotencyKey);
         var principal = principalProvider.currentPrincipal()
                 .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
         return execute(projectSlug, storyId, intent, null, files, guidance, idempotencyKey, principal);
@@ -97,8 +98,9 @@ public class DevLogStoryAgentTool {
             @Nullable String question,
             @McpArg(description = "Optional repository file paths", required = false) @Nullable List<String> files,
             @McpArg(description = "Optional human guidance", required = false) @Nullable Map<String, Object> guidance,
-            @McpArg(description = "Optional idempotency key", required = false) @Nullable String idempotencyKey,
+            @McpArg(description = "Caller-provided idempotency key required for safe resumption", required = true) String idempotencyKey,
             McpSyncRequestContext requestContext) {
+        requireIdempotencyKey(idempotencyKey);
         var principal = principalProvider.currentPrincipal(requestContext)
                 .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
         String operationId = observability != null ? observability.newOperationId() : null;
@@ -161,6 +163,13 @@ public class DevLogStoryAgentTool {
             return objectMapper.writeValueAsString(execution);
         } catch (Exception exception) {
             throw new IllegalStateException("Unable to serialize DevLog Story Agent response", exception);
+        }
+    }
+
+    private static void requireIdempotencyKey(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw ResourceSupport.invalidParams(
+                    "Idempotency key is required for safe Story Agent resumption");
         }
     }
 

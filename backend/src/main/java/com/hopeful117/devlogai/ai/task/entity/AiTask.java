@@ -119,6 +119,9 @@ public class AiTask {
     @Column(name = "idempotency_key_hash", length = 64)
     private String idempotencyKeyHash;
 
+    @Column(name = "idempotency_scope_hash", length = 64)
+    private String idempotencyScopeHash;
+
     @Column(name = "parent_snapshot_id", updatable = false)
     private UUID parentSnapshotId;
 
