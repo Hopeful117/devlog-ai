@@ -20,7 +20,8 @@ public record RepositoryContext(
         List<SelectionDecision> selectionDecisions,
         List<String> warnings,
         String contextDigest,
-        List<CandidateMetadata> candidates
+        List<CandidateMetadata> candidates,
+        RepositoryRevisionScope revisionScope
 ) {
     public RepositoryContext {
         evidence = List.copyOf(evidence);
@@ -47,7 +48,24 @@ public record RepositoryContext(
                 contextIntelligenceExplanations, evidence, selectedByLayer,
                 RepositoryContextDiagnostics.empty(), budget, usedTokens,
                 candidateCount, discardedCount, truncated, selectionDecisions,
-                warnings, contextDigest, List.of());
+                warnings, contextDigest, List.of(), null);
+    }
+
+    public RepositoryContext(String contextVersion, ContextProfile profile,
+            List<String> activeProfileKeys, String contextPlanVersion,
+            List<String> contextIntelligenceExplanations,
+            List<RepositoryEvidence> evidence,
+            Map<RepositoryContextLayer, Integer> selectedByLayer,
+            RepositoryContextDiagnostics diagnostics,
+            ContextBudget budget, int usedTokens, int candidateCount,
+            int discardedCount, boolean truncated,
+            List<SelectionDecision> selectionDecisions, List<String> warnings,
+            String contextDigest, List<CandidateMetadata> candidates) {
+        this(contextVersion, profile, activeProfileKeys, contextPlanVersion,
+                contextIntelligenceExplanations, evidence, selectedByLayer,
+                diagnostics, budget, usedTokens, candidateCount, discardedCount,
+                truncated, selectionDecisions, warnings, contextDigest,
+                candidates, null);
     }
 
     public RepositoryContext(String contextVersion, ContextProfile profile,
@@ -63,7 +81,7 @@ public record RepositoryContext(
         this(contextVersion, profile, activeProfileKeys, contextPlanVersion,
                 contextIntelligenceExplanations, evidence, selectedByLayer,
                 diagnostics, budget, usedTokens, candidateCount, discardedCount,
-                truncated, selectionDecisions, warnings, contextDigest, List.of());
+                truncated, selectionDecisions, warnings, contextDigest, List.of(), null);
     }
 
     public record ContextBudget(

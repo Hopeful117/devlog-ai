@@ -262,6 +262,59 @@ class StoryContextAnalysisQueryServiceTest {
     }
 
     @Test
+    void shouldSerializeFreshnessWithNullableRevisionAndWarnings() {
+        UUID aiTaskId = UUID.randomUUID();
+        Map<String, Object> freshness = new java.util.LinkedHashMap<>();
+        freshness.put("status", "NO_BASELINE");
+        freshness.put("repositoryRevision", null);
+        freshness.put("contextRevision", null);
+        freshness.put("warnings", List.of("PROJECT_CONTEXT_STALE"));
+
+        StoryContextAnalysis analysis = StoryContextAnalysis.builder()
+                .id(UUID.randomUUID())
+                .analysisSnapshot(baseSnapshot("Nullable freshness"))
+                .contextDigest("digest")
+                .promptExecutionMetadata(Map.of())
+                .contextFreshness(freshness)
+                .createdAt(Instant.now())
+                .build();
+
+        when(storyContextAnalysisRepository.findByAiTaskId(aiTaskId))
+                .thenReturn(Optional.of(analysis));
+
+        StoryContextAnalysisResponse response =
+                storyContextAnalysisQueryService.findResponseByAiTaskId(aiTaskId).orElseThrow();
+
+        assertEquals("NO_BASELINE", response.contextFreshness().get("status"));
+        assertNull(response.contextFreshness().get("repositoryRevision"));
+        assertEquals(List.of("PROJECT_CONTEXT_STALE"), response.contextFreshness().get("warnings"));
+    }
+
+    @Test
+    void shouldExposeExecutionScopeAndProvenanceFromTaskSnapshot() {
+        UUID aiTaskId = UUID.randomUUID();
+        Map<String, Object> scope = Map.of("sourceId", "source-1", "resolvedRevision", "rev-1");
+        Map<String, Object> provenance = Map.of("document:source-1:docs/adr.md@rev-1",
+                Map.of("sourceType", "REPOSITORY_DOCUMENT"));
+        com.hopeful117.devlogai.ai.task.entity.AiTask task =
+                com.hopeful117.devlogai.ai.task.entity.AiTask.builder()
+                        .id(aiTaskId)
+                        .contextSnapshot(Map.of("executionScope", scope, "provenance", provenance))
+                        .build();
+        StoryContextAnalysis analysis = StoryContextAnalysis.builder()
+                .id(UUID.randomUUID()).aiTask(task).analysisSnapshot(baseSnapshot("Scoped"))
+                .contextDigest("digest").promptExecutionMetadata(Map.of()).createdAt(Instant.now()).build();
+
+        when(storyContextAnalysisRepository.findByAiTaskId(aiTaskId)).thenReturn(Optional.of(analysis));
+
+        StoryContextAnalysisResponse response =
+                storyContextAnalysisQueryService.findResponseByAiTaskId(aiTaskId).orElseThrow();
+
+        assertEquals(scope, response.executionScope());
+        assertEquals(provenance, response.provenance());
+    }
+
+    @Test
     void shouldPreservePerSourceInformation() {
         UUID aiTaskId = UUID.randomUUID();
         UUID sourceId1 = UUID.randomUUID();

@@ -60,7 +60,8 @@ public interface DevlogResourceClient {
             @PathVariable("projectId") UUID projectId,
             @RequestParam("query") String query,
             @RequestParam(value = "limit", required = false) Integer limit,
-            @RequestHeader("Authorization") String authorization);
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation);
 
     @GetExchange("/evidence/resolve")
     String resolveEvidence(

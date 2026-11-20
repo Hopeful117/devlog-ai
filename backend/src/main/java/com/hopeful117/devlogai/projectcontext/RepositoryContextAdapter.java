@@ -790,7 +790,8 @@ public class RepositoryContextAdapter {
                 context.candidates().stream()
                         .filter(candidate -> filteredReferences.contains(candidate.reference())
                                 || candidateScope.test(candidate))
-                        .toList()
+                        .toList(),
+                context.revisionScope()
         );
     }
 }

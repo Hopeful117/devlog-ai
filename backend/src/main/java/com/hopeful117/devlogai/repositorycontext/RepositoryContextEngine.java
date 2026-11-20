@@ -172,7 +172,7 @@ public class RepositoryContextEngine implements RepositoryContextService {
                 contextPlan.profileKeys(), contextPlan.planVersion(),
                 contextPlan.explanations(), selected, byLayer, diagnostics, budget,
                 selection.usedTokens(), candidates.size(), discarded, truncated,
-                selection.decisions(), warnings, digest, candidateMetadata);
+                selection.decisions(), warnings, digest, candidateMetadata, revisionScope);
         long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNano);
         String revision = revisionScope != null ? revisionScope.resolvedRevision() : "";
         String projectSlug = context.project() != null ? context.project().slug() : "";

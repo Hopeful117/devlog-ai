@@ -4,6 +4,7 @@ import com.hopeful117.devlogai.contracts.projectcontext.ProjectContext;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogResourceClient;
 import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
+import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
 import io.modelcontextprotocol.spec.McpError;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,6 +77,48 @@ class SearchProjectHistoryToolTest {
         tool.searchProjectHistory(SLUG, "engine", 5, null);
 
         verify(resourceClient).searchProjectHistory(PROJECT_ID, "engine", 5);
+    }
+
+    @Test
+    void shouldForwardRequestScopedBearerAndDelegation() {
+        McpAuthenticatedPrincipalProvider.McpPrincipal principal =
+                new McpAuthenticatedPrincipalProvider.McpPrincipal(
+                        "request-principal",
+                        McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN,
+                        "request",
+                        "Bearer request-token",
+                        "delegation-token");
+        McpAuthenticatedPrincipalProvider principalProvider = new McpAuthenticatedPrincipalProvider() {
+            @Override
+            public Optional<McpPrincipal> currentPrincipal() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<McpPrincipal> currentPrincipal(
+                    org.springframework.ai.mcp.annotation.context.McpSyncRequestContext requestContext) {
+                return Optional.of(principal);
+            }
+        };
+        ResourceSupport authenticatedSupport = new ResourceSupport(
+                projectContextClient, resourceClient, new ObjectMapper(), principalProvider);
+        SearchProjectHistoryTool authenticatedTool = new SearchProjectHistoryTool(
+                resourceClient, authenticatedSupport, principalProvider);
+        org.springframework.ai.mcp.annotation.context.McpSyncRequestContext requestContext =
+                mock(org.springframework.ai.mcp.annotation.context.McpSyncRequestContext.class);
+        when(projectContextClient.getProjectContextAuthenticated(
+                SLUG, "Bearer request-token", "delegation-token"))
+                .thenReturn(new ProjectContext(PROJECT_ID, SLUG, SLUG, "d", "ACTIVE", List.of()));
+        when(resourceClient.searchProjectHistoryAuthenticated(
+                PROJECT_ID, "engine", null, "Bearer request-token", "delegation-token"))
+                .thenReturn("{\"results\":[]}");
+
+        authenticatedTool.searchProjectHistory(SLUG, "engine", null, requestContext);
+
+        verify(projectContextClient).getProjectContextAuthenticated(
+                SLUG, "Bearer request-token", "delegation-token");
+        verify(resourceClient).searchProjectHistoryAuthenticated(
+                PROJECT_ID, "engine", null, "Bearer request-token", "delegation-token");
     }
 
     @Test

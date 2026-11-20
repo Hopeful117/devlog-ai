@@ -39,6 +39,7 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryContext;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextLayer;
 import com.hopeful117.devlogai.repositorycontext.RepositoryContextDiagnostics;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
+import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
@@ -799,8 +800,9 @@ class AnalyzeStoryContextUseCaseTest {
                     Map.of("candidateCount", 1, "selectedCount", 1, "discardedCount", 0,
                             "usedTokens", 1, "budget", 10), Map.of(), List.of());
             IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                    () -> StoryContextAgentProjectionV1.canonicalRevision(canonical));
+                     () -> StoryContextAgentProjectionV1.canonicalRevision(canonical));
             assertTrue(error.getMessage().contains("not resolvable"));
+            assertEquals("UNKNOWN", StoryContextAgentProjectionV1.canonicalRevisionOrUnknown(canonical));
         }
     }
 
@@ -832,6 +834,49 @@ class AnalyzeStoryContextUseCaseTest {
                         "usedTokens", 1, "budget", 10), Map.of(), List.of());
 
         assertEquals(PROJECT_REVISION, StoryContextAgentProjectionV1.canonicalRevision(canonical));
+    }
+
+    @Test
+    void projectionMarksEvidenceAndFreshnessRevisionMismatch() {
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                engineeringContext(), repositoryContext(), CONTEXT_DIGEST, "engineering-context-v2",
+                new ContextRequestEcho(PROJECT_SLUG, INTENT_ID, List.of(CANONICAL_REFERENCE), null),
+                Map.of("summary", Map.of("status", "STALE", "repositoryRevision", "freshness-revision")),
+                Map.of("candidateCount", 1, "selectedCount", 1, "discardedCount", 0,
+                        "usedTokens", 1, "budget", 10), Map.of(), List.of());
+
+        Map<String, Object> projection = StoryContextAgentProjectionV1.build(
+                canonical, PROJECT_SLUG, null, INTENT_ID, List.of(CANONICAL_REFERENCE), null,
+                new ObjectMapper());
+
+        Map<?, ?> freshness = (Map<?, ?>) projection.get("freshness");
+        assertEquals("MISMATCH", freshness.get("revisionConsistency"));
+        assertEquals(Map.of("evidenceRevision", PROJECT_REVISION,
+                        "freshnessRevision", "freshness-revision"), freshness.get("revisionMismatch"));
+    }
+
+    @Test
+    void projectionRejectsScopeAndEvidenceRevisionMismatch() {
+        RepositoryContext base = repositoryContext();
+        RepositoryContext scoped = new RepositoryContext(
+                base.contextVersion(), base.profile(), base.activeProfileKeys(), base.contextPlanVersion(),
+                base.contextIntelligenceExplanations(), base.evidence(), base.selectedByLayer(),
+                base.diagnostics(), base.budget(), base.usedTokens(), base.candidateCount(),
+                base.discardedCount(), base.truncated(), base.selectionDecisions(), base.warnings(),
+                base.contextDigest(), base.candidates(), new RepositoryRevisionScope(
+                        UUID.randomUUID(), UUID.randomUUID(), "different-revision",
+                        java.nio.file.Path.of("/workspace"), "STORY_TARGET_COMMIT"));
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                engineeringContext(), scoped, CONTEXT_DIGEST, "engineering-context-v2",
+                new ContextRequestEcho(PROJECT_SLUG, INTENT_ID, List.of(CANONICAL_REFERENCE), null),
+                Map.of("sourceRevision", Map.of("kind", "PROJECT_REVISION",
+                        "project", PROJECT_SLUG, "revision", PROJECT_REVISION)),
+                Map.of("candidateCount", 1, "selectedCount", 1, "discardedCount", 0,
+                        "usedTokens", 1, "budget", 10), Map.of(), List.of());
+
+        assertThrows(IllegalArgumentException.class, () -> StoryContextAgentProjectionV1.build(
+                canonical, PROJECT_SLUG, null, INTENT_ID, List.of(CANONICAL_REFERENCE), null,
+                new ObjectMapper()));
     }
 
     @Test
