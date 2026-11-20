@@ -9,6 +9,7 @@ import os
 import re
 import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -35,6 +36,8 @@ MAX_COMPLETED_INSTANCES = 20
 DEFAULT_RENEWAL_MARGIN_SECONDS = 30
 DEFAULT_RENEWAL_COOLDOWN_SECONDS = 10
 DEFAULT_MINIMUM_LEASE_SECONDS = 5
+DEFAULT_TOKEN_RETRY_BACKOFF_SECONDS = 1
+MAX_TOKEN_RETRY_BACKOFF_SECONDS = 60
 TOOL_SCHEMA_VERSION = "mcp-tool-observability-v1"
 TOOL_ACTIVE = "ACTIVE"
 TOOL_RESPONDED = "RESPONDED"
@@ -186,6 +189,10 @@ def required_configuration() -> dict[str, str]:
         ),
         "minimum_lease_seconds": env(
             "DEVLOG_MCP_MINIMUM_LEASE_SECONDS", str(DEFAULT_MINIMUM_LEASE_SECONDS)
+        ),
+        "token_retry_backoff_seconds": env(
+            "DEVLOG_MCP_TOKEN_RETRY_BACKOFF_SECONDS",
+            str(DEFAULT_TOKEN_RETRY_BACKOFF_SECONDS),
         ),
         "core_base_url": env("DEVLOG_BACKEND_BASE_URL", "http://localhost:18080"),
         "project_slug": env("DEVLOG_MCP_PROJECT_SLUG", ""),
@@ -368,9 +375,17 @@ def validate_configuration(configuration: dict[str, str]) -> None:
     jar = Path(configuration["jar"])
     if not jar.is_file() or not os.access(jar, os.R_OK):
         raise RuntimeError("MCP_JAR_MISSING")
-    for name in ("renewal_margin_seconds", "renewal_cooldown_seconds", "minimum_lease_seconds"):
+    for name in (
+        "renewal_margin_seconds",
+        "renewal_cooldown_seconds",
+        "minimum_lease_seconds",
+        "token_retry_backoff_seconds",
+    ):
         try:
-            if not math.isfinite(float(configuration[name])) or float(configuration[name]) < 0:
+            value = float(configuration[name])
+            if not math.isfinite(value) or value < 0:
+                raise ValueError
+            if name == "token_retry_backoff_seconds" and value > MAX_TOKEN_RETRY_BACKOFF_SECONDS:
                 raise ValueError
         except (KeyError, TypeError, ValueError):
             raise RuntimeError("CONFIGURATION_INVALID: renewal timing is invalid")
@@ -542,36 +557,89 @@ class RuntimeSession:
     def minimum_lease(self) -> float:
         return float(self.configuration.get("minimum_lease_seconds", DEFAULT_MINIMUM_LEASE_SECONDS))
 
+    @property
+    def token_retry_backoff(self) -> float:
+        value = float(
+            self.configuration.get("token_retry_backoff_seconds", DEFAULT_TOKEN_RETRY_BACKOFF_SECONDS)
+        )
+        if not math.isfinite(value) or not 0 <= value <= MAX_TOKEN_RETRY_BACKOFF_SECONDS:
+            raise RuntimeError("CONFIGURATION_INVALID")
+        return value
+
+    @staticmethod
+    def is_transient_token_error(exception: BaseException) -> bool:
+        if isinstance(exception, TimeoutError):
+            return True
+        if isinstance(exception, urllib.error.HTTPError):
+            return exception.code in {502, 503, 504}
+        if isinstance(exception, urllib.error.URLError):
+            return isinstance(exception.reason, (TimeoutError, socket.timeout))
+        return False
+
+    @staticmethod
+    def token_retry_code(exception: BaseException) -> str:
+        if isinstance(exception, urllib.error.HTTPError):
+            return "TOKEN_ENDPOINT_5XX"
+        return "TOKEN_ENDPOINT_TIMEOUT"
+
+    def acquire_token_with_retry(self) -> TokenLease:
+        try:
+            return acquire_token(self.configuration)
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exception:
+            if not self.is_transient_token_error(exception):
+                raise
+            self.writer.write(
+                "TOKEN_RENEWAL_RETRY",
+                severity="WARN",
+                code=self.token_retry_code(exception),
+                attempt=1,
+                maxAttempts=1,
+            )
+            with self.lock:
+                if self.stop_requested.is_set():
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
+            try:
+                if self.stop_requested.wait(timeout=self.token_retry_backoff):
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
+            except OverflowError as exception:
+                raise RuntimeError("CONFIGURATION_INVALID") from exception
+            with self.lock:
+                if self.stop_requested.is_set():
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
+            return acquire_token(self.configuration)
+
     def start_child(self, replay_initialize: bool = False) -> None:
         with self.lock:
+            if self.stop_requested.is_set():
+                raise RuntimeError("MCP_INSTANCE_STOPPING")
             self.generation += 1
             generation = self.generation
-        child_env = os.environ.copy()
-        child_env["DEVLOG_MCP_BEARER_TOKEN"] = self.lease.token
-        child_env["KEYCLOAK_ISSUER_URI"] = self.configuration["issuer_uri"]
-        child_env.setdefault("KEYCLOAK_AUDIENCE", "devlog-core")
-        child_env["KEYCLOAK_JWKS_URI"] = self.configuration["jwks_uri"]
-        child_env["KEYCLOAK_MCP_ACTOR_CLIENT_ID"] = self.configuration["actor_client_id"]
-        try:
-            child = subprocess.Popen(
-                ["java", "-jar", self.configuration["jar"]],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=child_env,
-            )
-        except OSError as exception:
-            raise RuntimeError("MCP_PROCESS_FAILED") from exception
-        self.child = child
-        self.ready = threading.Event()
-        self.suppress_initialize_response = replay_initialize and self.initialize_raw is not None
-        update_manifest(self.directory, state="RUNNING", mcpPid=child.pid, mcpStartTime=process_start_time(child.pid))
-        self.writer.write("MCP_PROCESS_STARTED", mcpPid=child.pid)
-        threading.Thread(target=self.relay_stdout, args=(child, generation), daemon=True).start()
-        threading.Thread(target=self.relay_stderr, args=(child,), daemon=True).start()
-        if replay_initialize and self.initialize_raw is not None and child.stdin is not None:
-            child.stdin.write(self.initialize_raw)
-            child.stdin.flush()
+            child_env = os.environ.copy()
+            child_env["DEVLOG_MCP_BEARER_TOKEN"] = self.lease.token
+            child_env["KEYCLOAK_ISSUER_URI"] = self.configuration["issuer_uri"]
+            child_env.setdefault("KEYCLOAK_AUDIENCE", "devlog-core")
+            child_env["KEYCLOAK_JWKS_URI"] = self.configuration["jwks_uri"]
+            child_env["KEYCLOAK_MCP_ACTOR_CLIENT_ID"] = self.configuration["actor_client_id"]
+            try:
+                child = subprocess.Popen(
+                    ["java", "-jar", self.configuration["jar"]],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    env=child_env,
+                )
+            except OSError as exception:
+                raise RuntimeError("MCP_PROCESS_FAILED") from exception
+            self.child = child
+            self.ready = threading.Event()
+            self.suppress_initialize_response = replay_initialize and self.initialize_raw is not None
+            update_manifest(self.directory, state="RUNNING", mcpPid=child.pid, mcpStartTime=process_start_time(child.pid))
+            self.writer.write("MCP_PROCESS_STARTED", mcpPid=child.pid)
+            threading.Thread(target=self.relay_stdout, args=(child, generation), daemon=True).start()
+            threading.Thread(target=self.relay_stderr, args=(child,), daemon=True).start()
+            if replay_initialize and self.initialize_raw is not None and child.stdin is not None:
+                child.stdin.write(self.initialize_raw)
+                child.stdin.flush()
 
     def stop_child(self, code: str) -> None:
         terminal_events: list[tuple[ToolOperation, int]] = []
@@ -664,7 +732,12 @@ class RuntimeSession:
                 if isinstance(message.get("error"), dict):
                     terminal_generation = generation if generation is not None else operation.current_generation
                     if self._finish_operation_locked(operation, TOOL_FAILED, terminal_generation):
-                        terminal_event = (operation, TOOL_FAILED, terminal_generation, "MCP_JSONRPC_ERROR")
+                        terminal_event = (
+                            operation,
+                            TOOL_FAILED,
+                            terminal_generation,
+                            self.jsonrpc_error_reason(message),
+                        )
                 else:
                     terminal_generation = generation if generation is not None else operation.current_generation
                     if operation.tool_name in DEVLOG_CORRELATION_TOOLS:
@@ -675,6 +748,21 @@ class RuntimeSession:
                         terminal_event = (operation, TOOL_RESPONDED, terminal_generation, None)
             if terminal_event is not None:
                 self._emit_terminal_event(*terminal_event)
+
+    @staticmethod
+    def jsonrpc_error_reason(message: Any) -> str:
+        if not isinstance(message, dict) or not isinstance(message.get("error"), dict):
+            return "MCP_JSONRPC_ERROR"
+        data = message["error"].get("data")
+        if not isinstance(data, dict):
+            return "MCP_JSONRPC_ERROR"
+        category = data.get("category")
+        return {
+            "CORE_AUTHENTICATION": "CORE_AUTHENTICATION_FAILED",
+            "CORE_AUTHORIZATION": "CORE_AUTHORIZATION_FAILED",
+            "DELEGATION_AUTHENTICATION": "DELEGATION_FAILED",
+            "PROVIDER_AUTHENTICATION": "PROVIDER_FAILED",
+        }.get(category, "MCP_JSONRPC_ERROR")
 
     @staticmethod
     def is_transport_auth_failure(message: Any) -> bool:
@@ -741,7 +829,6 @@ class RuntimeSession:
                         terminal_event = (current, state, current.current_generation, reason_code)
             if terminal_event is not None:
                 self._emit_terminal_event(*terminal_event)
-            self.stop_requested.set()
             self.stop_child("MCP_REAUTH_REQUIRED")
             return False
 
@@ -811,11 +898,15 @@ class RuntimeSession:
             self.writer.write("TOKEN_EXPIRED", severity="INFO", code="TOKEN_RENEWAL_REQUIRED")
             self.writer.write("TOKEN_RENEWAL_STARTED")
         try:
-            lease = acquire_token(self.configuration)
+            lease = self.acquire_token_with_retry()
             if lease.expires_at - time.time() < self.minimum_lease:
                 raise RuntimeError("TOKEN_RESPONSE_INVALID")
-            self.stop_child("TOKEN_RENEWAL")
             with self.lock:
+                if self.stop_requested.is_set():
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
+                self.stop_child("TOKEN_RENEWAL")
+                if self.stop_requested.is_set():
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
                 self.lease = lease
                 self.start_child(replay_initialize=self.initialize_raw is not None)
                 has_initialize = self.initialize_raw is not None
@@ -832,7 +923,9 @@ class RuntimeSession:
                 self.last_renewal_failure = time.time()
             code = str(exception).split(":", 1)[0]
             if isinstance(exception, urllib.error.HTTPError):
-                code = "TOKEN_RENEWAL_FAILED"
+                code = "TOKEN_ENDPOINT_5XX" if exception.code in {500, 502, 503, 504} else "TOKEN_ENDPOINT_REJECTED"
+            elif isinstance(exception, (urllib.error.URLError, TimeoutError)):
+                code = "TOKEN_ENDPOINT_TIMEOUT"
             self.writer.write("TOKEN_RENEWAL_FAILED", severity="ERROR", code=code)
             raise RuntimeError("MCP_REAUTH_REQUIRED") from exception
 
@@ -918,7 +1011,6 @@ class RuntimeSession:
             while not self.stop_requested.is_set():
                 chunk = sys.stdin.buffer.read1(65536)
                 if not chunk:
-                    self.stop_requested.set()
                     push_thread = self.pusher.push_session_lifecycle_event("SESSION_LIFECYCLE_ENDED")
                     self.stop_child("STDIN_CLOSED")
                     if push_thread is not None:
@@ -937,11 +1029,10 @@ class RuntimeSession:
                     self.forward(raw, message)
         except RuntimeError as exception:
             self.writer.write("MCP_INSTANCE_STOPPED", severity="ERROR", code=str(exception))
-            self.stop_requested.set()
             self.stop_child(str(exception))
         except (BrokenPipeError, OSError):
             self.writer.write("MCP_INSTANCE_STOPPED", severity="WARN", code="STDIN_RELAY_FAILED")
-            self.stop_requested.set()
+            self.stop_child("STDIN_RELAY_FAILED")
 
 
 def terminate_child(child: subprocess.Popen[bytes], writer: EventWriter, code: str) -> None:
@@ -1038,12 +1129,10 @@ def main() -> int:
         while session.child is not None and session.child.poll() is None and not session.stop_requested.is_set():
             if os.getppid() != parent_pid or process_start_time(parent_pid) != parent_start:
                 writer.write("MCP_PARENT_DISAPPEARED", severity="WARN", code="PARENT_PROCESS_GONE")
-                session.stop_requested.set()
                 session.stop_child("PARENT_PROCESS_GONE")
                 break
             time.sleep(0.25)
     except KeyboardInterrupt:
-        session.stop_requested.set()
         session.stop_child("SIGNAL_RECEIVED")
 
     child = session.child
