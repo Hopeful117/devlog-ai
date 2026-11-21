@@ -125,19 +125,10 @@ def _final_response(request: Any) -> ProviderResponse:
 def _q1_runtime_input(config: Mapping[str, Any]) -> Iterator[None]:
     original = v4_runtime.condition_input
 
-    def condition_input(_condition: str, _question_id: str, _repetition: int) -> dict[str, Any]:
-        return {
-            "benchmarkVersion": "devlog-ai-q1-1.0.0",
-            "questionId": "Q1",
-            "questionVersion": "1.0.0",
-            "question": config["question"],
-            "condition": "AGENT_DIRECT_OPEN",
-            "repetition": 1,
-            "repositoryId": config["repository"]["repositoryId"],
-            "repositoryRevision": config["repository"]["revision"],
-            "accessMode": "READ_ONLY_PINNED_REPOSITORY_OPEN_SAFETY_CEILINGS",
-            "allowedOperations": ["read_file", "search_repository", "git_log", "git_show", "git_diff", "inspect_commit"],
-        }
+    def condition_input(condition: str, question_id: str, repetition: int) -> dict[str, Any]:
+        value = dict(original(condition, question_id, repetition))
+        value["repositoryRevision"] = config["repository"]["revision"]
+        return value
 
     v4_runtime.condition_input = condition_input
     try:
