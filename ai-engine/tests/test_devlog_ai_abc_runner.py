@@ -68,7 +68,12 @@ def test_result_payload_extracts_json_safe_summary_from_run_result(tmp_path: Pat
     summary = {"status": "PASS", "runRoot": str(tmp_path)}
     result = RunResult(run_root=tmp_path, summary=summary, integrity={"status": "PASS"})
 
+    class EquivalentRunResult:
+        def __init__(self) -> None:
+            self.summary = summary
+
     assert _result_payload(result) == summary
+    assert _result_payload(EquivalentRunResult()) == summary
     assert _result_payload(summary) == summary
 
 

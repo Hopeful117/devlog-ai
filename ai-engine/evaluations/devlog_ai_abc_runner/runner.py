@@ -345,6 +345,12 @@ def _result_payload(result: RunResult | dict[str, Any]) -> dict[str, Any]:
 
     if isinstance(result, RunResult):
         return result.summary
+    # ``python -m`` can load this module once as ``__main__`` and once under
+    # its package name when live adapters import it. Handle that second class
+    # identity without weakening the JSON boundary for ordinary values.
+    summary = getattr(result, "summary", None)
+    if isinstance(summary, dict):
+        return summary
     return result
 
 
