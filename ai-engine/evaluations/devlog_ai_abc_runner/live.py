@@ -120,6 +120,12 @@ def _is_sha256(value: object) -> bool:
     )
 
 
+def _is_runtime_revision(value: object) -> bool:
+    return isinstance(value, str) and len(value) in (40, 64) and all(
+        character in "0123456789abcdef" for character in value
+    )
+
+
 def load_q1_oracle(path: str | Path, *, expected_revision: str) -> dict[str, Any]:
     try:
         document = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -189,7 +195,7 @@ def validate_live_authorization(
         raise LiveAuthorizationError("authorization condition set mismatch")
     if authorization["repositoryRevision"] != manifest["repositoryRevision"]:
         raise LiveAuthorizationError("authorization repository revision mismatch")
-    if not _is_sha256(authorization["runtimeRevision"]):
+    if not _is_runtime_revision(authorization["runtimeRevision"]):
         raise LiveAuthorizationError("authorization runtime revision is invalid")
     if authorization["provider"] != manifest["provider"] or authorization["model"] != manifest["model"]:
         raise LiveAuthorizationError("authorization provider/model mismatch")
