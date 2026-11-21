@@ -199,7 +199,7 @@ class PinnedGitRepositoryTools(RepositoryToolServer):
             if not isinstance(query, str) or not query:
                 raise RuntimeContractError("repository search query is required")
             try:
-                result = _git_command(self.repository, "grep", "-n", "-I", "-F", "-z", query, self.revision, "--", *[_validate_path(path) for path in arguments.get("paths", [])], timeout=self.timeout_seconds)
+                result = _git_command(self.repository, "grep", "-n", "-I", "-F", "-z", query, self.revision, "--", *[_validate_path(path) for path in (arguments.get("paths") or [])], timeout=self.timeout_seconds)
             except RuntimeContractError:
                 return {"operation": operation, "query": query, "matches": []}
             matches = []
