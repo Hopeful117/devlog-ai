@@ -5,6 +5,7 @@ __all__ = [
     "INTEGRATION_SIMULATION",
     "LIVE",
     "LIVE_PREFLIGHT",
+    "LIVE_PREPARE",
     "LiveNotAuthorized",
     "ManifestValidationError",
     "RunResult",
@@ -13,6 +14,7 @@ __all__ = [
     "run_dry_run",
     "run_integration_simulation",
     "run_live_preflight",
+    "run_live_prepare",
 ]
 
 

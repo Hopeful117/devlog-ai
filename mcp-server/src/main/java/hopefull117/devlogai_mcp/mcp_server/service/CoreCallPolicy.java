@@ -5,6 +5,7 @@ import io.modelcontextprotocol.spec.McpSchema.ErrorCodes;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import hopefull117.devlogai_mcp.mcp_server.config.DevlogAuthDiagnostic;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -30,7 +31,9 @@ public final class CoreCallPolicy {
         if (exception instanceof RestClientResponseException responseException) {
             HttpStatus status = HttpStatus.resolve(responseException.getStatusCode().value());
             if (status == HttpStatus.UNAUTHORIZED) {
-                return coreAuthenticationFailed("Authentication is required to access DevLog backend");
+                return coreAuthenticationFailed(
+                        "Authentication is required to access DevLog backend",
+                        DevlogAuthDiagnostic.from(responseException));
             }
             if (status == HttpStatus.FORBIDDEN) {
                 return hideForbidden
@@ -82,8 +85,24 @@ public final class CoreCallPolicy {
     }
 
     public static McpError coreAuthenticationFailed(String message) {
-        return categorized(message, "CORE_AUTHENTICATION", "CORE_AUTHENTICATION_FAILED",
-                "CHECK_CORE_AUTHORIZATION");
+        return coreAuthenticationFailed(message, null);
+    }
+
+    private static McpError coreAuthenticationFailed(String message, String diagnostic) {
+        Map<String, Object> data = new java.util.HashMap<>(Map.of(
+                "source", "CORE",
+                "category", "CORE_AUTHENTICATION",
+                "code", "CORE_AUTHENTICATION_FAILED",
+                "layer", "CORE",
+                "retryable", false,
+                "action", "CHECK_CORE_AUTHORIZATION"));
+        if (diagnostic != null) {
+            data.put("authDiagnostic", diagnostic);
+        }
+        return McpError.builder(ErrorCodes.INVALID_REQUEST)
+                .message(message)
+                .data(data)
+                .build();
     }
 
     public static McpError coreAuthorizationFailed(String message) {

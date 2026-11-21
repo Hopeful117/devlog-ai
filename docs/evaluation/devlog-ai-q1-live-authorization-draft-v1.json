@@ -1,0 +1,59 @@
+{
+  "status": "AUTHORIZED_FOR_Q1_TECHNICAL_VALIDATION",
+  "purpose": "Human-review template for one bounded Q1 A/B/C campaign",
+  "authorizationStatus": "AUTHORIZED",
+  "approverId": "Hopeful117",
+  "approvedAt": "2026-11-21T02:11:34Z",
+  "campaignId": "devlog-ai-abc-first-test",
+  "manifestId": "devlog-ai-abc-first-test",
+  "manifestVersion": "1.1.0",
+  "manifestDigest": "c533be54e8189273f6fb81956a1587330f513cfefbe2512032063afc096f06bd",
+  "oracleStatus": "Q1_ORACLE_ACCEPTED",
+  "oracleDigest": "2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e",
+  "authorizedObservationIds": [
+    "Q1-A-DEVLOG-CURRENT-r1",
+    "Q1-B-DIRECT-INVESTIGATOR-r1",
+    "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1"
+  ],
+  "authorizedConditions": [
+    "A_DEVLOG_CURRENT",
+    "B_DIRECT_INVESTIGATOR",
+    "C_DEVLOG_ENGINEERING_ANALYST"
+  ],
+  "repositoryRevision": "60fae3e0e1104d0ffbe3832c1f578ed532b1268a",
+  "runtimeRevision": "9d2e4193ebd8c33f46a9df470f03aac424f28ca6",
+  "provider": "openai_chatgpt",
+  "model": "gpt-5.6-luna",
+  "budgets": {
+    "maxModelTurns": 8,
+    "maxProviderCalls": 8,
+    "maxToolOrActionOperations": 8,
+    "maxReadBytesPerOperation": 64000,
+    "maxReadTokensPerOperation": 8000,
+    "maxWallClockSeconds": 120,
+    "maxOutputTokensPerResponse": 32768
+  },
+  "limits": {
+    "maxModelTurns": 8,
+    "maxProviderCalls": 8,
+    "maxToolOrActionOperations": 8,
+    "maxReadBytesPerOperation": 64000,
+    "maxReadTokensPerOperation": 8000,
+    "maxWallClockSeconds": 120,
+    "maxOutputTokensPerResponse": 32768
+  },
+  "pricingStatus": "APPROVED",
+  "pricingVersion": "q1-chatgpt-oauth-pricing-v1",
+  "pricingDigest": "0b48079816061d0660476bf2bb5d08572ff5f3378be7d5f3ba77d4013c229fbd",
+  "costCeiling": {
+    "currency": "NOT_APPLICABLE",
+    "maxAmount": "NOT_MEASURED"
+  },
+  "expiresAtEpochSeconds": 1795312458,
+  "notes": [
+    "This draft contains no credentials or OAuth tokens.",
+    "Q1 oracle acceptance and the non-metered operational-limit pricing policy are recorded; this draft still does not authorize live execution.",
+    "Human approval metadata is recorded, but authorization remains pending runtime binding and final execution confirmation.",
+    "The manifest operational limits are the only execution ceiling; no monetary cost is calculated."
+  ]
+}

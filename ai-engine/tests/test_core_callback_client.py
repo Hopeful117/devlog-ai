@@ -170,6 +170,42 @@ async def test_callback_retries_not_ready_then_succeeds_with_same_payload() -> N
 
 
 @pytest.mark.asyncio
+async def test_callback_retries_task_not_found_during_transaction_commit() -> None:
+    correlation_id = uuid4()
+    requests: list[bytes] = []
+    delays: list[float] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(await request.aread())
+        if len(requests) == 1:
+            return httpx.Response(
+                404,
+                json={"message": "AI task not found with identifier: task-id"},
+            )
+        return httpx.Response(200, json=acknowledgement(correlation_id))
+
+    async def record_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    client = CoreCallbackClient(
+        "http://core.test",
+        callback_secret="test-secret",
+        transport=httpx.MockTransport(handler),
+        max_attempts=3,
+        sleep=record_sleep,
+    )
+
+    result = await client.send_result(
+        uuid4(), correlation_id, callback_result(correlation_id)
+    )
+
+    assert result.acknowledged is True
+    assert len(requests) == 2
+    assert requests[0] == requests[1]
+    assert delays == [0.1]
+
+
+@pytest.mark.asyncio
 async def test_callback_reports_bounded_error_after_retry_exhaustion() -> None:
     correlation_id = uuid4()
     attempts = 0

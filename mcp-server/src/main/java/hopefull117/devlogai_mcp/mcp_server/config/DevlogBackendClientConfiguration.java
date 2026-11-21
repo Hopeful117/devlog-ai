@@ -81,9 +81,16 @@ public class DevlogBackendClientConfiguration {
             long startedAt = System.nanoTime();
             try {
                 var response = execution.execute(request, body);
-                log.info("DevLog backend request completed method={} uri={} status={} durationMs={}",
+                String authDiagnostic = response.getHeaders().getFirst(DevlogAuthDiagnostic.HEADER_NAME);
+                if (response.getStatusCode().value() == 401) {
+                    log.warn("DevLog backend authentication failed method={} uri={} status={} authDiagnostic={} durationMs={}",
+                            request.getMethod(), request.getURI(), response.getStatusCode().value(),
+                            authDiagnostic, elapsedMillis(startedAt));
+                } else {
+                    log.info("DevLog backend request completed method={} uri={} status={} durationMs={}",
                         request.getMethod(), request.getURI(), response.getStatusCode().value(),
                         elapsedMillis(startedAt));
+                }
                 return response;
             } catch (Exception exception) {
                 log.error("DevLog backend request failed method={} uri={} durationMs={} exceptionType={}",

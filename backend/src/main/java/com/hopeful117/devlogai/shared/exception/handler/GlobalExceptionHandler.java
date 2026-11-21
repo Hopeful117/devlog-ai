@@ -13,11 +13,13 @@ import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.shared.exception.InvalidParameterException;
 import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
+import com.hopeful117.devlogai.authorization.OidcAuthenticationFailureDiagnostics;
 import com.hopeful117.devlogai.aicredentialbinding.service.CredentialAssociationVerificationException;
 import com.hopeful117.devlogai.shared.logging.CorrelationIdFilter;
 import com.hopeful117.devlogai.shared.response.ApiErrorCode;
 import com.hopeful117.devlogai.shared.response.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.http.HttpStatus;
@@ -39,7 +41,13 @@ import java.time.Instant;
 public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthenticatedPrincipalException.class)
     public ResponseEntity<ApiErrorResponse> handleUnauthenticated(
-            UnauthenticatedPrincipalException exception, HttpServletRequest request) {
+            UnauthenticatedPrincipalException exception,
+            HttpServletRequest request,
+            HttpServletResponse response) {
+        response.setHeader(OidcAuthenticationFailureDiagnostics.HEADER_NAME,
+                "PRINCIPAL_RESOLUTION_FAILED");
+        log.warn("Application authentication rejected path={} diagnostic=PRINCIPAL_RESOLUTION_FAILED",
+                request.getRequestURI());
         return response(HttpStatus.UNAUTHORIZED, ApiErrorCode.UNAUTHENTICATED,
                 "Authentication is required.", request);
     }

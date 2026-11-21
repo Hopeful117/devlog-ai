@@ -91,6 +91,17 @@ class SemanticRetrievalContextCollectorTest {
         verifyNoInteractions(repository);
     }
 
+    @Test
+    void nullGuidance_usesIntentObjectiveWithoutThrowing() {
+        stubEmbedding();
+        when(repository.findByProjectIdAndSimilarity(any(), any(), anyInt(), anyFloat()))
+                .thenReturn(List.of());
+
+        assertThatCode(() -> collector.collect(requestWithNullGuidance("test query")))
+                .doesNotThrowAnyException();
+        verify(embeddingClient).embed(eq(List.of("test query")), eq("text-embedding-3-small"));
+    }
+
     // --- layer and kind mapping ---
 
     @Test
@@ -258,6 +269,14 @@ class SemanticRetrievalContextCollectorTest {
     }
 
     private ContextRequest requestWith(String objective) {
+        return requestWith(objective, new UserGuidance(null, null, null, null, null, List.of()));
+    }
+
+    private ContextRequest requestWithNullGuidance(String objective) {
+        return requestWith(objective, null);
+    }
+
+    private ContextRequest requestWith(String objective, UserGuidance guidance) {
         AnalysisContext analysisContext = new AnalysisContext(
                 new AnalysisContext.ProjectSnapshot(PROJECT_ID, "Test Project",
                         "test-project", "A test project", ProjectStatus.ACTIVE),
@@ -272,8 +291,6 @@ class SemanticRetrievalContextCollectorTest {
                 List.of(InsightType.ARCHITECTURE_DESCRIPTION),
                 List.of("grounded"), Map.of("type", "object"),
                 "test-prompt", List.of("architecture-v1"));
-
-        UserGuidance guidance = new UserGuidance(null, null, null, null, null, List.of());
 
         return new ContextRequest(
                 analysisContext, intent, guidance, List.of(),

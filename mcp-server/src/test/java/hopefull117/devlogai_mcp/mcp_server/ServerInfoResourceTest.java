@@ -35,12 +35,15 @@ class ServerInfoResourceTest {
                 "get_engineering_context",
                 "open_devlog_companion",
                 "register_project",
+                "resolve_engineering_story",
                 "search_project_history",
                 "story_context_agent_follow_up_authenticated",
                 "story_context_agent_get_projection",
                 "story_context_agent_get_snapshot_authenticated",
+                "story_context_agent_prepare_task_binding",
                 "story_context_agent_submit_task",
-                "sync_project_history");
+                "sync_project_history",
+                "sync_project_stories");
         assertThat(values(result.path("tools"), "description"))
                 .allSatisfy(description -> assertThat(description).isNotBlank());
         assertThat(result.path("prompts").isArray()).isTrue();

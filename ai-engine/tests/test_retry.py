@@ -39,7 +39,7 @@ def prompt() -> Prompt:
 
 
 @pytest.mark.asyncio
-async def test_no_retry_on_success():
+async def test_no_retry_on_success(prompt):
     """Successful call should not retry."""
     client = AsyncMock()
     client.responses.parse = AsyncMock(return_value=MagicMock(
@@ -65,14 +65,14 @@ async def test_no_retry_on_success():
     )
     from app.schemas.engineering_event import EngineeringEventGenerationOutput
     result = await provider.generate_structured(
-        MagicMock(spec=Prompt, system_message="sys", user_message="usr"),
+        prompt,
         EngineeringEventGenerationOutput,
     )
     assert client.responses.parse.call_count == 1
 
 
 @pytest.mark.asyncio
-async def test_retry_on_timeout():
+async def test_retry_on_timeout(prompt):
     """Timeout error should retry up to max_retries."""
     client = AsyncMock()
     error = APITimeoutError(request=MagicMock())
@@ -88,7 +88,7 @@ async def test_retry_on_timeout():
     from app.schemas.engineering_event import EngineeringEventGenerationOutput
     with pytest.raises(APITimeoutError):
         await provider.generate_structured(
-            MagicMock(spec=Prompt, system_message="sys", user_message="usr"),
+            prompt,
             EngineeringEventGenerationOutput,
         )
     # 1 initial + 2 retries = 3 total calls
@@ -96,7 +96,7 @@ async def test_retry_on_timeout():
 
 
 @pytest.mark.asyncio
-async def test_no_retry_on_validation_error():
+async def test_no_retry_on_validation_error(prompt):
     """Non-retryable errors should not retry."""
     client = AsyncMock()
     client.responses.parse = AsyncMock(side_effect=ValueError("bad output"))
@@ -111,14 +111,14 @@ async def test_no_retry_on_validation_error():
     from app.schemas.engineering_event import EngineeringEventGenerationOutput
     with pytest.raises(ValueError, match="bad output"):
         await provider.generate_structured(
-            MagicMock(spec=Prompt, system_message="sys", user_message="usr"),
+            prompt,
             EngineeringEventGenerationOutput,
         )
     assert client.responses.parse.call_count == 1
 
 
 @pytest.mark.asyncio
-async def test_retry_on_429():
+async def test_retry_on_429(prompt):
     """429 rate limit error should retry."""
     client = AsyncMock()
     error = APIStatusError(
@@ -138,14 +138,14 @@ async def test_retry_on_429():
     from app.schemas.engineering_event import EngineeringEventGenerationOutput
     with pytest.raises(APIStatusError):
         await provider.generate_structured(
-            MagicMock(spec=Prompt, system_message="sys", user_message="usr"),
+            prompt,
             EngineeringEventGenerationOutput,
         )
     assert client.responses.parse.call_count == 2
 
 
 @pytest.mark.asyncio
-async def test_no_retry_on_400():
+async def test_no_retry_on_400(prompt):
     """400 bad request should not retry."""
     client = AsyncMock()
     error = APIStatusError(
@@ -165,7 +165,7 @@ async def test_no_retry_on_400():
     from app.schemas.engineering_event import EngineeringEventGenerationOutput
     with pytest.raises(APIStatusError):
         await provider.generate_structured(
-            MagicMock(spec=Prompt, system_message="sys", user_message="usr"),
+            prompt,
             EngineeringEventGenerationOutput,
         )
     assert client.responses.parse.call_count == 1

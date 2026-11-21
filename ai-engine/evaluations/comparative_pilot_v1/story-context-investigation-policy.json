@@ -1,0 +1,10 @@
+{
+  "treatment": "STORY_CONTEXT_INVESTIGATION",
+  "policyVersion": "story-0223-story-context-investigation-policy-1.0.0",
+  "compatibilityKey": "story0223-three-treatment-pairing-v1",
+  "repositoryAccess": "CORE_EXECUTED_ONLY",
+  "authority": "CORE_AUTHORIZED_ACTIONS_ONLY",
+  "allowedOperations": ["core_authorized_search", "core_authorized_read"],
+  "callbackContract": "story0184-authorized-action-callback-v1",
+  "forbiddenSources": ["direct_python_repository", "oracle", "other_treatment_output", "web"]
+}

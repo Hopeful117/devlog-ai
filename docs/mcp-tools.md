@@ -14,6 +14,38 @@ arguments : projectSlug*, intent*
 retour    : EngineeringContext (project, evidence[], metadata)
 ```
 
+## `resolve_engineering_story`
+
+Résout la référence externe d'une Story vers l'identité persistée du Core.
+Le numéro est qualifié par le projet et l'UUID retournée ne doit pas être
+générée ou configurée par un client.
+
+```text
+arguments : projectSlug*, storyNumber*
+retour    : EngineeringStoryResponse { id, projectId, storyNumber, title,
+            storyPath, status, baseCommit, targetCommit }
+```
+
+This operation is read-only and does not register missing repository Stories.
+
+## `sync_project_stories`
+
+Déclenche explicitement la synchronisation du catalogue des Engineering Stories
+depuis la source repository active. Il s'agit du fallback MCP lorsque la
+synchronisation automatique du repository n'a pas encore été exécutée.
+
+```text
+arguments : projectSlug*, revision
+retour    : StoryCatalogSynchronizationResult
+```
+
+La synchronisation automatique et cet outil appellent le même service Core et
+sont idempotents sur `(projectId, storyNumber)`.
+
+`sync_project_history` déclenche également cette synchronisation de catalogue
+après l'import de l'historique. `sync_project_stories` permet de demander le
+catalogue seul lorsque l'import historique n'est pas nécessaire.
+
 ## Story Context Agent v1 (canonical)
 
 The canonical runtime route is the versioned asynchronous protocol:
@@ -29,7 +61,13 @@ story_context_agent_get_projection
 story_context_agent_submit_task
 story_context_agent_get_snapshot_authenticated
 story_context_agent_follow_up_authenticated
+story_context_agent_prepare_task_binding
 ```
+
+`story_context_agent_prepare_task_binding` is an evaluation-only preparation
+operation. It creates the Core task and credential binding without dispatching
+provider work. The MCP runtime owns the technical bearer; callers receive only
+the bounded task identity and must provide an idempotency key.
 
 The high-level `devlog_story_agent` consumer orchestrates the same protocol and
 must be preferred by runtime validation. It must not call the legacy

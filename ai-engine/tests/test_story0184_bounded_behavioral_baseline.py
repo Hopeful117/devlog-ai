@@ -23,7 +23,13 @@ VALID_REFERENCE = f"retrieved:docs/architecture.md@{REVISION}"
 
 def _provider_payload() -> dict:
     return {
-        "objectiveUnderstanding": {},
+        "objectiveUnderstanding": {
+            "grounding": {
+                "evidenceReferences": [],
+                "classification": "RECOMMENDATION",
+                "grounded": False,
+            }
+        },
         "confidence": "LOW",
         "provenance": {
             "contextDigest": "a" * 64,
@@ -34,7 +40,13 @@ def _provider_payload() -> dict:
             "intentId": "engineering-story-context-analysis",
             "intentVersion": "v1",
         },
-        "outputClassification": {"entries": []},
+        "outputClassification": {
+            "entries": [{
+                "findingReference": "objectiveUnderstanding",
+                "classification": "RECOMMENDATION",
+                "grounded": False,
+            }]
+        },
     }
 
 

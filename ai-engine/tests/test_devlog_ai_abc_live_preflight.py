@@ -9,13 +9,19 @@ from pathlib import Path
 
 import pytest
 
-from evaluations.devlog_ai_abc_runner import LIVE, LIVE_PREFLIGHT, LiveNotAuthorized, run
+from evaluations.devlog_ai_abc_runner import LIVE, LIVE_PREFLIGHT, run
 from evaluations.devlog_ai_abc_runner.live import (
     LiveAuthorizationError,
     canonical_manifest_digest,
     live_preflight,
     load_q1_oracle,
     validate_live_authorization,
+)
+from evaluations.devlog_ai_abc_runner.live_execution import (
+    CoreLiveTreatmentAdapter,
+    LiveConfiguration,
+    LiveConfigurationError,
+    resolve_live_story,
 )
 from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
 
@@ -63,6 +69,7 @@ def valid_authorization() -> dict:
         "authorizedObservationIds": [item["observationId"] for item in value["observations"]],
         "authorizedConditions": value["conditions"],
         "repositoryRevision": value["repositoryRevision"],
+        "runtimeRevision": "a" * 64,
         "provider": value["provider"],
         "model": value["model"],
         "budgets": value["technicalBudgets"],
@@ -92,7 +99,7 @@ def test_live_preflight_is_static_and_fails_closed(tmp_path: Path, monkeypatch: 
 
     assert report["status"] == "Q1_LIVE_PREFLIGHT_BLOCKED"
     assert report["runnerStatus"] == "Q1_LIVE_ADAPTERS_AVAILABLE"
-    assert report["oracleStatus"] == "Q1_ORACLE_PENDING_HUMAN_REVIEW"
+    assert report["oracleStatus"] == "Q1_ORACLE_ACCEPTED"
     assert report["authorizationStatus"] == "Q1_LIVE_NOT_AUTHORIZED"
     assert report["providerCalls"] == 0
     assert report["networkCalls"] == 0
@@ -112,6 +119,33 @@ def test_valid_future_authorization_contract_is_accepted_by_validator_only() -> 
         manifest=manifest(),
         oracle=accepted_oracle(),
         pricing_contract=approved_pricing(),
+        now_epoch_seconds=3_000_000_000,
+    )
+
+
+def test_non_metered_oauth_authorization_uses_operational_ceiling_only() -> None:
+    authorization = valid_authorization()
+    pricing = {
+        "status": "APPROVED",
+        "version": "q1-chatgpt-oauth-pricing-v1",
+        "currency": "NOT_APPLICABLE",
+        "billingModel": "CHATGPT_OAUTH_SUBSCRIPTION_NOT_METERED",
+        "inputPerMillion": None,
+        "outputPerMillion": None,
+        "costCeilingPolicy": "OPERATIONAL_LIMITS_ONLY",
+    }
+    pricing["digest"] = canonical_pricing_digest(pricing)
+    authorization.update({
+        "pricingVersion": pricing["version"],
+        "pricingDigest": pricing["digest"],
+        "costCeiling": {"currency": "NOT_APPLICABLE", "maxAmount": "NOT_MEASURED"},
+    })
+
+    validate_live_authorization(
+        authorization,
+        manifest=manifest(),
+        oracle=accepted_oracle(),
+        pricing_contract=pricing,
         now_epoch_seconds=3_000_000_000,
     )
 
@@ -142,11 +176,12 @@ def test_invalid_authorization_is_rejected_closed(field: str, value: object, mes
 
 
 def test_pending_oracle_cannot_authorize_live_execution() -> None:
+    pending_oracle = {**load_q1_oracle(ORACLE_PATH, expected_revision=REVISION), "status": "CORRECTION_PROPOSED"}
     with pytest.raises(LiveAuthorizationError, match="not explicitly accepted"):
         validate_live_authorization(
             valid_authorization(),
             manifest=manifest(),
-            oracle=load_q1_oracle(ORACLE_PATH, expected_revision=REVISION),
+            oracle=pending_oracle,
             pricing_contract=approved_pricing(),
             now_epoch_seconds=3_000_000_000,
         )
@@ -178,8 +213,102 @@ def test_non_finite_cost_ceiling_is_rejected() -> None:
         )
 
 
+def test_live_configuration_requires_core_boundary_and_bounded_files() -> None:
+    with pytest.raises(LiveConfigurationError, match="DEVLOG_LIVE_PROJECT_SLUG"):
+        LiveConfiguration.from_environment({})
+
+    configuration = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md, docs/b.md",
+        "DEVLOG_LIVE_B_TASK_ID": "00000000-0000-0000-0000-000000000001",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    })
+    assert configuration.mcp_launcher == Path("/tmp/devlog-mcp-start.sh")
+    assert configuration.story_number == 223
+    assert configuration.story_id is None
+    assert configuration.files == ("docs/a.md", "docs/b.md")
+    assert str(configuration.b_task_id) == "00000000-0000-0000-0000-000000000001"
+    assert not hasattr(configuration, "core_bearer_token")
+
+
+def test_core_live_adapter_uses_authenticated_mcp_without_core_bearer() -> None:
+    class FakeMcp:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            self.calls.append((name, arguments))
+            return {
+                "status": "COMPLETED",
+                "aiTaskId": "task-1",
+                "result": {"analysis": "bounded"},
+            }
+
+    mcp = FakeMcp()
+    config = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    }, require_task_id=False)
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, {}, mcp)
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, {})
+
+    assert result["executionStatus"] == "COMPLETED"
+    assert result["submission"]["status"] == "MCP_ACCEPTED"
+    assert mcp.calls[0][0] == "devlog_story_agent"
+    assert "Authorization" not in mcp.calls[0][1]
+    assert "DEVLOG_CORE_BEARER_TOKEN" not in repr(mcp.calls[0][1])
+
+
+def test_story_number_is_resolved_before_uuid_scoped_live_calls() -> None:
+    class FakeMcp:
+        def tool(self, name: str, arguments: dict) -> dict:
+            assert name == "resolve_engineering_story"
+            assert arguments == {"projectSlug": "devlog-ai", "storyNumber": 223}
+            return {
+                "id": "00000000-0000-0000-0000-000000000223",
+                "storyNumber": 223,
+                "storyPath": "docs/a.md",
+            }
+
+    config = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    }, require_task_id=False)
+
+    resolved = resolve_live_story(config, FakeMcp())
+
+    assert resolved.story_id == "00000000-0000-0000-0000-000000000223"
+    assert resolved.story_path == "docs/a.md"
+
+
+def test_story_resolution_rejects_path_outside_configured_files() -> None:
+    class FakeMcp:
+        def tool(self, name: str, arguments: dict) -> dict:
+            return {
+                "id": "00000000-0000-0000-0000-000000000223",
+                "storyNumber": 223,
+                "storyPath": "docs/other.md",
+            }
+
+    config = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    }, require_task_id=False)
+
+    with pytest.raises(LiveConfigurationError, match="outside the configured files"):
+        resolve_live_story(config, FakeMcp())
+
+
 def test_live_mode_remains_disabled_even_when_a_future_contract_is_valid(tmp_path: Path) -> None:
-    with pytest.raises(LiveNotAuthorized, match="LIVE_NOT_AUTHORIZED"):
+    with pytest.raises(LiveAuthorizationError, match="approved pricing contract is missing"):
         run(
             mode=LIVE,
             manifest_path=MANIFEST_PATH,

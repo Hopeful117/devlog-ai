@@ -100,6 +100,36 @@ class EngineeringStoryServiceTest {
     }
 
     @Test
+    void shouldResolveStoryByProjectAndNumber() {
+        UUID projectId = UUID.randomUUID();
+        EngineeringStory story = new EngineeringStory();
+        story.setProject(Project.builder().id(projectId).build());
+        story.setStoryNumber(223);
+        EngineeringStoryResponse response = response(StoryStatus.COMPLETED, projectId);
+
+        when(storyRepository.findByProject_IdAndStoryNumber(projectId, 223))
+                .thenReturn(Optional.of(story));
+        when(storyMapper.toResponse(story)).thenReturn(response);
+
+        assertEquals(response, storyService.resolveByNumber(projectId, 223));
+
+        verify(storyRepository).findByProject_IdAndStoryNumber(projectId, 223);
+        verify(storyMapper).toResponse(story);
+    }
+
+    @Test
+    void shouldThrowWhenResolvingUnknownStoryNumber() {
+        UUID projectId = UUID.randomUUID();
+        when(storyRepository.findByProject_IdAndStoryNumber(projectId, 223))
+                .thenReturn(Optional.empty());
+
+        assertThrows(EntityNotFoundException.class,
+                () -> storyService.resolveByNumber(projectId, 223));
+
+        verify(storyMapper, never()).toResponse(any());
+    }
+
+    @Test
     void shouldStartImplementationSuccessfully() {
         UUID storyId = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();

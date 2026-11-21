@@ -1,7 +1,7 @@
 {
   "benchmarkId": "devlog-ai-abc",
   "version": "1.0.0",
-  "status": "PROPOSED_HUMAN_REVIEW",
+  "status": "ACCEPTED",
   "repositoryId": "git:github.com/Hopeful117/devlog-ai",
   "repositoryRevision": "60fae3e0e1104d0ffbe3832c1f578ed532b1268a",
   "oracles": [
@@ -77,6 +77,7 @@
     {
       "caseId": "Q2",
       "version": "1.0.0",
+      "status": "ACCEPTED",
       "question": "When an investigation action is repeated, what happens to repository reads and budget usage?",
       "requiredClaims": [
         {"id": "Q2-C1", "statement": "The Core action service identifies an existing action by actionId and compares the request digest.", "status": "VERIFIED", "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L131-L141"]},
@@ -93,6 +94,7 @@
     {
       "caseId": "Q3",
       "version": "1.0.0",
+      "status": "ACCEPTED",
       "question": "Why does the current design keep Core authoritative and Python repository-blind?",
       "requiredClaims": [
         {"id": "Q3-C1", "statement": "The design separates deterministic domain authority from probabilistic AI interpretation because AI output may be incorrect, incomplete, or assumption-based.", "status": "VERIFIED", "evidence": ["docs/decisions/ADR-006.md#L11-L37"]},
@@ -109,6 +111,7 @@
     {
       "caseId": "Q4",
       "version": "1.0.0",
+      "status": "ACCEPTED",
       "question": "If READ_EVIDENCE_RANGE limits or evidence projection change, which validation, grounding, and tests are affected?",
       "requiredClaims": [
         {"id": "Q4-C1", "statement": "The action contract and Python schema constrain range paths and line bounds, including a maximum 500-line range in Core validation.", "status": "VERIFIED", "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityActionValidator.java#L73-L79", "ai-engine/app/schemas/story_context_investigation.py#L98-L113"]},
@@ -125,6 +128,7 @@
     {
       "caseId": "Q5",
       "version": "1.0.0",
+      "status": "ACCEPTED",
       "question": "Which claims in older Story 0184 repository artifacts no longer describe the current branch, and why?",
       "requiredClaims": [
         {"id": "Q5-C1", "statement": "The Story 0184 implementation report identifies branch main at d83600a and a modified worktree, which is not the current physical checkout under evaluation.", "status": "VERIFIED", "evidence": ["docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L3-L19", "docs/evaluation/devlog-ai-abc-benchmark-v1.json"]},
@@ -141,6 +145,7 @@
     {
       "caseId": "Q6",
       "version": "1.0.0",
+      "status": "ACCEPTED",
       "question": "What evidence is needed to decide whether a weak answer came from candidate loss, projection loss, or synthesis failure?",
       "requiredClaims": [
         {"id": "Q6-C1", "statement": "Candidate loss requires candidate, ranking, selection and discard-reason accounting at the fixed question and revision.", "status": "VERIFIED", "evidence": ["docs/investigations/current-state-quality-bottleneck-investigation.md#L109-L124", "docs/stories/0179-story-context-runtime-loss-evaluation/evaluation-report.md#L42-L65"]},
@@ -157,6 +162,7 @@
     {
       "caseId": "Q7",
       "version": "1.0.0",
+      "status": "ACCEPTED",
       "question": "Does the current repository prove that the bounded analyst improves real engineering answer quality?",
       "requiredClaims": [
         {"id": "Q7-C1", "statement": "No: current Story 0184 tests are credential-free behavioral/contract tests and do not establish live semantic answer quality.", "status": "VERIFIED", "evidence": ["ai-engine/tests/test_story0184_bounded_behavioral_baseline.py#L1-L6", "docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L117-L128"]},
@@ -172,6 +178,7 @@
     {
       "caseId": "Q8",
       "version": "1.0.0",
+      "status": "ACCEPTED",
       "question": "Do the 0177 fixture result and V4 live result justify production hybrid retrieval or direct-agent adoption?",
       "requiredClaims": [
         {"id": "Q8-C1", "statement": "Story 0177's semantic/hybrid recall result is fixture-scoped, model-free, and explicitly does not justify production RAG by itself.", "status": "VERIFIED", "evidence": ["docs/stories/0177-evaluate-hybrid-retrieval-for-story-context/evaluation-report.md#L3-L17", "docs/stories/0177-evaluate-hybrid-retrieval-for-story-context/evaluation-report.md#L34-L56"]},

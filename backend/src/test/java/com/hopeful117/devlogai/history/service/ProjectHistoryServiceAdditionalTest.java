@@ -16,6 +16,7 @@ import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.entity.SourceType;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
 import com.hopeful117.devlogai.project.entity.Project;
+import com.hopeful117.devlogai.story.service.StoryCatalogSynchronizationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -39,10 +40,11 @@ class ProjectHistoryServiceAdditionalTest {
     @Mock private WorkspaceManager workspaceManager;
     @Mock private GitHistoryProvider historyProvider;
     @Mock private CommitDiffContextBuilder contextBuilder;
+    @Mock private StoryCatalogSynchronizationService storyCatalog;
 
     private ProjectHistoryServiceImpl createService() {
         return new ProjectHistoryServiceImpl(sourceRepository, commitRepository,
-                workspaceManager, historyProvider, contextBuilder);
+                workspaceManager, historyProvider, contextBuilder, storyCatalog);
     }
 
     private Source testSource() {

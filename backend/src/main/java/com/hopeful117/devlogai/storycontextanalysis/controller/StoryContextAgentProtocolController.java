@@ -20,6 +20,8 @@ import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 import tools.jackson.databind.ObjectMapper;
 
@@ -45,6 +47,7 @@ public class StoryContextAgentProtocolController {
     private final AuthenticatedPrincipalResolver principalResolver;
     private final StoryAgentFollowUpService followUpService;
     private final StoryContextAnalysisQueryService analysisQueryService;
+    private final boolean liveBootstrapEnabled;
     private final StoryContextInvestigationActionService investigationActionService;
 
     @Autowired
@@ -59,7 +62,8 @@ public class StoryContextAgentProtocolController {
             AuthenticatedPrincipalResolver principalResolver,
             StoryAgentFollowUpService followUpService,
             StoryContextAnalysisQueryService analysisQueryService,
-            StoryContextInvestigationActionService investigationActionService) {
+            StoryContextInvestigationActionService investigationActionService,
+            @Value("${devlog.evaluation.live-bootstrap-enabled:false}") boolean liveBootstrapEnabled) {
         this.analyzeStoryContextUseCase = analyzeStoryContextUseCase;
         this.callbackFacade = callbackFacade;
         this.aiTaskService = aiTaskService;
@@ -71,6 +75,25 @@ public class StoryContextAgentProtocolController {
         this.followUpService = followUpService;
         this.analysisQueryService = analysisQueryService;
         this.investigationActionService = investigationActionService;
+        this.liveBootstrapEnabled = liveBootstrapEnabled;
+    }
+
+    /** Compatibility constructor for investigation-action tests. */
+    public StoryContextAgentProtocolController(
+            AnalyzeStoryContextUseCase analyzeStoryContextUseCase,
+            StoryContextAgentCallbackFacade callbackFacade,
+            AiTaskService aiTaskService,
+            StoryContextAgentCallbackAuthenticator authenticator,
+            StoryContextAgentMetrics metrics,
+            ObjectMapper objectMapper,
+            AuthorizedStoryContextSnapshotReader snapshotReader,
+            AuthenticatedPrincipalResolver principalResolver,
+            StoryAgentFollowUpService followUpService,
+            StoryContextAnalysisQueryService analysisQueryService,
+            StoryContextInvestigationActionService investigationActionService) {
+        this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator, metrics, objectMapper,
+                snapshotReader, principalResolver, followUpService, analysisQueryService,
+                investigationActionService, false);
     }
 
     /** Compatibility constructor for callback-only unit tests. */
@@ -84,7 +107,7 @@ public class StoryContextAgentProtocolController {
             AuthorizedStoryContextSnapshotReader snapshotReader,
             AuthenticatedPrincipalResolver principalResolver) {
         this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator,
-                metrics, objectMapper, snapshotReader, principalResolver, null, null, null);
+                metrics, objectMapper, snapshotReader, principalResolver, null, null, null, false);
     }
 
     /** Compatibility constructor for callback-only unit tests. */
@@ -96,7 +119,7 @@ public class StoryContextAgentProtocolController {
             StoryContextAgentMetrics metrics,
             ObjectMapper objectMapper) {
         this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator,
-                metrics, objectMapper, null, null, null, null, null);
+                metrics, objectMapper, null, null, null, null, null, false);
     }
 
     @GetMapping("/projects/{projectSlug}/context")
@@ -136,6 +159,26 @@ public class StoryContextAgentProtocolController {
             AiTaskResponse task = aiTaskService.getById(aiTaskId);
             return ResponseEntity.accepted().body(SubmitResponse.from(task, task.contextSnapshot()));
         });
+    }
+
+    /** Evaluation-only bootstrap: reserve a credential-bound task without provider dispatch. */
+    @PostMapping("/projects/{projectSlug}/task-bindings")
+    public ResponseEntity<ReservationResponse> reserveTaskBinding(
+            @PathVariable String projectSlug,
+            @Valid @RequestBody SubmitRequest request,
+            @RequestParam(required = false) UUID storyId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            HttpServletRequest servletRequest) {
+        if (!liveBootstrapEnabled) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        var principal = principalResolver.resolve(servletRequest)
+                .orElseThrow(UnauthenticatedPrincipalException::new);
+        UUID aiTaskId = analyzeStoryContextUseCase.reserveCredentialBinding(
+                projectSlug, storyId, request.intent(), request.files(), request.guidance(),
+                idempotencyKey, principal, "chatgpt");
+        AiTaskResponse task = aiTaskService.getById(aiTaskId);
+        return ResponseEntity.accepted().body(ReservationResponse.from(task));
     }
 
     @PostMapping("/tasks/{aiTaskId}/callback")
@@ -243,6 +286,14 @@ public class StoryContextAgentProtocolController {
     }
 
     public record SubmitRequest(@NotBlank String intent, List<String> files, Map<String, Object> guidance) { }
+
+    public record ReservationResponse(UUID aiTaskId, String provider,
+                                      String model, String status) {
+        static ReservationResponse from(AiTaskResponse task) {
+            return new ReservationResponse(task.id(), task.provider(),
+                    task.modelIdentifier(), task.status().name());
+        }
+    }
 
     public record FollowUpRequest(@NotBlank String question, Map<String, Object> guidance) { }
 

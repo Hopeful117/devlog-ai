@@ -35,7 +35,9 @@ class McpClient:
             command,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            # The launcher records diagnostics in its bounded state directory.
+            # Do not leave an unread stderr pipe that can block a long capture.
+            stderr=subprocess.DEVNULL,
             text=True,
             bufsize=1,
         )

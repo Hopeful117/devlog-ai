@@ -1,0 +1,45 @@
+{
+  "protocolVersion": "story-0223-comparative-pilot/v1",
+  "benchmarkId": "devlog-ai-abc",
+  "benchmarkVersion": "1.0.0",
+  "benchmarkReference": "docs/evaluation/devlog-ai-abc-benchmark-v1.json",
+  "repositoryId": "git:github.com/Hopeful117/devlog-ai",
+  "repositoryRevision": "60fae3e0e1104d0ffbe3832c1f578ed532b1268a",
+  "oracleReference": "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json",
+  "oracleVersion": "1.1.0",
+  "oracleStatus": "Q1_ORACLE_ACCEPTED",
+  "scoringContractVersion": "story-0223-human-reviewed-quality/v1",
+  "rawObservationSchemaVersion": "story-0223-raw-observation/v1",
+  "repetitions": [1, 2, 3],
+  "treatments": ["DEVLOG_CONTEXT", "AGENT_DIRECT", "STORY_CONTEXT_INVESTIGATION"],
+  "executionPolicy": {
+    "providerCalls": "FORBIDDEN_DURING_PREPARATION",
+    "oracleLeakage": "FORBIDDEN",
+    "unevaluatedAnswers": "NOT_EVALUATED_NOT_INCORRECT",
+    "technicalValidationPerTreatment": 1,
+    "humanRaters": 2,
+    "humanScoring": {
+      "blindedTreatmentLabels": true,
+      "adjudicateDisagreements": true,
+      "utilitySession": "SEPARATE_SESSION_FOR_TARGET_TREATMENTS"
+    },
+    "liveProviderValidation": "FOLLOW_UP_FOR_STORY_ACCEPTANCE",
+    "proofThresholds": {
+      "minimumExecutionCompleteness": 1.0,
+      "minimumHumanUtility": 0.75,
+      "nonInferiorityMargin": 0.05,
+      "minimumAdvantageDelta": 0.1,
+      "advantageMetric": "groundedCorrectnessRate"
+    }
+  },
+  "questions": [
+    {"questionId":"Q1","questionVersion":"1.0.0","category":"ARCHITECTURE","question":"How does a Story Context request move from Core authorization to the final persisted analysis, and which side owns each invariant?","oracleReference":"Q1"},
+    {"questionId":"Q2","questionVersion":"1.0.0","category":"CODE_BEHAVIOR","question":"When an investigation action is repeated, what happens to repository reads and budget usage?","oracleReference":"Q2"},
+    {"questionId":"Q3","questionVersion":"1.0.0","category":"HISTORICAL_DECISION","question":"Why does the current design keep Core authoritative and Python repository-blind?","oracleReference":"Q3"},
+    {"questionId":"Q4","questionVersion":"1.0.0","category":"IMPACT_ANALYSIS","question":"If READ_EVIDENCE_RANGE limits or evidence projection change, which validation, grounding, and tests are affected?","oracleReference":"Q4"},
+    {"questionId":"Q5","questionVersion":"1.0.0","category":"CODE_DOCUMENT_INCONSISTENCY","question":"Which claims in older Story 0184 repository artifacts no longer describe the current branch, and why?","oracleReference":"Q5"},
+    {"questionId":"Q6","questionVersion":"1.0.0","category":"SEQUENTIAL_INVESTIGATION","question":"What evidence is needed to decide whether a weak answer came from candidate loss, projection loss, or synthesis failure?","oracleReference":"Q6"},
+    {"questionId":"Q7","questionVersion":"1.0.0","category":"INSUFFICIENT_EVIDENCE","question":"Does the current repository prove that the bounded analyst improves real engineering answer quality?","oracleReference":"Q7"},
+    {"questionId":"Q8","questionVersion":"1.0.0","category":"CONTRADICTIONS_AND_HISTORY","question":"Do the 0177 fixture result and V4 live result justify production hybrid retrieval or direct-agent adoption?","oracleReference":"Q8"}
+  ]
+}

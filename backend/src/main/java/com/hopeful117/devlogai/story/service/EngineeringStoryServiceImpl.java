@@ -79,6 +79,14 @@ public class EngineeringStoryServiceImpl implements EngineeringStoryService {
     }
 
     @Override
+    public EngineeringStoryResponse resolveByNumber(UUID projectId, Integer storyNumber) {
+        EngineeringStory story = storyRepository.findByProject_IdAndStoryNumber(projectId, storyNumber)
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "EngineeringStory", "%s/%s".formatted(projectId, storyNumber)));
+        return storyMapper.toResponse(story);
+    }
+
+    @Override
     public List<EngineeringStoryResponse> getByProject(UUID projectId) {
         return storyRepository.findByProject_IdOrderByCreatedAtDesc(projectId)
                 .stream()

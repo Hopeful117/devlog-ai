@@ -65,6 +65,26 @@ public class StoryContextAgentProtocolTool {
                 new DevlogProjectContextClient.SubmitRequest(intent, files, guidance)));
     }
 
+    @McpTool(name = "story_context_agent_prepare_task_binding",
+            description = "Reserve an authorized Story Context Agent task binding without dispatching provider work")
+    public String prepareTaskBinding(
+            @McpArg(description = "DevLog project slug", required = true) String projectSlug,
+            @McpArg(description = "Optional Engineering Story UUID", required = false) UUID storyId,
+            @McpArg(description = "Repository file paths", required = true) List<String> files,
+            @McpArg(description = "Intent identifier", required = true) String intent,
+            @McpArg(description = "Caller-provided idempotency key", required = true) String idempotencyKey,
+            McpSyncRequestContext requestContext) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw ResourceSupport.invalidParams("Idempotency key is required");
+        }
+        var principal = principalProvider.currentPrincipal(requestContext)
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        requireBearer(principal);
+        return write(client.reserveStoryContextAgentTaskBinding(projectSlug, storyId,
+                principal.bearerToken(), idempotencyKey, principal.delegationToken(),
+                new DevlogProjectContextClient.SubmitRequest(intent, files, Map.of())));
+    }
+
     public String getSnapshot(
             @McpArg(description = "AI task and snapshot UUID", required = true) UUID aiTaskId) {
         return getSnapshot(aiTaskId, null);

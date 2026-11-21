@@ -487,6 +487,7 @@ The current asynchronous Story Agent protocol is exposed through versioned Core 
 ```text
 GET  /api/v1/story-context-agent/projects/{projectSlug}/context
 POST /api/v1/story-context-agent/projects/{projectSlug}/tasks
+POST /api/v1/story-context-agent/projects/{projectSlug}/task-bindings
 POST /api/v1/story-context-agent/tasks/{aiTaskId}/callback
 GET  /api/v1/story-context-agent/tasks/{aiTaskId}/snapshot
 GET  /api/v1/story-context-agent/tasks/{aiTaskId}/result
@@ -497,6 +498,8 @@ POST /api/v1/story-context-agent/snapshots/{snapshotId}/follow-up
 The protocol creates bounded, project-authorized context tasks and supports callbacks, snapshots,
 results, bounded investigation actions, and follow-up requests. AI output remains transient until
 Core validates the response; the current repository remains authoritative for implementation details.
+The evaluation-only `task-bindings` endpoint reserves a user-bound task and credential binding
+without dispatching provider work; it is used to prepare the isolated direct-investigator treatment.
 The direct `POST /api/v1/projects/{projectSlug}/story-agent` adapter is also available for the
 DevLog Story Agent integration.
 

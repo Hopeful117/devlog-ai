@@ -18,5 +18,7 @@ public interface EngineeringStoryService {
 
     EngineeringStoryResponse getById(UUID storyId, UUID projectId);
 
+    EngineeringStoryResponse resolveByNumber(UUID projectId, Integer storyNumber);
+
     List<EngineeringStoryResponse> getByProject(UUID projectId);
 }

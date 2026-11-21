@@ -171,9 +171,11 @@ class CoreCallbackClient:
             ) from error
 
     def _is_transient_not_ready(self, response: httpx.Response) -> bool:
+        body = self._json_object(response)
+        if response.status_code == 404:
+            return body.get("message", "").startswith("AI task not found with identifier:")
         if response.status_code != 409:
             return False
-        body = self._json_object(response)
         return (
             body.get("code") == "AI_TASK_NOT_READY"
             and body.get("currentStatus") == "CREATED"

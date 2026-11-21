@@ -17,7 +17,7 @@ from typing import Any, Mapping
 
 from .runner import load_manifest, repository_revision, sha256_json
 from .provenance import ProvenanceError, execution_identity
-from .pricing import PricingContractError, validate_pricing_contract
+from .pricing import NON_METERED_BILLING_MODEL, PricingContractError, validate_pricing_contract
 
 LIVE_PREFLIGHT = "LIVE_PREFLIGHT"
 Q1_ORACLE_ACCEPTED = "Q1_ORACLE_ACCEPTED"
@@ -94,6 +94,7 @@ _REQUIRED_AUTH_KEYS = {
     "authorizedObservationIds",
     "authorizedConditions",
     "repositoryRevision",
+    "runtimeRevision",
     "provider",
     "model",
     "budgets",
@@ -115,6 +116,12 @@ def canonical_manifest_digest(manifest: Mapping[str, Any]) -> str:
 
 def _is_sha256(value: object) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(
+        character in "0123456789abcdef" for character in value
+    )
+
+
+def _is_runtime_revision(value: object) -> bool:
+    return isinstance(value, str) and len(value) in (40, 64) and all(
         character in "0123456789abcdef" for character in value
     )
 
@@ -188,6 +195,8 @@ def validate_live_authorization(
         raise LiveAuthorizationError("authorization condition set mismatch")
     if authorization["repositoryRevision"] != manifest["repositoryRevision"]:
         raise LiveAuthorizationError("authorization repository revision mismatch")
+    if not _is_runtime_revision(authorization["runtimeRevision"]):
+        raise LiveAuthorizationError("authorization runtime revision is invalid")
     if authorization["provider"] != manifest["provider"] or authorization["model"] != manifest["model"]:
         raise LiveAuthorizationError("authorization provider/model mismatch")
     if authorization["budgets"] != manifest["technicalBudgets"] or authorization["limits"] != manifest["technicalBudgets"]:
@@ -214,6 +223,10 @@ def validate_live_authorization(
     if authorization["costCeiling"]["currency"] != pricing_contract.get("currency"):
         raise LiveAuthorizationError("cost ceiling currency does not match approved pricing")
     maximum_cost = authorization["costCeiling"].get("maxAmount")
+    if pricing_contract.get("billingModel") == NON_METERED_BILLING_MODEL:
+        if authorization["costCeiling"].get("currency") != "NOT_APPLICABLE" or maximum_cost != "NOT_MEASURED":
+            raise LiveAuthorizationError("non-metered pricing requires an explicit non-monetary ceiling")
+        return
     if isinstance(maximum_cost, bool) or not isinstance(maximum_cost, (int, float)) or not math.isfinite(maximum_cost) or maximum_cost <= 0:
         raise LiveAuthorizationError("cost ceiling maxAmount is invalid")
     now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
@@ -228,8 +241,10 @@ def live_preflight(
     repository_root: str | Path,
     output_root: str | Path,
     authorization: Mapping[str, Any] | None = None,
+    pricing_contract: Mapping[str, Any] | None = None,
+    activate_live: bool = False,
 ) -> dict[str, Any]:
-    """Perform static live-readiness checks; never contacts a remote service."""
+    """Perform live-readiness checks; remote access remains outside preflight."""
 
     manifest = load_manifest(Path(manifest_path))
     root = Path(repository_root).resolve()
@@ -291,7 +306,7 @@ def live_preflight(
     budgets_ready = isinstance(manifest.get("technicalBudgets"), dict) and all(
         isinstance(value, int) and value > 0 for value in manifest["technicalBudgets"].values()
     )
-    pricing_contract = manifest.get("pricingContract")
+    pricing_contract = pricing_contract or manifest.get("pricingContract")
     pricing_ready = False
     if isinstance(pricing_contract, Mapping):
         try:
@@ -316,7 +331,7 @@ def live_preflight(
         blockers.append("source snapshot does not match the frozen manifest")
     if not isinstance(identity.get("runtimeRevision"), str) or not identity["runtimeRevision"]:
         blockers.append("runtime revision cannot be identified")
-    elif identity["runtimeRevision"] != manifest["repositoryRevision"]:
+    elif authorization is None or authorization.get("runtimeRevision") != identity["runtimeRevision"]:
         blockers.append("executed runtime revision does not match the frozen manifest")
     harness = identity.get("harness", {})
     if not isinstance(harness.get("sha256"), str) or len(harness["sha256"]) != 64:
@@ -336,19 +351,22 @@ def live_preflight(
                 authorization,
                 manifest=manifest,
                 oracle=oracle,
-                pricing_contract=manifest.get("pricingContract"),
+                pricing_contract=pricing_contract,
             )
         except LiveAuthorizationError as error:
             authorization_status = Q1_LIVE_NOT_AUTHORIZED
             blockers.append(str(error))
         else:
-            authorization_status = Q1_LIVE_NOT_AUTHORIZED
-            blockers.append("live activation is disabled in this evaluation runner")
+            if not activate_live:
+                authorization_status = Q1_LIVE_NOT_AUTHORIZED
+                blockers.append("live activation requires the explicit --activate-live flag")
+            else:
+                authorization_status = "Q1_LIVE_AUTHORIZED"
     if not (Path(output_root).parent.exists() and not Path(output_root).exists()):
         blockers.append("artifact output parent is missing or target already exists")
     runner_status = Q1_LIVE_ADAPTERS_AVAILABLE if controlled_ready else "Q1_LIVE_ADAPTERS_PARTIAL"
     return {
-        "status": "Q1_LIVE_PREFLIGHT_BLOCKED",
+        "status": "Q1_LIVE_PREFLIGHT_READY" if not blockers else "Q1_LIVE_PREFLIGHT_BLOCKED",
         "runnerStatus": runner_status,
         "authorizationStatus": authorization_status,
         "oracleStatus": Q1_ORACLE_ACCEPTED if oracle.get("status") == "ACCEPTED" else Q1_ORACLE_PENDING_HUMAN_REVIEW,

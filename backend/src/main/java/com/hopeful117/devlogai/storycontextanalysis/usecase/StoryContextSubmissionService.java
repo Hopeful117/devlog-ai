@@ -122,20 +122,36 @@ public class StoryContextSubmissionService {
     @Transactional
     public UUID submit(PreparedStoryContext prepared, Map<String, Object> guidance,
                        String submissionDigest, String idempotencyKeyHash) {
-        return submit(prepared, guidance, submissionDigest, idempotencyKeyHash, null, null, null);
+        return submit(prepared, guidance, submissionDigest, idempotencyKeyHash, null, null, null, true);
     }
 
     @Transactional
     public UUID submit(PreparedStoryContext prepared, Map<String, Object> guidance,
                        String submissionDigest, String idempotencyKeyHash,
                        AuthenticatedPrincipal principal, String provider) {
-        return submit(prepared, guidance, submissionDigest, idempotencyKeyHash, null, principal, provider);
+        return submit(prepared, guidance, submissionDigest, idempotencyKeyHash, null, principal, provider, true);
     }
 
     @Transactional
     public UUID submit(PreparedStoryContext prepared, Map<String, Object> guidance,
                        String submissionDigest, String idempotencyKeyHash, String idempotencyScopeHash,
                        AuthenticatedPrincipal principal, String provider) {
+        return submit(prepared, guidance, submissionDigest, idempotencyKeyHash, idempotencyScopeHash,
+                principal, provider, true);
+    }
+
+    @Transactional
+    public UUID reserveCredentialBinding(PreparedStoryContext prepared, Map<String, Object> guidance,
+                                         String submissionDigest, String idempotencyKeyHash,
+                                         String idempotencyScopeHash, AuthenticatedPrincipal principal,
+                                         String provider) {
+        return submit(prepared, guidance, submissionDigest, idempotencyKeyHash, idempotencyScopeHash,
+                principal, provider, false);
+    }
+
+    private UUID submit(PreparedStoryContext prepared, Map<String, Object> guidance,
+                        String submissionDigest, String idempotencyKeyHash, String idempotencyScopeHash,
+                        AuthenticatedPrincipal principal, String provider, boolean dispatch) {
         String projectSlug = prepared.projectSlug();
         UUID storyId = prepared.storyId();
         String requestedIntent = prepared.intent();
@@ -245,8 +261,10 @@ public class StoryContextSubmissionService {
                     new FailAiTaskRequest(budget.code(), budget.message()));
             throw new IllegalStateException(budget.message());
         }
-        aiTaskService.submit(task.getId(), new SubmitAiTaskRequest(null));
-        aiEngineClient.submit(prompt);
+        if (dispatch) {
+            aiTaskService.submit(task.getId(), new SubmitAiTaskRequest(null));
+            aiEngineClient.submit(prompt);
+        }
         return task.getId();
     }
 

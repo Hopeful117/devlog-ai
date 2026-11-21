@@ -1,0 +1,79 @@
+{
+  "protocolVersion": "story-0222-abstention-confidence/v1",
+  "oracleStatus": "PROPOSED_REQUIRES_HUMAN_REVIEW",
+  "repositoryRevision": "525c97011f7c572614a1b656cae294e50067b323",
+  "scenarios": [
+    {
+      "scenarioId": "0222-supported-targeted",
+      "scenarioVersion": "1.0.0",
+      "repositoryRevision": "525c97011f7c572614a1b656cae294e50067b323",
+      "reviewed": false,
+      "expectedAnswerClass": "SUPPORTED",
+      "expectedAbstention": false,
+      "requiredEvidence": ["file:docker-compose.yml"]
+    },
+    {
+      "scenarioId": "0222-supported-broad-bounded",
+      "scenarioVersion": "1.0.0",
+      "repositoryRevision": "525c97011f7c572614a1b656cae294e50067b323",
+      "reviewed": false,
+      "expectedAnswerClass": "BOUNDED",
+      "expectedAbstention": false,
+      "requiredEvidence": ["file:docker-compose.yml"]
+    },
+    {
+      "scenarioId": "0222-insufficient-evidence",
+      "scenarioVersion": "1.0.0",
+      "repositoryRevision": "525c97011f7c572614a1b656cae294e50067b323",
+      "reviewed": false,
+      "expectedAnswerClass": "INSUFFICIENT",
+      "expectedAbstention": true,
+      "requiredEvidence": []
+    },
+    {
+      "scenarioId": "0222-not-established-causality",
+      "scenarioVersion": "1.0.0",
+      "repositoryRevision": "525c97011f7c572614a1b656cae294e50067b323",
+      "reviewed": false,
+      "expectedAnswerClass": "NOT_ESTABLISHED",
+      "expectedAbstention": true,
+      "requiredEvidence": []
+    },
+    {
+      "scenarioId": "0222-truncated-context",
+      "scenarioVersion": "1.0.0",
+      "repositoryRevision": "525c97011f7c572614a1b656cae294e50067b323",
+      "reviewed": false,
+      "expectedAnswerClass": "INSUFFICIENT",
+      "expectedAbstention": true,
+      "requiredEvidence": ["file:docker-compose.yml"]
+    },
+    {
+      "scenarioId": "0222-stale-current-state",
+      "scenarioVersion": "1.0.0",
+      "repositoryRevision": "525c97011f7c572614a1b656cae294e50067b323",
+      "reviewed": false,
+      "expectedAnswerClass": "BOUNDED",
+      "expectedAbstention": true,
+      "requiredEvidence": []
+    },
+    {
+      "scenarioId": "0222-contradictory-evidence",
+      "scenarioVersion": "1.0.0",
+      "repositoryRevision": "525c97011f7c572614a1b656cae294e50067b323",
+      "reviewed": false,
+      "expectedAnswerClass": "INSUFFICIENT",
+      "expectedAbstention": true,
+      "requiredEvidence": []
+    },
+    {
+      "scenarioId": "0222-provider-incomplete",
+      "scenarioVersion": "1.0.0",
+      "repositoryRevision": "525c97011f7c572614a1b656cae294e50067b323",
+      "reviewed": false,
+      "expectedAnswerClass": "INSUFFICIENT",
+      "expectedAbstention": true,
+      "requiredEvidence": []
+    }
+  ]
+}

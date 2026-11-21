@@ -84,6 +84,31 @@ def test_b_preserves_common_answer_claims_evidence_and_locator() -> None:
     assert normalized["abstention"] is True
 
 
+def test_normalization_preserves_explicit_ordinal_confidence() -> None:
+    answer = {
+        "executionStatus": "COMPLETED",
+        "finalResponse": {
+            "answerText": "The evidence supports the bounded conclusion.",
+            "confidence": "HIGH",
+            "abstention": False,
+        },
+    }
+
+    normalized = normalize_direct_investigator(raw(answer, treatment="B"))
+
+    assert normalized["confidence"] == "HIGH"
+    assert "CONFIDENCE_INVALID" not in normalized["normalizationWarnings"]
+
+
+def test_invalid_confidence_is_not_reinterpreted() -> None:
+    normalized = normalize_direct_investigator(raw({
+        "finalResponse": {"confidence": "VERY_HIGH"},
+    }, treatment="B"))
+
+    assert normalized["confidence"] is None
+    assert "CONFIDENCE_INVALID" in normalized["normalizationWarnings"]
+
+
 def test_normalization_is_deterministic_and_keeps_raw_hash_identity() -> None:
     value = raw(story_payload(), treatment="C")
     first = normalize_story_context(value)

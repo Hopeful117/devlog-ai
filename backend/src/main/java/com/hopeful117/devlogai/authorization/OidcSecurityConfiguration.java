@@ -22,7 +22,8 @@ public class OidcSecurityConfiguration {
     SecurityFilterChain oidcSecurityFilterChain(
             HttpSecurity http,
             @Value("${devlog.security.oidc.issuer-uri}") String issuer,
-            @Value("${devlog.security.oidc.audience:}") String audience) throws Exception {
+            @Value("${devlog.security.oidc.audience:}") String audience,
+            OidcAuthenticationFailureDiagnostics authenticationFailureDiagnostics) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
@@ -30,7 +31,9 @@ public class OidcSecurityConfiguration {
                                 "/api/v1/story-context-agent/tasks/*/investigation/actions",
                                 "/api/v1/ai/configuration/oauth/chatgpt/callback").permitAll()
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder(issuer, audience))))
+                .oauth2ResourceServer(oauth -> oauth
+                        .authenticationEntryPoint(authenticationFailureDiagnostics)
+                        .jwt(jwt -> jwt.decoder(jwtDecoder(issuer, audience))))
                 .build();
     }
 

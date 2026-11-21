@@ -1,0 +1,20 @@
+{
+  "status": "APPROVED",
+  "version": "q1-chatgpt-oauth-pricing-v1",
+  "provider": "openai_chatgpt",
+  "authentication": "CHATGPT_OAUTH",
+  "currency": "NOT_APPLICABLE",
+  "billingModel": "CHATGPT_OAUTH_SUBSCRIPTION_NOT_METERED",
+  "inputPerMillion": null,
+  "outputPerMillion": null,
+  "costCeilingPolicy": "OPERATIONAL_LIMITS_ONLY",
+  "source": "HUMAN_DECISION_2026-11-21",
+  "humanDecision": "ACCEPTED",
+  "digest": "0b48079816061d0660476bf2bb5d08572ff5f3378be7d5f3ba77d4013c229fbd",
+  "notes": [
+    "Do not replace unknown values with zero without an explicit billing decision.",
+    "ChatGPT OAuth credentials are resolved from the encrypted credential store.",
+    "OAuth usage is not measurable as monetary cost; authorization is bounded only by the manifest operational limits.",
+    "This contract must not be used to calculate monetary cost or treated as a zero-cost declaration."
+  ]
+}

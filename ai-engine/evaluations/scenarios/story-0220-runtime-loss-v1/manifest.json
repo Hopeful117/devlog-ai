@@ -1,0 +1,20 @@
+{
+  "captureVersion": "story-context-runtime-loss-v1",
+  "scenarioVersion": "1.0.0",
+  "expectedRevision": "abcdef1",
+  "expectedDigests": {
+    "contextDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "projectionDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ledgerDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "scenarios": [
+    {"scenarioId": "targeted-complete", "expectedStatus": "COMPLETED", "semanticEligible": true},
+    {"scenarioId": "broad-projection-reduced", "expectedStatus": "PROJECTION_REDUCED", "semanticEligible": true},
+    {"scenarioId": "multi-source-complete", "expectedStatus": "COMPLETED", "semanticEligible": true},
+    {"scenarioId": "insufficient-abstention", "expectedStatus": "COMPLETED", "semanticEligible": true},
+    {"scenarioId": "provider-incomplete", "expectedStatus": "PROVIDER_INCOMPLETE", "semanticEligible": false},
+    {"scenarioId": "provider-timeout", "expectedStatus": "PROVIDER_TIMEOUT", "semanticEligible": false},
+    {"scenarioId": "preflight-rejected", "expectedStatus": "REJECTED", "semanticEligible": false},
+    {"scenarioId": "mixed-revision-invalid", "expectedStatus": "NOT_EVALUATED", "semanticEligible": false}
+  ]
+}

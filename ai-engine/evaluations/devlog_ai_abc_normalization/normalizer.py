@@ -86,6 +86,7 @@ def normalize_story_context(raw: dict[str, Any]) -> dict[str, Any]:
     )
     normalized["limitations"] = _story_limitations(payload)
     normalized["abstention"] = _explicit_abstention(payload, normalized["normalizationWarnings"])
+    normalized["confidence"] = _explicit_confidence(payload, normalized["normalizationWarnings"])
     normalized["acceptability"] = classify_acceptability(
         _story_acceptability_observation(envelope.payload, payload, normalized)
     )
@@ -111,6 +112,7 @@ def normalize_direct_investigator(raw: dict[str, Any]) -> dict[str, Any]:
     )
     normalized["limitations"] = _direct_limitations(payload)
     normalized["abstention"] = _explicit_abstention(payload, normalized["normalizationWarnings"])
+    normalized["confidence"] = _explicit_confidence(payload, normalized["normalizationWarnings"])
     normalized["acceptability"] = classify_acceptability(
         _story_acceptability_observation(envelope.payload, payload, normalized)
     )
@@ -159,6 +161,7 @@ def _base_answer(envelope: RawEnvelope, treatment: str) -> dict[str, Any]:
         "evidenceReferences": [],
         "limitations": [],
         "abstention": None,
+        "confidence": None,
         "normalizationWarnings": warnings,
         "rawArtifact": {
             "observationId": envelope.observation_id,
@@ -448,6 +451,19 @@ def _explicit_abstention(payload: dict[str, Any], warnings: list[str]) -> bool |
     if isinstance(value, bool):
         return value
     warnings.append("ABSTENTION_NOT_EXPLICIT")
+    return None
+
+
+def _explicit_confidence(payload: dict[str, Any], warnings: list[str]) -> str | None:
+    value = payload.get("confidence")
+    if isinstance(value, dict):
+        value = value.get("level")
+    if value in {"HIGH", "MEDIUM", "LOW"}:
+        return value
+    if value is not None:
+        warnings.append("CONFIDENCE_INVALID")
+    else:
+        warnings.append("CONFIDENCE_NOT_EXPLICIT")
     return None
 
 

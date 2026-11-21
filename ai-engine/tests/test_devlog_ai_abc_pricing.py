@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from evaluations.devlog_ai_abc_runner.pricing import PricingContractError, PricingTable
+from evaluations.devlog_ai_abc_runner.pricing import PricingContractError, PricingTable, canonical_pricing_digest, validate_pricing_contract
 
 
 def test_pricing_calculates_only_from_explicit_versioned_rates() -> None:
@@ -58,3 +58,18 @@ def test_missing_optional_rate_fails_closed_when_usage_requires_it() -> None:
 
     with pytest.raises(PricingContractError, match="cached input pricing"):
         table.calculate(input_tokens=10, output_tokens=10, cached_input_tokens=1)
+
+
+def test_non_metered_oauth_contract_uses_operational_limits_without_token_rates() -> None:
+    contract = {
+        "status": "APPROVED",
+        "version": "q1-chatgpt-oauth-pricing-v1",
+        "currency": "NOT_APPLICABLE",
+        "billingModel": "CHATGPT_OAUTH_SUBSCRIPTION_NOT_METERED",
+        "inputPerMillion": None,
+        "outputPerMillion": None,
+        "costCeilingPolicy": "OPERATIONAL_LIMITS_ONLY",
+    }
+    contract["digest"] = canonical_pricing_digest(contract)
+
+    validate_pricing_contract(contract)
