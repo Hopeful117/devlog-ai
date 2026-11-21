@@ -231,7 +231,7 @@ class PinnedGitRepositoryTools(RepositoryToolServer):
                     line = int(line_number)
                 except ValueError as error:
                     raise RuntimeContractError("pinned repository search line is malformed") from error
-                matches.append({"path": path, "line": line, "text": text})
+                matches.append({"path": path, "line": line, "text": text[:1000]})
                 if len(matches) >= int(arguments.get("maxMatches", 20)):
                     break
             return {"operation": operation, "query": query, "matches": matches}
