@@ -138,6 +138,18 @@ public class AiTask {
     @Column(columnDefinition = "TEXT")
     private String failureMessage;
 
+    @Column(name = "last_callback_failure_code", length = 100)
+    private String lastCallbackFailureCode;
+
+    @Column(name = "last_callback_failure_status", length = 30)
+    private String lastCallbackFailureStatus;
+
+    @Column(name = "last_callback_failure_message", columnDefinition = "TEXT")
+    private String lastCallbackFailureMessage;
+
+    @Column(name = "last_callback_failure_at")
+    private Instant lastCallbackFailureAt;
+
     @Column(nullable = false, updatable = false)
     @CreatedDate
     private Instant createdAt;

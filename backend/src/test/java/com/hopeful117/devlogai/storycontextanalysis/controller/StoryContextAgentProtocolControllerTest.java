@@ -142,7 +142,7 @@ class StoryContextAgentProtocolControllerTest {
         StoryContextAgentProtocolController controller = new StoryContextAgentProtocolController(
                 useCase, mock(StoryContextAgentCallbackFacade.class), taskService,
                 new StoryContextAgentCallbackAuthenticator("secret"),
-                new StoryContextAgentMetrics(new SimpleMeterRegistry()), new ObjectMapper(),
+                new StoryContextAgentMetrics(new SimpleMeterRegistry()), new ObjectMapper(), null,
                 mock(com.hopeful117.devlogai.storycontextanalysis.service.AuthorizedStoryContextSnapshotReader.class),
                 principalResolver, null, null, null, true);
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller)

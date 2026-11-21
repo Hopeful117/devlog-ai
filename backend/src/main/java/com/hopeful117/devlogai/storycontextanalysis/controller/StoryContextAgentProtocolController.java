@@ -9,6 +9,7 @@ import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAgentCal
 import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAgentMetrics;
 import com.hopeful117.devlogai.storycontextanalysis.service.AuthorizedStoryContextSnapshotReader;
 import com.hopeful117.devlogai.storycontextanalysis.service.StoryContextAnalysisQueryService;
+import com.hopeful117.devlogai.ai.engine.service.AiTaskCallbackRejectionService;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipalResolver;
 import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.AnalyzeStoryContextUseCase;
@@ -23,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
+import lombok.extern.slf4j.Slf4j;
 import tools.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,6 +38,7 @@ import java.util.LinkedHashMap;
 /** REST adapter for the versioned SCA protocol. It delegates to existing Core services. */
 @RestController
 @RequestMapping("/api/v1/story-context-agent")
+@Slf4j
 public class StoryContextAgentProtocolController {
     private final AnalyzeStoryContextUseCase analyzeStoryContextUseCase;
     private final StoryContextAgentCallbackFacade callbackFacade;
@@ -43,6 +46,7 @@ public class StoryContextAgentProtocolController {
     private final StoryContextAgentCallbackAuthenticator authenticator;
     private final StoryContextAgentMetrics metrics;
     private final ObjectMapper objectMapper;
+    private final AiTaskCallbackRejectionService callbackRejectionService;
     private final AuthorizedStoryContextSnapshotReader snapshotReader;
     private final AuthenticatedPrincipalResolver principalResolver;
     private final StoryAgentFollowUpService followUpService;
@@ -58,6 +62,7 @@ public class StoryContextAgentProtocolController {
             StoryContextAgentCallbackAuthenticator authenticator,
             StoryContextAgentMetrics metrics,
             ObjectMapper objectMapper,
+            AiTaskCallbackRejectionService callbackRejectionService,
             AuthorizedStoryContextSnapshotReader snapshotReader,
             AuthenticatedPrincipalResolver principalResolver,
             StoryAgentFollowUpService followUpService,
@@ -70,6 +75,7 @@ public class StoryContextAgentProtocolController {
         this.authenticator = authenticator;
         this.metrics = metrics;
         this.objectMapper = objectMapper;
+        this.callbackRejectionService = callbackRejectionService;
         this.snapshotReader = snapshotReader;
         this.principalResolver = principalResolver;
         this.followUpService = followUpService;
@@ -92,7 +98,7 @@ public class StoryContextAgentProtocolController {
             StoryContextAnalysisQueryService analysisQueryService,
             StoryContextInvestigationActionService investigationActionService) {
         this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator, metrics, objectMapper,
-                snapshotReader, principalResolver, followUpService, analysisQueryService,
+                null, snapshotReader, principalResolver, followUpService, analysisQueryService,
                 investigationActionService, false);
     }
 
@@ -107,7 +113,7 @@ public class StoryContextAgentProtocolController {
             AuthorizedStoryContextSnapshotReader snapshotReader,
             AuthenticatedPrincipalResolver principalResolver) {
         this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator,
-                metrics, objectMapper, snapshotReader, principalResolver, null, null, null, false);
+                metrics, objectMapper, null, snapshotReader, principalResolver, null, null, null, false);
     }
 
     /** Compatibility constructor for callback-only unit tests. */
@@ -119,7 +125,7 @@ public class StoryContextAgentProtocolController {
             StoryContextAgentMetrics metrics,
             ObjectMapper objectMapper) {
         this(analyzeStoryContextUseCase, callbackFacade, aiTaskService, authenticator,
-                metrics, objectMapper, null, null, null, null, null, false);
+                metrics, objectMapper, null, null, null, null, null, null, false);
     }
 
     @GetMapping("/projects/{projectSlug}/context")
@@ -199,10 +205,20 @@ public class StoryContextAgentProtocolController {
             } catch (Exception exception) {
                 return ResponseEntity.badRequest().build();
             }
-            request.validateCallbackContract();
-            // Keep domain conflicts visible to GlobalExceptionHandler so a different
-            // terminal payload is reported as 409 rather than being flattened to 400.
-            return ResponseEntity.ok(callbackFacade.callback(aiTaskId, request));
+            try {
+                request.validateCallbackContract();
+                // Keep domain conflicts visible to GlobalExceptionHandler so a different
+                // terminal payload is reported as 409 rather than being flattened to 400.
+                return ResponseEntity.ok(callbackFacade.callback(aiTaskId, request));
+            } catch (RuntimeException exception) {
+                if (callbackRejectionService != null) {
+                    callbackRejectionService.record(aiTaskId, request, exception);
+                }
+                log.warn("Story Context callback rejected taskId={} correlationId={} errorType={} message={}",
+                        aiTaskId, request.correlationId(), exception.getClass().getSimpleName(),
+                        boundedMessage(exception.getMessage()));
+                throw exception;
+            }
         });
     }
 

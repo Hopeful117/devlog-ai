@@ -242,6 +242,11 @@ async def test_callback_reports_bounded_error_after_retry_exhaustion() -> None:
     message = str(raised.value)
     assert attempts == 5
     assert delays == [0.1, 0.2, 0.4, 0.8]
+    assert raised.value.status_code == 409
+    assert raised.value.code == "AI_TASK_NOT_READY"
+    assert raised.value.current_status == "CREATED"
+    assert raised.value.attempts == 5
+    assert raised.value.correlation_id == correlation_id
     assert "status=409" in message
     assert f"correlationId={correlation_id}" in message
     assert "attempts=5" in message

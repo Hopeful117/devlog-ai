@@ -282,7 +282,9 @@ class InteractionTraceCollector:
             raw_model_response=redact_sensitive_text(generation.raw_output)
             if diagnostic and generation else None,
             parsed_model_response=_json_value(parsed) if diagnostic and parsed else None,
-            validation_diagnostics=redact_sensitive_text(failure_message) if diagnostic else None,
+            # Failure diagnostics are needed to distinguish contract failures in normal runs;
+            # prompts and raw provider output remain diagnostic-level only.
+            validation_diagnostics=redact_sensitive_text(failure_message) if failure_message else None,
             execution_phase=execution_phase,
             provider_status=provider_status or (generation.response_status if generation else None),
             incomplete_reason=incomplete_reason or (generation.incomplete_reason if generation else None),

@@ -23,6 +23,23 @@ from app.schemas.story_context_investigation import InvestigationActionResponse
 class CoreCallbackError(RuntimeError):
     """A callback response that the AI Engine cannot safely recover from."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        code: str | None = None,
+        current_status: str | None = None,
+        attempts: int | None = None,
+        correlation_id: UUID | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.current_status = current_status
+        self.attempts = attempts
+        self.correlation_id = correlation_id
+
 
 class CoreCallbackClient:
     def __init__(
@@ -200,7 +217,12 @@ class CoreCallbackClient:
         return CoreCallbackError(
             "Core callback failed: "
             f"status={response.status_code}, correlationId={correlation_id}, "
-            f"attempts={attempts}{suffix}"
+            f"attempts={attempts}{suffix}",
+            status_code=response.status_code,
+            code=body.get("code"),
+            current_status=body.get("currentStatus"),
+            attempts=attempts,
+            correlation_id=correlation_id,
         )
 
     def _json_object(self, response: httpx.Response) -> dict[str, Any]:
