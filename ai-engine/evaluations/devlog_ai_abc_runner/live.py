@@ -242,8 +242,9 @@ def live_preflight(
     output_root: str | Path,
     authorization: Mapping[str, Any] | None = None,
     pricing_contract: Mapping[str, Any] | None = None,
+    activate_live: bool = False,
 ) -> dict[str, Any]:
-    """Perform static live-readiness checks; never contacts a remote service."""
+    """Perform live-readiness checks; remote access remains outside preflight."""
 
     manifest = load_manifest(Path(manifest_path))
     root = Path(repository_root).resolve()
@@ -356,13 +357,16 @@ def live_preflight(
             authorization_status = Q1_LIVE_NOT_AUTHORIZED
             blockers.append(str(error))
         else:
-            authorization_status = Q1_LIVE_NOT_AUTHORIZED
-            blockers.append("live activation is disabled in this evaluation runner")
+            if not activate_live:
+                authorization_status = Q1_LIVE_NOT_AUTHORIZED
+                blockers.append("live activation requires the explicit --activate-live flag")
+            else:
+                authorization_status = "Q1_LIVE_AUTHORIZED"
     if not (Path(output_root).parent.exists() and not Path(output_root).exists()):
         blockers.append("artifact output parent is missing or target already exists")
     runner_status = Q1_LIVE_ADAPTERS_AVAILABLE if controlled_ready else "Q1_LIVE_ADAPTERS_PARTIAL"
     return {
-        "status": "Q1_LIVE_PREFLIGHT_BLOCKED",
+        "status": "Q1_LIVE_PREFLIGHT_READY" if not blockers else "Q1_LIVE_PREFLIGHT_BLOCKED",
         "runnerStatus": runner_status,
         "authorizationStatus": authorization_status,
         "oracleStatus": Q1_ORACLE_ACCEPTED if oracle.get("status") == "ACCEPTED" else Q1_ORACLE_PENDING_HUMAN_REVIEW,

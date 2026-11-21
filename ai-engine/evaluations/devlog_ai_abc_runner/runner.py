@@ -354,7 +354,7 @@ def run_integration_simulation(*, manifest_path: str | Path, output_root: str | 
     )
 
 
-def run_live_preflight(*, manifest_path: str | Path, oracle_path: str | Path, output_root: str | Path, repository_root: str | Path, authorization: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def run_live_preflight(*, manifest_path: str | Path, oracle_path: str | Path, output_root: str | Path, repository_root: str | Path, authorization: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, activate_live: bool = False) -> dict[str, Any]:
     from .live import live_preflight
 
     return live_preflight(
@@ -364,10 +364,11 @@ def run_live_preflight(*, manifest_path: str | Path, oracle_path: str | Path, ou
         repository_root=repository_root,
         authorization=authorization,
         pricing_contract=pricing_contract,
+        activate_live=activate_live,
     )
 
 
-def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None) -> RunResult | dict[str, Any]:
+def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, activate_live: bool = False) -> RunResult | dict[str, Any]:
     if mode == LIVE:
         if authorization is None:
             raise LiveNotAuthorized("LIVE_NOT_AUTHORIZED: Q1 live execution requires a separate explicit authorization")
@@ -401,6 +402,7 @@ def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, reposi
             repository_root=repository_root,
             authorization=authorization,
             pricing_contract=pricing_contract,
+            activate_live=activate_live,
         )
     if mode == INTEGRATION_SIMULATION:
         return run_integration_simulation(
@@ -422,6 +424,7 @@ def main() -> None:
     parser.add_argument("--oracle")
     parser.add_argument("--authorization")
     parser.add_argument("--pricing")
+    parser.add_argument("--activate-live", action="store_true", help="explicitly authorize live preflight activation")
     args = parser.parse_args()
     authorization = None
     if args.authorization:
@@ -442,6 +445,7 @@ def main() -> None:
         oracle_path=args.oracle,
         authorization=authorization,
         pricing_contract=pricing_contract,
+        activate_live=args.activate_live,
     )
     payload = result.summary if isinstance(result, RunResult) else result
     print(json.dumps(payload, indent=2, sort_keys=True))
