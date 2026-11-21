@@ -341,7 +341,10 @@ class ChatGptOAuthTransport:
                 )
             phase = "REQUEST_BUILD"
             if request.mode == "AGENT_DIRECT_OPEN":
-                instructions = "Use only the typed repository tools. Return the Q1 answer JSON after bounded inspection."
+                instructions = (
+                    "Use only the typed repository tools. Return the Q1 answer JSON after bounded inspection. "
+                    "Set questionId to CASE-03 and questionVersion to 1.0.0 in the final answer."
+                )
                 user_input: Any = serialize_v4_conversation(request.input_payload)
             else:
                 instructions = request.input_payload["prompt"]["system"]
