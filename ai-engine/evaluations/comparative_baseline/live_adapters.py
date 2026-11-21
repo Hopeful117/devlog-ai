@@ -243,7 +243,18 @@ class PinnedGitRepositoryTools(RepositoryToolServer):
         if operation == "git_show":
             path = arguments.get("path")
             target = [commit] if path is None else [f"{commit}:{_validate_path(path)}"]
-            return {"operation": operation, "reference": f"commit:{commit}", "commit": commit, "path": path, "content": _git_command(self.repository, "show", *target, timeout=self.timeout_seconds)}
+            try:
+                content = _git_command(self.repository, "show", *target, timeout=self.timeout_seconds)
+            except RuntimeContractError:
+                return {
+                    "operation": operation,
+                    "reference": f"commit:{commit}",
+                    "commit": commit,
+                    "path": path,
+                    "content": "",
+                    "error": "path not found in pinned commit",
+                }
+            return {"operation": operation, "reference": f"commit:{commit}", "commit": commit, "path": path, "content": content}
         if operation == "git_diff":
             parent = arguments.get("parent")
             if parent is not None and (not isinstance(parent, str) or not _HEX_REVISION.fullmatch(parent)):
