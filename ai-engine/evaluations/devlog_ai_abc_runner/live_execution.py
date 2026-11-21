@@ -361,26 +361,55 @@ class ChatGptOAuthTransport:
             transport_attempted = True
             if request.on_transport_attempt is not None:
                 request.on_transport_attempt()
+            output_text_parts: list[str] = []
+            function_call: dict[str, Any] | None = None
+            function_arguments: dict[str, str] = {}
+            completed_payload: dict[str, Any] | None = None
             with httpx.Client(timeout=self._settings.llm_timeout_seconds) as client:
-                response = client.post(
+                with client.stream(
+                    "POST",
                     self._settings.chatgpt_responses_endpoint,
                     headers={"Authorization": f"Bearer {credential.access_token}"},
                     json=body,
-                )
-            phase = "PROVIDER_RESPONSE"
-            provider_response_received = True
-            if response.status_code >= 400:
-                raise _ProviderHttpError(response.status_code)
-            try:
-                payload = response.json()
-            except (TypeError, ValueError) as error:
-                raise _oauth_transport_failure(
-                    error,
-                    phase="RESPONSE_PARSE",
-                    category="RESPONSE_PARSE_ERROR",
-                    transport_attempted=transport_attempted,
-                    provider_response_received=provider_response_received,
-                ) from error
+                ) as response:
+                    phase = "PROVIDER_RESPONSE"
+                    provider_response_received = True
+                    if response.status_code >= 400:
+                        response.read()
+                        raise _ProviderHttpError(response.status_code)
+                    event_type = None
+                    data_lines: list[str] = []
+                    for line in response.iter_lines():
+                        if line.startswith("event:"):
+                            event_type = line[6:].strip()
+                        elif line.startswith("data:"):
+                            data_lines.append(line[5:].strip())
+                        elif not line and data_lines:
+                            payload = json.loads("\n".join(data_lines))
+                            received_type = event_type or payload.get("type")
+                            if received_type == "response.output_text.delta":
+                                output_text_parts.append(payload.get("delta", ""))
+                            elif received_type == "response.function_call_arguments.delta":
+                                item_id = payload.get("item_id")
+                                if isinstance(item_id, str):
+                                    function_arguments[item_id] = function_arguments.get(item_id, "") + payload.get("delta", "")
+                            elif received_type == "response.output_item.done":
+                                item = payload.get("item", {})
+                                if item.get("type") == "function_call" and function_call is None:
+                                    item_id = item.get("id")
+                                    arguments = item.get("arguments") or function_arguments.get(item_id, "{}")
+                                    function_call = {
+                                        "operation": item.get("name"),
+                                        "arguments": json.loads(arguments),
+                                    }
+                            elif received_type == "response.completed":
+                                completed_payload = payload.get("response", payload)
+                            elif received_type in {"response.failed", "response.incomplete", "error"}:
+                                raise RuntimeError("ChatGPT OAuth response was incomplete")
+                            event_type, data_lines = None, []
+            if completed_payload is None:
+                raise RuntimeError("ChatGPT OAuth response did not complete")
+            payload = completed_payload
             if request.on_provider_response is not None:
                 usage = payload.get("usage", {}) if isinstance(payload.get("usage"), dict) else {}
                 request.on_provider_response(
@@ -404,15 +433,10 @@ class ChatGptOAuthTransport:
                     transport_attempted=transport_attempted,
                     provider_response_received=provider_response_received,
                 )
-            for item in payload.get("output", []):
-                if item.get("type") == "function_call":
-                    outcome = "TOOL_CALL"
-                    return ProviderResponse(
-                        "TOOL_CALL",
-                        {"operation": item.get("name"), "arguments": json.loads(item.get("arguments", "{}"))},
-                        payload,
-                    )
-            output_text = payload.get("output_text")
+            if function_call is not None:
+                outcome = "TOOL_CALL"
+                return ProviderResponse("TOOL_CALL", function_call, payload)
+            output_text = "".join(output_text_parts)
             if not isinstance(output_text, str) or not output_text:
                 raise _oauth_transport_failure(
                     RuntimeError("ChatGPT OAuth response did not contain a final answer"),
