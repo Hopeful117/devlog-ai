@@ -279,11 +279,19 @@ class V4CollectionRuntime:
                 status = ExecutionStatus.PROVIDER_TIMEOUT
                 provider_failure = getattr(error, "attribution", None) or provider_failure_attribution(error, category="TIMEOUT")
                 break
-            except Exception:
+            except Exception as error:
                 if attempt is not None:
                     resources.record_attempt_latency(attempt, round((time.perf_counter() - call_started) * 1000))
                 resources.stop("RUNTIME_INFRASTRUCTURE_FAILURE")
                 status = ExecutionStatus.RUNTIME_FAILURE
+                provider_failure = provider_failure_attribution(
+                    error,
+                    request_phase="RUNTIME",
+                    diagnostic_metadata={
+                        "transportAttempted": bool(attempt and attempt.transport_attempted),
+                        "providerResponseReceived": bool(attempt and attempt.provider_response_received),
+                    },
+                )
                 break
             responses.append(response.raw_response)
             if response.kind == "FINAL":

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 import time
@@ -22,6 +23,7 @@ from uuid import UUID
 import httpx
 
 from evaluations.comparative_baseline.collection_runtime import ProviderResponse
+from evaluations.comparative_baseline.collection_runtime import TransportFailure, provider_failure_attribution
 from evaluations.comparative_baseline.live_adapters import common_answer_schema, serialize_v4_conversation
 from evaluations.comparative_baseline_v4.protocol import SafetyCeilings, V4Assignment
 from evaluations.comparative_baseline_v4.runtime import V4CollectionRuntime
@@ -34,6 +36,39 @@ from evaluations.story_context_specificity_live import McpClient
 
 class LiveConfigurationError(ValueError):
     """Raised when the live runtime cannot be configured without guessing."""
+
+
+logger = logging.getLogger(__name__)
+
+
+class _ProviderHttpError(RuntimeError):
+    def __init__(self, status_code: int):
+        super().__init__(f"provider returned HTTP {status_code}")
+        self.status_code = status_code
+
+
+def _oauth_transport_failure(
+    error: BaseException,
+    *,
+    phase: str,
+    category: str | None = None,
+    transport_attempted: bool = False,
+    provider_response_received: bool = False,
+) -> TransportFailure:
+    status = getattr(error, "status_code", None)
+    metadata = {
+        "transportAttempted": transport_attempted,
+        "providerResponseReceived": provider_response_received,
+    }
+    if isinstance(status, int):
+        metadata["httpStatus"] = status
+    attribution = provider_failure_attribution(
+        error,
+        category=category,
+        request_phase=phase,
+        diagnostic_metadata=metadata,
+    )
+    return TransportFailure("ChatGPT OAuth transport failed", attribution=attribution)
 
 
 def _bounded_mcp_error(error: Exception) -> str:
@@ -213,67 +248,197 @@ class ChatGptOAuthTransport:
         self._required_scopes_granted = required_scopes_granted
 
     def complete(self, request: Any) -> ProviderResponse:
-        credential = self._resolver.resolve_for_task(self._task_id, "chatgpt")
-        if credential.access_token_expires_at is not None and credential.access_token_expires_at <= datetime.now(timezone.utc):
-            credential = asyncio.run(self._refresh_service.refresh_if_expired(credential.handle))
-        if not self._required_scopes_granted(credential.scopes):
-            raise LiveConfigurationError("ChatGPT OAuth credential lacks required scopes")
-        if request.mode == "AGENT_DIRECT_OPEN":
-            instructions = "Use only the typed repository tools. Return the Q1 answer JSON after bounded inspection."
-            user_input: Any = serialize_v4_conversation(request.input_payload)
-        else:
-            instructions = request.input_payload["prompt"]["system"]
-            user_input = request.input_payload["prompt"]["user"]
-        body: dict[str, Any] = {
-            "model": self._model,
-            "store": False,
-            "stream": False,
-            "instructions": instructions,
-            "input": user_input,
-            "max_output_tokens": request.max_output_tokens,
-            "text": {"format": {"type": "json_schema", "name": "q1_answer", "strict": True, "schema": common_answer_schema()}},
-        }
-        if request.tool_schema:
-            body["tools"] = request.tool_schema
-        if request.on_transport_attempt is not None:
-            request.on_transport_attempt()
-        with httpx.Client(timeout=self._settings.llm_timeout_seconds) as client:
-            response = client.post(
-                self._settings.chatgpt_responses_endpoint,
-                headers={"Authorization": f"Bearer {credential.access_token}"},
-                json=body,
-            )
-        if response.status_code >= 400:
-            raise LiveConfigurationError(f"ChatGPT OAuth request failed with HTTP {response.status_code}")
-        payload = response.json()
-        if request.on_provider_response is not None:
-            usage = payload.get("usage", {}) if isinstance(payload.get("usage"), dict) else {}
-            request.on_provider_response(
-                {
-                    "inputTokens": usage.get("input_tokens", "NOT_MEASURED"),
-                    "outputTokens": usage.get("output_tokens", "NOT_MEASURED"),
-                    "totalTokens": usage.get("total_tokens", "NOT_MEASURED"),
-                },
-                {
-                    "transportAttempted": True,
-                    "providerResponseReceived": True,
-                    "requestedModel": self._model,
-                    "resolvedProviderModel": payload.get("model"),
-                },
-            )
-        if payload.get("status") == "incomplete":
-            raise LiveConfigurationError("ChatGPT OAuth response was incomplete")
-        for item in payload.get("output", []):
-            if item.get("type") == "function_call":
-                return ProviderResponse(
-                    "TOOL_CALL",
-                    {"operation": item.get("name"), "arguments": json.loads(item.get("arguments", "{}"))},
-                    payload,
+        started = time.perf_counter()
+        phase = "CREDENTIAL_RESOLUTION"
+        transport_attempted = False
+        provider_response_received = False
+        outcome = "FAILED"
+        logger.info(
+            "Q1 B provider attempt started",
+            extra={
+                "event": "Q1_B_PROVIDER_ATTEMPT_STARTED",
+                "taskId": str(self._task_id),
+                "model": self._model,
+                "turn": request.turn_index,
+                "phase": phase,
+            },
+        )
+        try:
+            credential = self._resolver.resolve_for_task(self._task_id, "chatgpt")
+            phase = "CREDENTIAL_REFRESH"
+            if credential.access_token_expires_at is not None and credential.access_token_expires_at <= datetime.now(timezone.utc):
+                credential = asyncio.run(self._refresh_service.refresh_if_expired(credential.handle))
+            phase = "CREDENTIAL_SCOPE_VALIDATION"
+            if not self._required_scopes_granted(credential.scopes):
+                raise _oauth_transport_failure(
+                    RuntimeError("ChatGPT OAuth credential lacks required scopes"),
+                    phase=phase,
+                    category="AUTHENTICATION_ERROR",
                 )
-        output_text = payload.get("output_text")
-        if not isinstance(output_text, str) or not output_text:
-            raise LiveConfigurationError("ChatGPT OAuth response did not contain a final answer")
-        return ProviderResponse("FINAL", json.loads(output_text), payload)
+            phase = "REQUEST_BUILD"
+            if request.mode == "AGENT_DIRECT_OPEN":
+                instructions = "Use only the typed repository tools. Return the Q1 answer JSON after bounded inspection."
+                user_input: Any = serialize_v4_conversation(request.input_payload)
+            else:
+                instructions = request.input_payload["prompt"]["system"]
+                user_input = request.input_payload["prompt"]["user"]
+            body: dict[str, Any] = {
+                "model": self._model,
+                "store": False,
+                "stream": False,
+                "instructions": instructions,
+                "input": user_input,
+                "max_output_tokens": request.max_output_tokens,
+                "text": {"format": {"type": "json_schema", "name": "q1_answer", "strict": True, "schema": common_answer_schema()}},
+            }
+            if request.tool_schema:
+                body["tools"] = request.tool_schema
+            phase = "PROVIDER_REQUEST"
+            transport_attempted = True
+            if request.on_transport_attempt is not None:
+                request.on_transport_attempt()
+            with httpx.Client(timeout=self._settings.llm_timeout_seconds) as client:
+                response = client.post(
+                    self._settings.chatgpt_responses_endpoint,
+                    headers={"Authorization": f"Bearer {credential.access_token}"},
+                    json=body,
+                )
+            phase = "PROVIDER_RESPONSE"
+            provider_response_received = True
+            if response.status_code >= 400:
+                raise _ProviderHttpError(response.status_code)
+            try:
+                payload = response.json()
+            except (TypeError, ValueError) as error:
+                raise _oauth_transport_failure(
+                    error,
+                    phase="RESPONSE_PARSE",
+                    category="RESPONSE_PARSE_ERROR",
+                    transport_attempted=transport_attempted,
+                    provider_response_received=provider_response_received,
+                ) from error
+            if request.on_provider_response is not None:
+                usage = payload.get("usage", {}) if isinstance(payload.get("usage"), dict) else {}
+                request.on_provider_response(
+                    {
+                        "inputTokens": usage.get("input_tokens", "NOT_MEASURED"),
+                        "outputTokens": usage.get("output_tokens", "NOT_MEASURED"),
+                        "totalTokens": usage.get("total_tokens", "NOT_MEASURED"),
+                    },
+                    {
+                        "transportAttempted": True,
+                        "providerResponseReceived": True,
+                        "requestedModel": self._model,
+                        "resolvedProviderModel": payload.get("model"),
+                    },
+                )
+            if payload.get("status") == "incomplete":
+                raise _oauth_transport_failure(
+                    RuntimeError("ChatGPT OAuth response was incomplete"),
+                    phase="RESPONSE_STATE",
+                    category="PROVIDER_INCOMPLETE_RESPONSE",
+                    transport_attempted=transport_attempted,
+                    provider_response_received=provider_response_received,
+                )
+            for item in payload.get("output", []):
+                if item.get("type") == "function_call":
+                    outcome = "TOOL_CALL"
+                    return ProviderResponse(
+                        "TOOL_CALL",
+                        {"operation": item.get("name"), "arguments": json.loads(item.get("arguments", "{}"))},
+                        payload,
+                    )
+            output_text = payload.get("output_text")
+            if not isinstance(output_text, str) or not output_text:
+                raise _oauth_transport_failure(
+                    RuntimeError("ChatGPT OAuth response did not contain a final answer"),
+                    phase="RESPONSE_CONTRACT",
+                    category="RESPONSE_CONTRACT_ERROR",
+                    transport_attempted=transport_attempted,
+                    provider_response_received=provider_response_received,
+                )
+            try:
+                parsed = json.loads(output_text)
+            except (TypeError, ValueError) as error:
+                raise _oauth_transport_failure(
+                    error,
+                    phase="RESPONSE_PARSE",
+                    category="RESPONSE_PARSE_ERROR",
+                    transport_attempted=transport_attempted,
+                    provider_response_received=provider_response_received,
+                ) from error
+            outcome = "FINAL"
+            return ProviderResponse("FINAL", parsed, payload)
+        except TransportFailure as error:
+            attribution = error.attribution or provider_failure_attribution(
+                error,
+                request_phase=phase,
+                diagnostic_metadata={
+                    "transportAttempted": transport_attempted,
+                    "providerResponseReceived": provider_response_received,
+                },
+            )
+            logger.warning(
+                "Q1 B provider attempt failed",
+                extra={
+                    "event": "Q1_B_PROVIDER_ATTEMPT_FAILED",
+                    "taskId": str(self._task_id),
+                    "model": self._model,
+                    "turn": request.turn_index,
+                    "phase": phase,
+                    "outcome": attribution["category"],
+                    "providerStatus": attribution.get("httpStatus"),
+                    "providerResponseReceived": provider_response_received,
+                    "durationMs": round((time.perf_counter() - started) * 1000),
+                },
+            )
+            raise
+        except httpx.TimeoutException as error:
+            raise _oauth_transport_failure(
+                error,
+                phase=phase,
+                category="TIMEOUT",
+                transport_attempted=transport_attempted,
+                provider_response_received=provider_response_received,
+            ) from error
+        except httpx.HTTPError as error:
+            raise _oauth_transport_failure(
+                error,
+                phase=phase,
+                category="CONNECTION_ERROR",
+                transport_attempted=transport_attempted,
+                provider_response_received=provider_response_received,
+            ) from error
+        except _ProviderHttpError as error:
+            raise _oauth_transport_failure(
+                error,
+                phase=phase,
+                transport_attempted=transport_attempted,
+                provider_response_received=provider_response_received,
+            ) from error
+        except Exception as error:
+            raise _oauth_transport_failure(
+                error,
+                phase=phase,
+                category="AUTHENTICATION_ERROR" if phase.startswith("CREDENTIAL") else None,
+                transport_attempted=transport_attempted,
+                provider_response_received=provider_response_received,
+            ) from error
+        finally:
+            if outcome != "FAILED":
+                logger.info(
+                    "Q1 B provider attempt finished",
+                    extra={
+                        "event": "Q1_B_PROVIDER_ATTEMPT_FINISHED",
+                        "taskId": str(self._task_id),
+                        "model": self._model,
+                        "turn": request.turn_index,
+                        "phase": phase,
+                        "outcome": outcome,
+                        "providerResponseReceived": provider_response_received,
+                        "durationMs": round((time.perf_counter() - started) * 1000),
+                    },
+                )
 
 
 class DirectLiveTreatmentAdapter:

@@ -15,6 +15,7 @@ from evaluations.devlog_ai_abc_normalization import (
     normalize_direct_investigator,
     normalize_story_context,
 )
+from evaluations.comparative_baseline.collection_runtime import provider_failure_attribution
 
 from .fixtures import fixture_for
 from .provenance import (
@@ -264,15 +265,17 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
             technical_status = payload.get("executionStatus", "NOT_EVALUATED")
             error = None
         except Exception as failure:  # The failed treatment is preserved; no retry is attempted.
+            diagnostic = provider_failure_attribution(failure, request_phase="RUNNER")
             envelope["rawOutput"] = {
                 "executionStatus": "RUNTIME_FAILURE",
                 "semanticEligibility": "NOT_EVALUATED",
                 "errorType": type(failure).__name__,
-                "errorMessage": str(failure),
+                "errorMessage": diagnostic["safeMessage"],
+                "failureDiagnostic": diagnostic,
             }
             envelope["rawSha256"] = sha256_json(envelope["rawOutput"])
             technical_status = "RUNTIME_FAILURE"
-            error = {"type": type(failure).__name__, "message": str(failure)}
+            error = {"type": type(failure).__name__, "message": diagnostic["safeMessage"], "diagnostic": diagnostic}
         raw_path = observation_root / "raw" / "answer.json"
         raw_file_hash = _write_json_exclusive(raw_path, envelope)
         final_response = envelope["rawOutput"].get("finalResponse") or {}

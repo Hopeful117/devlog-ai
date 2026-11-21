@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import socket
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ from evaluations.devlog_ai_abc_runner.live import (
     validate_live_authorization,
 )
 from evaluations.devlog_ai_abc_runner.live_execution import (
+    ChatGptOAuthTransport,
     CoreLiveTreatmentAdapter,
     LiveConfiguration,
     LiveConfigurationError,
@@ -25,6 +27,7 @@ from evaluations.devlog_ai_abc_runner.live_execution import (
     live_adapters,
     resolve_live_story,
 )
+from evaluations.comparative_baseline.collection_runtime import ProviderRequest, TransportFailure
 from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
 
 
@@ -41,6 +44,61 @@ def manifest() -> dict:
 def accepted_oracle() -> dict:
     oracle = load_q1_oracle(ORACLE_PATH, expected_revision=REVISION)
     return {**oracle, "status": "ACCEPTED"}
+
+
+def test_env_example_quotes_shell_value_with_spaces() -> None:
+    env_example = (ROOT / ".env.example").read_text()
+
+    assert 'CHATGPT_AGENT_NAME="DevLog AI"' in env_example
+
+
+def test_chatgpt_oauth_transport_exposes_bounded_http_diagnostic(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Credential:
+        access_token = "access-token"
+        access_token_expires_at = None
+        scopes = "resource.invoke chatgpt.tokens.use.direct"
+
+    class Response:
+        status_code = 401
+
+    class Client:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def post(self, *_args, **_kwargs):
+            return Response()
+
+    transport = object.__new__(ChatGptOAuthTransport)
+    transport._task_id = "task-id"
+    transport._model = "gpt-5.6-luna"
+    transport._settings = SimpleNamespace(llm_timeout_seconds=1, chatgpt_responses_endpoint="https://provider.example/responses")
+    transport._resolver = SimpleNamespace(resolve_for_task=lambda *_args: Credential())
+    transport._refresh_service = None
+    transport._required_scopes_granted = lambda scopes: True
+    monkeypatch.setattr("evaluations.devlog_ai_abc_runner.live_execution.httpx.Client", lambda **_kwargs: Client())
+
+    request = ProviderRequest(
+        assignment=SimpleNamespace(),
+        mode="AGENT_DIRECT_OPEN",
+        turn_index=1,
+        input_payload={"conversation": [{"role": "user", "content": "question"}]},
+        tool_schema=None,
+        max_output_tokens=10,
+    )
+
+    with pytest.raises(TransportFailure) as captured:
+        transport.complete(request)
+
+    diagnostic = captured.value.attribution
+    assert diagnostic["category"] == "AUTHENTICATION_ERROR"
+    assert diagnostic["httpStatus"] == 401
+    assert diagnostic["requestPhase"] == "PROVIDER_RESPONSE"
+    assert diagnostic["transportAttempted"] is True
+    assert diagnostic["providerResponseReceived"] is True
+    assert "access-token" not in json.dumps(diagnostic)
 
 
 def approved_pricing() -> dict:

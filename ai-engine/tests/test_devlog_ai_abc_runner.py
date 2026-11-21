@@ -222,7 +222,7 @@ def test_failed_treatment_is_recorded_without_retry(tmp_path: Path) -> None:
 
         def execute(self, observation: dict, manifest: dict) -> dict:
             self.calls += 1
-            raise RuntimeError("fixture failure")
+            raise RuntimeError("Bearer sk-12345678901234567890 fixture failure")
 
     failing = FailingAdapter()
     adapters = {
@@ -235,7 +235,8 @@ def test_failed_treatment_is_recorded_without_retry(tmp_path: Path) -> None:
     status = json.loads((result.run_root / "observations" / "Q1-B-DIRECT-INVESTIGATOR-r1" / "status.json").read_text())
     assert status["technicalStatus"] == "RUNTIME_FAILURE"
     assert status["retryCount"] == 0
-    assert status["error"]["message"] == "fixture failure"
+    assert status["error"]["message"] == "[REDACTED] fixture failure"
+    assert "sk-12345678901234567890" not in (result.run_root / "observations" / "Q1-B-DIRECT-INVESTIGATOR-r1" / "raw" / "answer.json").read_text()
 
 
 def test_oracle_material_is_not_present_in_run_artifacts(tmp_path: Path) -> None:
