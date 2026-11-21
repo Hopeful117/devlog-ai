@@ -354,7 +354,7 @@ def run_integration_simulation(*, manifest_path: str | Path, output_root: str | 
     )
 
 
-def run_live_preflight(*, manifest_path: str | Path, oracle_path: str | Path, output_root: str | Path, repository_root: str | Path, authorization: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def run_live_preflight(*, manifest_path: str | Path, oracle_path: str | Path, output_root: str | Path, repository_root: str | Path, authorization: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None) -> dict[str, Any]:
     from .live import live_preflight
 
     return live_preflight(
@@ -363,6 +363,7 @@ def run_live_preflight(*, manifest_path: str | Path, oracle_path: str | Path, ou
         output_root=output_root,
         repository_root=repository_root,
         authorization=authorization,
+        pricing_contract=pricing_contract,
     )
 
 
@@ -398,6 +399,7 @@ def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, reposi
             output_root=output_root,
             repository_root=repository_root,
             authorization=authorization,
+            pricing_contract=pricing_contract,
         )
     if mode == INTEGRATION_SIMULATION:
         return run_integration_simulation(

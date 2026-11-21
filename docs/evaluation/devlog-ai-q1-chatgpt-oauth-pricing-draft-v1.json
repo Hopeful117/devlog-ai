@@ -10,7 +10,7 @@
   "costCeilingPolicy": "OPERATIONAL_LIMITS_ONLY",
   "source": "HUMAN_DECISION_2026-11-21",
   "humanDecision": "ACCEPTED",
-  "digest": "dc203cc5a4b6d812698a6ad9046d212cc27d7c2f7ec8ad96f9e5f58630d5579d",
+  "digest": "0b48079816061d0660476bf2bb5d08572ff5f3378be7d5f3ba77d4013c229fbd",
   "notes": [
     "Do not replace unknown values with zero without an explicit billing decision.",
     "ChatGPT OAuth credentials are resolved from the encrypted credential store.",

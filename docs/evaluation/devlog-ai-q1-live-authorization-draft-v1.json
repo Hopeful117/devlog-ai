@@ -7,7 +7,7 @@
   "campaignId": "devlog-ai-abc-first-test",
   "manifestId": "devlog-ai-abc-first-test",
   "manifestVersion": "1.1.0",
-  "manifestDigest": "cdc0bab530754f6ea6bcebd040e9e841012309a8ec1e93c02a052ba10a5c81e3",
+  "manifestDigest": "c533be54e8189273f6fb81956a1587330f513cfefbe2512032063afc096f06bd",
   "oracleStatus": "Q1_ORACLE_ACCEPTED",
   "oracleDigest": "2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e",
   "authorizedObservationIds": [
@@ -43,7 +43,7 @@
   },
   "pricingStatus": "APPROVED",
   "pricingVersion": "q1-chatgpt-oauth-pricing-v1",
-  "pricingDigest": "dc203cc5a4b6d812698a6ad9046d212cc27d7c2f7ec8ad96f9e5f58630d5579d",
+  "pricingDigest": "0b48079816061d0660476bf2bb5d08572ff5f3378be7d5f3ba77d4013c229fbd",
   "costCeiling": {
     "currency": "NOT_APPLICABLE",
     "maxAmount": "NOT_MEASURED"

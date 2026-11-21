@@ -232,6 +232,7 @@ def live_preflight(
     repository_root: str | Path,
     output_root: str | Path,
     authorization: Mapping[str, Any] | None = None,
+    pricing_contract: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Perform static live-readiness checks; never contacts a remote service."""
 
@@ -295,7 +296,7 @@ def live_preflight(
     budgets_ready = isinstance(manifest.get("technicalBudgets"), dict) and all(
         isinstance(value, int) and value > 0 for value in manifest["technicalBudgets"].values()
     )
-    pricing_contract = manifest.get("pricingContract")
+    pricing_contract = pricing_contract or manifest.get("pricingContract")
     pricing_ready = False
     if isinstance(pricing_contract, Mapping):
         try:
@@ -340,7 +341,7 @@ def live_preflight(
                 authorization,
                 manifest=manifest,
                 oracle=oracle,
-                pricing_contract=manifest.get("pricingContract"),
+                pricing_contract=pricing_contract,
             )
         except LiveAuthorizationError as error:
             authorization_status = Q1_LIVE_NOT_AUTHORIZED
