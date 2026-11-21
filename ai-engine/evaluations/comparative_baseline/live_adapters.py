@@ -187,7 +187,16 @@ class PinnedGitRepositoryTools(RepositoryToolServer):
         _validate_revision(arguments)
         if operation == "read_file":
             path = _validate_path(arguments.get("path"))
-            content = _git_command(self.repository, "show", f"{self.revision}:{path}", timeout=self.timeout_seconds)
+            try:
+                content = _git_command(self.repository, "show", f"{self.revision}:{path}", timeout=self.timeout_seconds)
+            except RuntimeContractError:
+                return {
+                    "operation": operation,
+                    "reference": path,
+                    "path": path,
+                    "content": "",
+                    "error": "file not found in pinned repository revision",
+                }
             lines = content.splitlines()
             start = int(arguments.get("startLine", 1))
             end = int(arguments.get("endLine", len(lines)))
