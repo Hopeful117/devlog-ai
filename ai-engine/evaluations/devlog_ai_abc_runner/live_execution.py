@@ -349,7 +349,7 @@ class ChatGptOAuthTransport:
             body: dict[str, Any] = {
                 "model": self._model,
                 "store": False,
-                "stream": False,
+                "stream": True,
                 "instructions": instructions,
                 "input": user_input,
                 "max_output_tokens": request.max_output_tokens,
