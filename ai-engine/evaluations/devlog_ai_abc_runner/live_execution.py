@@ -398,7 +398,7 @@ def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config:
     }
 
 
-def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], authorization: Mapping[str, Any], environment: Mapping[str, str] | None = None):
+def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], authorization: Mapping[str, Any], environment: Mapping[str, str] | None = None, observation_ids: tuple[str, ...] | None = None):
     root = Path(repository_root).resolve()
     if current_head(root) != authorization["runtimeRevision"]:
         raise LiveConfigurationError("live execution requires HEAD to equal the authorized runtime revision")
@@ -422,6 +422,7 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
             repository_root=root,
             adapters=adapters,
             mode="LIVE",
+            observation_ids=observation_ids,
         )
     finally:
         mcp.close()

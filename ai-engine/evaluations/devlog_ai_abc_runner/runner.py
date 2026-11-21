@@ -215,7 +215,7 @@ def replay_run(*, manifest_path: str | Path, run_root: str | Path) -> dict[str, 
     return {"status": "PASS", "integrity": integrity, "providerCalls": 0, "networkCalls": 0}
 
 
-def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, mode: str = DRY_RUN) -> RunResult:
+def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, mode: str = DRY_RUN, observation_ids: tuple[str, ...] | None = None) -> RunResult:
     manifest = load_manifest(Path(manifest_path))
     repository_root = Path(repository_root).resolve()
     actual_revision = repository_revision(repository_root)
@@ -233,8 +233,14 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
     manifest_file_hash = _write_json_exclusive(run_root / "manifest.json", manifest)
     provenance = execution_identity(repository_root, runtime_revision=actual_revision)
     selected = dict(adapters or _default_adapters())
+    observations = [
+        item for item in manifest["observations"]
+        if observation_ids is None or item["observationId"] in observation_ids
+    ]
+    if not observations:
+        raise ManifestValidationError("observation selection does not match the manifest")
     results: list[dict[str, Any]] = []
-    for observation in manifest["observations"]:
+    for observation in observations:
         observation_id = observation["observationId"]
         condition = _CONDITIONS[observation_id]
         adapter = selected.get(condition)
@@ -294,7 +300,7 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
         }
         _write_json_exclusive(observation_root / "status.json", status)
         results.append(status)
-    integrity = _validate_integrity(run_root, manifest["observations"])
+    integrity = _validate_integrity(run_root, observations)
     integration_passed = (
         mode == INTEGRATION_SIMULATION
         and all(item["integrationStatus"] == "PASS" for item in results)
@@ -389,7 +395,7 @@ def run_live_prepare() -> dict[str, Any]:
     return reserve_live_task_binding()
 
 
-def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, activate_live: bool = False) -> RunResult | dict[str, Any]:
+def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, activate_live: bool = False, observation_ids: tuple[str, ...] | None = None) -> RunResult | dict[str, Any]:
     if mode == LIVE_PREPARE:
         if not activate_live:
             raise LiveNotAuthorized("LIVE_PREPARE requires the explicit --activate-live flag")
@@ -416,6 +422,7 @@ def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, reposi
             repository_root=repository_root,
             manifest=manifest_value,
             authorization=authorization,
+            observation_ids=observation_ids,
         )
     if mode == LIVE_PREFLIGHT:
         if oracle_path is None:
@@ -437,7 +444,13 @@ def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, reposi
         )
     if mode != DRY_RUN:
         raise ValueError(f"unsupported runner mode: {mode}")
-    return run_dry_run(manifest_path=manifest_path, output_root=output_root, repository_root=repository_root, adapters=adapters)
+    return run_dry_run(
+        manifest_path=manifest_path,
+        output_root=output_root,
+        repository_root=repository_root,
+        adapters=adapters,
+        observation_ids=observation_ids,
+    )
 
 
 def main() -> None:
@@ -450,6 +463,8 @@ def main() -> None:
     parser.add_argument("--authorization")
     parser.add_argument("--pricing")
     parser.add_argument("--activate-live", action="store_true", help="explicitly authorize live preflight activation")
+    parser.add_argument("--observation-id", action="append", dest="observation_ids",
+                        help="limit execution to one or more frozen observation IDs")
     args = parser.parse_args()
     authorization = None
     if args.authorization:
@@ -471,6 +486,7 @@ def main() -> None:
         authorization=authorization,
         pricing_contract=pricing_contract,
         activate_live=args.activate_live,
+        observation_ids=tuple(args.observation_ids) if args.observation_ids else None,
     )
     payload = _result_payload(result)
     print(json.dumps(payload, indent=2, sort_keys=True))

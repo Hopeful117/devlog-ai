@@ -96,6 +96,21 @@ def test_dry_run_preserves_native_contracts_and_selects_a_b_c(tmp_path: Path) ->
     }
 
 
+def test_runner_can_select_one_frozen_observation(tmp_path: Path) -> None:
+    result = run(
+        mode=DRY_RUN,
+        manifest_path=MANIFEST,
+        output_root=tmp_path / "q1-a-run",
+        repository_root=REPOSITORY,
+        observation_ids=("Q1-A-DEVLOG-CURRENT-r1",),
+    )
+
+    assert [item["observationId"] for item in result.summary["observations"]] == [
+        "Q1-A-DEVLOG-CURRENT-r1"
+    ]
+    assert not (result.run_root / "observations" / "Q1-B-DIRECT-INVESTIGATOR-r1").exists()
+
+
 def test_invalid_manifest_is_rejected_before_creating_run(tmp_path: Path) -> None:
     value = json.loads(MANIFEST.read_text())
     value["observations"] = value["observations"][:2]
