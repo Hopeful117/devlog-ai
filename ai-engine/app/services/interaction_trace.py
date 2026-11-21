@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import logging
 from typing import Any, Awaitable, Callable
 from uuid import UUID, uuid4
 
@@ -21,6 +22,8 @@ _SECRET_PATTERNS = (
     re.compile(r"(?i)((?:api[_-]?key|password|secret|token)\s*[:=]\s*)[^\s,;]+"),
     re.compile(r"\bsk-[A-Za-z0-9_-]+\b"),
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _failure_category(error: Exception) -> str:
@@ -158,6 +161,19 @@ class InteractionTraceCollector:
         provider_status: str | None = None
         incomplete_reason: str | None = None
         try:
+            logger.info(
+                "AI provider generation started",
+                extra={
+                    "event": "AI_PROVIDER_GENERATION_STARTED",
+                    "taskId": str(self.submission.ai_task_id),
+                    "taskCorrelationId": str(self.submission.correlation_id),
+                    "attempt": attempt,
+                    "intent": self.submission.intent.id,
+                    "provider": self.provider.provider_name,
+                    "model": self.provider.model_identifier,
+                    "phase": "PROVIDER",
+                },
+            )
             generation = await self._generate(prompt, response_model)
             try:
                 parsed = response_model.model_validate(generation.output)
@@ -175,6 +191,19 @@ class InteractionTraceCollector:
                 failure_category = _failure_category(validation_error)
                 failure_code = _failure_code(validation_error)
                 raise
+            logger.info(
+                "AI provider generation completed",
+                extra={
+                    "event": "AI_PROVIDER_GENERATION_COMPLETED",
+                    "taskId": str(self.submission.ai_task_id),
+                    "taskCorrelationId": str(self.submission.correlation_id),
+                    "attempt": attempt,
+                    "intent": self.submission.intent.id,
+                    "provider": self.provider.provider_name,
+                    "model": self.provider.model_identifier,
+                    "phase": "VALIDATION",
+                },
+            )
             return parsed
         except Exception as error:
             failure_message = _failure_message(error)
@@ -188,6 +217,22 @@ class InteractionTraceCollector:
                 else:
                     status = "PROVIDER_FAILED"
                     failure_category = _failure_category(error)
+            logger.exception(
+                "AI provider generation failed",
+                extra={
+                    "event": "AI_PROVIDER_GENERATION_FAILED",
+                    "taskId": str(self.submission.ai_task_id),
+                    "taskCorrelationId": str(self.submission.correlation_id),
+                    "attempt": attempt,
+                    "intent": self.submission.intent.id,
+                    "provider": self.provider.provider_name,
+                    "model": self.provider.model_identifier,
+                    "phase": execution_phase,
+                    "outcome": failure_code,
+                    "providerStatus": provider_status,
+                    "incompleteReason": incomplete_reason,
+                },
+            )
             raise
         finally:
             completed_at = datetime.now(timezone.utc)

@@ -263,9 +263,31 @@ public class StoryContextSubmissionService {
         }
         if (dispatch) {
             aiTaskService.submit(task.getId(), new SubmitAiTaskRequest(null));
-            aiEngineClient.submit(prompt);
+            long dispatchStartedAt = System.nanoTime();
+            try {
+                var submission = aiEngineClient.submit(prompt);
+                task.setExternalJobId(submission.externalJobId());
+                task.setAiEngineAcceptedAt(submission.acceptedAt());
+                task.setAiEngineSubmissionDurationMs(elapsedMillis(dispatchStartedAt));
+                task.setAiEngineSubmissionError(null);
+                aiTaskRepository.save(task);
+            } catch (RuntimeException exception) {
+                task.setAiEngineSubmissionDurationMs(elapsedMillis(dispatchStartedAt));
+                task.setAiEngineSubmissionError(boundedMessage(exception.getMessage()));
+                aiTaskRepository.save(task);
+                throw exception;
+            }
         }
         return task.getId();
+    }
+
+    private long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000;
+    }
+
+    private String boundedMessage(String message) {
+        if (message == null || message.isBlank()) return "AI Engine submission failed";
+        return message.length() <= 5000 ? message : message.substring(0, 5000);
     }
 
     private Map<String, Object> budgetAccounting(StoryContextBudgetPreflight.Result budget) {

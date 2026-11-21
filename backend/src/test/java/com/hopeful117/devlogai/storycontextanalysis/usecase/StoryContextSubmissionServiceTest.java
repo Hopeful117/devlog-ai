@@ -1,7 +1,9 @@
 package com.hopeful117.devlogai.storycontextanalysis.usecase;
 
 import com.hopeful117.devlogai.ai.engine.client.AIEngineClient;
+import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
+import com.hopeful117.devlogai.ai.engine.exception.AIEngineCommunicationException;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
@@ -29,6 +31,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -90,6 +93,8 @@ class StoryContextSubmissionServiceTest {
                 new AiTaskExecutionAuthorizationService.AuthorizedExecution(
                          AiCredentialBinding.builder().id(bindingId).build(), "anthropic", "claude-opus-5-5",
                          Map.of()));
+        when(aiEngineClient.submit(any(PromptRequest.class))).thenReturn(
+                new AiTaskSubmissionResponse(task.getCorrelationId(), true, "external-job-1", Instant.now()));
 
         service.submit(prepared, null, "submission", "idempotency",
                 new AuthenticatedPrincipal("human-1", PrincipalKind.HUMAN, "test"), "anthropic");
@@ -104,6 +109,9 @@ class StoryContextSubmissionServiceTest {
         assertEquals("anthropic", prompt.getValue().provider());
         assertEquals("claude-opus-5-5", prompt.getValue().modelIdentifier());
         assertEquals(Map.of("maxOutputTokens", 6000), prompt.getValue().allowedParameters());
+        assertEquals("external-job-1", task.getExternalJobId());
+        assertNotNull(task.getAiEngineAcceptedAt());
+        assertNotNull(task.getAiEngineSubmissionDurationMs());
     }
 
     @Test
@@ -157,6 +165,18 @@ class StoryContextSubmissionServiceTest {
         assertEquals(0, ((Map<?, ?>) lossAccounting.get("counts")).get("providerVisibleCount"));
         verify(aiEngineClient, never()).submit(any(PromptRequest.class));
         verify(aiTaskService).failSubmission(eq(taskId), any());
+    }
+
+    @Test
+    void aiEngineSubmissionFailurePersistsBoundedDispatchDiagnostic() {
+        SubmissionFixture fixture = submissionFixture();
+        doThrow(new AIEngineCommunicationException("AI Engine timed out"))
+                .when(aiEngineClient).submit(any(PromptRequest.class));
+
+        assertThrows(AIEngineCommunicationException.class, () -> fixture.submit(Map.of()));
+
+        assertEquals("AI Engine timed out", fixture.task().getAiEngineSubmissionError());
+        assertNotNull(fixture.task().getAiEngineSubmissionDurationMs());
     }
 
     @Test
@@ -244,6 +264,8 @@ class StoryContextSubmissionServiceTest {
         lenient().when(aiTaskService.createForStoryContextAnalysisEntity(any(), eq(AiTaskType.STORY_CONTEXT_ANALYSIS),
                 any(), any(), any(), any(), any(), any(), any(), any())).thenReturn(task);
         lenient().when(aiTaskRepository.save(any(AiTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(aiEngineClient.submit(any(PromptRequest.class))).thenReturn(
+                new AiTaskSubmissionResponse(task.getCorrelationId(), true, "external-job-1", Instant.now()));
         lenient().when(authorizationService.authorizeAndIssue(any(), eq(task))).thenReturn(
                         new AiTaskExecutionAuthorizationService.AuthorizedExecution(
                         AiCredentialBinding.builder().id(UUID.randomUUID()).build(), "anthropic", "claude-opus-5-5",

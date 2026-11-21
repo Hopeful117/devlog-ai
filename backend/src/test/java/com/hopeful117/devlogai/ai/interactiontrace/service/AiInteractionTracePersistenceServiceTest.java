@@ -54,7 +54,7 @@ class AiInteractionTracePersistenceServiceTest {
     }
 
     @Test
-    void normalModePersistsBoundedFailureCode() {
+    void normalModePersistsFailureDiagnosticsWithoutDiagnosticPayload() {
         ReflectionTestUtils.setField(service, "configuredLevel", "NORMAL");
         AiInteractionTraceRequest request = requestWithFailureCode();
         when(repository.existsById(request.id())).thenReturn(false);
@@ -64,6 +64,7 @@ class AiInteractionTracePersistenceServiceTest {
         ArgumentCaptor<AiInteractionTrace> captor = ArgumentCaptor.forClass(AiInteractionTrace.class);
         verify(repository).save(captor.capture());
         assertThat(captor.getValue().getFailureCode()).isEqualTo("GROUNDING_REQUESTED_FILE_SCOPE");
+        assertThat(captor.getValue().getValidationDiagnostics()).isEqualTo("validation detail");
     }
 
     @Test
@@ -125,6 +126,6 @@ class AiInteractionTracePersistenceServiceTest {
                 "story-context-analysis-prompt-v1", started, Instant.now(), 25,
                 "VALIDATION_FAILED", "GROUNDING_ERROR", "GROUNDING_REQUESTED_FILE_SCOPE", "retry",
                 "a".repeat(64), "b".repeat(64), 1, 1, 1, 0, "c".repeat(64),
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, "validation detail", null, null, null, null, null);
     }
 }

@@ -110,6 +110,15 @@ public class AiTask {
     @Column(length = 255)
     private String externalJobId;
 
+    @Column(name = "ai_engine_accepted_at")
+    private Instant aiEngineAcceptedAt;
+
+    @Column(name = "ai_engine_submission_duration_ms")
+    private Long aiEngineSubmissionDurationMs;
+
+    @Column(name = "ai_engine_submission_error", columnDefinition = "TEXT")
+    private String aiEngineSubmissionError;
+
     @Column(name = "terminal_callback_digest", length = 64)
     private String terminalCallbackDigest;
 

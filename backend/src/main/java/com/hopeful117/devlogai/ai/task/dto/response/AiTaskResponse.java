@@ -28,6 +28,9 @@ public record AiTaskResponse(
         AiTaskStatus status,
         Map<String, Object> contextSnapshot,
         String externalJobId,
+        Instant aiEngineAcceptedAt,
+        Long aiEngineSubmissionDurationMs,
+        String aiEngineSubmissionError,
         int attemptCount,
         String failureCode,
         String failureMessage,
@@ -47,7 +50,7 @@ public record AiTaskResponse(
                           Instant startedAt, Instant completedAt) {
         this(id, analysisId, correlationId, taskType, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, status,
-                contextSnapshot, externalJobId, attemptCount, failureCode, failureMessage,
+                contextSnapshot, externalJobId, null, null, null, attemptCount, failureCode, failureMessage,
                 null, null, null, null,
                 createdAt, submittedAt, startedAt, completedAt);
     }
@@ -59,12 +62,12 @@ public record AiTaskResponse(
                           String promptContentDigest, String contextDigest, String projectionDigest,
                           Map<String, Object> selectedKnowledgeSnapshot, String selectionVersion,
                           String selectionDigest, AiTaskStatus status, Map<String, Object> contextSnapshot,
-                          String externalJobId, int attemptCount, String failureCode, String failureMessage,
-                          Instant createdAt, Instant submittedAt, Instant startedAt, Instant completedAt) {
+                           String externalJobId, int attemptCount, String failureCode, String failureMessage,
+                           Instant createdAt, Instant submittedAt, Instant startedAt, Instant completedAt) {
         this(id, analysisId, correlationId, taskType, intentId, intentVersion, intentSnapshot,
                 userGuidanceSnapshot, promptRequestId, promptVersion, provider, modelIdentifier,
                 promptContentDigest, contextDigest, projectionDigest, selectedKnowledgeSnapshot,
-                selectionVersion, selectionDigest, status, contextSnapshot, externalJobId, attemptCount,
+                selectionVersion, selectionDigest, status, contextSnapshot, externalJobId, null, null, null, attemptCount,
                 failureCode, failureMessage, null, null, null, null,
                 createdAt, submittedAt, startedAt, completedAt);
     }

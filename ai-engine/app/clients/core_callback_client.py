@@ -94,7 +94,10 @@ class CoreCallbackClient:
         logger.info(
             "Sending AI task result callback",
             extra={
+                "event": "AI_CALLBACK_STARTED",
+                "taskId": str(ai_task_id),
                 "taskCorrelationId": str(correlation_id),
+                "externalJobId": result.external_job_id,
                 "proposalCount": len(result.proposals),
             },
         )
@@ -117,20 +120,52 @@ class CoreCallbackClient:
                     logger.info(
                         "AI task result callback acknowledged",
                         extra={
+                            "event": "AI_CALLBACK_SUCCEEDED",
+                            "taskId": str(ai_task_id),
                             "taskCorrelationId": str(correlation_id),
+                            "externalJobId": result.external_job_id,
                             "status": response.status_code,
                             "attempt": attempt,
                         },
                     )
                     break
                 if not self._is_transient_not_ready(response):
-                    raise self._callback_error(response, correlation_id, attempt)
+                    error = self._callback_error(response, correlation_id, attempt)
+                    logger.error(
+                        "AI task result callback failed",
+                        extra={
+                            "event": "AI_CALLBACK_FAILED",
+                            "taskId": str(ai_task_id),
+                            "taskCorrelationId": str(correlation_id),
+                            "externalJobId": result.external_job_id,
+                            "status": response.status_code,
+                            "attempt": attempt,
+                            "outcome": error.code,
+                        },
+                    )
+                    raise error
                 if attempt == self._max_attempts:
-                    raise self._callback_error(response, correlation_id, attempt)
+                    error = self._callback_error(response, correlation_id, attempt)
+                    logger.error(
+                        "AI task result callback failed after retries",
+                        extra={
+                            "event": "AI_CALLBACK_FAILED",
+                            "taskId": str(ai_task_id),
+                            "taskCorrelationId": str(correlation_id),
+                            "externalJobId": result.external_job_id,
+                            "status": response.status_code,
+                            "attempt": attempt,
+                            "outcome": error.code,
+                        },
+                    )
+                    raise error
                 logger.warning(
                     "AI task result callback will be retried",
                     extra={
+                        "event": "AI_CALLBACK_RETRY",
+                        "taskId": str(ai_task_id),
                         "taskCorrelationId": str(correlation_id),
+                        "externalJobId": result.external_job_id,
                         "status": response.status_code,
                         "attempt": attempt,
                     },

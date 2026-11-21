@@ -1,3 +1,6 @@
+from datetime import datetime, timezone
+import logging
+from time import perf_counter
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, status
@@ -14,6 +17,7 @@ from app.services.ai_task_service import AiTaskAcceptanceService
 from app.services.task_processing_service import AiTaskProcessingService
 
 router = APIRouter(prefix="/ai/tasks", tags=["ai-tasks"])
+logger = logging.getLogger(__name__)
 SUPPORTED_TASK_TYPES = frozenset({
     AiTaskType.INSIGHT_GENERATION,
     AiTaskType.EVENT_PROPOSAL_GENERATION,
@@ -28,6 +32,60 @@ async def get_acceptance_service() -> AiTaskAcceptanceService:
 
 async def get_processing_service() -> AiTaskProcessingService:
     return get_task_processing_service()
+
+
+async def process_with_observability(
+    processing_service: AiTaskProcessingService,
+    request: AiTaskSubmissionRequest,
+    external_job_id,
+) -> None:
+    started_at = perf_counter()
+    logger.info(
+        "AI task processing started",
+        extra={
+            "event": "AI_TASK_PROCESSING_STARTED",
+            "taskId": str(request.ai_task_id),
+            "taskCorrelationId": str(request.correlation_id),
+            "externalJobId": str(external_job_id),
+            "intent": request.intent.id,
+            "provider": request.provider,
+            "model": request.model_identifier,
+            "phase": "PROCESSING",
+        },
+    )
+    try:
+        await processing_service.process(request, external_job_id)
+    except Exception as error:
+        logger.exception(
+            "AI task processing failed",
+            extra={
+                "event": "AI_TASK_PROCESSING_FAILED",
+                "taskId": str(request.ai_task_id),
+                "taskCorrelationId": str(request.correlation_id),
+                "externalJobId": str(external_job_id),
+                "intent": request.intent.id,
+                "provider": request.provider,
+                "model": request.model_identifier,
+                "phase": "PROCESSING",
+                "outcome": type(error).__name__,
+            },
+        )
+        raise
+    finally:
+        logger.info(
+            "AI task processing finished",
+            extra={
+                "event": "AI_TASK_PROCESSING_FINISHED",
+                "taskId": str(request.ai_task_id),
+                "taskCorrelationId": str(request.correlation_id),
+                "externalJobId": str(external_job_id),
+                "intent": request.intent.id,
+                "provider": request.provider,
+                "model": request.model_identifier,
+                "phase": "PROCESSING",
+                "durationMs": round((perf_counter() - started_at) * 1000),
+            },
+        )
 
 
 @router.post(
@@ -66,7 +124,8 @@ async def submit_ai_task(
             )
     response = service.accept(request)
     background_tasks.add_task(
-        processing_service.process,
+        process_with_observability,
+        processing_service,
         request,
         response.external_job_id,
     )

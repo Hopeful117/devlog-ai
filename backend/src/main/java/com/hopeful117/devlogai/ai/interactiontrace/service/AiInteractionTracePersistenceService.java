@@ -74,7 +74,8 @@ public class AiInteractionTracePersistenceService {
                 .userPrompt(diagnostic ? request.userPrompt() : null)
                 .rawModelResponse(diagnostic ? request.rawModelResponse() : null)
                 .parsedModelResponse(diagnostic ? request.parsedModelResponse() : null)
-                .validationDiagnostics(diagnostic ? request.validationDiagnostics() : null)
+                // Failure diagnostics are bounded and non-sensitive; retain them in NORMAL mode.
+                .validationDiagnostics(request.validationDiagnostics())
                 .executionPhase(request.executionPhase())
                 .providerStatus(request.providerStatus())
                 .incompleteReason(request.incompleteReason())
