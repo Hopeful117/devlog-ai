@@ -51,7 +51,7 @@ class ManifestValidationError(ValueError):
 
 
 class LiveNotAuthorized(RuntimeError):
-    """Raised before any live/provider object can be constructed."""
+    """Raised when live execution lacks its separate authorization contract."""
 
 
 class TreatmentExecutionError(RuntimeError):
@@ -366,9 +366,29 @@ def run_live_preflight(*, manifest_path: str | Path, oracle_path: str | Path, ou
     )
 
 
-def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None) -> RunResult | dict[str, Any]:
+def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None) -> RunResult | dict[str, Any]:
     if mode == LIVE:
-        raise LiveNotAuthorized("LIVE_NOT_AUTHORIZED: Q1 live execution requires a separate explicit authorization")
+        if authorization is None:
+            raise LiveNotAuthorized("LIVE_NOT_AUTHORIZED: Q1 live execution requires a separate explicit authorization")
+        from .live import load_q1_oracle, validate_live_authorization
+        from .live_execution import run_live_execution
+
+        manifest_value = load_manifest(Path(manifest_path))
+        if oracle_path is None:
+            raise ManifestValidationError("LIVE requires the Q1 oracle path")
+        oracle = load_q1_oracle(oracle_path, expected_revision=manifest_value["repositoryRevision"])
+        validate_live_authorization(
+            authorization,
+            manifest=manifest_value,
+            oracle=oracle,
+            pricing_contract=pricing_contract or manifest_value.get("pricingContract"),
+        )
+        return run_live_execution(
+            manifest_path=manifest_path,
+            output_root=output_root,
+            repository_root=repository_root,
+            manifest=manifest_value,
+        )
     if mode == LIVE_PREFLIGHT:
         if oracle_path is None:
             raise ManifestValidationError("LIVE_PREFLIGHT requires the Q1 oracle path")
@@ -398,12 +418,19 @@ def main() -> None:
     parser.add_argument("--mode", choices=(DRY_RUN, INTEGRATION_SIMULATION, LIVE_PREFLIGHT, LIVE), default=DRY_RUN)
     parser.add_argument("--oracle")
     parser.add_argument("--authorization")
+    parser.add_argument("--pricing")
     args = parser.parse_args()
     authorization = None
     if args.authorization:
         from .live import load_authorization
 
         authorization = load_authorization(args.authorization)
+    pricing_contract = None
+    if args.pricing:
+        try:
+            pricing_contract = json.loads(Path(args.pricing).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise SystemExit("pricing contract cannot be loaded") from error
     result = run(
         mode=args.mode,
         manifest_path=args.manifest,
@@ -411,6 +438,7 @@ def main() -> None:
         repository_root=args.repository_root,
         oracle_path=args.oracle,
         authorization=authorization,
+        pricing_contract=pricing_contract,
     )
     payload = result.summary if isinstance(result, RunResult) else result
     print(json.dumps(payload, indent=2, sort_keys=True))

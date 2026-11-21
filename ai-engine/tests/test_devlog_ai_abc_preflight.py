@@ -64,7 +64,7 @@ def test_q1_corrected_oracle_digest_and_scoring_are_coherent() -> None:
     oracle = next(item for item in oracle_document["oracles"] if item["caseId"] == "Q1")
     canonical = {key: value for key, value in oracle.items() if key != "canonicalDigest"}
     encoded = json.dumps(canonical, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    assert oracle["status"] == "CORRECTION_PROPOSED"
+    assert oracle["status"] == "ACCEPTED"
     assert oracle["canonicalDigest"] == hashlib.sha256(encoded).hexdigest()
     assert [claim["id"] for claim in oracle["requiredClaims"]] == [
         "Q1-C1", "Q1-C2", "Q1-C3", "Q1-C4"

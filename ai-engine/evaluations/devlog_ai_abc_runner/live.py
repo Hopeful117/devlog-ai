@@ -17,7 +17,7 @@ from typing import Any, Mapping
 
 from .runner import load_manifest, repository_revision, sha256_json
 from .provenance import ProvenanceError, execution_identity
-from .pricing import PricingContractError, validate_pricing_contract
+from .pricing import NON_METERED_BILLING_MODEL, PricingContractError, validate_pricing_contract
 
 LIVE_PREFLIGHT = "LIVE_PREFLIGHT"
 Q1_ORACLE_ACCEPTED = "Q1_ORACLE_ACCEPTED"
@@ -214,6 +214,10 @@ def validate_live_authorization(
     if authorization["costCeiling"]["currency"] != pricing_contract.get("currency"):
         raise LiveAuthorizationError("cost ceiling currency does not match approved pricing")
     maximum_cost = authorization["costCeiling"].get("maxAmount")
+    if pricing_contract.get("billingModel") == NON_METERED_BILLING_MODEL:
+        if authorization["costCeiling"].get("currency") != "NOT_APPLICABLE" or maximum_cost != "NOT_MEASURED":
+            raise LiveAuthorizationError("non-metered pricing requires an explicit non-monetary ceiling")
+        return
     if isinstance(maximum_cost, bool) or not isinstance(maximum_cost, (int, float)) or not math.isfinite(maximum_cost) or maximum_cost <= 0:
         raise LiveAuthorizationError("cost ceiling maxAmount is invalid")
     now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds

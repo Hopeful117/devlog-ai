@@ -17,6 +17,9 @@ class PricingContractError(ValueError):
     """Raised when pricing data is absent or cannot support accounting."""
 
 
+NON_METERED_BILLING_MODEL = "CHATGPT_OAUTH_SUBSCRIPTION_NOT_METERED"
+
+
 def canonical_pricing_digest(contract: Mapping[str, Any]) -> str:
     """Digest the complete pricing artifact, excluding its self-reported digest."""
 
@@ -34,6 +37,14 @@ def validate_pricing_contract(contract: Mapping[str, Any]) -> None:
         raise PricingContractError("pricing version and currency are required")
     if contract.get("digest") != canonical_pricing_digest(contract):
         raise PricingContractError("pricing digest does not match the artifact")
+    if contract.get("billingModel") == NON_METERED_BILLING_MODEL:
+        if contract.get("currency") != "NOT_APPLICABLE":
+            raise PricingContractError("non-metered pricing must use NOT_APPLICABLE currency")
+        if contract.get("costCeilingPolicy") != "OPERATIONAL_LIMITS_ONLY":
+            raise PricingContractError("non-metered pricing requires operational limits only")
+        if contract.get("inputPerMillion") is not None or contract.get("outputPerMillion") is not None:
+            raise PricingContractError("non-metered pricing must not declare token rates")
+        return
     for key in ("inputPerMillion", "outputPerMillion"):
         try:
             rate = Decimal(str(contract[key]))

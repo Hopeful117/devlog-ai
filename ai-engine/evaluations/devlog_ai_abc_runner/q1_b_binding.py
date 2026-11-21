@@ -34,7 +34,7 @@ Q1_B_REFERENCE = "backend/src/main/java/com/hopeful117/devlogai/storycontextanal
 Q1_B_NATIVE_V4_CASE = "CASE-03"
 
 
-def load_q1_b_config(repository_root: Path, config_path: Path = Q1_B_CONFIG) -> dict[str, Any]:
+def load_q1_b_config(repository_root: Path, config_path: Path = Q1_B_CONFIG, *, allow_live: bool = False) -> dict[str, Any]:
     path = repository_root / config_path
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -60,7 +60,7 @@ def load_q1_b_config(repository_root: Path, config_path: Path = Q1_B_CONFIG) -> 
         raise Q1BBindingError("Q1 B runtime status is not connected")
     if value.get("bindingStatus") != "Q1_B_RUNTIME_INTEGRATION_PASS":
         raise Q1BBindingError("Q1 B binding status is not connected")
-    if value.get("liveStatus") != "Q1_LIVE_TECHNICALLY_BLOCKED":
+    if not allow_live and value.get("liveStatus") != "Q1_LIVE_TECHNICALLY_BLOCKED":
         raise Q1BBindingError("Q1 live status must remain blocked")
     return value
 

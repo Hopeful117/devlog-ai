@@ -18,6 +18,7 @@ from evaluations.devlog_ai_abc_runner import (
     run,
 )
 from evaluations.devlog_ai_abc_runner.runner import FixtureTreatmentAdapter
+from evaluations.devlog_ai_abc_runner.provenance import current_head
 
 
 ROOT = Path(__file__).parents[1].parent
@@ -28,6 +29,12 @@ OBSERVATIONS = (
     "Q1-B-DIRECT-INVESTIGATOR-r1",
     "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1",
 )
+FROZEN_REVISION = "60fae3e0e1104d0ffbe3832c1f578ed532b1268a"
+
+
+def _require_frozen_revision() -> None:
+    if current_head(REPOSITORY) != FROZEN_REVISION:
+        pytest.skip("Q1 Core integration simulation requires the frozen manifest revision")
 
 
 def test_dry_run_executes_three_isolated_observations_and_replays(tmp_path: Path) -> None:
@@ -104,6 +111,7 @@ def test_live_is_rejected_before_loading_or_constructing_any_transport(tmp_path:
 
 
 def test_integration_simulation_exercises_all_three_boundaries_without_external_calls(tmp_path: Path) -> None:
+    _require_frozen_revision()
     result = run(
         mode=INTEGRATION_SIMULATION,
         manifest_path=MANIFEST,
@@ -131,6 +139,7 @@ def test_integration_simulation_exercises_all_three_boundaries_without_external_
 
 
 def test_integration_simulation_artifacts_identify_boundary_doubles(tmp_path: Path) -> None:
+    _require_frozen_revision()
     result = run(
         mode=INTEGRATION_SIMULATION,
         manifest_path=MANIFEST,

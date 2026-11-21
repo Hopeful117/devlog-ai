@@ -7,10 +7,10 @@
 - Frozen repository: `git:github.com/Hopeful117/devlog-ai`
 - Frozen revision: `60fae3e0e1104d0ffbe3832c1f578ed532b1268a`
 - Oracle version: `1.1.0`
-- Oracle status: `CORRECTION_PROPOSED`
+- Oracle status: `ACCEPTED`
 - Automated reference verification: `PASS`
-- Human semantic validation: `PENDING`
-- Human acceptance: **not granted**
+- Human semantic validation: `ACCEPTED`
+- Human acceptance: **granted for Q1 evaluation use**
 
 The canonical machine-readable oracle is the Q1 entry in
 `docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json`. Its digest excludes
@@ -228,12 +228,12 @@ separators. This avoids an authorial hash cycle. The digest field itself is not
 included in the bytes it authenticates.
 
 - Decision: `ACCEPTED`
-- Proposed decision: `CORRECTION_PROPOSED`
+- Proposed decision: `ACCEPTED`
 - Accepted decision: `ACCEPTED`
 - Reviewer: `Hopeful117`
 - Date: `2026-11-15T14:51:33+01:00`
 - Repository revision: `60fae3e0e1104d0ffbe3832c1f578ed532b1268a`
-- Final oracle digest: `464fcd1b50b785e78ddd76e0b4eea3e65ac6a85fb124b31cea9c355951fcc457`
+- Final oracle digest: `2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e`
 - Reservations: Contradiction handling rule not modified; existing rules preserved for this pilot without additional specification.
 - Authorization status: `Q1_ORACLE_ACCEPTED; Q1_LIVE_NOT_AUTHORIZED`
 
