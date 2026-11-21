@@ -5,6 +5,8 @@ import com.hopeful117.devlogai.story.dto.request.CreateEngineeringStoryRequest;
 import com.hopeful117.devlogai.story.dto.request.StartStoryRequest;
 import com.hopeful117.devlogai.story.dto.response.EngineeringStoryResponse;
 import com.hopeful117.devlogai.story.service.EngineeringStoryService;
+import com.hopeful117.devlogai.story.service.StoryCatalogSynchronizationResult;
+import com.hopeful117.devlogai.story.service.StoryCatalogSynchronizationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +22,7 @@ import java.util.UUID;
 public class EngineeringStoryController {
 
     private final EngineeringStoryService storyService;
+    private final StoryCatalogSynchronizationService storyCatalogSynchronizationService;
 
     @PostMapping
     public ResponseEntity<EngineeringStoryResponse> register(
@@ -64,6 +67,24 @@ public class EngineeringStoryController {
 
         return ResponseEntity.ok(
                 storyService.getById(storyId, projectId));
+    }
+
+    @GetMapping("/resolve")
+    public ResponseEntity<EngineeringStoryResponse> resolveByNumber(
+            @PathVariable UUID projectId,
+            @RequestParam Integer storyNumber) {
+
+        return ResponseEntity.ok(
+                storyService.resolveByNumber(projectId, storyNumber));
+    }
+
+    @PostMapping("/synchronize")
+    public ResponseEntity<StoryCatalogSynchronizationResult> synchronize(
+            @PathVariable UUID projectId,
+            @RequestParam(required = false) String revision) {
+
+        return ResponseEntity.ok(
+                storyCatalogSynchronizationService.synchronize(projectId, revision));
     }
 
     @GetMapping

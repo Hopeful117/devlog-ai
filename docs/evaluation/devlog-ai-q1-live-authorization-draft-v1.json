@@ -1,13 +1,13 @@
 {
-  "status": "DRAFT_DO_NOT_EXECUTE",
+  "status": "AUTHORIZED_FOR_Q1_TECHNICAL_VALIDATION",
   "purpose": "Human-review template for one bounded Q1 A/B/C campaign",
-  "authorizationStatus": "TO_BE_APPROVED",
+  "authorizationStatus": "AUTHORIZED",
   "approverId": "Hopeful117",
   "approvedAt": "2026-11-21T02:11:34Z",
   "campaignId": "devlog-ai-abc-first-test",
   "manifestId": "devlog-ai-abc-first-test",
   "manifestVersion": "1.1.0",
-  "manifestDigest": "44827670f56dd9f0d014cd26b23b4fa9b9197bed6969f5bf6fd40b68b620d059",
+  "manifestDigest": "c533be54e8189273f6fb81956a1587330f513cfefbe2512032063afc096f06bd",
   "oracleStatus": "Q1_ORACLE_ACCEPTED",
   "oracleDigest": "2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e",
   "authorizedObservationIds": [
@@ -21,7 +21,7 @@
     "C_DEVLOG_ENGINEERING_ANALYST"
   ],
   "repositoryRevision": "60fae3e0e1104d0ffbe3832c1f578ed532b1268a",
-  "runtimeRevision": "TO_BE_BOUND_AT_RUNTIME",
+  "runtimeRevision": "9d2e4193ebd8c33f46a9df470f03aac424f28ca6",
   "provider": "openai_chatgpt",
   "model": "gpt-5.6-luna",
   "budgets": {

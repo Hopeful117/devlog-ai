@@ -29,6 +29,34 @@ class CoreCallPolicyTest {
     }
 
     @Test
+    void carriesAllowlistedCoreAuthenticationDiagnostic() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-DevLog-Auth-Diagnostic", "TOKEN_EXPIRED");
+
+        McpError error = CoreCallPolicy.map(
+                HttpClientErrorException.create(HttpStatus.UNAUTHORIZED, "Unauthorized",
+                        headers, new byte[0], null),
+                "not found", false, "reading the resource");
+
+        assertThat(((java.util.Map<?, ?>) error.getJsonRpcError().data()).get("authDiagnostic"))
+                .isEqualTo("TOKEN_EXPIRED");
+    }
+
+    @Test
+    void ignoresUnrecognizedCoreAuthenticationDiagnostic() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-DevLog-Auth-Diagnostic", "secret-token-value");
+
+        McpError error = CoreCallPolicy.map(
+                HttpClientErrorException.create(HttpStatus.UNAUTHORIZED, "Unauthorized",
+                        headers, new byte[0], null),
+                "not found", false, "reading the resource");
+
+        assertThat(((java.util.Map<?, ?>) error.getJsonRpcError().data())
+                .containsKey("authDiagnostic")).isFalse();
+    }
+
+    @Test
     void hidesForbiddenResourceExistenceWhenRequested() {
         McpError error = CoreCallPolicy.map(
                 response(HttpStatus.FORBIDDEN), "resource not found", true, "reading the resource");

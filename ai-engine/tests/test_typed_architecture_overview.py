@@ -335,7 +335,7 @@ async def test_v3_unauthorized_grounding_gets_structured_retry_and_can_recover()
     assert callback.results[0].status.value == "COMPLETED"  # type: ignore[attr-defined]
     trace = callback.results[0].interaction_traces[0]  # type: ignore[attr-defined]
     assert trace.validation_diagnostics is None
-    assert trace.failure_code == "GROUNDING_ERROR"
+    assert trace.failure_code == "GROUNDING_AUTHORIZATION"
 
 
 @pytest.mark.asyncio

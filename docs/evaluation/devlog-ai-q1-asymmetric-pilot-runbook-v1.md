@@ -194,13 +194,38 @@ following variables are required and their values must not be printed:
 ```bash
 export LLM_PROVIDER=openai_chatgpt
 export LLM_MODEL=gpt-5.6-luna
-export DEVLOG_CORE_BASE_URL=http://127.0.0.1:8080
-export DEVLOG_CORE_BEARER_TOKEN=...
+export DEVLOG_MCP_LAUNCHER=/home/ludo/.config/opencode/devlog-mcp-start.sh
 export DEVLOG_LIVE_PROJECT_SLUG=...
-export DEVLOG_LIVE_STORY_ID=...
+export DEVLOG_LIVE_STORY_NUMBER=223
 export DEVLOG_LIVE_FILES=docs/stories/0223-agentic-quality-real-story-pilot/story.md
 export DEVLOG_LIVE_B_TASK_ID=...
 ```
+
+Before live execution, reserve the B treatment task through the authenticated
+MCP launcher. The launcher obtains and renews the technical Keycloak bearer
+privately; the evaluation runner never receives or reads that bearer. The MCP
+Story resolver maps `DEVLOG_LIVE_STORY_NUMBER` to the Core-owned Story UUID.
+The task-binding tool then creates the task and its user-bound ChatGPT
+credential binding without dispatching a provider request and prints only the
+returned task identity. Export the returned `aiTaskId` as
+`DEVLOG_LIVE_B_TASK_ID`.
+
+The resolver is read-only: the Story must already be registered in Core under
+the target project. It never creates a Story from a repository file. If the
+number is absent, stop the preparation and use the explicit Story registration
+or repository synchronization workflow before retrying.
+
+```bash
+PYTHONPATH=ai-engine uv run --project ai-engine python -m evaluations.devlog_ai_abc_runner.runner \
+  --mode LIVE_PREPARE \
+  --activate-live \
+  --manifest docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json \
+  --repository-root /path/to/clean/frozen/devlog-ai \
+  --output-root /tmp/q1-live-prepare
+```
+
+`LIVE_PREPARE` performs no provider call. It is not a substitute for the
+campaign authorization or the final live preflight.
 
 The authorization document must also bind `runtimeRevision` to the exact clean
 checkout commit used for execution. `repositoryRevision` remains the frozen

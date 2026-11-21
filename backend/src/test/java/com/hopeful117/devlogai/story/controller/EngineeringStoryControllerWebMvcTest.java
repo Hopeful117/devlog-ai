@@ -4,6 +4,8 @@ import com.hopeful117.devlogai.shared.controller.ControllerWebMvcTestSupport;
 import com.hopeful117.devlogai.story.dto.response.EngineeringStoryResponse;
 import com.hopeful117.devlogai.story.entity.StoryStatus;
 import com.hopeful117.devlogai.story.service.EngineeringStoryService;
+import com.hopeful117.devlogai.story.service.StoryCatalogSynchronizationService;
+import com.hopeful117.devlogai.story.service.StoryCatalogSynchronizationResult;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,7 +33,8 @@ class EngineeringStoryControllerWebMvcTest extends ControllerWebMvcTestSupport {
     @Test
     void shouldExposeAllStoryRoutes() throws Exception {
         EngineeringStoryService service = mock(EngineeringStoryService.class);
-        MockMvc mvc = mockMvc(new EngineeringStoryController(service));
+        StoryCatalogSynchronizationService catalog = mock(StoryCatalogSynchronizationService.class);
+        MockMvc mvc = mockMvc(new EngineeringStoryController(service, catalog));
 
         UUID id = UUID.randomUUID();
         UUID projectId = UUID.randomUUID();
@@ -41,7 +44,11 @@ class EngineeringStoryControllerWebMvcTest extends ControllerWebMvcTestSupport {
         when(service.startImplementation(eq(id), eq(projectId), any())).thenReturn(response);
         when(service.complete(eq(id), eq(projectId), any())).thenReturn(response);
         when(service.getById(id, projectId)).thenReturn(response);
+        when(service.resolveByNumber(projectId, 1)).thenReturn(response);
         when(service.getByProject(projectId)).thenReturn(List.of(response));
+        when(catalog.synchronize(projectId, null)).thenReturn(
+                new StoryCatalogSynchronizationResult(projectId, UUID.randomUUID(), "abc123",
+                        1, 0, 0, 0, List.of()));
 
         mvc.perform(post("/api/v1/projects/{projectId}/stories", projectId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -77,5 +84,15 @@ class EngineeringStoryControllerWebMvcTest extends ControllerWebMvcTestSupport {
         mvc.perform(get("/api/v1/projects/{projectId}/stories", projectId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].projectId").value(projectId.toString()));
+
+        mvc.perform(get("/api/v1/projects/{projectId}/stories/resolve", projectId)
+                        .param("storyNumber", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.storyNumber").value(1));
+
+        mvc.perform(post("/api/v1/projects/{projectId}/stories/synchronize", projectId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdCount").value(1));
     }
 }

@@ -13,6 +13,7 @@ from app.schemas.story_context_analysis import (
     EvidenceAssertion,
     EvidenceLocator,
     EvidenceRef,
+    ObjectiveUnderstanding,
     maximum_defensible_classification,
 )
 from app.services.story_context_analysis_generation_service import (
@@ -88,6 +89,7 @@ def test_unknown_finding_reference_uses_grounding_taxonomy():
         },
     })
     output = type("Output", (), {
+        "objective_understanding": ObjectiveUnderstanding(),
         "architecture_findings": [finding], "decision_findings": [], "evidence_findings": [],
         "historical_context": [], "constraint_findings": [], "impacted_component_findings": [],
         "causal_claims": [], "causal_assessment": None, "uncertainties": [],
@@ -111,6 +113,7 @@ def test_factual_finding_without_evidence_is_rejected():
         },
     })
     output = type("Output", (), {
+        "objective_understanding": ObjectiveUnderstanding(),
         "architecture_findings": [finding], "decision_findings": [], "evidence_findings": [],
         "historical_context": [], "constraint_findings": [], "impacted_component_findings": [],
         "causal_claims": [], "causal_assessment": None, "uncertainties": [],
@@ -191,6 +194,7 @@ def test_maximum_defensible_classification_is_structural():
 def test_causal_required_output_cannot_be_empty():
     service = StoryContextAnalysisGenerationService.__new__(StoryContextAnalysisGenerationService)
     output = type("Output", (), {
+        "objective_understanding": ObjectiveUnderstanding(),
         "causal_claims": [],
         "architecture_findings": [], "decision_findings": [], "evidence_findings": [],
         "historical_context": [], "constraint_findings": [],
@@ -243,6 +247,7 @@ def test_service_rejects_unknown_causal_reference_and_duplicate_relationship():
     service = StoryContextAnalysisGenerationService.__new__(StoryContextAnalysisGenerationService)
     valid = claim(CausalClassification.EXPLICITLY_DOCUMENTED, ["e1"])
     output = type("Output", (), {
+        "objective_understanding": ObjectiveUnderstanding(),
         "causal_claims": [valid],
         "architecture_findings": [], "decision_findings": [], "evidence_findings": [],
         "historical_context": [], "constraint_findings": [],
@@ -396,6 +401,7 @@ def test_v2_python_validation_rejects_question_substitution():
         explanation="The fixed relationship is not established.",
     )
     output = type("Output", (), {
+        "objective_understanding": ObjectiveUnderstanding(),
         "causal_assessment": assessment,
         "causal_claims": [],
         "architecture_findings": [], "decision_findings": [], "evidence_findings": [],

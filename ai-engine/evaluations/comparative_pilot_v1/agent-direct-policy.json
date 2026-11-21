@@ -1,0 +1,9 @@
+{
+  "treatment": "AGENT_DIRECT",
+  "policyVersion": "story-0223-agent-direct-policy-1.0.0",
+  "compatibilityKey": "story0223-three-treatment-pairing-v1",
+  "repositoryAccess": "READ_ONLY_PINNED_REVISION",
+  "authority": "BOUNDED_READ_ONLY_INVESTIGATION",
+  "allowedOperations": ["read_file", "search_repository", "git_log", "git_show", "git_diff", "inspect_commit"],
+  "forbiddenSources": ["devlog", "mcp_context", "oracle", "web", "external_memory", "other_treatment_output"]
+}

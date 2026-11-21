@@ -56,7 +56,14 @@ def _selected_knowledge() -> dict:
 
 def _parsed_response() -> dict:
     return {
-        "objectiveUnderstanding": {"summary": "bounded"},
+        "objectiveUnderstanding": {
+            "summary": "bounded",
+            "grounding": {
+                "evidenceReferences": [{"reference": "src/Example.java"}],
+                "classification": "FACTUAL_EXTRACTION",
+                "grounded": True,
+            },
+        },
         "architectureFindings": [], "decisionFindings": [], "evidenceFindings": [],
         "historicalContext": [], "constraintFindings": [], "impactedComponentFindings": [],
         "uncertainties": [], "missingInformation": [], "implementationQuestions": [],
@@ -68,7 +75,13 @@ def _parsed_response() -> dict:
             "promptContentDigest": "b" * 64, "intentId": "engineering-story-context-analysis",
             "intentVersion": "v1", "guidanceKeys": [], "executionMetadata": {},
         },
-        "outputClassification": {"entries": []},
+        "outputClassification": {
+            "entries": [{
+                "findingReference": "objectiveUnderstanding",
+                "classification": "FACTUAL_EXTRACTION",
+                "grounded": True,
+            }]
+        },
         "causalClaims": [],
         "causalAssessment": {
             "question": {

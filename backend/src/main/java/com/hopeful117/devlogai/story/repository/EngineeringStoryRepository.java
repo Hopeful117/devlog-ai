@@ -20,6 +20,11 @@ public interface EngineeringStoryRepository extends JpaRepository<EngineeringSto
 
     List<EngineeringStory> findByProject_Id(UUID projectId);
 
+    java.util.Optional<EngineeringStory> findByProject_IdAndStoryNumber(
+            UUID projectId,
+            Integer storyNumber
+    );
+
     @EntityGraph(attributePaths = "project")
     List<EngineeringStory> findByProject_IdOrderByCreatedAtDesc(UUID projectId);
 

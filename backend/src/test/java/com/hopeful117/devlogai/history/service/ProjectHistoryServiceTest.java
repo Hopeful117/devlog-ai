@@ -12,6 +12,7 @@ import com.hopeful117.devlogai.history.repository.ProjectCommitRepository;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
+import com.hopeful117.devlogai.story.service.StoryCatalogSynchronizationService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -34,6 +35,7 @@ class ProjectHistoryServiceTest {
         ProjectCommitRepository commits = mock(ProjectCommitRepository.class);
         WorkspaceManager workspaces = mock(WorkspaceManager.class);
         GitHistoryProvider provider = mock(GitHistoryProvider.class);
+        StoryCatalogSynchronizationService storyCatalog = mock(StoryCatalogSynchronizationService.class);
         UUID sourceId = UUID.randomUUID();
         Source source = Source.builder().id(sourceId)
                 .project(Project.builder().id(UUID.randomUUID()).build()).build();
@@ -47,7 +49,7 @@ class ProjectHistoryServiceTest {
         when(commits.existsBySourceIdAndCommitHash(sourceId, "old")).thenReturn(true);
         when(commits.existsBySourceIdAndCommitHash(sourceId, "new")).thenReturn(false);
         ProjectHistoryServiceImpl service = new ProjectHistoryServiceImpl(
-                sources, commits, workspaces, provider, new CommitDiffContextBuilder(10, 100));
+                sources, commits, workspaces, provider, new CommitDiffContextBuilder(10, 100), storyCatalog);
 
         HistoryImportResult result = service.importHistory(sourceId, null);
 
@@ -56,6 +58,7 @@ class ProjectHistoryServiceTest {
         assertEquals(1, result.existingCommits());
         ArgumentCaptor<ProjectCommit> saved = ArgumentCaptor.forClass(ProjectCommit.class);
         verify(commits).save(saved.capture());
+        verify(storyCatalog).synchronize(source.getProject(), new SynchronizedWorkspace(sourceId, path, "head"));
         assertEquals("new", saved.getValue().getCommitHash());
         assertEquals("old", saved.getValue().getParents().getFirst().getParentHash());
         org.junit.jupiter.api.Assertions.assertNotNull(saved.getValue().getImportedAt());
@@ -67,6 +70,7 @@ class ProjectHistoryServiceTest {
         ProjectCommitRepository commits = mock(ProjectCommitRepository.class);
         WorkspaceManager workspaces = mock(WorkspaceManager.class);
         GitHistoryProvider provider = mock(GitHistoryProvider.class);
+        StoryCatalogSynchronizationService storyCatalog = mock(StoryCatalogSynchronizationService.class);
         UUID sourceId = UUID.randomUUID();
         Source source = Source.builder().id(sourceId)
                 .project(Project.builder().id(UUID.randomUUID()).build()).build();
@@ -77,7 +81,7 @@ class ProjectHistoryServiceTest {
                 .thenReturn(List.of(commit("same", List.of())));
         when(commits.existsBySourceIdAndCommitHash(sourceId, "same")).thenReturn(true);
         ProjectHistoryServiceImpl service = new ProjectHistoryServiceImpl(
-                sources, commits, workspaces, provider, new CommitDiffContextBuilder(10, 100));
+                sources, commits, workspaces, provider, new CommitDiffContextBuilder(10, 100), storyCatalog);
 
         HistoryImportResult result = service.importHistory(sourceId, null);
 

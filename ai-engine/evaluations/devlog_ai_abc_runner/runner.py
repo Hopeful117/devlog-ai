@@ -29,6 +29,7 @@ DRY_RUN = "DRY_RUN"
 INTEGRATION_SIMULATION = "INTEGRATION_SIMULATION"
 LIVE = "LIVE"
 LIVE_PREFLIGHT = "LIVE_PREFLIGHT"
+LIVE_PREPARE = "LIVE_PREPARE"
 _EXPECTED_OBSERVATIONS = (
     "Q1-A-DEVLOG-CURRENT-r1",
     "Q1-B-DIRECT-INVESTIGATOR-r1",
@@ -368,7 +369,17 @@ def run_live_preflight(*, manifest_path: str | Path, oracle_path: str | Path, ou
     )
 
 
+def run_live_prepare() -> dict[str, Any]:
+    from .live_execution import reserve_live_task_binding
+
+    return reserve_live_task_binding()
+
+
 def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, activate_live: bool = False) -> RunResult | dict[str, Any]:
+    if mode == LIVE_PREPARE:
+        if not activate_live:
+            raise LiveNotAuthorized("LIVE_PREPARE requires the explicit --activate-live flag")
+        return run_live_prepare()
     if mode == LIVE:
         if authorization is None:
             raise LiveNotAuthorized("LIVE_NOT_AUTHORIZED: Q1 live execution requires a separate explicit authorization")
@@ -420,7 +431,7 @@ def main() -> None:
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--output-root", required=True)
     parser.add_argument("--repository-root", required=True)
-    parser.add_argument("--mode", choices=(DRY_RUN, INTEGRATION_SIMULATION, LIVE_PREFLIGHT, LIVE), default=DRY_RUN)
+    parser.add_argument("--mode", choices=(DRY_RUN, INTEGRATION_SIMULATION, LIVE_PREFLIGHT, LIVE_PREPARE, LIVE), default=DRY_RUN)
     parser.add_argument("--oracle")
     parser.add_argument("--authorization")
     parser.add_argument("--pricing")

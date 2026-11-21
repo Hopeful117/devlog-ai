@@ -1,0 +1,9 @@
+{
+  "treatment": "DEVLOG_CONTEXT",
+  "policyVersion": "story-0223-devlog-context-policy-1.0.0",
+  "compatibilityKey": "story0223-three-treatment-pairing-v1",
+  "repositoryAccess": "NONE",
+  "authority": "CORE_AUTHORIZED_CONTEXT_PROJECTION",
+  "allowedOperations": ["authorized_context_projection"],
+  "forbiddenSources": ["oracle", "other_treatment_output", "direct_repository"]
+}

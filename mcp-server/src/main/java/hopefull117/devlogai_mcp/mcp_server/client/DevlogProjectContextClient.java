@@ -105,6 +105,16 @@ public interface DevlogProjectContextClient {
             @RequestBody SubmitRequest request
     );
 
+    @PostExchange("/story-context-agent/projects/{projectSlug}/task-bindings")
+    Map<String, Object> reserveStoryContextAgentTaskBinding(
+            @PathVariable String projectSlug,
+            @RequestParam(value = "storyId", required = false) UUID storyId,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @RequestHeader("X-DevLog-Delegation") String delegation,
+            @RequestBody SubmitRequest request
+    );
+
     @GetExchange("/story-context-agent/tasks/{aiTaskId}/snapshot")
     Map<String, Object> getStoryContextAgentSnapshot(
             @PathVariable UUID aiTaskId,

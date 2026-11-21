@@ -12,11 +12,11 @@ import asyncio
 import json
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import httpx
 
@@ -28,6 +28,7 @@ from evaluations.comparative_baseline_v4.runtime import V4CollectionRuntime
 from .q1_b_binding import Q1PinnedRepositoryTools, load_q1_b_config
 from .runner import TreatmentAdapter, run_dry_run
 from .provenance import Q1_SOURCE_REVISION, assert_reproducible_worktree, current_head, verify_commit
+from evaluations.story_context_specificity_live import McpClient
 
 
 class LiveConfigurationError(ValueError):
@@ -36,64 +37,69 @@ class LiveConfigurationError(ValueError):
 
 @dataclass(frozen=True)
 class LiveConfiguration:
-    core_base_url: str
-    core_bearer_token: str
+    mcp_launcher: Path
     project_slug: str
+    story_number: int
     story_id: str | None
+    story_path: str | None
     files: tuple[str, ...]
-    b_task_id: UUID
+    b_task_id: UUID | None
     callback_timeout_seconds: float
     poll_interval_seconds: float
+    mcp_read_timeout_seconds: float
 
     @classmethod
-    def from_environment(cls, environment: Mapping[str, str] | None = None) -> "LiveConfiguration":
+    def from_environment(cls, environment: Mapping[str, str] | None = None,
+                         *, require_task_id: bool = True) -> "LiveConfiguration":
         values = os.environ if environment is None else environment
-        base_url = values.get("DEVLOG_CORE_BASE_URL", "").strip().rstrip("/")
-        token = values.get("DEVLOG_CORE_BEARER_TOKEN", "").strip()
+        launcher = Path(values.get(
+            "DEVLOG_MCP_LAUNCHER",
+            str(Path.home() / ".config/opencode/devlog-mcp-start.sh"),
+        ).strip())
         project = values.get("DEVLOG_LIVE_PROJECT_SLUG", "").strip()
         files = tuple(item.strip() for item in values.get("DEVLOG_LIVE_FILES", "").split(",") if item.strip())
         b_task_value = values.get("DEVLOG_LIVE_B_TASK_ID", "").strip()
-        if not base_url or not token or not project or not files or not b_task_value:
+        story_number_value = values.get("DEVLOG_LIVE_STORY_NUMBER", "").strip()
+        if not project or not story_number_value or not files or (require_task_id and not b_task_value):
             raise LiveConfigurationError(
-                "DEVLOG_CORE_BASE_URL, DEVLOG_CORE_BEARER_TOKEN, "
-                "DEVLOG_LIVE_PROJECT_SLUG, DEVLOG_LIVE_FILES, and "
-                "DEVLOG_LIVE_B_TASK_ID are required"
+                "DEVLOG_LIVE_PROJECT_SLUG, DEVLOG_LIVE_STORY_NUMBER and DEVLOG_LIVE_FILES are required"
             )
+        try:
+            story_number = int(story_number_value)
+        except ValueError as error:
+            raise LiveConfigurationError("DEVLOG_LIVE_STORY_NUMBER must be an integer") from error
+        if story_number < 1:
+            raise LiveConfigurationError("DEVLOG_LIVE_STORY_NUMBER must be positive")
         try:
             timeout = float(values.get("DEVLOG_LIVE_TIMEOUT_SECONDS", "120"))
             interval = float(values.get("DEVLOG_LIVE_POLL_INTERVAL_SECONDS", "1"))
         except ValueError as error:
             raise LiveConfigurationError("live timeout values must be numeric") from error
-        if timeout <= 0 or interval <= 0 or interval > timeout:
-            raise LiveConfigurationError("live timeout values must be positive and ordered")
         try:
-            b_task_id = UUID(b_task_value)
+            mcp_timeout = float(values.get("DEVLOG_MCP_READ_TIMEOUT_SECONDS", "180"))
         except ValueError as error:
-            raise LiveConfigurationError("DEVLOG_LIVE_B_TASK_ID must be a UUID") from error
-        story_id = values.get("DEVLOG_LIVE_STORY_ID", "").strip() or None
-        return cls(base_url, token, project, story_id, files, b_task_id, timeout, interval)
-
-
-def _bounded_json(response: httpx.Response, *, limit: int = 256_000) -> dict[str, Any]:
-    if len(response.content) > limit:
-        raise LiveConfigurationError("Core response exceeds the bounded live capture size")
-    try:
-        value = response.json()
-    except ValueError as error:
-        raise LiveConfigurationError("Core returned a non-JSON live response") from error
-    if not isinstance(value, dict):
-        raise LiveConfigurationError("Core live response must be an object")
-    return value
+            raise LiveConfigurationError("MCP read timeout must be numeric") from error
+        if timeout <= 0 or interval <= 0 or interval > timeout or mcp_timeout <= 0:
+            raise LiveConfigurationError("live timeout values must be positive and ordered")
+        b_task_id = None
+        if b_task_value:
+            try:
+                b_task_id = UUID(b_task_value)
+            except ValueError as error:
+                raise LiveConfigurationError("DEVLOG_LIVE_B_TASK_ID must be a UUID") from error
+        return cls(launcher, project, story_number, None, None, files, b_task_id,
+                   timeout, interval, mcp_timeout)
 
 
 class CoreLiveTreatmentAdapter:
-    """Execute one Core-authorized Story Context treatment over HTTP."""
+    """Execute one Core-authorized Story Context treatment through MCP."""
 
-    def __init__(self, condition: str, config: LiveConfiguration, manifest: Mapping[str, Any]):
+    def __init__(self, condition: str, config: LiveConfiguration, manifest: Mapping[str, Any], mcp: McpClient):
         self.condition = condition
-        self.live_status = "LIVE_CORE_HTTP_BOUNDARY"
+        self.live_status = "LIVE_CORE_MCP_BOUNDARY"
         self._config = config
         self._manifest = manifest
+        self._mcp = mcp
 
     def execute(self, observation: Mapping[str, Any], manifest: Mapping[str, Any]) -> dict[str, Any]:
         guidance: dict[str, Any] = {}
@@ -113,45 +119,32 @@ class CoreLiveTreatmentAdapter:
                     },
                 }
             }
-        headers = {
-            "Authorization": f"Bearer {self._config.core_bearer_token}",
-            "Idempotency-Key": f"q1-live-{observation['observationId']}-{uuid4().hex}",
-        }
-        payload = {
-            "files": list(self._config.files),
-            "intent": "engineering-story-context-analysis",
-            "guidance": guidance,
-        }
-        url = f"{self._config.core_base_url}/api/v1/story-context-agent/projects/{self._config.project_slug}/tasks"
-        params = {"storyId": self._config.story_id} if self._config.story_id else {}
+        idempotency_key = f"q1-live-{observation['observationId']}"
         started = time.perf_counter()
-        with httpx.Client(timeout=self._config.callback_timeout_seconds, headers=headers) as client:
-            response = client.post(url, params=params, json=payload)
-            if response.status_code != 202:
-                raise LiveConfigurationError(f"Core submission failed with HTTP {response.status_code}")
-            submitted = _bounded_json(response)
-            task_id = submitted.get("aiTaskId")
-            if not isinstance(task_id, str) or not task_id:
-                raise LiveConfigurationError("Core submission did not return aiTaskId")
-            result_url = f"{self._config.core_base_url}/api/v1/story-context-agent/tasks/{task_id}/result"
-            deadline = time.monotonic() + self._config.callback_timeout_seconds
-            result: dict[str, Any] | None = None
-            while time.monotonic() < deadline:
-                result_response = client.get(result_url)
-                if result_response.status_code == 200:
-                    result = _bounded_json(result_response)
-                    break
-                if result_response.status_code not in {404, 409, 425}:
-                    raise LiveConfigurationError(
-                        f"Core result polling failed with HTTP {result_response.status_code}"
-                    )
-                time.sleep(self._config.poll_interval_seconds)
-            if result is None:
-                raise TimeoutError("Core Story Context result polling timed out")
+        try:
+            execution = self._mcp.tool("devlog_story_agent", {
+                "projectSlug": self._config.project_slug,
+                "storyId": self._config.story_id,
+                "intent": "engineering-story-context-analysis",
+                "question": "Q1 bounded live evaluation",
+                "files": list(self._config.files),
+                "guidance": guidance,
+                "idempotencyKey": idempotency_key,
+            })
+        except (OSError, RuntimeError, TimeoutError) as error:
+            raise LiveConfigurationError("MCP authenticated Story Agent execution failed") from error
+        if not isinstance(execution, dict):
+            raise LiveConfigurationError("MCP Story Agent response must be an object")
+        task_id = execution.get("aiTaskId")
+        if not isinstance(task_id, str) or not task_id:
+            raise LiveConfigurationError("MCP Story Agent response did not return aiTaskId")
+        result = execution.get("result") if isinstance(execution.get("result"), dict) else {}
+        execution_status = execution.get("status", "RUNTIME_FAILURE")
+        completed = execution_status == "COMPLETED"
         return {
             "executionMode": "LIVE",
-            "executionStatus": "COMPLETED",
-            "integrationStatus": "LIVE_CORE_CALLBACK_COMPLETED",
+            "executionStatus": execution_status,
+            "integrationStatus": "LIVE_CORE_CALLBACK_COMPLETED" if completed else "LIVE_CORE_FAILED",
             "providerType": "CORE_CONFIGURED_PROVIDER",
             "providerCalls": 1,
             "externalProviderCalls": 1,
@@ -159,8 +152,15 @@ class CoreLiveTreatmentAdapter:
             "networkCalls": 1,
             "latencyMs": round((time.perf_counter() - started) * 1000),
             "taskId": task_id,
-            "submission": {"status": response.status_code, "aiTaskId": task_id},
+            "storyReference": {
+                "projectSlug": self._config.project_slug,
+                "storyNumber": self._config.story_number,
+                "storyId": self._config.story_id,
+                "storyPath": self._config.story_path,
+            },
+            "submission": {"status": "MCP_ACCEPTED", "aiTaskId": task_id},
             "finalResponse": result,
+            "mcpExecution": execution,
         }
 
 
@@ -291,16 +291,81 @@ class DirectLiveTreatmentAdapter:
         }
 
 
-def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], environment: Mapping[str, str] | None = None) -> dict[str, TreatmentAdapter]:
+def resolve_live_story(config: LiveConfiguration, mcp: McpClient) -> LiveConfiguration:
+    """Resolve the repository Story number through Core before UUID-scoped calls."""
+
+    try:
+        result = mcp.tool("resolve_engineering_story", {
+            "projectSlug": config.project_slug,
+            "storyNumber": config.story_number,
+        })
+    except (OSError, RuntimeError, TimeoutError) as error:
+        raise LiveConfigurationError("MCP Engineering Story resolution failed") from error
+    if not isinstance(result, dict):
+        raise LiveConfigurationError("MCP Story resolution response must be an object")
+    story_id = result.get("id")
+    if not isinstance(story_id, str) or not story_id:
+        raise LiveConfigurationError("MCP Story resolution response did not return id")
+    try:
+        UUID(story_id)
+    except ValueError as error:
+        raise LiveConfigurationError("MCP Story resolution response returned an invalid id") from error
+    if result.get("storyNumber") != config.story_number:
+        raise LiveConfigurationError("MCP Story resolution returned a different story number")
+    story_path = result.get("storyPath")
+    if story_path and story_path not in config.files:
+        raise LiveConfigurationError("MCP Story resolution returned a path outside the configured files")
+    return replace(config, story_id=story_id, story_path=story_path)
+
+
+def reserve_live_task_binding(environment: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Reserve a Core task/binding through MCP without dispatching provider work."""
+
+    config = LiveConfiguration.from_environment(environment, require_task_id=False)
+    try:
+        mcp = McpClient(config.mcp_launcher, launcher=config.mcp_launcher,
+                        read_timeout_seconds=config.mcp_read_timeout_seconds)
+    except (OSError, RuntimeError, TimeoutError) as error:
+        raise LiveConfigurationError("MCP authenticated transport could not be started") from error
+    try:
+        config = resolve_live_story(config, mcp)
+        result = mcp.tool("story_context_agent_prepare_task_binding", {
+            "projectSlug": config.project_slug,
+            "storyId": config.story_id,
+            "files": list(config.files),
+            "intent": "engineering-story-context-analysis",
+            "idempotencyKey": "q1-live-binding-prepare",
+        })
+    except (OSError, RuntimeError, TimeoutError) as error:
+        raise LiveConfigurationError("MCP task binding reservation failed") from error
+    finally:
+        mcp.close()
+    if not isinstance(result, dict):
+        raise LiveConfigurationError("MCP task binding response must be an object")
+    task_id = result.get("aiTaskId")
+    if not isinstance(task_id, str) or not task_id:
+        raise LiveConfigurationError("Core binding reservation did not return aiTaskId")
+    return {
+        **result,
+        "storyReference": {
+            "projectSlug": config.project_slug,
+            "storyNumber": config.story_number,
+            "storyId": config.story_id,
+            "storyPath": config.story_path,
+        },
+    }
+
+
+def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config: LiveConfiguration,
+                  mcp: McpClient, environment: Mapping[str, str] | None = None) -> dict[str, TreatmentAdapter]:
     values = os.environ if environment is None else environment
     if values.get("LLM_PROVIDER", "openai_chatgpt").strip().lower() != "openai_chatgpt":
         raise LiveConfigurationError("B live execution requires LLM_PROVIDER=openai_chatgpt")
     model = values.get("LLM_MODEL", manifest["model"]).strip()
-    config = LiveConfiguration.from_environment(values)
     return {
-        "A_DEVLOG_CURRENT": CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, manifest),
+        "A_DEVLOG_CURRENT": CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, manifest, mcp),
         "B_DIRECT_INVESTIGATOR": DirectLiveTreatmentAdapter(repository_root, config.b_task_id, model),
-        "C_DEVLOG_ENGINEERING_ANALYST": CoreLiveTreatmentAdapter("C_DEVLOG_ENGINEERING_ANALYST", config, manifest),
+        "C_DEVLOG_ENGINEERING_ANALYST": CoreLiveTreatmentAdapter("C_DEVLOG_ENGINEERING_ANALYST", config, manifest, mcp),
     }
 
 
@@ -312,11 +377,22 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
         assert_reproducible_worktree(root)
     except ValueError as error:
         raise LiveConfigurationError(str(error)) from error
-    adapters = live_adapters(repository_root=root, manifest=manifest, environment=environment)
-    return run_dry_run(
-        manifest_path=manifest_path,
-        output_root=output_root,
-        repository_root=root,
-        adapters=adapters,
-        mode="LIVE",
-    )
+    config = LiveConfiguration.from_environment(environment)
+    try:
+        mcp = McpClient(config.mcp_launcher, launcher=config.mcp_launcher,
+                        read_timeout_seconds=config.mcp_read_timeout_seconds)
+    except (OSError, RuntimeError, TimeoutError) as error:
+        raise LiveConfigurationError("MCP authenticated transport could not be started") from error
+    try:
+        config = resolve_live_story(config, mcp)
+        adapters = live_adapters(repository_root=root, manifest=manifest, config=config, mcp=mcp,
+                                 environment=environment)
+        return run_dry_run(
+            manifest_path=manifest_path,
+            output_root=output_root,
+            repository_root=root,
+            adapters=adapters,
+            mode="LIVE",
+        )
+    finally:
+        mcp.close()

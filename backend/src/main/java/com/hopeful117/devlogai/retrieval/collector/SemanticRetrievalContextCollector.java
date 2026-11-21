@@ -128,15 +128,17 @@ public class SemanticRetrievalContextCollector implements RepositoryContextColle
         if (objective != null && !objective.isBlank()) {
             sb.append(objective);
         }
-        String focus = request.guidance().focus();
-        if (focus != null && !focus.isBlank()) {
-            if (!sb.isEmpty()) sb.append(' ');
-            sb.append(focus);
+        if (request.guidance() != null) {
+            String focus = request.guidance().focus();
+            if (focus != null && !focus.isBlank()) {
+                if (!sb.isEmpty()) sb.append(' ');
+                sb.append(focus);
+            }
+            request.guidance().priorities().forEach(p -> {
+                if (!sb.isEmpty()) sb.append(' ');
+                sb.append(p);
+            });
         }
-        request.guidance().priorities().forEach(p -> {
-            if (!sb.isEmpty()) sb.append(' ');
-            sb.append(p);
-        });
         return sb.toString().trim();
     }
 

@@ -70,9 +70,10 @@ verification ou insuffisante.
 
 1. [Story 0210 - Contrat d'acceptabilite agentique et baseline](../../stories/0210-agent-response-acceptability-contract/story.md)
 2. [Story 0219 - Freshness, Scope and Provenance Explicitness](../../stories/0219-explicit-freshness-scope-provenance/story.md)
-3. Story a definir - Survie des preuves critiques et loss ledger exploitable
-4. Story a definir - Specificite, abstention et confiance calibree
-5. Story a definir - Evaluation agentique et pilote sur Stories reelles
+3. [Story 0220 - Revision-Pinned Runtime Loss and Provider Outcome Evaluation](../../stories/0220-revision-pinned-runtime-loss-evaluation/story.md)
+4. [Story 0221 - Bounded Live Provider Captures and Attribution](../../stories/0221-bounded-live-provider-captures/story.md)
+5. Story a definir - Specificite, abstention et confiance calibree
+6. Story a definir - Evaluation agentique et pilote sur Stories reelles
 
 Les Stories 0158, 0173, 0176, 0178 et 0209 sont des dependances ou travaux a
 reconcilier. Elles ne sont pas dupliquees par cette epic.

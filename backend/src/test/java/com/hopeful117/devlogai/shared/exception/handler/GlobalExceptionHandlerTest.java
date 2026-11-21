@@ -6,6 +6,8 @@ import com.hopeful117.devlogai.ai.engine.exception.InvalidAiTaskResultException;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.analysis.entity.AnalysisType;
 import com.hopeful117.devlogai.analysis.workflow.exception.UnsupportedAnalysisTypeException;
+import com.hopeful117.devlogai.authorization.OidcAuthenticationFailureDiagnostics;
+import com.hopeful117.devlogai.authorization.UnauthenticatedPrincipalException;
 import com.hopeful117.devlogai.project.exception.ProjectSlugAlreadyExistsException;
 import com.hopeful117.devlogai.shared.exception.ConflictException;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
@@ -19,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.validation.BindingResult;
@@ -45,6 +48,21 @@ class GlobalExceptionHandlerTest {
         when(request.getAttribute(CorrelationIdFilter.REQUEST_ATTRIBUTE))
                 .thenReturn(CORRELATION_ID);
         return request;
+    }
+
+    @Test
+    void shouldExposePrincipalResolutionDiagnosticWithoutSensitiveDetails() {
+        MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleUnauthenticated(
+                new UnauthenticatedPrincipalException(),
+                mockRequest("/api/v1/projects/devlog-ai/context"),
+                servletResponse);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("PRINCIPAL_RESOLUTION_FAILED",
+                servletResponse.getHeader(OidcAuthenticationFailureDiagnostics.HEADER_NAME));
+        assertFalse(response.getBody().message().contains("token"));
     }
 
     @Test

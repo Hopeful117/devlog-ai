@@ -52,4 +52,11 @@ public interface DevlogAdminClient {
             @PathVariable("repositoryId") UUID repositoryId,
             @RequestParam(value = "revision", required = false) String revision
     );
+
+    @PostExchange("/projects/{projectId}/stories/synchronize")
+    String synchronizeProjectStoriesAuthenticated(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("projectId") UUID projectId,
+            @RequestParam(value = "revision", required = false) String revision
+    );
 }

@@ -17,7 +17,12 @@ from evaluations.devlog_ai_abc_runner.live import (
     load_q1_oracle,
     validate_live_authorization,
 )
-from evaluations.devlog_ai_abc_runner.live_execution import LiveConfiguration, LiveConfigurationError
+from evaluations.devlog_ai_abc_runner.live_execution import (
+    CoreLiveTreatmentAdapter,
+    LiveConfiguration,
+    LiveConfigurationError,
+    resolve_live_story,
+)
 from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
 
 
@@ -209,19 +214,97 @@ def test_non_finite_cost_ceiling_is_rejected() -> None:
 
 
 def test_live_configuration_requires_core_boundary_and_bounded_files() -> None:
-    with pytest.raises(LiveConfigurationError, match="DEVLOG_CORE_BASE_URL"):
+    with pytest.raises(LiveConfigurationError, match="DEVLOG_LIVE_PROJECT_SLUG"):
         LiveConfiguration.from_environment({})
 
     configuration = LiveConfiguration.from_environment({
-        "DEVLOG_CORE_BASE_URL": "http://localhost:8080/",
-        "DEVLOG_CORE_BEARER_TOKEN": "runtime-token",
         "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
         "DEVLOG_LIVE_FILES": "docs/a.md, docs/b.md",
         "DEVLOG_LIVE_B_TASK_ID": "00000000-0000-0000-0000-000000000001",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
     })
-    assert configuration.core_base_url == "http://localhost:8080"
+    assert configuration.mcp_launcher == Path("/tmp/devlog-mcp-start.sh")
+    assert configuration.story_number == 223
+    assert configuration.story_id is None
     assert configuration.files == ("docs/a.md", "docs/b.md")
     assert str(configuration.b_task_id) == "00000000-0000-0000-0000-000000000001"
+    assert not hasattr(configuration, "core_bearer_token")
+
+
+def test_core_live_adapter_uses_authenticated_mcp_without_core_bearer() -> None:
+    class FakeMcp:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            self.calls.append((name, arguments))
+            return {
+                "status": "COMPLETED",
+                "aiTaskId": "task-1",
+                "result": {"analysis": "bounded"},
+            }
+
+    mcp = FakeMcp()
+    config = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    }, require_task_id=False)
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, {}, mcp)
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, {})
+
+    assert result["executionStatus"] == "COMPLETED"
+    assert result["submission"]["status"] == "MCP_ACCEPTED"
+    assert mcp.calls[0][0] == "devlog_story_agent"
+    assert "Authorization" not in mcp.calls[0][1]
+    assert "DEVLOG_CORE_BEARER_TOKEN" not in repr(mcp.calls[0][1])
+
+
+def test_story_number_is_resolved_before_uuid_scoped_live_calls() -> None:
+    class FakeMcp:
+        def tool(self, name: str, arguments: dict) -> dict:
+            assert name == "resolve_engineering_story"
+            assert arguments == {"projectSlug": "devlog-ai", "storyNumber": 223}
+            return {
+                "id": "00000000-0000-0000-0000-000000000223",
+                "storyNumber": 223,
+                "storyPath": "docs/a.md",
+            }
+
+    config = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    }, require_task_id=False)
+
+    resolved = resolve_live_story(config, FakeMcp())
+
+    assert resolved.story_id == "00000000-0000-0000-0000-000000000223"
+    assert resolved.story_path == "docs/a.md"
+
+
+def test_story_resolution_rejects_path_outside_configured_files() -> None:
+    class FakeMcp:
+        def tool(self, name: str, arguments: dict) -> dict:
+            return {
+                "id": "00000000-0000-0000-0000-000000000223",
+                "storyNumber": 223,
+                "storyPath": "docs/other.md",
+            }
+
+    config = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    }, require_task_id=False)
+
+    with pytest.raises(LiveConfigurationError, match="outside the configured files"):
+        resolve_live_story(config, FakeMcp())
 
 
 def test_live_mode_remains_disabled_even_when_a_future_contract_is_valid(tmp_path: Path) -> None:

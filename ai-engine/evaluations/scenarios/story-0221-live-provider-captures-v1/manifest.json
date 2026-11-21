@@ -1,0 +1,24 @@
+{
+  "captureVersion": "story-context-live-provider-v1",
+  "captureSource": "LIVE_PROVIDER",
+  "scenarioVersion": "1.0.0",
+  "expectedRevision": "abcdef1",
+  "expectedDigests": {
+    "contextDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "projectionDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "ledgerDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "retention": {
+    "scope": "EVALUATION_EXPORT_ONLY",
+    "duration": "EXISTING_DIAGNOSTIC_RETENTION_CEILING",
+    "usage": "TOKENS_ONLY",
+    "rawPayloads": false
+  },
+  "scenarios": [
+    {"scenarioId": "live-complete-measured", "expectedStatus": "COMPLETED", "semanticEligible": true},
+    {"scenarioId": "live-provider-incomplete", "expectedStatus": "PROVIDER_INCOMPLETE", "semanticEligible": false},
+    {"scenarioId": "live-provider-timeout", "expectedStatus": "PROVIDER_TIMEOUT", "semanticEligible": false},
+    {"scenarioId": "live-unattributed", "expectedStatus": "COMPLETED", "semanticEligible": true},
+    {"scenarioId": "live-missing-measurements", "expectedStatus": "COMPLETED", "semanticEligible": true}
+  ]
+}

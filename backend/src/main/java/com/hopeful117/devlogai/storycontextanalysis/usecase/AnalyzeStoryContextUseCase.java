@@ -165,6 +165,35 @@ public class AnalyzeStoryContextUseCase {
         return submitPrepared(prepared, guidance, identity, principal, provider);
     }
 
+    /** Reserves a user-bound task and credential binding without dispatching provider work. */
+    @Transactional
+    public UUID reserveCredentialBinding(
+            String projectSlug, UUID storyId, String requestedIntent, List<String> files,
+            Map<String, Object> guidance, String idempotencyKey,
+            AuthenticatedPrincipal principal, String provider) {
+        Project project = projectRepository.findBySlug(projectSlug)
+                .orElseThrow(() -> new EntityNotFoundException("Project", projectSlug));
+        authorizePrincipal(principal, project, "MCP_STORY_AGENT_EXECUTE");
+        EngineeringStory story = storyId == null ? null : storyRepository.findById(storyId)
+                .orElseThrow(() -> new EntityNotFoundException("EngineeringStory", storyId));
+        if (story != null && !story.getProject().getId().equals(project.getId())) {
+            throw new IllegalArgumentException("Story does not belong to project");
+        }
+        if (requestedIntent == null || requestedIntent.isBlank()) {
+            throw new IllegalArgumentException("intent is required");
+        }
+        intentCatalog.resolve(requestedIntent, INTENT_VERSION);
+        List<String> requestedFiles = files == null ? List.of() : List.copyOf(files);
+        SubmissionIdentity identity = submissionIdentity(
+                projectSlug, storyId, requestedIntent, requestedFiles, null, guidance, idempotencyKey, principal);
+        Optional<UUID> existingReservation = existingSubmission(identity);
+        if (existingReservation.isPresent()) {
+            return existingReservation.get();
+        }
+        return reservePrepared(
+                prepare(projectSlug, storyId, requestedIntent, requestedFiles), guidance, identity, principal, provider);
+    }
+
     private void authorizePrincipal(
             AuthenticatedPrincipal principal, Project project, String requiredScope) {
         if (!authorizationService.isAuthorized(principal, project, requiredScope)) {
@@ -187,6 +216,14 @@ public class AnalyzeStoryContextUseCase {
             PreparedStoryContext prepared, Map<String, Object> guidance, SubmissionIdentity identity,
             AuthenticatedPrincipal principal, String provider) {
         return submissionService.submit(
+                prepared, guidance, identity.submissionDigest(), identity.idempotencyKeyHash(),
+                identity.idempotencyScopeHash(), principal, provider);
+    }
+
+    private UUID reservePrepared(
+            PreparedStoryContext prepared, Map<String, Object> guidance, SubmissionIdentity identity,
+            AuthenticatedPrincipal principal, String provider) {
+        return submissionService.reserveCredentialBinding(
                 prepared, guidance, identity.submissionDigest(), identity.idempotencyKeyHash(),
                 identity.idempotencyScopeHash(), principal, provider);
     }

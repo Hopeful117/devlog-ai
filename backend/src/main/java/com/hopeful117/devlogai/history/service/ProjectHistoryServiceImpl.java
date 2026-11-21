@@ -15,6 +15,7 @@ import com.hopeful117.devlogai.history.repository.ProjectCommitRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.source.entity.Source;
 import com.hopeful117.devlogai.source.repository.SourceRepository;
+import com.hopeful117.devlogai.story.service.StoryCatalogSynchronizationService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,19 +30,22 @@ public class ProjectHistoryServiceImpl implements ProjectHistoryService {
     private final WorkspaceManager workspaceManager;
     private final GitHistoryProvider historyProvider;
     private final CommitDiffContextBuilder contextBuilder;
+    private final StoryCatalogSynchronizationService storyCatalogSynchronizationService;
 
     public ProjectHistoryServiceImpl(
             SourceRepository sourceRepository,
             ProjectCommitRepository commitRepository,
             WorkspaceManager workspaceManager,
             GitHistoryProvider historyProvider,
-            CommitDiffContextBuilder contextBuilder
+            CommitDiffContextBuilder contextBuilder,
+            StoryCatalogSynchronizationService storyCatalogSynchronizationService
     ) {
         this.sourceRepository = sourceRepository;
         this.commitRepository = commitRepository;
         this.workspaceManager = workspaceManager;
         this.historyProvider = historyProvider;
         this.contextBuilder = contextBuilder;
+        this.storyCatalogSynchronizationService = storyCatalogSynchronizationService;
     }
 
     @Override
@@ -76,6 +80,7 @@ public class ProjectHistoryServiceImpl implements ProjectHistoryService {
             commitRepository.save(toEntity(managedSource, data, Instant.now()));
             imported++;
         }
+        storyCatalogSynchronizationService.synchronize(managedSource.getProject(), workspace);
         return new HistoryImportResult(repositoryId, workspace.resolvedRevision(), discovered.size(),
                 imported, discovered.size() - imported);
     }

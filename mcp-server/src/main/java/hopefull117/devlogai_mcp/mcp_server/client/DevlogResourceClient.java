@@ -33,6 +33,18 @@ public interface DevlogResourceClient {
             @PathVariable("projectId") UUID projectId,
             @PathVariable("storyId") UUID storyId);
 
+    @GetExchange("/projects/{projectId}/stories/resolve")
+    String resolveStoryByNumber(
+            @PathVariable("projectId") UUID projectId,
+            @RequestParam("storyNumber") Integer storyNumber);
+
+    @GetExchange("/projects/{projectId}/stories/resolve")
+    String resolveStoryByNumberAuthenticated(
+            @PathVariable("projectId") UUID projectId,
+            @RequestParam("storyNumber") Integer storyNumber,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation);
+
     @GetExchange("/projects/{projectSlug}/stories/{storyId}/change-briefing")
     String getStoryChangeBriefing(
             @PathVariable("projectSlug") String projectSlug,
