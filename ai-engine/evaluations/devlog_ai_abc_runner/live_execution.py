@@ -9,6 +9,7 @@ authorization document or an evaluation artifact.
 from __future__ import annotations
 
 import asyncio
+import ast
 import json
 import logging
 import os
@@ -39,6 +40,69 @@ class LiveConfigurationError(ValueError):
 
 
 logger = logging.getLogger(__name__)
+
+
+_ENV_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_LIVE_PROVIDER_REQUIRED_ENV = (
+    "CHATGPT_REDIRECT_URI",
+    "CHATGPT_EXT_AGENT_HOST_ID",
+    "DEVLOG_CREDENTIAL_ENCRYPTION_KEY",
+    "DEVLOG_SERVICE_AUTH_SECRET",
+)
+
+
+def load_environment_file(path: str | Path, *, environ: dict[str, str] | None = None) -> tuple[str, ...]:
+    """Load a strict dotenv file without overriding explicit environment values."""
+
+    target = os.environ if environ is None else environ
+    loaded: list[str] = []
+    try:
+        lines = Path(path).read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise LiveConfigurationError(f"environment file cannot be read: {path}") from error
+    for line_number, raw_line in enumerate(lines, start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        if "=" not in line:
+            raise LiveConfigurationError(f"environment file line {line_number} is invalid")
+        key, raw_value = line.split("=", 1)
+        key = key.strip()
+        if not _ENV_KEY.fullmatch(key):
+            raise LiveConfigurationError(f"environment file line {line_number} has an invalid key")
+        raw_value = raw_value.strip()
+        if raw_value.startswith(("'", '"')):
+            try:
+                value = ast.literal_eval(raw_value)
+            except (SyntaxError, ValueError) as error:
+                raise LiveConfigurationError(f"environment file line {line_number} has an invalid quoted value") from error
+            if not isinstance(value, str):
+                raise LiveConfigurationError(f"environment file line {line_number} has an invalid value")
+        else:
+            value = raw_value
+        if key not in target:
+            target[key] = value
+            loaded.append(key)
+    return tuple(loaded)
+
+
+def missing_live_provider_environment(environment: Mapping[str, str] | None = None) -> tuple[str, ...]:
+    values = os.environ if environment is None else environment
+    if values.get("LLM_PROVIDER", "openai_chatgpt").strip().lower() != "openai_chatgpt":
+        return ()
+    if values.get("CHATGPT_OAUTH_ENABLED", "false").strip().lower() != "true":
+        return ()
+    return tuple(name for name in _LIVE_PROVIDER_REQUIRED_ENV if not values.get(name, "").strip())
+
+
+def require_live_provider_environment(environment: Mapping[str, str] | None = None) -> None:
+    missing = missing_live_provider_environment(environment)
+    if missing:
+        raise LiveConfigurationError(
+            "live provider environment is incomplete: " + ", ".join(missing)
+        )
 
 
 class _ProviderHttpError(RuntimeError):
@@ -573,6 +637,7 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
         assert_reproducible_worktree(root)
     except ValueError as error:
         raise LiveConfigurationError(str(error)) from error
+    require_live_provider_environment(environment)
     config = LiveConfiguration.from_environment(environment)
     try:
         mcp = McpClient(config.mcp_launcher, launcher=config.mcp_launcher,

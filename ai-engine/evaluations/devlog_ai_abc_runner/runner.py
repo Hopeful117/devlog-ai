@@ -466,9 +466,17 @@ def main() -> None:
     parser.add_argument("--authorization")
     parser.add_argument("--pricing")
     parser.add_argument("--activate-live", action="store_true", help="explicitly authorize live preflight activation")
+    parser.add_argument("--env-file", help="load a dotenv file without overriding explicit environment variables")
     parser.add_argument("--observation-id", action="append", dest="observation_ids",
                         help="limit execution to one or more frozen observation IDs")
     args = parser.parse_args()
+    if args.env_file:
+        from .live_execution import LiveConfigurationError, load_environment_file
+
+        try:
+            load_environment_file(args.env_file)
+        except LiveConfigurationError as error:
+            raise SystemExit(str(error)) from error
     authorization = None
     if args.authorization:
         from .live import load_authorization

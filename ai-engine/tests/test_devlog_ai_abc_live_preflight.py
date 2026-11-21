@@ -24,7 +24,10 @@ from evaluations.devlog_ai_abc_runner.live_execution import (
     LiveConfiguration,
     LiveConfigurationError,
     _bounded_mcp_error,
+    load_environment_file,
     live_adapters,
+    missing_live_provider_environment,
+    require_live_provider_environment,
     resolve_live_story,
 )
 from evaluations.comparative_baseline.collection_runtime import ProviderRequest, TransportFailure
@@ -50,6 +53,42 @@ def test_env_example_quotes_shell_value_with_spaces() -> None:
     env_example = (ROOT / ".env.example").read_text()
 
     assert 'CHATGPT_AGENT_NAME="DevLog AI"' in env_example
+
+
+def test_load_environment_file_preserves_explicit_values_and_parses_quotes(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        'CHATGPT_AGENT_NAME="DevLog AI"\n'
+        "EXPLICIT=value-from-file\n"
+        "export EMPTY=\n",
+        encoding="utf-8",
+    )
+    environment = {"EXPLICIT": "from-process"}
+
+    loaded = load_environment_file(env_file, environ=environment)
+
+    assert loaded == ("CHATGPT_AGENT_NAME", "EMPTY")
+    assert environment == {
+        "EXPLICIT": "from-process",
+        "CHATGPT_AGENT_NAME": "DevLog AI",
+        "EMPTY": "",
+    }
+
+
+def test_live_provider_environment_reports_names_only() -> None:
+    environment = {
+        "LLM_PROVIDER": "openai_chatgpt",
+        "CHATGPT_OAUTH_ENABLED": "true",
+        "CHATGPT_REDIRECT_URI": "http://127.0.0.1:18081/api/v1/auth/chatgpt/callback",
+    }
+
+    assert missing_live_provider_environment(environment) == (
+        "CHATGPT_EXT_AGENT_HOST_ID",
+        "DEVLOG_CREDENTIAL_ENCRYPTION_KEY",
+        "DEVLOG_SERVICE_AUTH_SECRET",
+    )
+    with pytest.raises(LiveConfigurationError, match="CHATGPT_EXT_AGENT_HOST_ID"):
+        require_live_provider_environment(environment)
 
 
 def test_chatgpt_oauth_transport_exposes_bounded_http_diagnostic(monkeypatch: pytest.MonkeyPatch) -> None:
