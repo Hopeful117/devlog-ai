@@ -143,7 +143,9 @@ class CoreLiveTreatmentAdapter:
                     },
                 }
             }
-        idempotency_key = f"q1-live-{observation['observationId']}"
+        idempotency_key = (
+            f"q1-live-{observation['observationId']}-{current_head(Path.cwd())[:12]}"
+        )
         started = time.perf_counter()
         try:
             execution = self._mcp.tool("devlog_story_agent", {
