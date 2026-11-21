@@ -29,7 +29,7 @@ from evaluations.comparative_baseline.live_adapters import common_answer_schema,
 from evaluations.comparative_baseline_v4.protocol import SafetyCeilings, V4Assignment
 from evaluations.comparative_baseline_v4.runtime import V4CollectionRuntime
 
-from .q1_b_binding import Q1PinnedRepositoryTools, load_q1_b_config
+from .q1_b_binding import Q1PinnedRepositoryTools, _q1_runtime_input, load_q1_b_config
 from .runner import TreatmentAdapter, run_dry_run
 from .provenance import Q1_SOURCE_REVISION, assert_reproducible_worktree, current_head, verify_commit
 from evaluations.story_context_specificity_live import McpClient
