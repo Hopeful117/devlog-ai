@@ -89,6 +89,14 @@ class StoryAgentSourceRevision(ContractModel):
 class StoryAgentFreshness(ContractModel):
     source_revision: StoryAgentSourceRevision = Field(alias="sourceRevision")
     state: Literal["FRESH", "STALE", "UNKNOWN", "NOT_ESTABLISHED"]
+    version: str | None = None
+    project_id: str | None = Field(default=None, alias="projectId")
+    checked_sources: list[dict[str, Any]] | None = Field(default=None, alias="checkedSources")
+    unchecked_source_count: int | None = Field(default=None, alias="uncheckedSourceCount")
+    truncated: bool | None = None
+    status: str | None = None
+    revision_consistency: str | None = Field(default=None, alias="revisionConsistency")
+    warnings: list[str] | None = None
 
 class StoryAgentAccounting(ContractModel):
     candidate_count: StrictInt = Field(alias="candidateCount", ge=0, le=2**31 - 1)
@@ -143,6 +151,7 @@ class StoryContextAgentProjectionV1(ContractModel):
     request: dict[str, Any]
     request_echo: dict[str, Any] = Field(alias="requestEcho")
     scope: dict[str, Any]
+    execution_scope: dict[str, Any] | None = Field(default=None, alias="executionScope")
     freshness: StoryAgentFreshness
     context: dict[str, Any]
     grounding_candidates: dict[str, list[dict[str, Any]]] = Field(alias="groundingCandidates")

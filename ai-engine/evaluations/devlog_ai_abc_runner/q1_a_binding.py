@@ -33,19 +33,26 @@ class ScriptedStoryContextProvider(LlmProvider):
     provider_name = "mock"
     model_identifier = "q1-a-scripted-v1"
 
-    def __init__(self) -> None:
+    def __init__(self, submission: PromptRequest) -> None:
+        self._submission = submission
         self.calls = 0
 
     async def generate_structured(self, request: Prompt, response_model: type[Any]) -> Any:
         self.calls += 1
         if self.calls > 1:
             raise Q1ABindingError("one-shot provider received more than one generation")
+        grounding_reference = self._submission.grounding_contract["allowedGroundingReferences"][0]["ref"]
         result = {
             "objectiveUnderstanding": {
                 "summary": "Core authorized and persisted the Story Context analysis.",
                 "keyDomains": ["authorization", "persistence"],
                 "primaryTechnologies": ["Java", "Python"],
                 "architecturalPatterns": ["Core authority", "callback boundary"],
+                "grounding": {
+                    "evidenceReferences": [{"reference": grounding_reference}],
+                    "classification": "FACTUAL_EXTRACTION",
+                    "grounded": True,
+                },
             },
             "architectureFindings": [],
             "decisionFindings": [],
@@ -69,7 +76,12 @@ class ScriptedStoryContextProvider(LlmProvider):
                 "guidanceKeys": [],
                 "executionMetadata": {},
             },
-            "outputClassification": {"entries": []},
+            "outputClassification": {"entries": [{
+                "findingReference": "objectiveUnderstanding",
+                "classification": "FACTUAL_EXTRACTION",
+                "grounded": True,
+                "rationale": "Grounded in the authorized Core evidence.",
+            }]},
             "causalClaims": [],
             "causalAssessment": None,
         }
@@ -100,7 +112,7 @@ async def run_binding(
     artifact_path: Path,
 ) -> dict[str, Any]:
     submission = PromptRequest.model_validate(json.loads(prompt_path.read_text(encoding="utf-8")))
-    provider = ScriptedStoryContextProvider()
+    provider = ScriptedStoryContextProvider(submission)
     callback = RecordingCoreCallbackClient(
         CoreCallbackClient(core_url, callback_secret=secret, max_attempts=1)
     )

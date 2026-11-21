@@ -165,6 +165,7 @@ class ScriptedInvestigationProvider(LlmProvider):
         if len(results) != 2 or any(item.get("outcome") not in {"RESULTS", "EMPTY"} for item in results):
             raise Q1CBindingError("FINAL was requested before both Core actions completed")
         traceability = request.traceability
+        grounding_reference = self._submission.grounding_contract["allowedGroundingReferences"][0]["ref"]
         return {
             "phase": "FINAL",
             "stopReason": "SUFFICIENT_EVIDENCE",
@@ -174,6 +175,11 @@ class ScriptedInvestigationProvider(LlmProvider):
                     "keyDomains": ["authorization", "investigation", "persistence"],
                     "primaryTechnologies": ["Java", "Python"],
                     "architecturalPatterns": ["Core authority", "callback boundary"],
+                    "grounding": {
+                        "evidenceReferences": [{"reference": grounding_reference}],
+                        "classification": "FACTUAL_EXTRACTION",
+                        "grounded": True,
+                    },
                 },
                 "architectureFindings": [],
                 "decisionFindings": [],
@@ -197,7 +203,12 @@ class ScriptedInvestigationProvider(LlmProvider):
                     "guidanceKeys": [],
                     "executionMetadata": {},
                 },
-                "outputClassification": {"entries": []},
+                 "outputClassification": {"entries": [{
+                     "findingReference": "objectiveUnderstanding",
+                     "classification": "FACTUAL_EXTRACTION",
+                     "grounded": True,
+                     "rationale": "Grounded in the authorized Core evidence.",
+                 }]},
                 "causalClaims": [],
                 "causalAssessment": None,
             },
