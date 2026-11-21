@@ -21,6 +21,8 @@ from evaluations.devlog_ai_abc_runner.live_execution import (
     CoreLiveTreatmentAdapter,
     LiveConfiguration,
     LiveConfigurationError,
+    _bounded_mcp_error,
+    live_adapters,
     resolve_live_story,
 )
 from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
@@ -261,6 +263,52 @@ def test_core_live_adapter_uses_authenticated_mcp_without_core_bearer() -> None:
     assert mcp.calls[0][0] == "devlog_story_agent"
     assert "Authorization" not in mcp.calls[0][1]
     assert "DEVLOG_CORE_BEARER_TOKEN" not in repr(mcp.calls[0][1])
+
+
+def test_live_adapters_require_chatgpt_oauth_before_provider_execution() -> None:
+    configuration = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_LIVE_B_TASK_ID": "00000000-0000-0000-0000-000000000001",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    })
+
+    with pytest.raises(LiveConfigurationError, match="CHATGPT_OAUTH_ENABLED=true"):
+        live_adapters(
+            repository_root=ROOT,
+            manifest={"model": "gpt-5.6-luna"},
+            config=configuration,
+            mcp=object(),
+            environment={"LLM_PROVIDER": "openai_chatgpt"},
+        )
+
+    adapters = live_adapters(
+        repository_root=ROOT,
+        manifest={"model": "gpt-5.6-luna"},
+        config=configuration,
+        mcp=object(),
+        environment={
+            "LLM_PROVIDER": "openai_chatgpt",
+            "CHATGPT_OAUTH_ENABLED": "true",
+            "LLM_MODEL": "gpt-5.6-luna",
+        },
+    )
+    assert set(adapters) == {"A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST"}
+
+
+def test_mcp_error_diagnostic_is_bounded_and_redacts_credentials() -> None:
+    error = RuntimeError(json.dumps({
+        "code": -32001,
+        "message": "Bearer abc123 token=secret-value request failed",
+    }))
+
+    diagnostic = _bounded_mcp_error(error)
+
+    assert diagnostic.startswith("-32001: ")
+    assert "abc123" not in diagnostic
+    assert "secret-value" not in diagnostic
+    assert "[REDACTED]" in diagnostic
 
 
 def test_story_number_is_resolved_before_uuid_scoped_live_calls() -> None:

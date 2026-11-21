@@ -17,7 +17,7 @@ from evaluations.devlog_ai_abc_runner import (
     replay_run,
     run,
 )
-from evaluations.devlog_ai_abc_runner.runner import FixtureTreatmentAdapter
+from evaluations.devlog_ai_abc_runner.runner import FixtureTreatmentAdapter, RunResult, _result_payload
 from evaluations.devlog_ai_abc_runner.provenance import current_head
 
 
@@ -62,6 +62,14 @@ def test_dry_run_executes_three_isolated_observations_and_replays(tmp_path: Path
         assert derived["observationId"] == observation_id
         assert derived["semanticEligibility"] == "NOT_EVALUATED"
         assert derived["acceptability"]["status"] == "NOT_EVALUATED"
+
+
+def test_result_payload_extracts_json_safe_summary_from_run_result(tmp_path: Path) -> None:
+    summary = {"status": "PASS", "runRoot": str(tmp_path)}
+    result = RunResult(run_root=tmp_path, summary=summary, integrity={"status": "PASS"})
+
+    assert _result_payload(result) == summary
+    assert _result_payload(summary) == summary
 
 
 def test_dry_run_preserves_native_contracts_and_selects_a_b_c(tmp_path: Path) -> None:

@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import time
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
@@ -33,6 +34,29 @@ from evaluations.story_context_specificity_live import McpClient
 
 class LiveConfigurationError(ValueError):
     """Raised when the live runtime cannot be configured without guessing."""
+
+
+def _bounded_mcp_error(error: Exception) -> str:
+    """Expose bounded MCP diagnostics without forwarding credentials."""
+
+    value: Any
+    try:
+        value = json.loads(str(error))
+    except json.JSONDecodeError:
+        value = {}
+    if isinstance(value, dict):
+        value = value.get("error", value)
+    if isinstance(value, dict):
+        code = value.get("code")
+        message = value.get("message")
+        if isinstance(message, str):
+            message = re.sub(r"(?i)bearer\s+\S+", "Bearer [REDACTED]", message)
+            message = re.sub(r"(?i)(token|secret|password)=\S+", r"\1=[REDACTED]", message)
+            message = message[:240]
+        details = [str(item) for item in (code, message) if item is not None]
+        if details:
+            return ": ".join(details)
+    return type(error).__name__
 
 
 @dataclass(frozen=True)
@@ -132,7 +156,10 @@ class CoreLiveTreatmentAdapter:
                 "idempotencyKey": idempotency_key,
             })
         except (OSError, RuntimeError, TimeoutError) as error:
-            raise LiveConfigurationError("MCP authenticated Story Agent execution failed") from error
+            detail = _bounded_mcp_error(error)
+            raise LiveConfigurationError(
+                f"MCP authenticated Story Agent execution failed: {detail}"
+            ) from error
         if not isinstance(execution, dict):
             raise LiveConfigurationError("MCP Story Agent response must be an object")
         task_id = execution.get("aiTaskId")
@@ -361,6 +388,8 @@ def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config:
     values = os.environ if environment is None else environment
     if values.get("LLM_PROVIDER", "openai_chatgpt").strip().lower() != "openai_chatgpt":
         raise LiveConfigurationError("B live execution requires LLM_PROVIDER=openai_chatgpt")
+    if values.get("CHATGPT_OAUTH_ENABLED", "false").strip().lower() != "true":
+        raise LiveConfigurationError("B live execution requires CHATGPT_OAUTH_ENABLED=true")
     model = values.get("LLM_MODEL", manifest["model"]).strip()
     return {
         "A_DEVLOG_CURRENT": CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, manifest, mcp),

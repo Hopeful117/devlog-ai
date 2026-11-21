@@ -340,6 +340,14 @@ def _acceptability_counts(results: list[dict[str, Any]]) -> dict[str, int]:
     return counts
 
 
+def _result_payload(result: RunResult | dict[str, Any]) -> dict[str, Any]:
+    """Return the JSON payload exposed by the command-line runner."""
+
+    if isinstance(result, RunResult):
+        return result.summary
+    return result
+
+
 def run_integration_simulation(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path) -> RunResult:
     """Exercise local boundaries with deterministic provider/Core doubles."""
 
@@ -458,7 +466,7 @@ def main() -> None:
         pricing_contract=pricing_contract,
         activate_live=args.activate_live,
     )
-    payload = result.summary if isinstance(result, RunResult) else result
+    payload = _result_payload(result)
     print(json.dumps(payload, indent=2, sort_keys=True))
 
 
