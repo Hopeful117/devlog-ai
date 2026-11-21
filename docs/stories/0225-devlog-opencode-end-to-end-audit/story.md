@@ -1,4 +1,4 @@
-# Story 0210 - DevLog to OpenCode End-to-End Audit and Comparative Evaluation
+# Story 0225 - DevLog to OpenCode End-to-End Audit and Comparative Evaluation
 
 ## Status
 
