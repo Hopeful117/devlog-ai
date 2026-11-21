@@ -554,7 +554,8 @@ class DirectLiveTreatmentAdapter:
             run_id=str(observation["observationId"]),
             test_only=False,
         )
-        native = runtime.run_assignment(assignment)
+        with _q1_runtime_input(config):
+            native = runtime.run_assignment(assignment)
         raw = native.get("rawOutput", {})
         return {
             "executionMode": "LIVE",
