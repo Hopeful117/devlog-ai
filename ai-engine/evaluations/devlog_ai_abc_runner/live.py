@@ -94,6 +94,7 @@ _REQUIRED_AUTH_KEYS = {
     "authorizedObservationIds",
     "authorizedConditions",
     "repositoryRevision",
+    "runtimeRevision",
     "provider",
     "model",
     "budgets",
@@ -188,6 +189,8 @@ def validate_live_authorization(
         raise LiveAuthorizationError("authorization condition set mismatch")
     if authorization["repositoryRevision"] != manifest["repositoryRevision"]:
         raise LiveAuthorizationError("authorization repository revision mismatch")
+    if not _is_sha256(authorization["runtimeRevision"]):
+        raise LiveAuthorizationError("authorization runtime revision is invalid")
     if authorization["provider"] != manifest["provider"] or authorization["model"] != manifest["model"]:
         raise LiveAuthorizationError("authorization provider/model mismatch")
     if authorization["budgets"] != manifest["technicalBudgets"] or authorization["limits"] != manifest["technicalBudgets"]:
@@ -321,7 +324,7 @@ def live_preflight(
         blockers.append("source snapshot does not match the frozen manifest")
     if not isinstance(identity.get("runtimeRevision"), str) or not identity["runtimeRevision"]:
         blockers.append("runtime revision cannot be identified")
-    elif identity["runtimeRevision"] != manifest["repositoryRevision"]:
+    elif authorization is None or authorization.get("runtimeRevision") != identity["runtimeRevision"]:
         blockers.append("executed runtime revision does not match the frozen manifest")
     harness = identity.get("harness", {})
     if not isinstance(harness.get("sha256"), str) or len(harness["sha256"]) != 64:

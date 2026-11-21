@@ -202,6 +202,11 @@ export DEVLOG_LIVE_FILES=docs/stories/0223-agentic-quality-real-story-pilot/stor
 export DEVLOG_LIVE_B_TASK_ID=...
 ```
 
+The authorization document must also bind `runtimeRevision` to the exact clean
+checkout commit used for execution. `repositoryRevision` remains the frozen
+source snapshot used by the oracle; it is not a substitute for the executable
+runtime revision.
+
 Run the three bounded observations only with the separately approved files:
 
 ```bash

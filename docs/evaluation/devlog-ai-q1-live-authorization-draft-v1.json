@@ -21,6 +21,7 @@
     "C_DEVLOG_ENGINEERING_ANALYST"
   ],
   "repositoryRevision": "60fae3e0e1104d0ffbe3832c1f578ed532b1268a",
+  "runtimeRevision": "TO_BE_BOUND_AT_RUNTIME",
   "provider": "openai_chatgpt",
   "model": "gpt-5.6-luna",
   "budgets": {

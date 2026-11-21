@@ -304,10 +304,10 @@ def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], environ
     }
 
 
-def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], environment: Mapping[str, str] | None = None):
+def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], authorization: Mapping[str, Any], environment: Mapping[str, str] | None = None):
     root = Path(repository_root).resolve()
-    if current_head(root) != manifest["repositoryRevision"]:
-        raise LiveConfigurationError("live execution requires HEAD to equal the frozen manifest revision")
+    if current_head(root) != authorization["runtimeRevision"]:
+        raise LiveConfigurationError("live execution requires HEAD to equal the authorized runtime revision")
     try:
         assert_reproducible_worktree(root)
     except ValueError as error:

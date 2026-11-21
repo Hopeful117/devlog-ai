@@ -389,6 +389,7 @@ def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, reposi
             output_root=output_root,
             repository_root=repository_root,
             manifest=manifest_value,
+            authorization=authorization,
         )
     if mode == LIVE_PREFLIGHT:
         if oracle_path is None:

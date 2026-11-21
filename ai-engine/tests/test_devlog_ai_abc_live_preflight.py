@@ -64,6 +64,7 @@ def valid_authorization() -> dict:
         "authorizedObservationIds": [item["observationId"] for item in value["observations"]],
         "authorizedConditions": value["conditions"],
         "repositoryRevision": value["repositoryRevision"],
+        "runtimeRevision": "a" * 64,
         "provider": value["provider"],
         "model": value["model"],
         "budgets": value["technicalBudgets"],
