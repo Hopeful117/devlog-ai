@@ -51,8 +51,10 @@ async def complete_chatgpt(
         )
         payload = EvaluationProviderRequest.model_validate_json(raw_body)
         return await _complete(payload)
-    except (ServiceAuthenticationError, ValueError):
+    except ServiceAuthenticationError:
         return _error("INVALID_SERVICE_AUTHENTICATION")
+    except ValueError:
+        return _error("INVALID_PROVIDER_REQUEST", status.HTTP_400_BAD_REQUEST)
     except httpx.HTTPError:
         return _error("PROVIDER_CONNECTION_ERROR", status.HTTP_502_BAD_GATEWAY)
 
