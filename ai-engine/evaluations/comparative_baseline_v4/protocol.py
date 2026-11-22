@@ -590,6 +590,16 @@ def _file_sha256(path: Path) -> str:
 
 
 def _question(question_id: str) -> dict[str, Any]:
+    if question_id == "Q1":
+        oracle = json.loads((ROOT / "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json").read_text(encoding="utf-8"))
+        q1 = next(item for item in oracle["oracles"] if item["caseId"] == "Q1")
+        authorized = {reference.split("#", 1)[0] for reference in q1["requiredEvidenceReferences"]}
+        return {
+            "questionId": "Q1",
+            "questionVersion": "1.0.0",
+            "question": q1["question"],
+            "authorizedEvidence": sorted(authorized),
+        }
     try:
         return next(item for item in load_manifest()["questions"] if item["questionId"] == question_id)
     except StopIteration as error:
@@ -758,6 +768,23 @@ def _normalized_terms(value: Any) -> str:
 
 
 def evaluate_semantics(answer: dict[str, Any], question_id: str) -> dict[str, Any]:
+    if question_id == "Q1":
+        text = _normalized_terms(answer)
+        required_groups = (
+            ("core", "javacore"),
+            ("authorization", "authorizes"),
+            ("aitask", "analysis"),
+            ("python", "aiengine"),
+            ("callback", "persist"),
+            ("nontrusted", "nottrusted"),
+        )
+        correct = all(any(term in text for term in group) for group in required_groups)
+        return {
+            "semanticCorrect": correct,
+            "semanticEvaluated": True,
+            "contract": "devlog-ai-abc-q1-oracle-proposals-v1",
+            "authority": {"oracle": "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json"},
+        }
     benchmark = next(item for item in _load_benchmark()["cases"] if item["caseId"] == question_id.replace("-COMPARATIVE", "") or item["caseId"] == question_id)
     oracle = _load_oracle()
     if question_id == "CASE-04":

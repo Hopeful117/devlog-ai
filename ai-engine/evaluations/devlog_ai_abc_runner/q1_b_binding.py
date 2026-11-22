@@ -31,7 +31,7 @@ class Q1BBindingError(ValueError):
 
 Q1_B_CONFIG = Path("docs/evaluation/devlog-ai-q1-b-direct-config-v1.json")
 Q1_B_REFERENCE = "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java"
-Q1_B_NATIVE_V4_CASE = "CASE-03"
+Q1_B_NATIVE_V4_CASE = "Q1"
 
 
 def load_q1_b_config(repository_root: Path, config_path: Path = Q1_B_CONFIG, *, allow_live: bool = False) -> dict[str, Any]:
@@ -126,7 +126,10 @@ def _q1_runtime_input(config: Mapping[str, Any]) -> Iterator[None]:
     original = v4_runtime.condition_input
 
     def condition_input(condition: str, question_id: str, repetition: int) -> dict[str, Any]:
-        value = dict(original(condition, question_id, repetition))
+        value = dict(original(condition, "CASE-03", repetition))
+        value["questionId"] = "Q1"
+        value["questionVersion"] = "1.0.0"
+        value["question"] = config["question"]
         value["repositoryRevision"] = config["repository"]["revision"]
         return value
 
