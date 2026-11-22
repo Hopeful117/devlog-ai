@@ -246,16 +246,18 @@ class CoreLiveTreatmentAdapter:
             f"q1-live-{observation['observationId']}-{current_head(Path.cwd())[:12]}"
         )
         started = time.perf_counter()
+        request = {
+            "projectSlug": self._config.project_slug,
+            "intent": "engineering-story-context-analysis",
+            "question": "Q1 bounded live evaluation",
+            "files": list(self._config.files),
+            "guidance": guidance,
+            "idempotencyKey": idempotency_key,
+        }
+        if self._config.story_id is not None:
+            request["storyId"] = self._config.story_id
         try:
-            execution = self._mcp.tool("devlog_story_agent", {
-                "projectSlug": self._config.project_slug,
-                "storyId": self._config.story_id,
-                "intent": "engineering-story-context-analysis",
-                "question": "Q1 bounded live evaluation",
-                "files": list(self._config.files),
-                "guidance": guidance,
-                "idempotencyKey": idempotency_key,
-            })
+            execution = self._mcp.tool("devlog_story_agent", request)
         except (OSError, RuntimeError, TimeoutError) as error:
             detail = _bounded_mcp_error(error)
             raise LiveConfigurationError(

@@ -358,6 +358,7 @@ def test_core_live_adapter_uses_authenticated_mcp_without_core_bearer() -> None:
     assert result["executionStatus"] == "COMPLETED"
     assert result["submission"]["status"] == "MCP_ACCEPTED"
     assert mcp.calls[0][0] == "devlog_story_agent"
+    assert "storyId" not in mcp.calls[0][1]
     assert "Authorization" not in mcp.calls[0][1]
     assert "DEVLOG_CORE_BEARER_TOKEN" not in repr(mcp.calls[0][1])
 
