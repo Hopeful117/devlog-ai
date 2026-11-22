@@ -8,6 +8,7 @@ from typing import Annotated
 import httpx
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from app.core.config import get_settings
 from app.schemas.evaluation_provider import EvaluationProviderRequest
@@ -53,7 +54,17 @@ async def complete_chatgpt(
         return await _complete(payload)
     except ServiceAuthenticationError:
         return _error("INVALID_SERVICE_AUTHENTICATION")
-    except ValueError:
+    except ValidationError as error:
+        logger.warning(
+            "Remote provider request validation failed",
+            extra={
+                "event": "REMOTE_PROVIDER_REQUEST_VALIDATION_FAILED",
+                "fields": [
+                    {"location": list(item.get("loc", ())), "type": item.get("type")}
+                    for item in error.errors()
+                ],
+            },
+        )
         return _error("INVALID_PROVIDER_REQUEST", status.HTTP_400_BAD_REQUEST)
     except httpx.HTTPError:
         return _error("PROVIDER_CONNECTION_ERROR", status.HTTP_502_BAD_GATEWAY)
