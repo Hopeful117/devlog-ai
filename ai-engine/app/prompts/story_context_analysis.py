@@ -334,7 +334,7 @@ class StoryContextAnalysisPromptBuilder:
              "Do not invent filenames or substitute plausible paths. Every ACTION must use a new unique actionId; never reuse an earlier actionId.\n\n"
              f"PRIOR CAPABILITY RESULTS\n{results_json}\n\n"
               "DECISION RULES\n"
-              "Use PLAN only when no capability result exists. After a result, use ACTION for one additional bounded action "
+              "Use PLAN only on the first turn when no capability result exists. After any capability result, never return PLAN; use ACTION for one additional bounded action "
               "or FINAL when the supplied evidence is sufficient. If Core rejects an action, do not invent a result; stop. "
               "READ_EVIDENCE_RANGE requires an exact authorized relative file path plus integer startLine and endLine; "
               "the range must be bounded, startLine >= 1, endLine >= startLine, and contain at most 500 lines. "

@@ -55,6 +55,7 @@ def test_investigation_prompt_bounds_range_reads_and_empty_evidence_final() -> N
     prompt = StoryContextAnalysisPromptBuilder().build_investigation(request)
 
     assert "at most 500 lines" in prompt.user_message
+    assert "After any capability result, never return PLAN" in prompt.user_message
     assert "Never use READ_EVIDENCE_RANGE to request a whole document" in prompt.user_message
     assert "If all capability results contain no evidence" in prompt.user_message
     assert "leave its summary empty and its grounding null" in prompt.user_message
