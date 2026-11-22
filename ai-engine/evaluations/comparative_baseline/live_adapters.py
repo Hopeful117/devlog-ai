@@ -202,7 +202,7 @@ class PinnedGitRepositoryTools(RepositoryToolServer):
             end = int(arguments.get("endLine", len(lines)))
             if start < 1 or end < start:
                 raise RuntimeContractError("invalid repository line range")
-            return {"operation": operation, "reference": path, "path": path, "startLine": start, "endLine": end, "content": "\n".join(lines[start - 1:end])}
+            return {"operation": operation, "reference": path, "path": path, "startLine": start, "endLine": end, "content": "\n".join(lines[start - 1:end])[:64000]}
         if operation == "search_repository":
             query = arguments.get("query")
             if not isinstance(query, str) or not query:
@@ -232,7 +232,7 @@ class PinnedGitRepositoryTools(RepositoryToolServer):
                 except ValueError as error:
                     raise RuntimeContractError("pinned repository search line is malformed") from error
                 matches.append({"path": path, "line": line, "text": text[:1000]})
-                if len(matches) >= int(arguments.get("maxMatches", 20)):
+                if len(matches) >= min(int(arguments.get("maxMatches", 20)), 20):
                     break
             return {"operation": operation, "query": query, "matches": matches}
         commit = arguments.get("commit", self.revision)
