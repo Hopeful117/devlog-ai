@@ -230,7 +230,10 @@ class CoreLiveTreatmentAdapter:
             guidance = {
                 "investigation": {
                     "enabled": True,
-                    "allowedPathPrefixes": ["docs", "backend", "ai-engine"],
+                    # Keep the live evaluation scoped to the requested artifact.
+                    # Broad repository prefixes let the model invent plausible
+                    # paths that Core correctly rejects as unavailable.
+                    "allowedPathPrefixes": list(self._config.files),
                     "budget": {
                         "maximumSteps": 2,
                         "maximumRetrievalCalls": 2,
