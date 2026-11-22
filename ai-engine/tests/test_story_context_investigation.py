@@ -82,6 +82,9 @@ def test_v2_plan_rejects_duplicate_ids_mismatched_scope_and_invalid_range():
     range_action = search(kind="READ_EVIDENCE_RANGE", path="backend/Main.java", startLine=20, endLine=10)
     with pytest.raises(ValidationError):
         InvestigationPlanProposal.model_validate(plan(range_action))
+    oversized_range = search(kind="READ_EVIDENCE_RANGE", path="backend/Main.java", startLine=1, endLine=502)
+    with pytest.raises(ValidationError):
+        InvestigationPlanProposal.model_validate(plan(oversized_range))
 
 
 def test_capability_result_accepts_only_bounded_stop_reasons():
