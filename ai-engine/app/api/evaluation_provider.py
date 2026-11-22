@@ -97,7 +97,7 @@ async def _complete(payload: EvaluationProviderRequest) -> dict:
     if not required_scopes_granted(credential.scopes):
         return {"status": "FAILED", "code": "OAUTH_SCOPES_INCOMPLETE"}
 
-    body = payload.model_dump(mode="json", by_alias=True, exclude={"taskId"})
+    body = payload.model_dump(mode="json", by_alias=True, exclude={"task_id"})
     body["model"] = payload.model
     chunks: list[str] = []
     function_arguments: dict[str, str] = {}
