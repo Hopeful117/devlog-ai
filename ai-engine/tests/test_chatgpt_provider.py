@@ -68,6 +68,41 @@ async def test_stream_requires_completed_event(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_stream_records_completed_usage(monkeypatch):
+    class UsageResponse(StreamResponse):
+        async def aiter_lines(self):
+            for line in (
+                'data: {"type":"response.output_text.delta","delta":"{\\"ok\\":true}"}',
+                "",
+                'data: {"type":"response.completed","response":{"usage":{"input_tokens":12,"output_tokens":7,"total_tokens":19}}}',
+                "",
+            ):
+                yield line
+
+    class UsageContext(StreamContext):
+        async def __aenter__(self):
+            return UsageResponse()
+
+    class UsageClient(FakeClient):
+        def stream(self, method, url, *, headers, json):
+            return UsageContext()
+
+    monkeypatch.setattr("app.providers.chatgpt.httpx.AsyncClient", UsageClient)
+    provider = OpenAiChatGptProvider(
+        resolver=None, endpoint="https://api.openai.com/v1/responses",
+        model="test", timeout_seconds=1, token_endpoint=None,
+        client_id=None, resource=None, max_output_tokens=2000,
+    )
+
+    assert await provider._stream("fixture-token", {"store": False}) == '{"ok":true}'
+    assert provider._last_usage == {
+        "input_tokens": 12,
+        "output_tokens": 7,
+        "total_tokens": 19,
+    }
+
+
+@pytest.mark.asyncio
 async def test_stream_reports_bounded_incomplete_reason(monkeypatch):
     class IncompleteResponse(StreamResponse):
         async def aiter_lines(self):

@@ -47,9 +47,15 @@ class OpenAiChatGptProvider:
         self._token_endpoint = token_endpoint
         self._client_id = client_id
         self._resource = resource
+        self._last_usage: dict[str, int | None] = {}
 
     async def generate_structured(self, request: Prompt,
                                   response_model: type[StructuredOutput]) -> StructuredOutput:
+        return (await self.generate_structured_with_trace(request, response_model)).output
+
+    async def generate_structured_with_trace(
+        self, request: Prompt, response_model: type[StructuredOutput]
+    ) -> ProviderGenerationResult:
         started_at = datetime.now(timezone.utc)
         try:
             task_id = UUID(request.traceability.ai_task_id)
@@ -88,7 +94,18 @@ class OpenAiChatGptProvider:
                 }},
             }
             output_text = await self._stream(credential.access_token, body)
-            return response_model.model_validate(json.loads(output_text))
+            completed_at = datetime.now(timezone.utc)
+            parsed = response_model.model_validate(json.loads(output_text))
+            return ProviderGenerationResult(
+                output=parsed,
+                raw_output=output_text,
+                started_at=started_at,
+                completed_at=completed_at,
+                input_tokens=self._last_usage.get("input_tokens"),
+                output_tokens=self._last_usage.get("output_tokens"),
+                total_tokens=self._last_usage.get("total_tokens"),
+                response_status="COMPLETED",
+            )
         except OutputAllowanceError:
             raise
         except (ValueError, KeyError, json.JSONDecodeError, httpx.HTTPError) as exception:
@@ -128,6 +145,7 @@ class OpenAiChatGptProvider:
     async def _stream(self, access_token: str, body: dict) -> str:
         chunks: list[str] = []
         completed = False
+        self._last_usage = {}
         async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
             async with client.stream(
                     "POST", self._endpoint,
@@ -169,10 +187,22 @@ class OpenAiChatGptProvider:
                             )
                         elif received_type == "response.completed":
                             completed = True
+                            response = data.get("response") if isinstance(data.get("response"), dict) else data
+                            usage = response.get("usage") if isinstance(response, dict) else None
+                            if isinstance(usage, dict):
+                                self._last_usage = {
+                                    "input_tokens": self._non_negative_int(usage.get("input_tokens")),
+                                    "output_tokens": self._non_negative_int(usage.get("output_tokens")),
+                                    "total_tokens": self._non_negative_int(usage.get("total_tokens")),
+                                }
                         event_type, data_lines = None, []
         if not completed:
             raise ChatGptProviderError("ChatGPT response did not complete")
         return "".join(chunks)
+
+    @staticmethod
+    def _non_negative_int(value: object) -> int | None:
+        return value if isinstance(value, int) and value >= 0 else None
 
     @staticmethod
     def _incomplete_response_message(event_type: str, data: dict) -> str:
