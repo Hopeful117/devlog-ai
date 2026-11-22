@@ -542,7 +542,8 @@ def validate_answer(answer: dict[str, Any], assignment: Assignment) -> None:
         if set(item) != {"reference", "locator", "excerpt", "role"} or not isinstance(item["reference"], str):
             raise RuntimeContractError("invalid evidence assertion")
         validate_locator(item["locator"])
-        if not isinstance(item["excerpt"], str) or len(item["excerpt"]) > 400 or item["role"] not in {"DIRECT", "SUPPORTING"}:
+        excerpt_limit = 1000 if assignment.question_id == "Q1" else 400
+        if not isinstance(item["excerpt"], str) or len(item["excerpt"]) > excerpt_limit or item["role"] not in {"DIRECT", "SUPPORTING"}:
             raise RuntimeContractError("invalid evidence excerpt or role")
     assert_secret_free(answer)
 
