@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import asyncio
 import ast
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -37,6 +39,21 @@ from evaluations.story_context_specificity_live import McpClient
 
 class LiveConfigurationError(ValueError):
     """Raised when the live runtime cannot be configured without guessing."""
+
+
+def _mcp_response_diagnostic(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep response shape evidence without persisting project content."""
+    encoded = json.dumps(response, sort_keys=True, separators=(",", ":"), default=str)
+    diagnostics = response.get("diagnostics")
+    return {
+        "responseDigest": hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
+        "responseKeys": sorted(str(key) for key in response),
+        "status": response.get("status"),
+        "aiTaskIdPresent": bool(response.get("aiTaskId")),
+        "snapshotIdPresent": bool(response.get("snapshotId")),
+        "resultPresent": bool(response.get("result")),
+        "diagnosticKeys": sorted(str(key) for key in diagnostics) if isinstance(diagnostics, Mapping) else [],
+    }
 
 
 logger = logging.getLogger(__name__)
@@ -118,6 +135,7 @@ def _oauth_transport_failure(
     category: str | None = None,
     transport_attempted: bool = False,
     provider_response_received: bool = False,
+    diagnostic_metadata: dict[str, Any] | None = None,
 ) -> TransportFailure:
     status = getattr(error, "status_code", None)
     metadata = {
@@ -126,6 +144,8 @@ def _oauth_transport_failure(
     }
     if isinstance(status, int):
         metadata["httpStatus"] = status
+    if diagnostic_metadata:
+        metadata.update(diagnostic_metadata)
     attribution = provider_failure_attribution(
         error,
         category=category,
@@ -273,11 +293,37 @@ class CoreLiveTreatmentAdapter:
             ) from error
         if not isinstance(execution, dict):
             raise LiveConfigurationError("MCP Story Agent response must be an object")
-        task_id = execution.get("aiTaskId")
+        response_diagnostic = _mcp_response_diagnostic(execution)
+        task_id = execution.get("aiTaskId") or execution.get("snapshotId")
         if not isinstance(task_id, str) or not task_id:
-            raise LiveConfigurationError("MCP Story Agent response did not return aiTaskId")
+            return {
+                "executionMode": "LIVE",
+                "executionStatus": "RUNTIME_FAILURE",
+                "integrationStatus": "LIVE_CORE_MCP_BOUNDARY_FAILURE",
+                "providerCalls": 0,
+                "externalProviderCalls": 0,
+                "externalNetworkCalls": 0,
+                "networkCalls": 0,
+                "errorType": "MCP_TASK_ID_MISSING",
+                "errorMessage": "MCP Story Agent response did not return aiTaskId or snapshotId",
+                "mcpResponse": response_diagnostic,
+            }
         result = execution.get("result") if isinstance(execution.get("result"), dict) else {}
         execution_status = execution.get("status", "RUNTIME_FAILURE")
+        if execution_status == "COMPLETED" and not result:
+            return {
+                "executionMode": "LIVE",
+                "executionStatus": "RUNTIME_FAILURE",
+                "integrationStatus": "LIVE_CORE_MCP_BOUNDARY_FAILURE",
+                "providerCalls": 0,
+                "externalProviderCalls": 0,
+                "externalNetworkCalls": 0,
+                "networkCalls": 0,
+                "errorType": "MCP_COMPLETED_RESULT_UNAVAILABLE",
+                "errorMessage": "MCP Story Agent completed without a readable result",
+                "taskId": task_id,
+                "mcpResponse": response_diagnostic,
+            }
         completed = execution_status == "COMPLETED"
         return {
             "executionMode": "LIVE",
@@ -299,6 +345,7 @@ class CoreLiveTreatmentAdapter:
             "submission": {"status": "MCP_ACCEPTED", "aiTaskId": task_id},
             "finalResponse": result,
             "mcpExecution": execution,
+            "mcpResponse": response_diagnostic,
         }
 
 
@@ -387,6 +434,8 @@ class ChatGptOAuthTransport:
             function_arguments: dict[str, str] = {}
             completed_payload: dict[str, Any] | None = None
             with httpx.Client(timeout=self._settings.llm_timeout_seconds) as client:
+                if os.getenv("DEVLOG_LIVE_REMOTE_PROVIDER", "false").lower() == "true":
+                    return self._complete_remote(request, body, client)
                 with client.stream(
                     "POST",
                     self._settings.chatgpt_responses_endpoint,
@@ -524,6 +573,13 @@ class ChatGptOAuthTransport:
                 phase=phase,
                 transport_attempted=transport_attempted,
                 provider_response_received=provider_response_received,
+                diagnostic_metadata={
+                    "bindingTaskId": str(self._task_id),
+                    "bindingProvider": "chatgpt",
+                    "bindingStorePathDigest": hashlib.sha256(
+                        str(getattr(self._settings, "binding_store_path", "")).encode("utf-8")
+                    ).hexdigest(),
+                },
             ) from error
         except Exception as error:
             raise _oauth_transport_failure(
@@ -532,6 +588,13 @@ class ChatGptOAuthTransport:
                 category="AUTHENTICATION_ERROR" if phase.startswith("CREDENTIAL") else None,
                 transport_attempted=transport_attempted,
                 provider_response_received=provider_response_received,
+                diagnostic_metadata={
+                    "bindingTaskId": str(self._task_id),
+                    "bindingProvider": "chatgpt",
+                    "bindingStorePathDigest": hashlib.sha256(
+                        str(getattr(self._settings, "binding_store_path", "")).encode("utf-8")
+                    ).hexdigest(),
+                },
             ) from error
         finally:
             if outcome != "FAILED":
@@ -548,6 +611,78 @@ class ChatGptOAuthTransport:
                         "durationMs": round((time.perf_counter() - started) * 1000),
                     },
                 )
+
+    def _complete_remote(self, request: Any, body: dict[str, Any], client: httpx.Client) -> ProviderResponse:
+        endpoint = os.getenv(
+            "DEVLOG_LIVE_PROVIDER_ENDPOINT",
+            "http://127.0.0.1:18081/api/v1/evaluations/chatgpt/responses",
+        )
+        secret = os.getenv("DEVLOG_SERVICE_AUTH_SECRET", "")
+        if not secret:
+            raise LiveConfigurationError("remote provider execution requires DEVLOG_SERVICE_AUTH_SECRET")
+        payload = {"taskId": str(self._task_id), **body}
+        raw_body = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        timestamp = str(int(time.time()))
+        nonce = str(UUID(int=int.from_bytes(os.urandom(16), "big")))
+        request_id = str(UUID(int=int.from_bytes(os.urandom(16), "big")))
+        canonical = "\n".join(("POST", "/api/v1/evaluations/chatgpt/responses", timestamp, nonce, request_id)).encode()
+        signature = hmac.new(secret.encode(), canonical + b"\n" + raw_body, hashlib.sha256).hexdigest()
+        response = client.post(
+            endpoint,
+            content=raw_body,
+            headers={
+                "Content-Type": "application/json",
+                "X-DevLog-Service-Signature": f"sha256={signature}",
+                "X-DevLog-Service-Timestamp": timestamp,
+                "X-DevLog-Service-Nonce": nonce,
+                "X-DevLog-Service-Request-Id": request_id,
+            },
+        )
+        if response.status_code >= 400:
+            error = _ProviderHttpError(response.status_code)
+            raise _oauth_transport_failure(
+                error,
+                phase="CREDENTIAL_RESOLUTION" if response.status_code == 401 else "PROVIDER_REQUEST",
+                transport_attempted=True,
+                provider_response_received=True,
+                diagnostic_metadata={
+                    "bindingTaskId": str(self._task_id),
+                    "bindingProvider": "chatgpt",
+                    "remoteProviderEndpoint": endpoint,
+                },
+            )
+        result = response.json()
+        if result.get("status") != "COMPLETED":
+            raise _oauth_transport_failure(
+                RuntimeError(str(result.get("code", "REMOTE_PROVIDER_FAILED"))),
+                phase="PROVIDER_RESPONSE",
+                transport_attempted=True,
+                provider_response_received=True,
+                diagnostic_metadata={
+                    "bindingTaskId": str(self._task_id),
+                    "bindingProvider": "chatgpt",
+                    "remoteProviderEndpoint": endpoint,
+                },
+            )
+        if result.get("kind") == "TOOL_CALL":
+            function_call = result.get("functionCall", {})
+            return ProviderResponse(
+                "TOOL_CALL",
+                {
+                    "operation": function_call.get("operation"),
+                    "arguments": json.loads(function_call.get("arguments", "{}")),
+                },
+                result,
+            )
+        output_text = result.get("outputText", "")
+        if not isinstance(output_text, str) or not output_text:
+            raise _oauth_transport_failure(
+                RuntimeError("remote provider returned no final answer"),
+                phase="RESPONSE_CONTRACT",
+                transport_attempted=True,
+                provider_response_received=True,
+            )
+        return ProviderResponse("FINAL", json.loads(output_text), result)
 
 
 class DirectLiveTreatmentAdapter:

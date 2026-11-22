@@ -100,6 +100,15 @@ def test_chatgpt_oauth_transport_exposes_bounded_http_diagnostic(monkeypatch: py
     class Response:
         status_code = 401
 
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b""
+
     class Client:
         def __enter__(self):
             return self
@@ -107,7 +116,7 @@ def test_chatgpt_oauth_transport_exposes_bounded_http_diagnostic(monkeypatch: py
         def __exit__(self, *_args):
             return None
 
-        def post(self, *_args, **_kwargs):
+        def stream(self, *_args, **_kwargs):
             return Response()
 
     transport = object.__new__(ChatGptOAuthTransport)
@@ -138,6 +147,41 @@ def test_chatgpt_oauth_transport_exposes_bounded_http_diagnostic(monkeypatch: py
     assert diagnostic["transportAttempted"] is True
     assert diagnostic["providerResponseReceived"] is True
     assert "access-token" not in json.dumps(diagnostic)
+    assert diagnostic["bindingTaskId"] == "task-id"
+    assert diagnostic["bindingProvider"] == "chatgpt"
+    assert len(diagnostic["bindingStorePathDigest"]) == 64
+
+
+def test_core_live_adapter_preserves_mcp_shape_when_task_identity_is_missing() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "A_DEVLOG_CURRENT",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223, story_path=None, files=("docs/story.md",)),
+        manifest(),
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {"status": "COMPLETED", "diagnostics": {"code": "TASK_ID_MISSING"}}),
+    )
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, manifest())
+
+    assert result["executionStatus"] == "RUNTIME_FAILURE"
+    assert result["errorType"] == "MCP_TASK_ID_MISSING"
+    assert result["mcpResponse"]["status"] == "COMPLETED"
+    assert result["mcpResponse"]["diagnosticKeys"] == ["code"]
+    assert len(result["mcpResponse"]["responseDigest"]) == 64
+
+
+def test_core_live_adapter_rejects_completed_response_without_result() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "C_DEVLOG_ENGINEERING_ANALYST",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223, story_path=None, files=("docs/story.md",)),
+        manifest(),
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {"status": "COMPLETED", "aiTaskId": "task-id"}),
+    )
+
+    result = adapter.execute({"observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1"}, manifest())
+
+    assert result["executionStatus"] == "RUNTIME_FAILURE"
+    assert result["errorType"] == "MCP_COMPLETED_RESULT_UNAVAILABLE"
+    assert result["taskId"] == "task-id"
 
 
 def approved_pricing() -> dict:
