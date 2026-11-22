@@ -274,7 +274,8 @@ class StoryContextAnalysisPromptBuilder:
         )
 
     def build_investigation(
-        self, request: PromptRequest, capability_results: list[dict[str, Any]] | None = None
+        self, request: PromptRequest, capability_results: list[dict[str, Any]] | None = None,
+        *, final_required: bool = False,
     ) -> Prompt:
         """Render the opt-in v2 decision protocol without changing the v1 prompt."""
         if request.intent.prompt_template != "story-context-analysis-prompt-v1":
@@ -343,7 +344,9 @@ class StoryContextAnalysisPromptBuilder:
               "do not claim an evidence-grounded objective understanding: leave its summary empty and its grounding null, "
               "leave grounded finding arrays empty, and express remaining work only as ungrounded recommendations or "
               "missing information.\n"
-              "Final findings must cite only evidence references authorized in the Core grounding contract. "
+               + ("The action budget is exhausted. Return FINAL now; do not return PLAN or ACTION.\n"
+                  if final_required else "")
+              + "Final findings must cite only evidence references authorized in the Core grounding contract. "
              "In FINAL, outputClassification must include exactly one matching entry for objectiveUnderstanding whenever "
              "the result contains objectiveUnderstanding.grounding, including when all finding arrays are empty.\n\n"
             "EXPECTED OUTPUT SCHEMA\n"

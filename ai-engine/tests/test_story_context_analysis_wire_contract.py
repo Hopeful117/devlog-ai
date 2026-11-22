@@ -479,13 +479,16 @@ async def test_investigation_budget_stop_is_bounded(monkeypatch):
         }}
     })
     action = {"phase": "ACTION", "action": _investigation_plan(request.ai_task_id)["plan"]["actions"][0]}
-    traces = _ServiceTraces([_investigation_plan(request.ai_task_id), action])
+    traces = _ServiceTraces([_investigation_plan(request.ai_task_id), action, _final_decision()])
     callback = _InvestigationCallback({"actionId": "action-1", "outcome": "RESULTS", "evidence": []})
     service = _service(monkeypatch, traces, callback)
 
     await service.process(request, UUID("00000000-0000-0000-0000-000000000007"))
 
-    assert callback.results[0].error.code == "BUDGET_EXHAUSTED"
+    assert traces.calls == 3
+    assert len(traces.retry_reasons) == 1
+    assert "FINAL now" in traces.prompts[2]
+    assert callback.results[0].status.value == "COMPLETED"
 
 
 @pytest.mark.asyncio
