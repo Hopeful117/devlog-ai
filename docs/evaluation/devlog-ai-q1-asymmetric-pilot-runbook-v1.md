@@ -219,6 +219,7 @@ or repository synchronization workflow before retrying.
 PYTHONPATH=ai-engine uv run --project ai-engine python -m evaluations.devlog_ai_abc_runner.runner \
   --mode LIVE_PREPARE \
   --activate-live \
+  --env-file .env \
   --manifest docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json \
   --repository-root /path/to/clean/frozen/devlog-ai \
   --output-root /tmp/q1-live-prepare
@@ -232,11 +233,24 @@ checkout commit used for execution. `repositoryRevision` remains the frozen
 source snapshot used by the oracle; it is not a substitute for the executable
 runtime revision.
 
+The standalone runner does not load `.env` implicitly. Load the local environment
+explicitly through `--env-file`; explicit process variables still take precedence.
+The loader reports only variable names and never prints values. Before any live
+network access, the runner checks the four OAuth deployment values and fails
+closed if one is missing:
+
+- `CHATGPT_REDIRECT_URI` must match the registered OAuth callback.
+- `CHATGPT_EXT_AGENT_HOST_ID` must be provisioned by the OAuth integration.
+- `DEVLOG_CREDENTIAL_ENCRYPTION_KEY` must remain stable for the credential store.
+- `DEVLOG_SERVICE_AUTH_SECRET` must match the Core service secret and remain
+  distinct from `SCA_CALLBACK_SECRET`.
+
 Run the three bounded observations only with the separately approved files:
 
 ```bash
 PYTHONPATH=ai-engine uv run --project ai-engine python -m evaluations.devlog_ai_abc_runner.runner \
   --mode LIVE \
+  --env-file .env \
   --manifest docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json \
   --oracle docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json \
   --authorization /secure/path/q1-authorization.json \

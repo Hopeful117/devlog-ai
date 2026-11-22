@@ -215,9 +215,9 @@ class StoryContextAnalysisPromptBuilder:
                 if follow_up else "Produce a ProviderStoryContextAnalysisResult with all required fields.\n")
              + ("Follow-up evidenceReferences and nextStep evidenceReferences must use only authorized references.\n"
                 if follow_up else "confidence must be exactly one scalar value: HIGH, MEDIUM, or LOW; do not emit a confidence object.\n"
-              "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
-             "objectiveUnderstanding.grounding is required when its summary is non-empty. Ground factual or interpretative summaries with authorized evidenceReferences; use RECOMMENDATION only for explicitly advisory content.\n"
-            "Classify each finding as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION in outputClassification.\n"
+             "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
+              "objectiveUnderstanding.grounding is required when its summary is non-empty. Ground factual or interpretative summaries with authorized evidenceReferences; use RECOMMENDATION only for explicitly advisory content.\n"
+             "Classify every non-empty finding, including objectiveUnderstanding, as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION in outputClassification; objectiveUnderstanding must never be omitted.\n"
             "ArchitectureFinding, DecisionFinding, HistoricalContextItem, and ImpactedComponentFinding MUST include relationType (EXPLICIT, TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE, or INFERRED_HYPOTHESIS).\n"
             "For V2 causal analysis, build one causalAssessment for the exact Core-owned causalQuestion. Select only bounded LINE_RANGE or SECTION locators over authorized repository evidence; do not fabricate resolved content or digests.\n"
             "For legacy causal analysis, causal claims are separate from relationType. Build the evidence ledger first: candidate source/target, authorized references, one role per cited reference, permitted level, classification, bounded explanation.\n"
@@ -274,7 +274,8 @@ class StoryContextAnalysisPromptBuilder:
         )
 
     def build_investigation(
-        self, request: PromptRequest, capability_results: list[dict[str, Any]] | None = None
+        self, request: PromptRequest, capability_results: list[dict[str, Any]] | None = None,
+        *, final_required: bool = False,
     ) -> Prompt:
         """Render the opt-in v2 decision protocol without changing the v1 prompt."""
         if request.intent.prompt_template != "story-context-analysis-prompt-v1":
@@ -328,12 +329,26 @@ class StoryContextAnalysisPromptBuilder:
             "Never request a capability outside the typed action schema. Core is the authority for every action.\n"
             f"QUESTION\n{projection.request.get('question', projection.request.get('intent', ''))}\n\n"
              f"INVESTIGATION STATE\n{self._canonical(investigation)}\n\n"
-            f"AUTHORIZED PROJECTION\n{knowledge_json}\n\n"
+             f"AUTHORIZED PROJECTION\n{knowledge_json}\n\n"
+             "AUTHORIZED PATHS\n"
+             f"Use only these exact authorized paths for actions: {self._canonical(investigation.get('scope', {}).get('allowedPathPrefixes', []))}. "
+             "Do not invent filenames or substitute plausible paths. Every ACTION must use a new unique actionId; never reuse an earlier actionId.\n\n"
              f"PRIOR CAPABILITY RESULTS\n{results_json}\n\n"
-            "DECISION RULES\n"
-            "Use PLAN only when no capability result exists. After a result, use ACTION for one additional bounded action "
-            "or FINAL when the supplied evidence is sufficient. If Core rejects an action, do not invent a result; stop. "
-            "Final findings must cite only evidence references authorized in the Core grounding contract.\n\n"
+              "DECISION RULES\n"
+              "Use PLAN only on the first turn when no capability result exists. After any capability result, never return PLAN; use ACTION for one additional bounded action "
+              "or FINAL when the supplied evidence is sufficient. If Core rejects an action, do not invent a result; stop. "
+              "READ_EVIDENCE_RANGE requires an exact authorized relative file path plus integer startLine and endLine; "
+              "the range must be bounded, startLine >= 1, endLine >= startLine, and contain at most 500 lines. "
+              "Never use READ_EVIDENCE_RANGE to request a whole document or omit its locator fields; use SEARCH_EVIDENCE "
+              "first when the exact file or line range is unknown. If all capability results contain no evidence, "
+              "do not claim an evidence-grounded objective understanding: leave its summary empty and its grounding null, "
+              "leave grounded finding arrays empty, and express remaining work only as ungrounded recommendations or "
+              "missing information.\n"
+               + ("The action budget is exhausted. Return FINAL now; do not return PLAN or ACTION.\n"
+                  if final_required else "")
+              + "Final findings must cite only evidence references authorized in the Core grounding contract. "
+             "In FINAL, outputClassification must include exactly one matching entry for objectiveUnderstanding whenever "
+             "the result contains objectiveUnderstanding.grounding, including when all finding arrays are empty.\n\n"
             "EXPECTED OUTPUT SCHEMA\n"
             f"{self._canonical(decision_schema)}"
         )
@@ -433,6 +448,35 @@ class StoryContextAnalysisPromptBuilder:
         content = f"{SYSTEM_MESSAGE}\n\n{corrective_user_message}"
         content_digest = hashlib.sha256(content.encode()).hexdigest()
 
+        return Prompt(
+            prompt_id=str(uuid.uuid5(uuid.NAMESPACE_URL, content_digest)),
+            prompt_version=original_prompt.prompt_version,
+            intent_id=original_prompt.intent_id,
+            intent_version=original_prompt.intent_version,
+            system_message=SYSTEM_MESSAGE,
+            user_message=corrective_user_message,
+            expected_output_schema=original_prompt.expected_output_schema,
+            traceability=original_prompt.traceability,
+            generation_policy=original_prompt.generation_policy,
+            content_digest=content_digest,
+            generation_parameters=original_prompt.generation_parameters,
+            model_identifier=original_prompt.model_identifier,
+        )
+
+    def investigation_corrective_retry(self, original_prompt: Prompt, error: Exception) -> Prompt:
+        error_message = str(error)
+        corrective_user_message = (
+            original_prompt.user_message
+            + "\n\nCORRECTIVE RETRY\n"
+            "The previous FINAL result failed Core's deterministic output validation.\n"
+            f"Validation error: {error_message}\n"
+            "Return the same decision envelope protocol. Preserve valid evidence and findings, "
+            "but make every outputClassification.findingReference match an item that is actually "
+            "present in the corresponding output array. Remove stale classification entries instead "
+            "of inventing identifiers. Do not add evidence or references outside the authorized contract."
+        )
+        content = f"{SYSTEM_MESSAGE}\n\n{corrective_user_message}"
+        content_digest = hashlib.sha256(content.encode()).hexdigest()
         return Prompt(
             prompt_id=str(uuid.uuid5(uuid.NAMESPACE_URL, content_digest)),
             prompt_version=original_prompt.prompt_version,

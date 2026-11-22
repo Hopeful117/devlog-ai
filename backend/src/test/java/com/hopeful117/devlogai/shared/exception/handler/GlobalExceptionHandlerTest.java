@@ -28,6 +28,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
@@ -248,6 +249,18 @@ class GlobalExceptionHandlerTest {
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertEquals(ApiErrorCode.ROUTE_NOT_FOUND, response.getBody().code());
+    }
+
+    @Test
+    void shouldPreserveResponseStatusExceptionStatus() {
+        ResponseStatusException ex = new ResponseStatusException(HttpStatus.NOT_FOUND);
+
+        ResponseEntity<ApiErrorResponse> response = handler.handleResponseStatus(
+                ex, mockRequest("/api/v1/story-context-agent/projects/devlog-ai/task-bindings"));
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals(ApiErrorCode.ROUTE_NOT_FOUND, response.getBody().code());
+        assertEquals("No API route matches this request.", response.getBody().message());
     }
 
     @Test

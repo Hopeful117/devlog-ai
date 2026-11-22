@@ -187,19 +187,28 @@ class PinnedGitRepositoryTools(RepositoryToolServer):
         _validate_revision(arguments)
         if operation == "read_file":
             path = _validate_path(arguments.get("path"))
-            content = _git_command(self.repository, "show", f"{self.revision}:{path}", timeout=self.timeout_seconds)
+            try:
+                content = _git_command(self.repository, "show", f"{self.revision}:{path}", timeout=self.timeout_seconds)
+            except RuntimeContractError:
+                return {
+                    "operation": operation,
+                    "reference": path,
+                    "path": path,
+                    "content": "",
+                    "error": "file not found in pinned repository revision",
+                }
             lines = content.splitlines()
             start = int(arguments.get("startLine", 1))
             end = int(arguments.get("endLine", len(lines)))
             if start < 1 or end < start:
                 raise RuntimeContractError("invalid repository line range")
-            return {"operation": operation, "reference": path, "path": path, "startLine": start, "endLine": end, "content": "\n".join(lines[start - 1:end])}
+            return {"operation": operation, "reference": path, "path": path, "startLine": start, "endLine": end, "content": "\n".join(lines[start - 1:end])[:64000]}
         if operation == "search_repository":
             query = arguments.get("query")
             if not isinstance(query, str) or not query:
                 raise RuntimeContractError("repository search query is required")
             try:
-                result = _git_command(self.repository, "grep", "-n", "-I", "-F", "-z", query, self.revision, "--", *[_validate_path(path) for path in arguments.get("paths", [])], timeout=self.timeout_seconds)
+                result = _git_command(self.repository, "grep", "-n", "-I", "-F", "-z", query, self.revision, "--", *[_validate_path(path) for path in (arguments.get("paths") or [])], timeout=self.timeout_seconds)
             except RuntimeContractError:
                 return {"operation": operation, "query": query, "matches": []}
             matches = []
@@ -222,8 +231,8 @@ class PinnedGitRepositoryTools(RepositoryToolServer):
                     line = int(line_number)
                 except ValueError as error:
                     raise RuntimeContractError("pinned repository search line is malformed") from error
-                matches.append({"path": path, "line": line, "text": text})
-                if len(matches) >= int(arguments.get("maxMatches", 20)):
+                matches.append({"path": path, "line": line, "text": text[:1000]})
+                if len(matches) >= min(int(arguments.get("maxMatches", 20)), 20):
                     break
             return {"operation": operation, "query": query, "matches": matches}
         commit = arguments.get("commit", self.revision)
@@ -234,7 +243,18 @@ class PinnedGitRepositoryTools(RepositoryToolServer):
         if operation == "git_show":
             path = arguments.get("path")
             target = [commit] if path is None else [f"{commit}:{_validate_path(path)}"]
-            return {"operation": operation, "reference": f"commit:{commit}", "commit": commit, "path": path, "content": _git_command(self.repository, "show", *target, timeout=self.timeout_seconds)}
+            try:
+                content = _git_command(self.repository, "show", *target, timeout=self.timeout_seconds)
+            except RuntimeContractError:
+                return {
+                    "operation": operation,
+                    "reference": f"commit:{commit}",
+                    "commit": commit,
+                    "path": path,
+                    "content": "",
+                    "error": "path not found in pinned commit",
+                }
+            return {"operation": operation, "reference": f"commit:{commit}", "commit": commit, "path": path, "content": content}
         if operation == "git_diff":
             parent = arguments.get("parent")
             if parent is not None and (not isinstance(parent, str) or not _HEX_REVISION.fullmatch(parent)):

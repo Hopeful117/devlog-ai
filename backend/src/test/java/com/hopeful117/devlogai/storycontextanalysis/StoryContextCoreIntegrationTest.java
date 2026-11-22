@@ -96,6 +96,8 @@ class StoryContextCoreIntegrationTest {
     private static final String REVISION = "q1-integration-revision";
     private static final String PROVIDER = "mock";
     private static final String MODEL = "deterministic-v1";
+    private static final UUID Q1_EXTERNAL_JOB_ID =
+            UUID.fromString("00000000-0000-0000-0000-000000000184");
 
     @Container
     @ServiceConnection
@@ -312,7 +314,7 @@ class StoryContextCoreIntegrationTest {
                 "--prompt-file", prompt.toString(),
                 "--core-url", "http://127.0.0.1:" + localServerPort,
                 "--secret", "q1-test-secret",
-                "--external-job-id", UUID.randomUUID().toString(),
+                "--external-job-id", Q1_EXTERNAL_JOB_ID.toString(),
                 "--artifact", pythonArtifact.toString())
                 .directory(root.toFile())
                 .redirectErrorStream(true);
@@ -362,7 +364,7 @@ class StoryContextCoreIntegrationTest {
                 "--prompt-file", prompt.toString(),
                 "--core-url", "http://127.0.0.1:" + localServerPort,
                 "--secret", "q1-test-secret",
-                "--external-job-id", UUID.randomUUID().toString(),
+                "--external-job-id", Q1_EXTERNAL_JOB_ID.toString(),
                 "--artifact", pythonArtifact.toString())
                 .directory(root.toFile())
                 .redirectErrorStream(true);
@@ -499,7 +501,7 @@ class StoryContextCoreIntegrationTest {
                                  "objectiveUnderstanding",
                                  com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult.OutputClassification.Classification.FACTUAL_EXTRACTION,
                                  true, "Directly grounded"))));
-        return new AiTaskResultRequest(task.getCorrelationId(), "q1-scripted-job", AiTaskResultStatus.COMPLETED,
+        return new AiTaskResultRequest(task.getCorrelationId(), Q1_EXTERNAL_JOB_ID.toString(), AiTaskResultStatus.COMPLETED,
                 Instant.now(), List.of(), null, metadata, null, result);
     }
 
@@ -570,7 +572,8 @@ class StoryContextCoreIntegrationTest {
         public AiTaskSubmissionResponse submit(PromptRequest request) {
             lastRequest = request;
             submitCount++;
-            return new AiTaskSubmissionResponse(request.correlationId(), true, "q1-scripted-job", Instant.now());
+            return new AiTaskSubmissionResponse(request.correlationId(), true,
+                    Q1_EXTERNAL_JOB_ID.toString(), Instant.now());
         }
 
         @Override

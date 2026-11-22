@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import socket
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -18,11 +19,18 @@ from evaluations.devlog_ai_abc_runner.live import (
     validate_live_authorization,
 )
 from evaluations.devlog_ai_abc_runner.live_execution import (
+    ChatGptOAuthTransport,
     CoreLiveTreatmentAdapter,
     LiveConfiguration,
     LiveConfigurationError,
+    _bounded_mcp_error,
+    load_environment_file,
+    live_adapters,
+    missing_live_provider_environment,
+    require_live_provider_environment,
     resolve_live_story,
 )
+from evaluations.comparative_baseline.collection_runtime import ProviderRequest, TransportFailure
 from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
 
 
@@ -39,6 +47,160 @@ def manifest() -> dict:
 def accepted_oracle() -> dict:
     oracle = load_q1_oracle(ORACLE_PATH, expected_revision=REVISION)
     return {**oracle, "status": "ACCEPTED"}
+
+
+def test_env_example_quotes_shell_value_with_spaces() -> None:
+    env_example = (ROOT / ".env.example").read_text()
+
+    assert 'CHATGPT_AGENT_NAME="DevLog AI"' in env_example
+
+
+def test_load_environment_file_preserves_explicit_values_and_parses_quotes(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        'CHATGPT_AGENT_NAME="DevLog AI"\n'
+        "EXPLICIT=value-from-file\n"
+        "export EMPTY=\n",
+        encoding="utf-8",
+    )
+    environment = {"EXPLICIT": "from-process"}
+
+    loaded = load_environment_file(env_file, environ=environment)
+
+    assert loaded == ("CHATGPT_AGENT_NAME", "EMPTY")
+    assert environment == {
+        "EXPLICIT": "from-process",
+        "CHATGPT_AGENT_NAME": "DevLog AI",
+        "EMPTY": "",
+    }
+
+
+def test_live_provider_environment_reports_names_only() -> None:
+    environment = {
+        "LLM_PROVIDER": "openai_chatgpt",
+        "CHATGPT_OAUTH_ENABLED": "true",
+        "CHATGPT_REDIRECT_URI": "http://127.0.0.1:18081/api/v1/auth/chatgpt/callback",
+    }
+
+    assert missing_live_provider_environment(environment) == (
+        "CHATGPT_EXT_AGENT_HOST_ID",
+        "DEVLOG_CREDENTIAL_ENCRYPTION_KEY",
+        "DEVLOG_SERVICE_AUTH_SECRET",
+    )
+    with pytest.raises(LiveConfigurationError, match="CHATGPT_EXT_AGENT_HOST_ID"):
+        require_live_provider_environment(environment)
+
+
+def test_chatgpt_oauth_transport_exposes_bounded_http_diagnostic(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Credential:
+        access_token = "access-token"
+        access_token_expires_at = None
+        scopes = "resource.invoke chatgpt.tokens.use.direct"
+
+    class Response:
+        status_code = 401
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self):
+            return b""
+
+    class Client:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def stream(self, *_args, **_kwargs):
+            return Response()
+
+    transport = object.__new__(ChatGptOAuthTransport)
+    transport._task_id = "task-id"
+    transport._model = "gpt-5.6-luna"
+    transport._settings = SimpleNamespace(llm_timeout_seconds=1, chatgpt_responses_endpoint="https://provider.example/responses")
+    transport._resolver = SimpleNamespace(resolve_for_task=lambda *_args: Credential())
+    transport._refresh_service = None
+    transport._required_scopes_granted = lambda scopes: True
+    monkeypatch.setattr("evaluations.devlog_ai_abc_runner.live_execution.httpx.Client", lambda **_kwargs: Client())
+
+    request = ProviderRequest(
+        assignment=SimpleNamespace(),
+        mode="AGENT_DIRECT_OPEN",
+        turn_index=1,
+        input_payload={"conversation": [{"role": "user", "content": "question"}]},
+        tool_schema=None,
+        max_output_tokens=10,
+    )
+
+    with pytest.raises(TransportFailure) as captured:
+        transport.complete(request)
+
+    diagnostic = captured.value.attribution
+    assert diagnostic["category"] == "AUTHENTICATION_ERROR"
+    assert diagnostic["httpStatus"] == 401
+    assert diagnostic["requestPhase"] == "PROVIDER_RESPONSE"
+    assert diagnostic["transportAttempted"] is True
+    assert diagnostic["providerResponseReceived"] is True
+    assert "access-token" not in json.dumps(diagnostic)
+    assert diagnostic["bindingTaskId"] == "task-id"
+    assert diagnostic["bindingProvider"] == "chatgpt"
+    assert len(diagnostic["bindingStorePathDigest"]) == 64
+
+
+def test_core_live_adapter_preserves_mcp_shape_when_task_identity_is_missing() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "A_DEVLOG_CURRENT",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223, story_path=None, files=("docs/story.md",)),
+        manifest(),
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {"status": "COMPLETED", "diagnostics": {"code": "TASK_ID_MISSING"}}),
+    )
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, manifest())
+
+    assert result["executionStatus"] == "RUNTIME_FAILURE"
+    assert result["errorType"] == "MCP_TASK_ID_MISSING"
+    assert result["mcpResponse"]["status"] == "COMPLETED"
+    assert result["mcpResponse"]["diagnosticKeys"] == ["code"]
+    assert len(result["mcpResponse"]["responseDigest"]) == 64
+
+
+def test_core_live_adapter_classifies_plain_mcp_text_and_bounds_credentials() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "A_DEVLOG_CURRENT",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223, story_path=None, files=("docs/story.md",)),
+        manifest(),
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {
+            "mcpText": "MCP error: Bearer abc123 token=secret-value " + "x" * 600,
+        }),
+    )
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, manifest())
+
+    assert result["errorType"] == "MCP_TEXT_RESPONSE"
+    assert result["mcpResponse"]["text"].startswith("MCP error: Bearer [REDACTED] token=[REDACTED]")
+    assert "abc123" not in result["mcpResponse"]["text"]
+    assert "secret-value" not in result["mcpResponse"]["text"]
+    assert len(result["mcpResponse"]["text"]) <= 500
+
+
+def test_core_live_adapter_rejects_completed_response_without_result() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "C_DEVLOG_ENGINEERING_ANALYST",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223, story_path=None, files=("docs/story.md",)),
+        manifest(),
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {"status": "COMPLETED", "aiTaskId": "task-id"}),
+    )
+
+    result = adapter.execute({"observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1"}, manifest())
+
+    assert result["executionStatus"] == "RUNTIME_FAILURE"
+    assert result["errorType"] == "MCP_COMPLETED_RESULT_UNAVAILABLE"
+    assert result["taskId"] == "task-id"
 
 
 def approved_pricing() -> dict:
@@ -259,8 +421,55 @@ def test_core_live_adapter_uses_authenticated_mcp_without_core_bearer() -> None:
     assert result["executionStatus"] == "COMPLETED"
     assert result["submission"]["status"] == "MCP_ACCEPTED"
     assert mcp.calls[0][0] == "devlog_story_agent"
+    assert "storyId" not in mcp.calls[0][1]
     assert "Authorization" not in mcp.calls[0][1]
     assert "DEVLOG_CORE_BEARER_TOKEN" not in repr(mcp.calls[0][1])
+
+
+def test_live_adapters_require_chatgpt_oauth_before_provider_execution() -> None:
+    configuration = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_LIVE_B_TASK_ID": "00000000-0000-0000-0000-000000000001",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    })
+
+    with pytest.raises(LiveConfigurationError, match="CHATGPT_OAUTH_ENABLED=true"):
+        live_adapters(
+            repository_root=ROOT,
+            manifest={"model": "gpt-5.6-luna"},
+            config=configuration,
+            mcp=object(),
+            environment={"LLM_PROVIDER": "openai_chatgpt"},
+        )
+
+    adapters = live_adapters(
+        repository_root=ROOT,
+        manifest={"model": "gpt-5.6-luna"},
+        config=configuration,
+        mcp=object(),
+        environment={
+            "LLM_PROVIDER": "openai_chatgpt",
+            "CHATGPT_OAUTH_ENABLED": "true",
+            "LLM_MODEL": "gpt-5.6-luna",
+        },
+    )
+    assert set(adapters) == {"A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST"}
+
+
+def test_mcp_error_diagnostic_is_bounded_and_redacts_credentials() -> None:
+    error = RuntimeError(json.dumps({
+        "code": -32001,
+        "message": "Bearer abc123 token=secret-value request failed",
+    }))
+
+    diagnostic = _bounded_mcp_error(error)
+
+    assert diagnostic.startswith("-32001: ")
+    assert "abc123" not in diagnostic
+    assert "secret-value" not in diagnostic
+    assert "[REDACTED]" in diagnostic
 
 
 def test_story_number_is_resolved_before_uuid_scoped_live_calls() -> None:

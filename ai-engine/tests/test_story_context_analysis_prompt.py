@@ -28,6 +28,39 @@ def test_story_context_prompt_uses_only_java_authored_grounding_contract() -> No
     ) in empty_contract_prompt.user_message
 
 
+def test_investigation_prompt_bounds_range_reads_and_empty_evidence_final() -> None:
+    base_request = load_scenario(SCENARIO_ID).prompt_request
+    request = base_request.model_copy(update={
+        "metadata": {
+            **base_request.metadata,
+            "investigation": {
+                "initialized": True,
+                "protocolVersion": "story-context-agent-protocol/v2",
+                "executionId": str(base_request.ai_task_id),
+                "parentTaskId": str(base_request.ai_task_id),
+                "scope": {"projectSlug": "devlog-ai", "revision": "revision-1", "allowedPathPrefixes": ["docs"]},
+                "budget": {
+                    "maximumSteps": 2, "maximumRetrievalCalls": 2, "maximumEvidenceItems": 10,
+                    "maximumBytes": 10000, "maximumTokens": 2000, "maximumElapsedMillis": 60000,
+                    "maximumProviderOutputTokens": 4000,
+                },
+                "usage": {
+                    "steps": 0, "retrievalCalls": 0, "evidenceItems": 0,
+                    "bytes": 0, "tokens": 0, "elapsedMillis": 0, "providerOutputTokens": 0,
+                },
+            },
+        },
+    })
+
+    prompt = StoryContextAnalysisPromptBuilder().build_investigation(request)
+
+    assert "at most 500 lines" in prompt.user_message
+    assert "After any capability result, never return PLAN" in prompt.user_message
+    assert "Never use READ_EVIDENCE_RANGE to request a whole document" in prompt.user_message
+    assert "If all capability results contain no evidence" in prompt.user_message
+    assert "leave its summary empty and its grounding null" in prompt.user_message
+
+
 def test_requested_file_scope_lists_only_file_grounding_references() -> None:
     builder = StoryContextAnalysisPromptBuilder()
 

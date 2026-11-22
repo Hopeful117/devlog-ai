@@ -590,6 +590,16 @@ def _file_sha256(path: Path) -> str:
 
 
 def _question(question_id: str) -> dict[str, Any]:
+    if question_id == "Q1":
+        oracle = json.loads((ROOT / "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json").read_text(encoding="utf-8"))
+        q1 = next(item for item in oracle["oracles"] if item["caseId"] == "Q1")
+        authorized = {reference.split("#", 1)[0] for reference in q1["requiredEvidenceReferences"]}
+        return {
+            "questionId": "Q1",
+            "questionVersion": "1.0.0",
+            "question": q1["question"],
+            "authorizedEvidence": sorted(authorized),
+        }
     try:
         return next(item for item in load_manifest()["questions"] if item["questionId"] == question_id)
     except StopIteration as error:
@@ -721,6 +731,34 @@ def evaluate_grounding(answer: dict[str, Any], evidence: list[EvidenceItem | dic
     authorized = _authorized_references(question_id) if question_id else None
     resolutions: list[dict[str, Any]] = []
     valid = True
+    if question_id == "Q1":
+        for citation in answer.get("evidence", []):
+            reference = citation.get("reference")
+            source = by_reference.get(reference)
+            excerpt = citation.get("excerpt")
+            item_valid = (
+                source is not None
+                and source.authorized
+                and reference in authorized
+                and source.resolved
+                and isinstance(excerpt, str)
+                and bool(excerpt)
+                and source.digest_valid
+            )
+            valid = valid and item_valid
+            resolutions.append({
+                "reference": reference,
+                "authorization": "AUTHORIZED" if source is not None and reference in authorized else "NOT_AUTHORIZED",
+                "resolution": "RESOLVED" if source is not None and source.resolved else "UNRESOLVED",
+                "locator": "Q1_BOUNDED_CONTENT",
+                "exactExcerpt": bool(isinstance(excerpt, str) and source is not None and excerpt in source.content),
+                "contentDigestValid": bool(source is not None and source.digest_valid),
+                "status": "PASS" if item_valid else "FAIL",
+            })
+        if answer.get("relationshipResult") == "ESTABLISHED" and not answer.get("evidence"):
+            valid = False
+            resolutions.append({"status": "FAIL", "resolution": "REQUIRED_EVIDENCE_MISSING"})
+        return {"status": "PASS" if valid else "FAIL", "resolutions": resolutions, "contract": "devlog-ai-abc-q1-bounded-grounding-v1"}
     for citation in answer.get("evidence", []):
         reference = citation.get("reference")
         source = by_reference.get(reference)
@@ -758,6 +796,23 @@ def _normalized_terms(value: Any) -> str:
 
 
 def evaluate_semantics(answer: dict[str, Any], question_id: str) -> dict[str, Any]:
+    if question_id == "Q1":
+        text = _normalized_terms(answer)
+        required_groups = (
+            ("core", "javacore"),
+            ("authorization", "authorizes"),
+            ("aitask", "analysis"),
+            ("python", "aiengine"),
+            ("callback", "persist"),
+            ("nontrusted", "nottrusted"),
+        )
+        correct = all(any(term in text for term in group) for group in required_groups)
+        return {
+            "semanticCorrect": correct,
+            "semanticEvaluated": True,
+            "contract": "devlog-ai-abc-q1-oracle-proposals-v1",
+            "authority": {"oracle": "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json"},
+        }
     benchmark = next(item for item in _load_benchmark()["cases"] if item["caseId"] == question_id.replace("-COMPARATIVE", "") or item["caseId"] == question_id)
     oracle = _load_oracle()
     if question_id == "CASE-04":

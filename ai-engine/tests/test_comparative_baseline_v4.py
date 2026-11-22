@@ -311,6 +311,22 @@ def test_provider_failure_is_safely_attributed_and_persisted():
     assert observation["rawSchemaVersion"] == "comparative-v4-raw-observation-4.0.0"
 
 
+def test_unexpected_provider_runtime_failure_keeps_bounded_diagnostic():
+    class BrokenProvider:
+        def complete(self, _request):
+            raise RuntimeError("Bearer sk-12345678901234567890 provider setup failed")
+
+    observation = V4CollectionRuntime(
+        BrokenProvider(), ceilings=_ceilings(), tool_factory=lambda _: _tools(), test_only=True
+    ).run_assignment(_assignment())
+
+    assert observation["executionStatus"] == "RUNTIME_FAILURE"
+    assert observation["providerFailure"]["requestPhase"] == "RUNTIME"
+    assert observation["providerFailure"]["transportAttempted"] is True
+    assert observation["providerFailure"]["providerResponseReceived"] is False
+    assert "sk-12345678901234567890" not in observation["providerFailure"]["safeMessage"]
+
+
 @pytest.mark.parametrize(
     ("error", "category"),
     [

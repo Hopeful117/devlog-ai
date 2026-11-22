@@ -276,9 +276,14 @@ public class AnalyzeStoryContextUseCase {
                 throw new com.hopeful117.devlogai.shared.exception.ConflictException(
                         "Idempotency-Key is already bound to a legacy unscoped request");
             }
-            return Optional.empty();
+            // The submission digest is also unique. A retried equivalent request
+            // with a new runtime idempotency key must reuse that task instead of
+            // reaching the database unique constraint.
+            Optional<AiTask> equivalent = aiTaskRepository.findBySubmissionDigest(identity.submissionDigest());
+            return equivalent == null ? Optional.empty() : equivalent.map(AiTask::getId);
         }
-        return aiTaskRepository.findBySubmissionDigest(identity.submissionDigest()).map(AiTask::getId);
+        Optional<AiTask> equivalent = aiTaskRepository.findBySubmissionDigest(identity.submissionDigest());
+        return equivalent == null ? Optional.empty() : equivalent.map(AiTask::getId);
     }
 
     private record SubmissionIdentity(

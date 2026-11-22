@@ -214,7 +214,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
     }
 
     private boolean isTerminal(AiTaskStatus status) {
-        return status == AiTaskStatus.COMPLETED || status == AiTaskStatus.FAILED;
+        return status.isTerminal();
     }
 
     private void applyPromptExecution(AiTask task, PromptExecutionMetadata metadata) {

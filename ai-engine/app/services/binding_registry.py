@@ -1,10 +1,14 @@
 from datetime import datetime, timezone
+import logging
 import sqlite3
 from pathlib import Path
 from uuid import UUID
 
 from app.schemas.binding import BindingRegistrationRequest
 from app.services.provider_identity import engine_provider
+
+
+logger = logging.getLogger(__name__)
 
 
 class BindingRegistry:
@@ -56,6 +60,16 @@ class BindingRegistry:
                 "VALUES (?, ?, ?, ?, ?)",
                 (str(binding.binding_id), *values),
             )
+        logger.info(
+            "AI credential binding registered",
+            extra={
+                "event": "AI_CREDENTIAL_BINDING_REGISTERED",
+                "bindingId": str(binding.binding_id),
+                "taskId": str(binding.task_id),
+                "provider": engine_provider(binding.provider),
+                "expiresAt": binding.expires_at.isoformat(),
+            },
+        )
 
     def resolve(self, binding_id: UUID, task_id: UUID, provider: str) -> str:
         with self._connect() as connection:
@@ -77,19 +91,48 @@ class BindingRegistry:
     def resolve_for_task(self, task_id: UUID, provider: str) -> str:
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT credential_handle, expires_at FROM ai_credential_bindings "
+                "SELECT binding_id, credential_handle, expires_at FROM ai_credential_bindings "
                 "WHERE task_id = ? AND provider = ? ORDER BY expires_at DESC LIMIT 1",
                 (str(task_id), provider),
             ).fetchone()
             revoked = row is not None and connection.execute(
                 "SELECT 1 FROM revoked_credential_handles WHERE credential_handle = ?",
-                (row[0],),
+                (row[1],),
             ).fetchone() is not None
         if row is None or revoked:
+            logger.warning(
+                "AI credential binding resolution failed",
+                extra={
+                    "event": "AI_CREDENTIAL_BINDING_RESOLUTION_FAILED",
+                    "taskId": str(task_id),
+                    "provider": provider,
+                    "reason": "MISSING_OR_REVOKED",
+                },
+            )
             raise ValueError("binding is not available for this task and provider")
-        if datetime.fromisoformat(row[1]) <= datetime.now(timezone.utc):
+        if datetime.fromisoformat(row[2]) <= datetime.now(timezone.utc):
+            logger.warning(
+                "AI credential binding resolution failed",
+                extra={
+                    "event": "AI_CREDENTIAL_BINDING_RESOLUTION_FAILED",
+                    "bindingId": row[0],
+                    "taskId": str(task_id),
+                    "provider": provider,
+                    "reason": "EXPIRED",
+                },
+            )
             raise ValueError("binding is expired")
-        return row[0]
+        logger.info(
+            "AI credential binding resolved",
+            extra={
+                "event": "AI_CREDENTIAL_BINDING_RESOLVED",
+                "bindingId": row[0],
+                "taskId": str(task_id),
+                "provider": provider,
+                "expiresAt": row[2],
+            },
+        )
+        return row[1]
 
     def revoke_credential(self, credential_handle: str) -> None:
         with self._connect() as connection:

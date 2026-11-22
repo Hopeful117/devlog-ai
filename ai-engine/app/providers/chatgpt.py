@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -47,9 +48,15 @@ class OpenAiChatGptProvider:
         self._token_endpoint = token_endpoint
         self._client_id = client_id
         self._resource = resource
+        self._last_usage: dict[str, int | None] = {}
 
     async def generate_structured(self, request: Prompt,
                                   response_model: type[StructuredOutput]) -> StructuredOutput:
+        return (await self.generate_structured_with_trace(request, response_model)).output
+
+    async def generate_structured_with_trace(
+        self, request: Prompt, response_model: type[StructuredOutput]
+    ) -> ProviderGenerationResult:
         started_at = datetime.now(timezone.utc)
         try:
             task_id = UUID(request.traceability.ai_task_id)
@@ -73,6 +80,7 @@ class OpenAiChatGptProvider:
                     else "REQUEST_OR_ENGINE_CONFIG",
                 },
             )
+            schema, wrapped_root = self._provider_schema(response_model)
             body = {
                 "model": request.model_identifier or self._model,
                 "store": False,
@@ -84,11 +92,25 @@ class OpenAiChatGptProvider:
                 ],
                 "text": {"format": {
                     "type": "json_schema", "name": "devlog_output", "strict": True,
-                    "schema": to_strict_json_schema(response_model),
+                    "schema": schema,
                 }},
             }
             output_text = await self._stream(credential.access_token, body)
-            return response_model.model_validate(json.loads(output_text))
+            completed_at = datetime.now(timezone.utc)
+            payload = json.loads(output_text)
+            if wrapped_root:
+                payload = payload["root"]
+            parsed = response_model.model_validate(payload)
+            return ProviderGenerationResult(
+                output=parsed,
+                raw_output=output_text,
+                started_at=started_at,
+                completed_at=completed_at,
+                input_tokens=self._last_usage.get("input_tokens"),
+                output_tokens=self._last_usage.get("output_tokens"),
+                total_tokens=self._last_usage.get("total_tokens"),
+                response_status="COMPLETED",
+            )
         except OutputAllowanceError:
             raise
         except (ValueError, KeyError, json.JSONDecodeError, httpx.HTTPError) as exception:
@@ -128,6 +150,7 @@ class OpenAiChatGptProvider:
     async def _stream(self, access_token: str, body: dict) -> str:
         chunks: list[str] = []
         completed = False
+        self._last_usage = {}
         async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
             async with client.stream(
                     "POST", self._endpoint,
@@ -169,10 +192,51 @@ class OpenAiChatGptProvider:
                             )
                         elif received_type == "response.completed":
                             completed = True
+                            response = data.get("response") if isinstance(data.get("response"), dict) else data
+                            usage = response.get("usage") if isinstance(response, dict) else None
+                            if isinstance(usage, dict):
+                                self._last_usage = {
+                                    "input_tokens": self._non_negative_int(usage.get("input_tokens")),
+                                    "output_tokens": self._non_negative_int(usage.get("output_tokens")),
+                                    "total_tokens": self._non_negative_int(usage.get("total_tokens")),
+                                }
                         event_type, data_lines = None, []
         if not completed:
             raise ChatGptProviderError("ChatGPT response did not complete")
         return "".join(chunks)
+
+    @staticmethod
+    def _non_negative_int(value: object) -> int | None:
+        return value if isinstance(value, int) and value >= 0 else None
+
+    @staticmethod
+    def _provider_schema(response_model: type[StructuredOutput]) -> tuple[dict, bool]:
+        schema = deepcopy(to_strict_json_schema(response_model))
+        wrapped_root = "oneOf" in schema or "anyOf" in schema or schema.get("type") != "object"
+        OpenAiChatGptProvider._replace_one_of(schema)
+        if not wrapped_root:
+            return schema, False
+        definitions = schema.pop("$defs", None)
+        wrapped = {
+            "type": "object",
+            "properties": {"root": schema},
+            "required": ["root"],
+            "additionalProperties": False,
+        }
+        if definitions:
+            wrapped["$defs"] = definitions
+        return wrapped, True
+
+    @staticmethod
+    def _replace_one_of(value: object) -> None:
+        if isinstance(value, dict):
+            if "oneOf" in value:
+                value["anyOf"] = value.pop("oneOf")
+            for child in value.values():
+                OpenAiChatGptProvider._replace_one_of(child)
+        elif isinstance(value, list):
+            for child in value:
+                OpenAiChatGptProvider._replace_one_of(child)
 
     @staticmethod
     def _incomplete_response_message(event_type: str, data: dict) -> str:

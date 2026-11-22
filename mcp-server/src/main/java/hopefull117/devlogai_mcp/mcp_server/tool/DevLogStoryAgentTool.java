@@ -30,8 +30,10 @@ import java.util.function.Supplier;
 @Slf4j
 public class DevLogStoryAgentTool {
     private static final String STORY_CONTEXT_ANALYSIS_INTENT = "engineering-story-context-analysis";
-    private static final long DEFAULT_POLL_TIMEOUT_MS = 180_000L;
-    private static final long MAX_POLL_TIMEOUT_MS = 180_000L;
+    // Keep the synchronous MCP call below the client-side request deadline so
+    // a bounded timeout response can still return the aiTaskId for resumption.
+    private static final long DEFAULT_POLL_TIMEOUT_MS = 90_000L;
+    private static final long MAX_POLL_TIMEOUT_MS = 90_000L;
     private static final long DEFAULT_POLL_INTERVAL_MS = 2_000L;
 
     private final DevlogProjectContextClient client;
@@ -59,12 +61,12 @@ public class DevLogStoryAgentTool {
     public DevLogStoryAgentTool(
             DevlogProjectContextClient client,
             ObjectMapper objectMapper,
-            @Value("${devlog.story-agent.poll.timeout-ms:180000}") long pollTimeoutMs,
+             @Value("${devlog.story-agent.poll.timeout-ms:90000}") long pollTimeoutMs,
             @Value("${devlog.story-agent.poll.interval-ms:2000}") long pollIntervalMs,
             McpAuthenticatedPrincipalProvider principalProvider,
             @Nullable McpToolObservabilityService observability) {
         if (pollTimeoutMs < 0 || pollTimeoutMs > MAX_POLL_TIMEOUT_MS || pollIntervalMs < 0) {
-            throw new IllegalArgumentException("Story Agent polling timeout must be between 0 and 180000 ms");
+            throw new IllegalArgumentException("Story Agent polling timeout must be between 0 and 90000 ms");
         }
         this.client = client;
         this.objectMapper = objectMapper;
@@ -225,11 +227,15 @@ public class DevLogStoryAgentTool {
 
         String lastKnownStatus = stringValue(latestExecution.get("status"));
         latestExecution.put("status", "TIMED_OUT");
-        latestExecution.put("diagnostics", Map.of(
-                "status", "TIMED_OUT",
-                "code", "POLL_TIMEOUT",
-                "lastKnownStatus", lastKnownStatus,
-                "aiTaskId", taskId.toString()));
+        Map<String, Object> diagnostics = new LinkedHashMap<>();
+        if (latestExecution.get("diagnostics") instanceof Map<?, ?> existing) {
+            existing.forEach((key, value) -> diagnostics.put(String.valueOf(key), value));
+        }
+        diagnostics.put("status", "TIMED_OUT");
+        diagnostics.put("code", "POLL_TIMEOUT");
+        diagnostics.put("lastKnownStatus", lastKnownStatus);
+        diagnostics.put("aiTaskId", taskId.toString());
+        latestExecution.put("diagnostics", diagnostics);
         return latestExecution;
     }
 
@@ -313,6 +319,15 @@ public class DevLogStoryAgentTool {
         }
         if (taskStatus.get("failureMessage") != null) {
             diagnostics.put("failureMessage", taskStatus.get("failureMessage"));
+        }
+        if (taskStatus.get("deadlineAt") != null) {
+            diagnostics.put("deadlineAt", taskStatus.get("deadlineAt"));
+        }
+        if (taskStatus.get("terminalReason") != null) {
+            diagnostics.put("terminalReason", taskStatus.get("terminalReason"));
+        }
+        if (taskStatus.get("recoveryAction") != null) {
+            diagnostics.put("recoveryAction", taskStatus.get("recoveryAction"));
         }
         execution.put("diagnostics", diagnostics);
         return execution;

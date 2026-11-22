@@ -23,6 +23,23 @@ from app.schemas.story_context_investigation import InvestigationActionResponse
 class CoreCallbackError(RuntimeError):
     """A callback response that the AI Engine cannot safely recover from."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        code: str | None = None,
+        current_status: str | None = None,
+        attempts: int | None = None,
+        correlation_id: UUID | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.current_status = current_status
+        self.attempts = attempts
+        self.correlation_id = correlation_id
+
 
 class CoreCallbackClient:
     def __init__(
@@ -77,7 +94,10 @@ class CoreCallbackClient:
         logger.info(
             "Sending AI task result callback",
             extra={
+                "event": "AI_CALLBACK_STARTED",
+                "taskId": str(ai_task_id),
                 "taskCorrelationId": str(correlation_id),
+                "externalJobId": result.external_job_id,
                 "proposalCount": len(result.proposals),
             },
         )
@@ -100,20 +120,52 @@ class CoreCallbackClient:
                     logger.info(
                         "AI task result callback acknowledged",
                         extra={
+                            "event": "AI_CALLBACK_SUCCEEDED",
+                            "taskId": str(ai_task_id),
                             "taskCorrelationId": str(correlation_id),
+                            "externalJobId": result.external_job_id,
                             "status": response.status_code,
                             "attempt": attempt,
                         },
                     )
                     break
                 if not self._is_transient_not_ready(response):
-                    raise self._callback_error(response, correlation_id, attempt)
+                    error = self._callback_error(response, correlation_id, attempt)
+                    logger.error(
+                        "AI task result callback failed",
+                        extra={
+                            "event": "AI_CALLBACK_FAILED",
+                            "taskId": str(ai_task_id),
+                            "taskCorrelationId": str(correlation_id),
+                            "externalJobId": result.external_job_id,
+                            "status": response.status_code,
+                            "attempt": attempt,
+                            "outcome": error.code,
+                        },
+                    )
+                    raise error
                 if attempt == self._max_attempts:
-                    raise self._callback_error(response, correlation_id, attempt)
+                    error = self._callback_error(response, correlation_id, attempt)
+                    logger.error(
+                        "AI task result callback failed after retries",
+                        extra={
+                            "event": "AI_CALLBACK_FAILED",
+                            "taskId": str(ai_task_id),
+                            "taskCorrelationId": str(correlation_id),
+                            "externalJobId": result.external_job_id,
+                            "status": response.status_code,
+                            "attempt": attempt,
+                            "outcome": error.code,
+                        },
+                    )
+                    raise error
                 logger.warning(
                     "AI task result callback will be retried",
                     extra={
+                        "event": "AI_CALLBACK_RETRY",
+                        "taskId": str(ai_task_id),
                         "taskCorrelationId": str(correlation_id),
+                        "externalJobId": result.external_job_id,
                         "status": response.status_code,
                         "attempt": attempt,
                     },
@@ -200,7 +252,12 @@ class CoreCallbackClient:
         return CoreCallbackError(
             "Core callback failed: "
             f"status={response.status_code}, correlationId={correlation_id}, "
-            f"attempts={attempts}{suffix}"
+            f"attempts={attempts}{suffix}",
+            status_code=response.status_code,
+            code=body.get("code"),
+            current_status=body.get("currentStatus"),
+            attempts=attempts,
+            correlation_id=correlation_id,
         )
 
     def _json_object(self, response: httpx.Response) -> dict[str, Any]:

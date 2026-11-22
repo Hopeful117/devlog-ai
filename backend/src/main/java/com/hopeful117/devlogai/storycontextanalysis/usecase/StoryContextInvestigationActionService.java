@@ -262,6 +262,7 @@ public class StoryContextInvestigationActionService {
         snapshot.put("investigation", investigation);
         task.setContextSnapshot(snapshot);
         Map<String, Object> canonical = new LinkedHashMap<>(metadata);
+        canonical.remove("requestDigest");
         metadata.put("result", canonical);
         aiTaskRepository.save(task);
         return new ActionResponse(task.getId(), false, canonical);

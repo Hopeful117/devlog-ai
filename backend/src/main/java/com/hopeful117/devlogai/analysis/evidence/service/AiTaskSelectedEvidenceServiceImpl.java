@@ -21,7 +21,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AiTaskSelectedEvidenceServiceImpl implements AiTaskSelectedEvidenceService {
     private static final Set<AiTaskStatus> TERMINAL_STATUSES =
-            Set.of(AiTaskStatus.COMPLETED, AiTaskStatus.FAILED);
+            Set.of(AiTaskStatus.COMPLETED, AiTaskStatus.FAILED, AiTaskStatus.TIMED_OUT);
 
     private final AnalysisRepository analysisRepository;
     private final AiTaskRepository aiTaskRepository;

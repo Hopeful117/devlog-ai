@@ -30,6 +30,9 @@ public interface AiTaskMapper {
     @Mapping(target = "selectionDigest", ignore = true)
     @Mapping(target = "contextSnapshot", ignore = true)
     @Mapping(target = "externalJobId", ignore = true)
+    @Mapping(target = "aiEngineAcceptedAt", ignore = true)
+    @Mapping(target = "aiEngineSubmissionDurationMs", ignore = true)
+    @Mapping(target = "aiEngineSubmissionError", ignore = true)
     @Mapping(target = "attemptCount", ignore = true)
     @Mapping(target = "failureCode", ignore = true)
     @Mapping(target = "failureMessage", ignore = true)
@@ -37,6 +40,9 @@ public interface AiTaskMapper {
     @Mapping(target = "submittedAt", ignore = true)
     @Mapping(target = "startedAt", ignore = true)
     @Mapping(target = "completedAt", ignore = true)
+    @Mapping(target = "deadlineAt", ignore = true)
+    @Mapping(target = "terminalReason", ignore = true)
+    @Mapping(target = "recoveryAction", ignore = true)
     AiTask toEntity(CreateAiTaskRequest request);
 
     @Mapping(target = "analysisId", source = "analysis.id")

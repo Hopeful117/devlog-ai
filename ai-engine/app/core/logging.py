@@ -34,6 +34,7 @@ class JsonFormatter(logging.Formatter):
             "intent", "provider", "model", "authorizedOutputTokens",
             "effectiveOutputTokens", "configuredOutputTokens", "outputParameterSource",
             "providerStatus", "incompleteReason",
+            "externalJobId", "phase", "outcome",
         ):
             if hasattr(record, key):
                 event[key] = getattr(record, key)

@@ -17,7 +17,7 @@ from evaluations.devlog_ai_abc_runner import (
     replay_run,
     run,
 )
-from evaluations.devlog_ai_abc_runner.runner import FixtureTreatmentAdapter
+from evaluations.devlog_ai_abc_runner.runner import FixtureTreatmentAdapter, RunResult, _result_payload
 from evaluations.devlog_ai_abc_runner.provenance import current_head
 
 
@@ -64,6 +64,19 @@ def test_dry_run_executes_three_isolated_observations_and_replays(tmp_path: Path
         assert derived["acceptability"]["status"] == "NOT_EVALUATED"
 
 
+def test_result_payload_extracts_json_safe_summary_from_run_result(tmp_path: Path) -> None:
+    summary = {"status": "PASS", "runRoot": str(tmp_path)}
+    result = RunResult(run_root=tmp_path, summary=summary, integrity={"status": "PASS"})
+
+    class EquivalentRunResult:
+        def __init__(self) -> None:
+            self.summary = summary
+
+    assert _result_payload(result) == summary
+    assert _result_payload(EquivalentRunResult()) == summary
+    assert _result_payload(summary) == summary
+
+
 def test_dry_run_preserves_native_contracts_and_selects_a_b_c(tmp_path: Path) -> None:
     result = run(
         mode=DRY_RUN,
@@ -81,6 +94,21 @@ def test_dry_run_preserves_native_contracts_and_selects_a_b_c(tmp_path: Path) ->
         "Q1-B-DIRECT-INVESTIGATOR-r1": "B_DIRECT_INVESTIGATOR",
         "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1": "C_DEVLOG_ENGINEERING_ANALYST",
     }
+
+
+def test_runner_can_select_one_frozen_observation(tmp_path: Path) -> None:
+    result = run(
+        mode=DRY_RUN,
+        manifest_path=MANIFEST,
+        output_root=tmp_path / "q1-a-run",
+        repository_root=REPOSITORY,
+        observation_ids=("Q1-A-DEVLOG-CURRENT-r1",),
+    )
+
+    assert [item["observationId"] for item in result.summary["observations"]] == [
+        "Q1-A-DEVLOG-CURRENT-r1"
+    ]
+    assert not (result.run_root / "observations" / "Q1-B-DIRECT-INVESTIGATOR-r1").exists()
 
 
 def test_invalid_manifest_is_rejected_before_creating_run(tmp_path: Path) -> None:
@@ -194,7 +222,7 @@ def test_failed_treatment_is_recorded_without_retry(tmp_path: Path) -> None:
 
         def execute(self, observation: dict, manifest: dict) -> dict:
             self.calls += 1
-            raise RuntimeError("fixture failure")
+            raise RuntimeError("Bearer sk-12345678901234567890 fixture failure")
 
     failing = FailingAdapter()
     adapters = {
@@ -207,7 +235,8 @@ def test_failed_treatment_is_recorded_without_retry(tmp_path: Path) -> None:
     status = json.loads((result.run_root / "observations" / "Q1-B-DIRECT-INVESTIGATOR-r1" / "status.json").read_text())
     assert status["technicalStatus"] == "RUNTIME_FAILURE"
     assert status["retryCount"] == 0
-    assert status["error"]["message"] == "fixture failure"
+    assert status["error"]["message"] == "[REDACTED] fixture failure"
+    assert "sk-12345678901234567890" not in (result.run_root / "observations" / "Q1-B-DIRECT-INVESTIGATOR-r1" / "raw" / "answer.json").read_text()
 
 
 def test_oracle_material_is_not_present_in_run_artifacts(tmp_path: Path) -> None:

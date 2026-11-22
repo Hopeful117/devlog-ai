@@ -22,6 +22,8 @@ from app.schemas.story_context_analysis import (
     CausalClassification,
     CausalEvidenceRole,
     StoryContextAnalysisResult,
+    ClassificationEntry,
+    OutputClassification,
     RelationType,
     maximum_defensible_classification,
     CausalAssessment,
@@ -232,7 +234,9 @@ class StoryContextAnalysisGenerationService:
         prompt: Prompt | None = None
         try:
             prompt = self._prompt_builder.build_investigation(submission)
-            decision = await self._investigation_decision(prompt, traces)
+            decision, prompt = await self._investigation_decision_with_retry(
+                submission, prompt, traces, final_required=False
+            )
             if not isinstance(decision, InvestigationPlanDecision):
                 raise ValueError("Investigation must begin with a PLAN decision")
             pending = list(decision.plan.actions)
@@ -281,8 +285,13 @@ class StoryContextAnalysisGenerationService:
                         else "INVESTIGATION_ACTION_REJECTED"
                     )
                 self._synchronize_investigation_grounding(submission, response)
-                prompt = self._prompt_builder.build_investigation(submission, results)
-                decision = await self._investigation_decision(prompt, traces)
+                final_required = actions_taken >= maximum_steps
+                prompt = self._prompt_builder.build_investigation(
+                    submission, results, final_required=final_required
+                )
+                decision, prompt = await self._investigation_decision_with_retry(
+                    submission, prompt, traces, final_required=final_required
+                )
         except _InvestigationTerminal as error:
             await self._send_failure(
                 submission, external_job_id, error.code, error, prompt, traces,
@@ -296,12 +305,51 @@ class StoryContextAnalysisGenerationService:
             )
 
     async def _investigation_decision(
-        self, prompt: Prompt, traces: InteractionTraceCollector
+        self, submission: AiTaskSubmissionRequest, prompt: Prompt,
+        traces: InteractionTraceCollector, *, final_required: bool = False,
     ):
         response = await traces.generate_and_validate(
-            prompt, InvestigationDecisionResponse, lambda value: None
+            prompt,
+            InvestigationDecisionResponse,
+            lambda value: self._validate_investigation_decision(
+                submission, value, final_required=final_required
+            ),
         )
         return response.root
+
+    async def _investigation_decision_with_retry(
+        self, submission: AiTaskSubmissionRequest, prompt: Prompt,
+        traces: InteractionTraceCollector, *, final_required: bool,
+    ) -> tuple[object, Prompt]:
+        try:
+            return await self._investigation_decision(
+                submission, prompt, traces, final_required=final_required
+            ), prompt
+        except (ValidationError, StoryContextAnalysisOutputValidationError, ValueError) as error:
+            if not getattr(error, "retryable", True):
+                raise
+            corrective_prompt = self._prompt_builder.investigation_corrective_retry(prompt, error)
+            traces.retry(error)
+            return await self._investigation_decision(
+                submission, corrective_prompt, traces, final_required=final_required
+            ), corrective_prompt
+
+    def _validate_investigation_decision(
+        self, submission: AiTaskSubmissionRequest, response: InvestigationDecisionResponse,
+        *, final_required: bool = False,
+    ) -> None:
+        decision = response.root
+        if final_required and not isinstance(decision, InvestigationFinalDecision):
+            raise StoryContextAnalysisOutputValidationError(
+                "Investigation action budget is exhausted; FINAL decision is required"
+            )
+        if isinstance(decision, InvestigationFinalDecision):
+            self._synchronize_output_classification(decision.result)
+            self._validate_output(
+                provider_result_to_internal(decision.result),
+                submission.selected_knowledge,
+                submission.grounding_contract or {},
+            )
 
     async def _complete_investigation(
         self, submission: AiTaskSubmissionRequest, external_job_id: UUID,
@@ -312,6 +360,7 @@ class StoryContextAnalysisGenerationService:
         if prompt is None:
             raise ValueError("Investigation final prompt is missing")
         output = provider_result_to_internal(provider_result)
+        self._synchronize_output_classification(output)
         self._validate_output(output, submission.selected_knowledge, submission.grounding_contract or {})
         output = self._apply_execution_provenance(output, prompt)
         await self._callback_client.send_result(
@@ -328,6 +377,51 @@ class StoryContextAnalysisGenerationService:
                 interaction_traces=traces.traces,
             ),
         )
+
+    @staticmethod
+    def _synchronize_output_classification(output: StoryContextAnalysisResult) -> None:
+        """Fill omitted redundant classifications from the already supplied grounding metadata."""
+        findings = [
+            ("objectiveUnderstanding", output.objective_understanding),
+            *[
+                (f"architectureFindings[{index}]", finding)
+                for index, finding in enumerate(output.architecture_findings)
+            ],
+            *[
+                (f"decisionFindings[{index}]", finding)
+                for index, finding in enumerate(output.decision_findings)
+            ],
+            *[
+                (f"evidenceFindings[{index}]", finding)
+                for index, finding in enumerate(output.evidence_findings)
+            ],
+            *[
+                (f"historicalContext[{index}]", finding)
+                for index, finding in enumerate(output.historical_context)
+            ],
+            *[
+                (f"constraintFindings[{index}]", finding)
+                for index, finding in enumerate(output.constraint_findings)
+            ],
+            *[
+                (f"impactedComponentFindings[{index}]", finding)
+                for index, finding in enumerate(output.impacted_component_findings)
+            ],
+        ]
+        entries = list(output.output_classification.entries)
+        classified_references = {entry.finding_reference for entry in entries}
+        entries.extend(
+            [
+                ClassificationEntry(
+                    findingReference=reference,
+                    classification=finding.grounding.classification,
+                    grounded=finding.grounding.grounded,
+                )
+                for reference, finding in findings
+                if finding.grounding is not None and reference not in classified_references
+            ]
+        )
+        output.output_classification = OutputClassification(entries=entries)
 
     @staticmethod
     def _action_payload(action: object, submission, traces) -> dict[str, object]:
@@ -655,7 +749,9 @@ class StoryContextAnalysisGenerationService:
                         f"Finding {finding.title} has invalid relationType: {finding.grounding.relation_type.value}"
                     )
 
-        valid_classification_references = {"objectiveUnderstanding"}
+        valid_classification_references: set[str] = set()
+        if output.objective_understanding.grounding is not None:
+            valid_classification_references.add("objectiveUnderstanding")
         for field_name, findings in (
             ("architectureFindings", output.architecture_findings),
             ("decisionFindings", output.decision_findings),
@@ -667,9 +763,9 @@ class StoryContextAnalysisGenerationService:
             valid_classification_references.update(
                 f"{field_name}[{index}]" for index in range(len(findings))
             )
-        grounding_by_reference = {
-            "objectiveUnderstanding": output.objective_understanding.grounding,
-        }
+        grounding_by_reference: dict[str, object] = {}
+        if output.objective_understanding.grounding is not None:
+            grounding_by_reference["objectiveUnderstanding"] = output.objective_understanding.grounding
         for field_name, findings in (
             ("architectureFindings", output.architecture_findings),
             ("decisionFindings", output.decision_findings),
@@ -701,8 +797,15 @@ class StoryContextAnalysisGenerationService:
                 entry.classification != grounding.classification
                 or entry.grounded != grounding.grounded
             ):
+                expected = (
+                    f"classification={grounding.classification}, grounded={grounding.grounded}"
+                    if grounding is not None
+                    else "no matching grounded finding"
+                )
                 raise StoryContextAnalysisOutputValidationError(
-                    f"outputClassification disagrees with grounding: {entry.finding_reference}"
+                    f"outputClassification disagrees with grounding: {entry.finding_reference}; "
+                    f"received classification={entry.classification}, grounded={entry.grounded}; "
+                    f"expected {expected}"
                 )
         missing_classifications = set(grounding_by_reference) - classified_references
         if missing_classifications:

@@ -160,6 +160,38 @@ def test_interaction_trace_accepts_bounded_failure_code():
     assert trace.failure_code == "GROUNDING_REQUESTED_FILE_SCOPE"
 
 
+def test_interaction_trace_serializes_validation_diagnostics_for_core_callback():
+    trace = AiInteractionTrace.model_validate({
+        "id": "00000000-0000-0000-0000-000000000002",
+        "attempt": 1,
+        "interactionType": "INITIAL_GENERATION",
+        "traceLevel": "NORMAL",
+        "provider": "mock",
+        "modelIdentifier": "test-model",
+        "intent": "engineering-story-context-analysis",
+        "intentVersion": "v1",
+        "promptVersion": "prompt-v1",
+        "startedAt": "2026-01-01T00:00:00Z",
+        "completedAt": "2026-01-01T00:00:01Z",
+        "durationMs": 1000,
+        "validationStatus": "VALIDATION_FAILED",
+        "failureCategory": "STRUCTURAL_CONTRACT_ERROR",
+        "failureCode": "STRUCTURAL_CONTRACT_ERROR",
+        "selectedKnowledgeFingerprint": "a" * 64,
+        "promptFingerprint": "b" * 64,
+        "selectedFactCount": 0,
+        "selectedObservationCount": 0,
+        "selectedInsightCount": 0,
+        "selectedEngineeringEventCount": 0,
+        "groundingFingerprint": "c" * 64,
+        "validationDiagnostics": "outputClassification disagrees with grounding",
+    })
+
+    payload = trace.model_dump(by_alias=True, mode="json", exclude_none=True)
+
+    assert payload["validationDiagnostics"] == "outputClassification disagrees with grounding"
+
+
 @pytest.mark.asyncio
 async def test_production_generation_uses_provider_model_before_adapting(monkeypatch):
     captured = {}
@@ -348,6 +380,29 @@ async def test_initialized_investigation_executes_one_action_and_returns_final(m
 
 
 @pytest.mark.asyncio
+async def test_investigation_retries_final_output_contract_failure_once(monkeypatch):
+    request = _investigation_request()
+    invalid_final = _final_decision()
+    invalid_final["result"]["outputClassification"]["entries"][0]["findingReference"] = (
+        "missingInformation:stale-reference"
+    )
+    traces = _ServiceTraces([
+        _investigation_plan(request.ai_task_id),
+        invalid_final,
+        _final_decision(),
+    ])
+    callback = _InvestigationCallback({"actionId": "action-1", "outcome": "RESULTS", "evidence": []})
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-00000000000b"))
+
+    assert traces.calls == 3
+    assert len(traces.retry_reasons) == 1
+    assert "Core's deterministic output validation" in traces.prompts[2]
+    assert callback.results[0].status.value == "COMPLETED"
+
+
+@pytest.mark.asyncio
 async def test_investigation_synchronizes_updated_grounding_for_final_callback(monkeypatch):
     request = _investigation_request()
     contract = {
@@ -424,13 +479,16 @@ async def test_investigation_budget_stop_is_bounded(monkeypatch):
         }}
     })
     action = {"phase": "ACTION", "action": _investigation_plan(request.ai_task_id)["plan"]["actions"][0]}
-    traces = _ServiceTraces([_investigation_plan(request.ai_task_id), action])
+    traces = _ServiceTraces([_investigation_plan(request.ai_task_id), action, _final_decision()])
     callback = _InvestigationCallback({"actionId": "action-1", "outcome": "RESULTS", "evidence": []})
     service = _service(monkeypatch, traces, callback)
 
     await service.process(request, UUID("00000000-0000-0000-0000-000000000007"))
 
-    assert callback.results[0].error.code == "BUDGET_EXHAUSTED"
+    assert traces.calls == 3
+    assert len(traces.retry_reasons) == 1
+    assert "FINAL now" in traces.prompts[2]
+    assert callback.results[0].status.value == "COMPLETED"
 
 
 @pytest.mark.asyncio

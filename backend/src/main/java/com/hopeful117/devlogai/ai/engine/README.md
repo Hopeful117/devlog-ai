@@ -19,7 +19,9 @@ not expected to retrieve additional project knowledge.
 Only a valid `202 Accepted` acknowledgement with the same correlation
 identifier advances the Core task from `CREATED` to `SUBMITTED`. Rejection,
 invalid acknowledgement or transport failure advances it to `FAILED` through
-the AI task service.
+the AI task service. A task that remains `SUBMITTED` or `PROCESSING` beyond its
+Core-owned deadline is terminalized as `TIMED_OUT` by the Core recovery
+watchdog.
 
 ## Configuration
 
@@ -37,4 +39,7 @@ POST /api/v1/ai/tasks/{correlationId}/result
 
 The callback creates only `ValidatableProposal` records and atomically moves
 the task to a terminal state. Automatic retries, cancellation, real AI
-processing and knowledge promotion remain outside this increment.
+processing and knowledge promotion remain outside this increment. The AI
+Engine still uses process-lifetime background dispatch; Core timeout recovery
+therefore guarantees a terminal Core outcome but does not guarantee provider
+cancellation or process-restart replay.

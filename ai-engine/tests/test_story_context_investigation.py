@@ -82,6 +82,9 @@ def test_v2_plan_rejects_duplicate_ids_mismatched_scope_and_invalid_range():
     range_action = search(kind="READ_EVIDENCE_RANGE", path="backend/Main.java", startLine=20, endLine=10)
     with pytest.raises(ValidationError):
         InvestigationPlanProposal.model_validate(plan(range_action))
+    oversized_range = search(kind="READ_EVIDENCE_RANGE", path="backend/Main.java", startLine=1, endLine=502)
+    with pytest.raises(ValidationError):
+        InvestigationPlanProposal.model_validate(plan(oversized_range))
 
 
 def test_capability_result_accepts_only_bounded_stop_reasons():
@@ -138,3 +141,57 @@ def test_missing_provider_output_measurement_fails_closed():
     collector.traces = [SimpleNamespace(output_tokens=None, duration_ms=4)]
     with pytest.raises(ValueError, match="measurement"):
         collector.provider_accounting_delta()
+
+
+def test_failed_trace_keeps_bounded_redacted_validation_diagnostic_in_normal_mode():
+    from datetime import datetime, timezone
+
+    from app.providers.base import PromptTraceability
+    from app.services.interaction_trace import InteractionTraceCollector
+
+    collector = InteractionTraceCollector(
+        SimpleNamespace(provider_name="mock", model_identifier="mock-model"),
+        SimpleNamespace(
+            selected_knowledge={"selectedFacts": [], "selectedObservations": []},
+            intent=SimpleNamespace(id="intent", version="v1"),
+        ),
+    )
+    prompt = SimpleNamespace(
+        prompt_version="prompt-v1",
+        system_message="system",
+        user_message="user",
+        content_digest="a" * 64,
+        traceability=PromptTraceability(
+            request_id="request",
+            correlation_id="correlation",
+            ai_task_id="task",
+            analysis_id="analysis",
+            intent_id="intent",
+            intent_version="v1",
+            context_digest="b" * 64,
+            analysis_context_id=None,
+            profile_id=None,
+            profile_version=None,
+        ),
+    )
+
+    trace = collector._trace(
+        prompt,
+        1,
+        "INITIAL_GENERATION",
+        datetime.now(timezone.utc),
+        datetime.now(timezone.utc),
+        "VALIDATION_FAILED",
+        "STRUCTURAL_CONTRACT_ERROR",
+        "STRUCTURAL_CONTRACT_ERROR",
+        "causal answer contains token=secret-value",
+        None,
+        None,
+        "VALIDATION",
+        None,
+        None,
+    )
+
+    assert trace.validation_diagnostics == "causal answer contains token=[REDACTED]"
+    assert trace.system_prompt is None
+    assert trace.raw_model_response is None

@@ -54,10 +54,24 @@ def _tool_schema() -> list[dict[str, Any]]:
         for name, kind in fields.items():
             value_type = json_types[kind]
             constraints = V4_TOOL_FIELD_CONSTRAINTS.get(operation, {}).get(name, {})
+            provider_constraints = {
+                key: value
+                for key, value in constraints.items()
+                if key != "items" and not (key == "pattern" and "(?" in str(value))
+            }
             properties[name] = {
                 "type": value_type,
-                **({"items": {"type": "string", **constraints["items"]}} if kind == "string[]" else {}),
-                **{key: value for key, value in constraints.items() if key != "items"},
+                **({
+                    "items": {
+                        "type": "string",
+                        **{
+                            key: value
+                            for key, value in constraints["items"].items()
+                            if not (key == "pattern" and "(?" in str(value))
+                        },
+                    }
+                } if kind == "string[]" else {}),
+                **provider_constraints,
             }
         tools.append({
             "type": "function",
@@ -279,11 +293,19 @@ class V4CollectionRuntime:
                 status = ExecutionStatus.PROVIDER_TIMEOUT
                 provider_failure = getattr(error, "attribution", None) or provider_failure_attribution(error, category="TIMEOUT")
                 break
-            except Exception:
+            except Exception as error:
                 if attempt is not None:
                     resources.record_attempt_latency(attempt, round((time.perf_counter() - call_started) * 1000))
                 resources.stop("RUNTIME_INFRASTRUCTURE_FAILURE")
                 status = ExecutionStatus.RUNTIME_FAILURE
+                provider_failure = provider_failure_attribution(
+                    error,
+                    request_phase="RUNTIME",
+                    diagnostic_metadata={
+                        "transportAttempted": bool(attempt and attempt.transport_attempted),
+                        "providerResponseReceived": bool(attempt and attempt.provider_response_received),
+                    },
+                )
                 break
             responses.append(response.raw_response)
             if response.kind == "FINAL":

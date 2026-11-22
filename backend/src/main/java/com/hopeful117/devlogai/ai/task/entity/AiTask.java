@@ -110,6 +110,15 @@ public class AiTask {
     @Column(length = 255)
     private String externalJobId;
 
+    @Column(name = "ai_engine_accepted_at")
+    private Instant aiEngineAcceptedAt;
+
+    @Column(name = "ai_engine_submission_duration_ms")
+    private Long aiEngineSubmissionDurationMs;
+
+    @Column(name = "ai_engine_submission_error", columnDefinition = "TEXT")
+    private String aiEngineSubmissionError;
+
     @Column(name = "terminal_callback_digest", length = 64)
     private String terminalCallbackDigest;
 
@@ -138,6 +147,18 @@ public class AiTask {
     @Column(columnDefinition = "TEXT")
     private String failureMessage;
 
+    @Column(name = "last_callback_failure_code", length = 100)
+    private String lastCallbackFailureCode;
+
+    @Column(name = "last_callback_failure_status", length = 30)
+    private String lastCallbackFailureStatus;
+
+    @Column(name = "last_callback_failure_message", columnDefinition = "TEXT")
+    private String lastCallbackFailureMessage;
+
+    @Column(name = "last_callback_failure_at")
+    private Instant lastCallbackFailureAt;
+
     @Column(nullable = false, updatable = false)
     @CreatedDate
     private Instant createdAt;
@@ -147,4 +168,13 @@ public class AiTask {
     private Instant startedAt;
 
     private Instant completedAt;
+
+    @Column(name = "deadline_at")
+    private Instant deadlineAt;
+
+    @Column(name = "terminal_reason", length = 100)
+    private String terminalReason;
+
+    @Column(name = "recovery_action", length = 100)
+    private String recoveryAction;
 }

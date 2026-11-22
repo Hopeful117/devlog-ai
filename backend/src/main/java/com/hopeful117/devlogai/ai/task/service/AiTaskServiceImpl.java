@@ -23,11 +23,10 @@ import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Clock;
-import java.time.Duration;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -51,6 +50,9 @@ public class AiTaskServiceImpl implements AiTaskService {
     private final IntentCatalog intentCatalog;
     private final SelectedKnowledgePromptProjectionService promptProjectionService;
     private final Clock clock;
+
+    @Value("${ai-task.timeout-seconds:300}")
+    private long taskTimeoutSeconds = 300L;
 
     @Override
     public AiTaskResponse create(CreateAiTaskRequest request) {
@@ -326,10 +328,16 @@ public class AiTaskServiceImpl implements AiTaskService {
         AiTask task = findTask(id);
         requireStatus(task, AiTaskStatus.CREATED, AiTaskStatus.SUBMITTED);
 
+        Instant now = clock.instant();
         task.setStatus(AiTaskStatus.SUBMITTED);
         task.setExternalJobId(request.externalJobId());
         task.setAttemptCount(task.getAttemptCount() + 1);
-        task.setSubmittedAt(Instant.now());
+        if (task.getSubmittedAt() == null) {
+            task.setSubmittedAt(now);
+        }
+        if (task.getDeadlineAt() == null) {
+            task.setDeadlineAt(task.getSubmittedAt().plusSeconds(taskTimeoutSeconds));
+        }
 
         return saveAndMap(task);
     }

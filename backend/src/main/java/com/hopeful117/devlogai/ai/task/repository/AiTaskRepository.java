@@ -7,10 +7,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Instant;
+import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.storycontextanalysis.service.SnapshotIdentity;
 
 public interface AiTaskRepository extends JpaRepository<AiTask, UUID> {
@@ -43,6 +46,13 @@ public interface AiTaskRepository extends JpaRepository<AiTask, UUID> {
     List<AiTask> findByAnalysisIdOrderByCreatedAtDescIdDesc(UUID analysisId);
 
     Optional<AiTask> findFirstByAnalysisIdOrderByCreatedAtDescIdDesc(UUID analysisId);
+
+    @Query("select task.id from AiTask task where task.status in :statuses and task.deadlineAt < :now order by task.deadlineAt asc, task.id asc")
+    List<UUID> findIdsWithExpiredDeadline(
+            @Param("statuses") List<AiTaskStatus> statuses,
+            @Param("now") Instant now,
+            Pageable pageable
+    );
 
     List<AiTask> findByIntentIdAndIntentVersion(String intentId, String intentVersion);
 
