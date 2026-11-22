@@ -773,7 +773,9 @@ def reserve_live_task_binding(environment: Mapping[str, str] | None = None) -> d
             "storyId": config.story_id,
             "files": list(config.files),
             "intent": "engineering-story-context-analysis",
-            "idempotencyKey": "q1-live-binding-prepare",
+            "idempotencyKey": os.getenv(
+                "DEVLOG_LIVE_BINDING_IDEMPOTENCY_KEY", "q1-live-binding-prepare"
+            ),
         })
     except (OSError, RuntimeError, TimeoutError) as error:
         raise LiveConfigurationError("MCP task binding reservation failed") from error
