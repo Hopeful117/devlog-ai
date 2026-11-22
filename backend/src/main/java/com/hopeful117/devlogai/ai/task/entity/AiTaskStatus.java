@@ -5,9 +5,10 @@ public enum AiTaskStatus {
     SUBMITTED,
     PROCESSING,
     COMPLETED,
-    FAILED;
+    FAILED,
+    TIMED_OUT;
 
     public boolean isTerminal() {
-        return this == COMPLETED || this == FAILED;
+        return this == COMPLETED || this == FAILED || this == TIMED_OUT;
     }
 }

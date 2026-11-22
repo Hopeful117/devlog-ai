@@ -168,4 +168,13 @@ public class AiTask {
     private Instant startedAt;
 
     private Instant completedAt;
+
+    @Column(name = "deadline_at")
+    private Instant deadlineAt;
+
+    @Column(name = "terminal_reason", length = 100)
+    private String terminalReason;
+
+    @Column(name = "recovery_action", length = 100)
+    private String recoveryAction;
 }

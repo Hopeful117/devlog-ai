@@ -40,6 +40,9 @@ public interface AiTaskMapper {
     @Mapping(target = "submittedAt", ignore = true)
     @Mapping(target = "startedAt", ignore = true)
     @Mapping(target = "completedAt", ignore = true)
+    @Mapping(target = "deadlineAt", ignore = true)
+    @Mapping(target = "terminalReason", ignore = true)
+    @Mapping(target = "recoveryAction", ignore = true)
     AiTask toEntity(CreateAiTaskRequest request);
 
     @Mapping(target = "analysisId", source = "analysis.id")

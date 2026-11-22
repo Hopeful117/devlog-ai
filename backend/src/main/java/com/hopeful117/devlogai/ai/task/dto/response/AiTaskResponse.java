@@ -41,7 +41,10 @@ public record AiTaskResponse(
         Instant createdAt,
         Instant submittedAt,
         Instant startedAt,
-        Instant completedAt
+        Instant completedAt,
+        Instant deadlineAt,
+        String terminalReason,
+        String recoveryAction
 ) {
     public AiTaskResponse(UUID id, UUID analysisId, UUID correlationId, AiTaskType taskType,
                            AiTaskStatus status, Map<String, Object> contextSnapshot,
@@ -52,7 +55,7 @@ public record AiTaskResponse(
                 null, null, null, null, null, null, null, null, null, null, status,
                 contextSnapshot, externalJobId, null, null, null, attemptCount, failureCode, failureMessage,
                 null, null, null, null,
-                createdAt, submittedAt, startedAt, completedAt);
+                 createdAt, submittedAt, startedAt, completedAt, null, null, null);
     }
 
     public AiTaskResponse(UUID id, UUID analysisId, UUID correlationId, AiTaskType taskType,
@@ -69,6 +72,6 @@ public record AiTaskResponse(
                 promptContentDigest, contextDigest, projectionDigest, selectedKnowledgeSnapshot,
                 selectionVersion, selectionDigest, status, contextSnapshot, externalJobId, null, null, null, attemptCount,
                 failureCode, failureMessage, null, null, null, null,
-                createdAt, submittedAt, startedAt, completedAt);
+                 createdAt, submittedAt, startedAt, completedAt, null, null, null);
     }
 }

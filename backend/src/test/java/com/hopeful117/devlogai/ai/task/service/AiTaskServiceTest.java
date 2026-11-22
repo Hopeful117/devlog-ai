@@ -210,6 +210,7 @@ class AiTaskServiceTest {
     @Test
     void shouldFollowSuccessfulLifecycle() {
         UUID id = UUID.randomUUID();
+        Instant now = Instant.parse("2026-11-22T20:00:00Z");
         AiTask task = AiTask.builder()
                 .status(AiTaskStatus.CREATED)
                 .attemptCount(0)
@@ -218,6 +219,7 @@ class AiTaskServiceTest {
         when(aiTaskRepository.findById(id)).thenReturn(Optional.of(task));
         when(aiTaskRepository.save(task)).thenReturn(task);
         when(aiTaskMapper.toResponse(task)).thenReturn(response);
+        when(clock.instant()).thenReturn(now);
 
         assertSame(
                 response,
@@ -227,6 +229,7 @@ class AiTaskServiceTest {
         assertEquals("engine-job-42", task.getExternalJobId());
         assertEquals(1, task.getAttemptCount());
         assertNotNull(task.getSubmittedAt());
+        assertEquals(task.getSubmittedAt().plusSeconds(300), task.getDeadlineAt());
 
         assertSame(response, aiTaskService.startProcessing(id));
         assertEquals(AiTaskStatus.PROCESSING, task.getStatus());
@@ -236,6 +239,29 @@ class AiTaskServiceTest {
         assertEquals(AiTaskStatus.COMPLETED, task.getStatus());
         assertNotNull(task.getCompletedAt());
         verify(aiTaskRepository, times(3)).save(task);
+    }
+
+    @Test
+    void shouldRejectResubmissionWithoutChangingDeadline() {
+        UUID id = UUID.randomUUID();
+        Instant submittedAt = Instant.parse("2026-11-22T20:00:00Z");
+        Instant deadline = submittedAt.plusSeconds(300);
+        AiTask task = AiTask.builder()
+                .status(AiTaskStatus.SUBMITTED)
+                .submittedAt(submittedAt)
+                .deadlineAt(deadline)
+                .attemptCount(1)
+                .build();
+        when(aiTaskRepository.findById(id)).thenReturn(Optional.of(task));
+
+        assertThrows(
+                ConflictException.class,
+                () -> aiTaskService.submit(id, new SubmitAiTaskRequest("retry-job"))
+        );
+
+        assertEquals(submittedAt, task.getSubmittedAt());
+        assertEquals(deadline, task.getDeadlineAt());
+        assertEquals(1, task.getAttemptCount());
     }
 
     @Test

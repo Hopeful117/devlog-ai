@@ -227,11 +227,15 @@ public class DevLogStoryAgentTool {
 
         String lastKnownStatus = stringValue(latestExecution.get("status"));
         latestExecution.put("status", "TIMED_OUT");
-        latestExecution.put("diagnostics", Map.of(
-                "status", "TIMED_OUT",
-                "code", "POLL_TIMEOUT",
-                "lastKnownStatus", lastKnownStatus,
-                "aiTaskId", taskId.toString()));
+        Map<String, Object> diagnostics = new LinkedHashMap<>();
+        if (latestExecution.get("diagnostics") instanceof Map<?, ?> existing) {
+            existing.forEach((key, value) -> diagnostics.put(String.valueOf(key), value));
+        }
+        diagnostics.put("status", "TIMED_OUT");
+        diagnostics.put("code", "POLL_TIMEOUT");
+        diagnostics.put("lastKnownStatus", lastKnownStatus);
+        diagnostics.put("aiTaskId", taskId.toString());
+        latestExecution.put("diagnostics", diagnostics);
         return latestExecution;
     }
 
@@ -315,6 +319,15 @@ public class DevLogStoryAgentTool {
         }
         if (taskStatus.get("failureMessage") != null) {
             diagnostics.put("failureMessage", taskStatus.get("failureMessage"));
+        }
+        if (taskStatus.get("deadlineAt") != null) {
+            diagnostics.put("deadlineAt", taskStatus.get("deadlineAt"));
+        }
+        if (taskStatus.get("terminalReason") != null) {
+            diagnostics.put("terminalReason", taskStatus.get("terminalReason"));
+        }
+        if (taskStatus.get("recoveryAction") != null) {
+            diagnostics.put("recoveryAction", taskStatus.get("recoveryAction"));
         }
         execution.put("diagnostics", diagnostics);
         return execution;
