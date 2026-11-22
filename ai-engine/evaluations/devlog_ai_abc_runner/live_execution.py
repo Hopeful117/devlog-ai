@@ -374,6 +374,7 @@ class ChatGptOAuthTransport:
         transport_attempted = False
         provider_response_received = False
         outcome = "FAILED"
+        remote_provider = os.getenv("DEVLOG_LIVE_REMOTE_PROVIDER", "false").lower() == "true"
         logger.info(
             "Q1 B provider attempt started",
             extra={
@@ -385,17 +386,18 @@ class ChatGptOAuthTransport:
             },
         )
         try:
-            credential = self._resolver.resolve_for_task(self._task_id, "chatgpt")
-            phase = "CREDENTIAL_REFRESH"
-            if credential.access_token_expires_at is not None and credential.access_token_expires_at <= datetime.now(timezone.utc):
-                credential = asyncio.run(self._refresh_service.refresh_if_expired(credential.handle))
-            phase = "CREDENTIAL_SCOPE_VALIDATION"
-            if not self._required_scopes_granted(credential.scopes):
-                raise _oauth_transport_failure(
-                    RuntimeError("ChatGPT OAuth credential lacks required scopes"),
-                    phase=phase,
-                    category="AUTHENTICATION_ERROR",
-                )
+            if not remote_provider:
+                credential = self._resolver.resolve_for_task(self._task_id, "chatgpt")
+                phase = "CREDENTIAL_REFRESH"
+                if credential.access_token_expires_at is not None and credential.access_token_expires_at <= datetime.now(timezone.utc):
+                    credential = asyncio.run(self._refresh_service.refresh_if_expired(credential.handle))
+                phase = "CREDENTIAL_SCOPE_VALIDATION"
+                if not self._required_scopes_granted(credential.scopes):
+                    raise _oauth_transport_failure(
+                        RuntimeError("ChatGPT OAuth credential lacks required scopes"),
+                        phase=phase,
+                        category="AUTHENTICATION_ERROR",
+                    )
             phase = "REQUEST_BUILD"
             if request.mode == "AGENT_DIRECT_OPEN":
                 instructions = (
@@ -434,7 +436,7 @@ class ChatGptOAuthTransport:
             function_arguments: dict[str, str] = {}
             completed_payload: dict[str, Any] | None = None
             with httpx.Client(timeout=self._settings.llm_timeout_seconds) as client:
-                if os.getenv("DEVLOG_LIVE_REMOTE_PROVIDER", "false").lower() == "true":
+                if remote_provider:
                     return self._complete_remote(request, body, client)
                 with client.stream(
                     "POST",
