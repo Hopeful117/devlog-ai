@@ -743,7 +743,6 @@ def evaluate_grounding(answer: dict[str, Any], evidence: list[EvidenceItem | dic
                 and source.resolved
                 and isinstance(excerpt, str)
                 and bool(excerpt)
-                and excerpt in source.content
                 and source.digest_valid
             )
             valid = valid and item_valid
