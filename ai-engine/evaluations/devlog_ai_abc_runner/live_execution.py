@@ -343,7 +343,7 @@ class ChatGptOAuthTransport:
             if request.mode == "AGENT_DIRECT_OPEN":
                 instructions = (
                     "Use only the typed repository tools. Return the Q1 answer JSON after bounded inspection. "
-                    "Set questionId to CASE-03 and questionVersion to 1.0.0 in the final answer. "
+                    "Set questionId to Q1 and questionVersion to 1.0.0 in the final answer. "
                     "Keep answerText concise and under 3000 characters."
                 )
                 user_input: Any = serialize_v4_conversation(request.input_payload)
@@ -549,7 +549,7 @@ class DirectLiveTreatmentAdapter:
         verify_commit(self._repository_root, Q1_SOURCE_REVISION)
         provider = ChatGptOAuthTransport(task_id=self._task_id, model=self._model)
         assignment = V4Assignment(
-            "q1-live-b", "CASE-03", "1.0.0", "CASE-03", "AGENT_DIRECT_OPEN", 1
+            "q1-live-b", "Q1", "1.0.0", "Q1", "AGENT_DIRECT_OPEN", 1
         )
         runtime = V4CollectionRuntime(
             provider,
