@@ -746,8 +746,15 @@ class StoryContextAnalysisGenerationService:
                 entry.classification != grounding.classification
                 or entry.grounded != grounding.grounded
             ):
+                expected = (
+                    f"classification={grounding.classification}, grounded={grounding.grounded}"
+                    if grounding is not None
+                    else "no matching grounded finding"
+                )
                 raise StoryContextAnalysisOutputValidationError(
-                    f"outputClassification disagrees with grounding: {entry.finding_reference}"
+                    f"outputClassification disagrees with grounding: {entry.finding_reference}; "
+                    f"received classification={entry.classification}, grounded={entry.grounded}; "
+                    f"expected {expected}"
                 )
         missing_classifications = set(grounding_by_reference) - classified_references
         if missing_classifications:
