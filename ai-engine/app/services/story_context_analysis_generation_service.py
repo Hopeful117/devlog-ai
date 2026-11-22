@@ -22,6 +22,8 @@ from app.schemas.story_context_analysis import (
     CausalClassification,
     CausalEvidenceRole,
     StoryContextAnalysisResult,
+    ClassificationEntry,
+    OutputClassification,
     RelationType,
     maximum_defensible_classification,
     CausalAssessment,
@@ -342,6 +344,7 @@ class StoryContextAnalysisGenerationService:
                 "Investigation action budget is exhausted; FINAL decision is required"
             )
         if isinstance(decision, InvestigationFinalDecision):
+            self._synchronize_output_classification(decision.result)
             self._validate_output(
                 provider_result_to_internal(decision.result),
                 submission.selected_knowledge,
@@ -357,6 +360,7 @@ class StoryContextAnalysisGenerationService:
         if prompt is None:
             raise ValueError("Investigation final prompt is missing")
         output = provider_result_to_internal(provider_result)
+        self._synchronize_output_classification(output)
         self._validate_output(output, submission.selected_knowledge, submission.grounding_contract or {})
         output = self._apply_execution_provenance(output, prompt)
         await self._callback_client.send_result(
@@ -373,6 +377,51 @@ class StoryContextAnalysisGenerationService:
                 interaction_traces=traces.traces,
             ),
         )
+
+    @staticmethod
+    def _synchronize_output_classification(output: StoryContextAnalysisResult) -> None:
+        """Fill omitted redundant classifications from the already supplied grounding metadata."""
+        findings = [
+            ("objectiveUnderstanding", output.objective_understanding),
+            *[
+                (f"architectureFindings[{index}]", finding)
+                for index, finding in enumerate(output.architecture_findings)
+            ],
+            *[
+                (f"decisionFindings[{index}]", finding)
+                for index, finding in enumerate(output.decision_findings)
+            ],
+            *[
+                (f"evidenceFindings[{index}]", finding)
+                for index, finding in enumerate(output.evidence_findings)
+            ],
+            *[
+                (f"historicalContext[{index}]", finding)
+                for index, finding in enumerate(output.historical_context)
+            ],
+            *[
+                (f"constraintFindings[{index}]", finding)
+                for index, finding in enumerate(output.constraint_findings)
+            ],
+            *[
+                (f"impactedComponentFindings[{index}]", finding)
+                for index, finding in enumerate(output.impacted_component_findings)
+            ],
+        ]
+        entries = list(output.output_classification.entries)
+        classified_references = {entry.finding_reference for entry in entries}
+        entries.extend(
+            [
+                ClassificationEntry(
+                    findingReference=reference,
+                    classification=finding.grounding.classification,
+                    grounded=finding.grounding.grounded,
+                )
+                for reference, finding in findings
+                if finding.grounding is not None and reference not in classified_references
+            ]
+        )
+        output.output_classification = OutputClassification(entries=entries)
 
     @staticmethod
     def _action_payload(action: object, submission, traces) -> dict[str, object]:
