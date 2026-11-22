@@ -235,13 +235,13 @@ class CoreLiveTreatmentAdapter:
                     # paths that Core correctly rejects as unavailable.
                     "allowedPathPrefixes": list(self._config.files),
                     "budget": {
-                        "maximumSteps": 2,
-                        "maximumRetrievalCalls": 2,
-                        "maximumEvidenceItems": 10,
-                        "maximumBytes": 20_000,
-                        "maximumTokens": 5_000,
+                        "maximumSteps": 3,
+                        "maximumRetrievalCalls": 3,
+                        "maximumEvidenceItems": 15,
+                        "maximumBytes": 30_000,
+                        "maximumTokens": 7_500,
                         "maximumElapsedMillis": 30_000,
-                         "maximumProviderOutputTokens": 8_000,
+                         "maximumProviderOutputTokens": 12_000,
                     },
                 }
             }
