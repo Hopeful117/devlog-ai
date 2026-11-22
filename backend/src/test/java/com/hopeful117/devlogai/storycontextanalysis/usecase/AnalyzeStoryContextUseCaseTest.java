@@ -462,6 +462,40 @@ class AnalyzeStoryContextUseCaseTest {
     }
 
     @Test
+    void equivalentRequestWithNewIdempotencyKeyReusesSubmissionDigest() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        UUID existingTaskId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        AiTask existing = AiTask.builder().id(existingTaskId)
+                .submissionDigest("same-request")
+                .build();
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                "grant-1", projectId.toString(), "MCP_STORY_AGENT_EXECUTE");
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectId), any())).thenReturn(true);
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(any(), any()))
+                .thenReturn(Optional.empty());
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHashIsNull(any()))
+                .thenReturn(Optional.empty());
+        when(aiTaskRepository.findBySubmissionDigest(any())).thenReturn(Optional.of(existing));
+
+        UUID result = useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null,
+                "new-runtime-key", principal, "chatgpt");
+
+        assertEquals(existingTaskId, result);
+        verify(engineeringContextFacade, never()).getCanonicalEngineeringContext(
+                any(), any(), any(), any());
+        verify(analysisRepository, never()).save(any(Analysis.class));
+    }
+
+    @Test
     void legacyUnscopedKeyCannotBeReusedAcrossTheScopedContract() {
         UUID projectId = UUID.randomUUID();
         UUID storyId = UUID.randomUUID();
