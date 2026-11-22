@@ -749,7 +749,9 @@ class StoryContextAnalysisGenerationService:
                         f"Finding {finding.title} has invalid relationType: {finding.grounding.relation_type.value}"
                     )
 
-        valid_classification_references = {"objectiveUnderstanding"}
+        valid_classification_references: set[str] = set()
+        if output.objective_understanding.grounding is not None:
+            valid_classification_references.add("objectiveUnderstanding")
         for field_name, findings in (
             ("architectureFindings", output.architecture_findings),
             ("decisionFindings", output.decision_findings),
@@ -761,9 +763,9 @@ class StoryContextAnalysisGenerationService:
             valid_classification_references.update(
                 f"{field_name}[{index}]" for index in range(len(findings))
             )
-        grounding_by_reference = {
-            "objectiveUnderstanding": output.objective_understanding.grounding,
-        }
+        grounding_by_reference: dict[str, object] = {}
+        if output.objective_understanding.grounding is not None:
+            grounding_by_reference["objectiveUnderstanding"] = output.objective_understanding.grounding
         for field_name, findings in (
             ("architectureFindings", output.architecture_findings),
             ("decisionFindings", output.decision_findings),
