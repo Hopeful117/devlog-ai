@@ -169,6 +169,25 @@ def test_core_live_adapter_preserves_mcp_shape_when_task_identity_is_missing() -
     assert len(result["mcpResponse"]["responseDigest"]) == 64
 
 
+def test_core_live_adapter_classifies_plain_mcp_text_and_bounds_credentials() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "A_DEVLOG_CURRENT",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223, story_path=None, files=("docs/story.md",)),
+        manifest(),
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {
+            "mcpText": "MCP error: Bearer abc123 token=secret-value " + "x" * 600,
+        }),
+    )
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, manifest())
+
+    assert result["errorType"] == "MCP_TEXT_RESPONSE"
+    assert result["mcpResponse"]["text"].startswith("MCP error: Bearer [REDACTED] token=[REDACTED]")
+    assert "abc123" not in result["mcpResponse"]["text"]
+    assert "secret-value" not in result["mcpResponse"]["text"]
+    assert len(result["mcpResponse"]["text"]) <= 500
+
+
 def test_core_live_adapter_rejects_completed_response_without_result() -> None:
     adapter = CoreLiveTreatmentAdapter(
         "C_DEVLOG_ENGINEERING_ANALYST",

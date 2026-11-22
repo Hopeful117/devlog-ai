@@ -178,6 +178,15 @@ def _bounded_mcp_error(error: Exception) -> str:
     return type(error).__name__
 
 
+def _bounded_mcp_text(value: object) -> str:
+    """Keep plain MCP tool text diagnostic-only and credential-safe."""
+
+    text = str(value)
+    text = re.sub(r"(?i)bearer\s+\S+", "Bearer [REDACTED]", text)
+    text = re.sub(r"(?i)(token|secret|password|api[_-]?key)=\S+", r"\1=[REDACTED]", text)
+    return text[:500]
+
+
 @dataclass(frozen=True)
 class LiveConfiguration:
     mcp_launcher: Path
@@ -296,7 +305,7 @@ class CoreLiveTreatmentAdapter:
         response_diagnostic = _mcp_response_diagnostic(execution)
         task_id = execution.get("aiTaskId") or execution.get("snapshotId")
         if not isinstance(task_id, str) or not task_id:
-            return {
+            response = {
                 "executionMode": "LIVE",
                 "executionStatus": "RUNTIME_FAILURE",
                 "integrationStatus": "LIVE_CORE_MCP_BOUNDARY_FAILURE",
@@ -308,6 +317,11 @@ class CoreLiveTreatmentAdapter:
                 "errorMessage": "MCP Story Agent response did not return aiTaskId or snapshotId",
                 "mcpResponse": response_diagnostic,
             }
+            if isinstance(execution.get("mcpText"), str):
+                response["errorType"] = "MCP_TEXT_RESPONSE"
+                response["errorMessage"] = "MCP Story Agent returned non-JSON tool text"
+                response["mcpResponse"]["text"] = _bounded_mcp_text(execution["mcpText"])
+            return response
         result = execution.get("result") if isinstance(execution.get("result"), dict) else {}
         execution_status = execution.get("status", "RUNTIME_FAILURE")
         if execution_status == "COMPLETED" and not result:
