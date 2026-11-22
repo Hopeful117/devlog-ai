@@ -31,6 +31,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -133,6 +134,23 @@ public class GlobalExceptionHandler {
     ) {
         return response(HttpStatus.NOT_FOUND, ApiErrorCode.ROUTE_NOT_FOUND,
                 "No API route matches this request.", request);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiErrorResponse> handleResponseStatus(
+            ResponseStatusException ex,
+            HttpServletRequest request) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        if (status == null) {
+            status = HttpStatus.INTERNAL_SERVER_ERROR;
+        }
+        ApiErrorCode code = status == HttpStatus.NOT_FOUND
+                ? ApiErrorCode.ROUTE_NOT_FOUND
+                : ApiErrorCode.INTERNAL_ERROR;
+        String message = status == HttpStatus.NOT_FOUND
+                ? "No API route matches this request."
+                : "Request could not be completed.";
+        return response(status, code, message, request);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

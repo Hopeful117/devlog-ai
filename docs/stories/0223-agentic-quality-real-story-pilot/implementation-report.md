@@ -77,6 +77,17 @@ git diff --check -- ai-engine/evaluations/comparative_pilot_v1 ai-engine/tests/t
 - Python compilation: **passed**.
 - Diff whitespace check: **passed**.
 
+## Live C Validation Outcome
+
+- The bounded live C path completed technically on runtime `5db1d521`.
+- One real provider call was made; Core/MCP completed and persisted the result.
+- The result contained no repository evidence, exhausted the investigation budget,
+  and returned `LOW` confidence with missing information.
+- The pilot objective was not achieved. This is a technical execution pass but a
+  product-quality failure, not evidence of semantic success.
+- The persisted artifact is under `/tmp/opencode/q1-live-c-5db1d521-r1/` and its
+  integrity report passed.
+
 ## Known Limitations
 
 - Q1-Q8 oracle acceptance is recorded in the oracle proposal document; inferred
@@ -85,18 +96,19 @@ git diff --check -- ai-engine/evaluations/comparative_pilot_v1 ai-engine/tests/t
 - The proof gate currently returns `NOT_PROVEN` until approved thresholds and
   campaign evidence are supplied; approved thresholds are recorded in the pilot
   manifest and the gate does not fabricate human-utility evidence.
-- No live technical validation or 72-assignment provider campaign was run.
-- The live authorization contract is offline-validatable only; it does not
-  execute providers.
+- No 72-assignment provider campaign was run.
+- The live C source projection was only partially fresh and resolved to source
+  revision `030527205c12f6d21bf973ca349b135e3843d50e`, not the local runtime
+  revision. The next investigation must align source ingestion and runtime
+  revision before repeating the quality test.
 - The first combined Maven run exceeded its command timeout during MCP tests;
   the backend and MCP modules were subsequently validated independently.
 
 ## Blockers / Repository Inconsistencies
 
 - DevLog context service returned `401 Unauthorized` during preflight.
-- Human acceptance of Story 0223 and separate live-provider authorization remain
-  required. The campaign plan and scoring protocol are approved, but execution
-  remains gated by technical live validation and authorization.
+- Human acceptance of Story 0223 remains required. The bounded live validation
+  authorization was used for the single C observation only.
 
 ## Human Decisions Recorded
 
@@ -107,18 +119,17 @@ git diff --check -- ai-engine/evaluations/comparative_pilot_v1 ai-engine/tests/t
 - Campaign: 8 questions x 3 treatments x 3 repetitions (72 assignments).
 - Human scoring: 2 blinded raters with adjudication of disagreements.
 - Human utility: separate utility session for both target treatments.
-- Live provider validation: follow-up for Story acceptance, not implicitly
-  authorized by this decision.
-- Live execution decision: prepare the bounded authorization only; provider
-  calls remain explicitly unauthorized.
+- Live provider validation: C executed once under the bounded authorization;
+  semantic objective failed because no evidence was returned.
+- Live execution decision: no broader A/B/C campaign is authorized by this run.
 - Proof thresholds: execution completeness 1.00, human utility 0.75,
   non-inferiority margin 0.05, advantage delta 0.10 on
   `groundedCorrectnessRate`.
 
 ## Commit / Push
 
-- Commit created: **NO**
-- Push performed: **NO**
+- Commit created: **PENDING DELIVERY**
+- Push performed: **PENDING DELIVERY**
 
 ## Readiness
 
