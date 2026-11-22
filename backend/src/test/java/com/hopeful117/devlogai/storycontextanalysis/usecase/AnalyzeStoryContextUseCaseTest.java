@@ -6,6 +6,7 @@ import com.hopeful117.devlogai.ai.engine.dto.AiTaskResultStatus;
 import com.hopeful117.devlogai.ai.engine.dto.AiInteractionTraceRequest;
 import com.hopeful117.devlogai.ai.engine.dto.PromptExecutionMetadata;
 import com.hopeful117.devlogai.ai.engine.dto.PromptRequest;
+import com.hopeful117.devlogai.ai.engine.dto.AiTaskSubmissionResponse;
 import com.hopeful117.devlogai.ai.task.entity.AiTask;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskStatus;
 import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
@@ -211,6 +212,8 @@ class AnalyzeStoryContextUseCaseTest {
                 new AiTaskExecutionAuthorizationService.AuthorizedExecution(
                         AiCredentialBinding.builder().id(UUID.randomUUID()).build(),
                         "anthropic", "claude-opus-5-5", Map.of("maxOutputTokens", 4096)));
+        when(aiEngineClient.submit(any(PromptRequest.class))).thenReturn(
+                new AiTaskSubmissionResponse(task.getCorrelationId(), true, "external-job-1", Instant.now()));
 
         UUID result = useCase.execute(
                 PROJECT_SLUG, storyId, INTENT_ID, List.of("src/main/java/Canonical.java"), null,
