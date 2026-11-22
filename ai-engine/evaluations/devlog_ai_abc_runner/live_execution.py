@@ -238,7 +238,7 @@ class CoreLiveTreatmentAdapter:
                         "maximumBytes": 20_000,
                         "maximumTokens": 5_000,
                         "maximumElapsedMillis": 30_000,
-                        "maximumProviderOutputTokens": 1_000,
+                         "maximumProviderOutputTokens": 4_000,
                     },
                 }
             }
