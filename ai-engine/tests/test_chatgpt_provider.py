@@ -1,4 +1,5 @@
 from dataclasses import replace
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -7,6 +8,7 @@ import httpx
 from app.prompts.insight import InsightPromptBuilder
 from app.providers.chatgpt import ChatGptProviderError, OpenAiChatGptProvider
 from app.schemas.insight import InsightGenerationOutput
+from app.schemas.story_context_investigation import InvestigationDecisionResponse
 from tests.intent_fixtures import prompt_request
 
 
@@ -100,6 +102,16 @@ async def test_stream_records_completed_usage(monkeypatch):
         "output_tokens": 7,
         "total_tokens": 19,
     }
+
+
+def test_root_union_schema_is_wrapped_for_responses_api() -> None:
+    schema, wrapped = OpenAiChatGptProvider._provider_schema(InvestigationDecisionResponse)
+
+    assert wrapped is True
+    assert schema["type"] == "object"
+    assert schema["required"] == ["root"]
+    assert schema["additionalProperties"] is False
+    assert "oneOf" not in json.dumps(schema)
 
 
 @pytest.mark.asyncio

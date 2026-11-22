@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -79,6 +80,7 @@ class OpenAiChatGptProvider:
                     else "REQUEST_OR_ENGINE_CONFIG",
                 },
             )
+            schema, wrapped_root = self._provider_schema(response_model)
             body = {
                 "model": request.model_identifier or self._model,
                 "store": False,
@@ -90,12 +92,15 @@ class OpenAiChatGptProvider:
                 ],
                 "text": {"format": {
                     "type": "json_schema", "name": "devlog_output", "strict": True,
-                    "schema": to_strict_json_schema(response_model),
+                    "schema": schema,
                 }},
             }
             output_text = await self._stream(credential.access_token, body)
             completed_at = datetime.now(timezone.utc)
-            parsed = response_model.model_validate(json.loads(output_text))
+            payload = json.loads(output_text)
+            if wrapped_root:
+                payload = payload["root"]
+            parsed = response_model.model_validate(payload)
             return ProviderGenerationResult(
                 output=parsed,
                 raw_output=output_text,
@@ -203,6 +208,35 @@ class OpenAiChatGptProvider:
     @staticmethod
     def _non_negative_int(value: object) -> int | None:
         return value if isinstance(value, int) and value >= 0 else None
+
+    @staticmethod
+    def _provider_schema(response_model: type[StructuredOutput]) -> tuple[dict, bool]:
+        schema = deepcopy(to_strict_json_schema(response_model))
+        wrapped_root = "oneOf" in schema or "anyOf" in schema or schema.get("type") != "object"
+        OpenAiChatGptProvider._replace_one_of(schema)
+        if not wrapped_root:
+            return schema, False
+        definitions = schema.pop("$defs", None)
+        wrapped = {
+            "type": "object",
+            "properties": {"root": schema},
+            "required": ["root"],
+            "additionalProperties": False,
+        }
+        if definitions:
+            wrapped["$defs"] = definitions
+        return wrapped, True
+
+    @staticmethod
+    def _replace_one_of(value: object) -> None:
+        if isinstance(value, dict):
+            if "oneOf" in value:
+                value["anyOf"] = value.pop("oneOf")
+            for child in value.values():
+                OpenAiChatGptProvider._replace_one_of(child)
+        elif isinstance(value, list):
+            for child in value:
+                OpenAiChatGptProvider._replace_one_of(child)
 
     @staticmethod
     def _incomplete_response_message(event_type: str, data: dict) -> str:
