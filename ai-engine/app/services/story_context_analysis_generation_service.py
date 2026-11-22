@@ -232,7 +232,9 @@ class StoryContextAnalysisGenerationService:
         prompt: Prompt | None = None
         try:
             prompt = self._prompt_builder.build_investigation(submission)
-            decision = await self._investigation_decision(prompt, traces)
+            decision, prompt = await self._investigation_decision_with_retry(
+                submission, prompt, traces
+            )
             if not isinstance(decision, InvestigationPlanDecision):
                 raise ValueError("Investigation must begin with a PLAN decision")
             pending = list(decision.plan.actions)
@@ -282,7 +284,9 @@ class StoryContextAnalysisGenerationService:
                     )
                 self._synchronize_investigation_grounding(submission, response)
                 prompt = self._prompt_builder.build_investigation(submission, results)
-                decision = await self._investigation_decision(prompt, traces)
+                decision, prompt = await self._investigation_decision_with_retry(
+                    submission, prompt, traces
+                )
         except _InvestigationTerminal as error:
             await self._send_failure(
                 submission, external_job_id, error.code, error, prompt, traces,
@@ -296,12 +300,41 @@ class StoryContextAnalysisGenerationService:
             )
 
     async def _investigation_decision(
-        self, prompt: Prompt, traces: InteractionTraceCollector
+        self, submission: AiTaskSubmissionRequest, prompt: Prompt,
+        traces: InteractionTraceCollector,
     ):
         response = await traces.generate_and_validate(
-            prompt, InvestigationDecisionResponse, lambda value: None
+            prompt,
+            InvestigationDecisionResponse,
+            lambda value: self._validate_investigation_decision(submission, value),
         )
         return response.root
+
+    async def _investigation_decision_with_retry(
+        self, submission: AiTaskSubmissionRequest, prompt: Prompt,
+        traces: InteractionTraceCollector,
+    ) -> tuple[object, Prompt]:
+        try:
+            return await self._investigation_decision(submission, prompt, traces), prompt
+        except (ValidationError, StoryContextAnalysisOutputValidationError, ValueError) as error:
+            if not getattr(error, "retryable", True):
+                raise
+            corrective_prompt = self._prompt_builder.investigation_corrective_retry(prompt, error)
+            traces.retry(error)
+            return await self._investigation_decision(
+                submission, corrective_prompt, traces
+            ), corrective_prompt
+
+    def _validate_investigation_decision(
+        self, submission: AiTaskSubmissionRequest, response: InvestigationDecisionResponse
+    ) -> None:
+        decision = response.root
+        if isinstance(decision, InvestigationFinalDecision):
+            self._validate_output(
+                provider_result_to_internal(decision.result),
+                submission.selected_knowledge,
+                submission.grounding_contract or {},
+            )
 
     async def _complete_investigation(
         self, submission: AiTaskSubmissionRequest, external_job_id: UUID,

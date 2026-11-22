@@ -380,6 +380,29 @@ async def test_initialized_investigation_executes_one_action_and_returns_final(m
 
 
 @pytest.mark.asyncio
+async def test_investigation_retries_final_output_contract_failure_once(monkeypatch):
+    request = _investigation_request()
+    invalid_final = _final_decision()
+    invalid_final["result"]["outputClassification"]["entries"][0]["findingReference"] = (
+        "missingInformation:stale-reference"
+    )
+    traces = _ServiceTraces([
+        _investigation_plan(request.ai_task_id),
+        invalid_final,
+        _final_decision(),
+    ])
+    callback = _InvestigationCallback({"actionId": "action-1", "outcome": "RESULTS", "evidence": []})
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-00000000000b"))
+
+    assert traces.calls == 3
+    assert len(traces.retry_reasons) == 1
+    assert "Core's deterministic output validation" in traces.prompts[2]
+    assert callback.results[0].status.value == "COMPLETED"
+
+
+@pytest.mark.asyncio
 async def test_investigation_synchronizes_updated_grounding_for_final_callback(monkeypatch):
     request = _investigation_request()
     contract = {

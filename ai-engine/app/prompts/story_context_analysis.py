@@ -459,3 +459,32 @@ class StoryContextAnalysisPromptBuilder:
             generation_parameters=original_prompt.generation_parameters,
             model_identifier=original_prompt.model_identifier,
         )
+
+    def investigation_corrective_retry(self, original_prompt: Prompt, error: Exception) -> Prompt:
+        error_message = str(error)
+        corrective_user_message = (
+            original_prompt.user_message
+            + "\n\nCORRECTIVE RETRY\n"
+            "The previous FINAL result failed Core's deterministic output validation.\n"
+            f"Validation error: {error_message}\n"
+            "Return the same decision envelope protocol. Preserve valid evidence and findings, "
+            "but make every outputClassification.findingReference match an item that is actually "
+            "present in the corresponding output array. Remove stale classification entries instead "
+            "of inventing identifiers. Do not add evidence or references outside the authorized contract."
+        )
+        content = f"{SYSTEM_MESSAGE}\n\n{corrective_user_message}"
+        content_digest = hashlib.sha256(content.encode()).hexdigest()
+        return Prompt(
+            prompt_id=str(uuid.uuid5(uuid.NAMESPACE_URL, content_digest)),
+            prompt_version=original_prompt.prompt_version,
+            intent_id=original_prompt.intent_id,
+            intent_version=original_prompt.intent_version,
+            system_message=SYSTEM_MESSAGE,
+            user_message=corrective_user_message,
+            expected_output_schema=original_prompt.expected_output_schema,
+            traceability=original_prompt.traceability,
+            generation_policy=original_prompt.generation_policy,
+            content_digest=content_digest,
+            generation_parameters=original_prompt.generation_parameters,
+            model_identifier=original_prompt.model_identifier,
+        )
