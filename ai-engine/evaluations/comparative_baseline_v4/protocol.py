@@ -731,6 +731,35 @@ def evaluate_grounding(answer: dict[str, Any], evidence: list[EvidenceItem | dic
     authorized = _authorized_references(question_id) if question_id else None
     resolutions: list[dict[str, Any]] = []
     valid = True
+    if question_id == "Q1":
+        for citation in answer.get("evidence", []):
+            reference = citation.get("reference")
+            source = by_reference.get(reference)
+            excerpt = citation.get("excerpt")
+            item_valid = (
+                source is not None
+                and source.authorized
+                and reference in authorized
+                and source.resolved
+                and isinstance(excerpt, str)
+                and bool(excerpt)
+                and excerpt in source.content
+                and source.digest_valid
+            )
+            valid = valid and item_valid
+            resolutions.append({
+                "reference": reference,
+                "authorization": "AUTHORIZED" if source is not None and reference in authorized else "NOT_AUTHORIZED",
+                "resolution": "RESOLVED" if source is not None and source.resolved else "UNRESOLVED",
+                "locator": "Q1_BOUNDED_CONTENT",
+                "exactExcerpt": bool(isinstance(excerpt, str) and source is not None and excerpt in source.content),
+                "contentDigestValid": bool(source is not None and source.digest_valid),
+                "status": "PASS" if item_valid else "FAIL",
+            })
+        if answer.get("relationshipResult") == "ESTABLISHED" and not answer.get("evidence"):
+            valid = False
+            resolutions.append({"status": "FAIL", "resolution": "REQUIRED_EVIDENCE_MISSING"})
+        return {"status": "PASS" if valid else "FAIL", "resolutions": resolutions, "contract": "devlog-ai-abc-q1-bounded-grounding-v1"}
     for citation in answer.get("evidence", []):
         reference = citation.get("reference")
         source = by_reference.get(reference)
