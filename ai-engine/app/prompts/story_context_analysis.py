@@ -331,7 +331,7 @@ class StoryContextAnalysisPromptBuilder:
              f"AUTHORIZED PROJECTION\n{knowledge_json}\n\n"
              "AUTHORIZED PATHS\n"
              f"Use only these exact authorized paths for actions: {self._canonical(investigation.get('scope', {}).get('allowedPathPrefixes', []))}. "
-             "Do not invent filenames or substitute plausible paths.\n\n"
+             "Do not invent filenames or substitute plausible paths. Every ACTION must use a new unique actionId; never reuse an earlier actionId.\n\n"
              f"PRIOR CAPABILITY RESULTS\n{results_json}\n\n"
             "DECISION RULES\n"
             "Use PLAN only when no capability result exists. After a result, use ACTION for one additional bounded action "
