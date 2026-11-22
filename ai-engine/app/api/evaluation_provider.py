@@ -65,7 +65,16 @@ async def complete_chatgpt(
                 ],
             },
         )
-        return _error("INVALID_PROVIDER_REQUEST", status.HTTP_400_BAD_REQUEST)
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={
+                "code": "INVALID_PROVIDER_REQUEST",
+                "fields": [
+                    {"location": list(item.get("loc", ())), "type": item.get("type")}
+                    for item in error.errors()
+                ],
+            },
+        )
     except httpx.HTTPError:
         return _error("PROVIDER_CONNECTION_ERROR", status.HTTP_502_BAD_GATEWAY)
 

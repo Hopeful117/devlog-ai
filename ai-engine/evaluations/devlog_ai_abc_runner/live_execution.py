@@ -641,6 +641,7 @@ class ChatGptOAuthTransport:
             },
         )
         if response.status_code >= 400:
+            error_payload = response.json() if response.headers.get("content-type", "").startswith("application/json") else {}
             error = _ProviderHttpError(response.status_code)
             raise _oauth_transport_failure(
                 error,
@@ -651,6 +652,8 @@ class ChatGptOAuthTransport:
                     "bindingTaskId": str(self._task_id),
                     "bindingProvider": "chatgpt",
                     "remoteProviderEndpoint": endpoint,
+                    "remoteProviderErrorCode": error_payload.get("code"),
+                    "remoteProviderErrorFields": error_payload.get("fields", []),
                 },
             )
         result = response.json()
