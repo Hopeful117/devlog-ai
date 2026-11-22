@@ -351,6 +351,7 @@ class ChatGptOAuthTransport:
                     "ai-engine/app/schemas/story_context_investigation.py, "
                     "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextCallbackService.java, "
                     "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextResultValidator.java, and docs/decisions/ADR-067.md."
+                    " Every evidence excerpt must be copied verbatim from the returned tool content; do not paraphrase excerpts."
                 )
                 user_input: Any = serialize_v4_conversation(request.input_payload)
             else:
