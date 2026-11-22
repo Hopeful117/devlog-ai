@@ -13,4 +13,6 @@ class EvaluationProviderRequest(BaseModel):
     input: Any
     max_output_tokens: int = Field(alias="maxOutputTokens", ge=256, le=32_768)
     text: dict[str, Any]
+    store: bool = False
+    stream: bool = False
     tools: list[dict[str, Any]] | None = None
