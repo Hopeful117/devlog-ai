@@ -667,6 +667,7 @@ class ChatGptOAuthTransport:
                     "bindingTaskId": str(self._task_id),
                     "bindingProvider": "chatgpt",
                     "remoteProviderEndpoint": endpoint,
+                    "remoteProviderError": result.get("providerError"),
                 },
             )
         if result.get("kind") == "TOOL_CALL":

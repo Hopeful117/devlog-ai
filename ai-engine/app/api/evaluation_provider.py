@@ -112,7 +112,21 @@ async def _complete(payload: EvaluationProviderRequest) -> dict:
         ) as response:
             if response.status_code >= 400:
                 await response.aread()
-                return {"status": "FAILED", "code": f"PROVIDER_HTTP_{response.status_code}"}
+                try:
+                    error_body = response.json()
+                except ValueError:
+                    error_body = {}
+                error = error_body.get("error", {}) if isinstance(error_body, dict) else {}
+                return {
+                    "status": "FAILED",
+                    "code": f"PROVIDER_HTTP_{response.status_code}",
+                    "providerError": {
+                        "type": error.get("type"),
+                        "code": error.get("code"),
+                        "param": error.get("param"),
+                        "message": str(error.get("message", ""))[:500],
+                    },
+                }
             event_type = None
             data_lines: list[str] = []
             async for line in response.aiter_lines():
