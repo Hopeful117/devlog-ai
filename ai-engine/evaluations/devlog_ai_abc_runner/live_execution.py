@@ -245,6 +245,11 @@ class CoreLiveTreatmentAdapter:
         idempotency_key = (
             f"q1-live-{observation['observationId']}-{current_head(Path.cwd())[:12]}"
         )
+        if self.condition == "C_DEVLOG_ENGINEERING_ANALYST":
+            guidance = {
+                **guidance,
+                "evaluation": {"executionIdentity": idempotency_key},
+            }
         started = time.perf_counter()
         request = {
             "projectSlug": self._config.project_slug,
