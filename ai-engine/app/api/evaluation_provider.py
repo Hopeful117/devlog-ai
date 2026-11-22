@@ -117,6 +117,7 @@ async def _complete(payload: EvaluationProviderRequest) -> dict:
                 except ValueError:
                     error_body = {}
                 error = error_body.get("error", {}) if isinstance(error_body, dict) else {}
+                response_text = response.text[:500]
                 return {
                     "status": "FAILED",
                     "code": f"PROVIDER_HTTP_{response.status_code}",
@@ -125,6 +126,7 @@ async def _complete(payload: EvaluationProviderRequest) -> dict:
                         "code": error.get("code"),
                         "param": error.get("param"),
                         "message": str(error.get("message", ""))[:500],
+                        "rawBody": response_text,
                     },
                 }
             event_type = None
