@@ -80,4 +80,27 @@ public interface DevlogResourceClient {
             @RequestParam("reference") String reference,
             @RequestParam("mode") String mode,
             @RequestParam(value = "analysisId", required = false) UUID analysisId);
+
+    @GetExchange("/proposals/project/{projectId}")
+    String listProposals(@PathVariable("projectId") UUID projectId);
+
+    @GetExchange("/proposals/project/{projectId}")
+    String listProposalsAuthenticated(
+            @PathVariable("projectId") UUID projectId,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation);
+
+    @GetExchange("/analyses/{analysisId}/proposal-review")
+    String getProposalReview(
+            @PathVariable("analysisId") UUID analysisId,
+            @RequestParam(value = "page", required = false) Integer page,
+            @RequestParam(value = "size", required = false) Integer size);
+
+    @GetExchange("/analyses/{analysisId}/proposal-review")
+    String getProposalReviewAuthenticated(
+            @PathVariable("analysisId") UUID analysisId,
+            @RequestParam(value = "page", required = false) Integer page,
+            @RequestParam(value = "size", required = false) Integer size,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation);
 }
