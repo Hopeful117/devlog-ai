@@ -172,13 +172,17 @@ public class InvestigationCapabilityExecutionService {
             RepositoryEvidence evidence,
             InvestigationAction action,
             RepositoryContext context) {
-        if (!(action instanceof ReadEvidenceRangeRequest read)
-                || evidence.content() != null && evidence.content().text() != null) {
+        if (!"ENGINEERING_STORY".equals(evidence.kind())
+                || evidence.provenance() == null) {
             return ResolvedEvidence.available(evidence, evidence.reference());
         }
-        if (!"ENGINEERING_STORY".equals(evidence.kind())
-                || evidence.provenance() == null
-                || !read.path().equals(evidence.provenance().originatingFile())) {
+        String path = evidence.provenance().originatingFile();
+        boolean readRequiresContent = action instanceof ReadEvidenceRangeRequest read
+                && (evidence.content() == null || evidence.content().text() == null)
+                && read.path().equals(path);
+        boolean searchRequiresRevision = action instanceof SearchEvidenceRequest
+                && (resolvedRevision(evidence) == null || resolvedRevision(evidence).isBlank());
+        if (!readRequiresContent && !searchRequiresRevision) {
             return ResolvedEvidence.available(evidence, evidence.reference());
         }
         if (context.revisionScope() == null
@@ -189,20 +193,25 @@ public class InvestigationCapabilityExecutionService {
         }
 
         String documentReference = "document:" + context.revisionScope().sourceId()
-                + ":" + read.path() + "@" + action.revision();
+                + ":" + path + "@" + action.revision();
         try {
             var result = evidenceResolutionFacade.resolve(new EvidenceResolutionRequest(
                     documentReference, EvidenceResolutionMode.CURRENT));
             if (!(result.payload() instanceof DocumentResolutionPayload payload)
                     || !action.revision().equals(payload.revision())
-                    || !read.path().equals(payload.path())) {
+                    || !path.equals(payload.path())) {
                 return ResolvedEvidence.unavailable(
                         "Resolved Story document did not match the authorized path and revision");
             }
-            var content = new com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent(
-                    com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.COMPLETE,
-                    payload.content(), null, null, null, payload.revision());
-            return ResolvedEvidence.available(evidence.withContent(content), evidence.reference());
+            if (readRequiresContent) {
+                var content = new com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent(
+                        com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.COMPLETE,
+                        payload.content(), null, null, null, payload.revision());
+                return ResolvedEvidence.available(evidence.withContent(content), evidence.reference());
+            }
+            var metadata = new java.util.HashMap<>(evidence.extractionMetadata());
+            metadata.put("resolvedRevision", payload.revision());
+            return ResolvedEvidence.available(evidence.withExtractionMetadata(metadata), evidence.reference());
         } catch (EvidenceResolutionException exception) {
             return ResolvedEvidence.unavailable("Authorized Story document is unavailable");
         }

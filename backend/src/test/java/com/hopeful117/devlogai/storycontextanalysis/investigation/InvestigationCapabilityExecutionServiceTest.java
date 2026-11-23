@@ -121,6 +121,32 @@ class InvestigationCapabilityExecutionServiceTest {
     }
 
     @Test
+    void searchResolvesAuthorizedStoryRevisionWithoutMaterializingContent() {
+        var action = new SearchEvidenceRequest("action-story-search", "devlog", REVISION,
+                "find Story", "Core", "docs", 2, 10_000, 2_000);
+        var sourceId = UUID.randomUUID();
+        when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
+        when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
+                eq(snapshot), eq(List.of()), eq(STORY_ID), eq(action.query())))
+                .thenReturn(contextWithRevisionScope(sourceId, storyEvidence("docs/q1.md")));
+        when(evidenceResolutionFacade.resolve(any())).thenReturn(evidenceResolutionResult);
+        when(evidenceResolutionResult.payload())
+                .thenReturn(new DocumentResolutionPayload("docs/q1.md", REVISION, "unbounded content"));
+
+        var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
+                InvestigationUsage.empty(), Set.of());
+
+        assertThat(result.outcome()).isEqualTo(InvestigationCapabilityResult.Outcome.RESULTS);
+        assertThat(result.evidence()).singleElement().satisfies(value -> {
+            assertThat(value.reference()).isEqualTo("story:" + STORY_ID);
+            assertThat(value.revision()).isEqualTo(REVISION);
+            assertThat(value.content()).isNull();
+            assertThat(value.citable()).isTrue();
+        });
+        verify(evidenceResolutionFacade).resolve(any());
+    }
+
+    @Test
     void missingStoryRevisionScopeIsExplicitlyUnavailable() {
         var action = new ReadEvidenceRangeRequest("action-story-no-scope", "devlog", REVISION,
                 "inspect Story", "docs/stories/0230/story.md", 1, 2, 1, 10_000, 2_000);
