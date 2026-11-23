@@ -271,7 +271,11 @@ class StoryContextAnalysisGenerationService:
                     raise _InvestigationTerminal("INVESTIGATION_RESULT_INVALID") from error
                 self._validate_investigation_identity(submission, typed_result)
                 account_generations = getattr(traces, "account_provider_generations", None)
-                if account_generations is not None:
+                # Core does not persist provider accounting for an early
+                # protocol/scope rejection. Keep those generations pending so
+                # the terminal failure callback can account for them exactly
+                # once. Capability-level REJECTED results do persist usage.
+                if account_generations is not None and response.get("rejected") is not True:
                     account_generations(action_accounting["providerGenerationCount"])
                 # Keep the complete Core result, including evidence and grounding,
                 # in the next prompt. Metadata-only action summaries are not enough.

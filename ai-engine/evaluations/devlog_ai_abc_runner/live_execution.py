@@ -296,6 +296,11 @@ class CoreLiveTreatmentAdapter:
             "guidance": guidance,
             "idempotencyKey": idempotency_key,
         }
+        if self.condition == "A_DEVLOG_CURRENT":
+            request["guidance"] = {
+                **guidance,
+                "evaluation": {"executionIdentity": idempotency_key},
+            }
         if self._config.story_id is not None:
             request["storyId"] = self._config.story_id
         try:
