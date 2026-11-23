@@ -11,7 +11,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -169,6 +173,107 @@ class DevLogStoryAgentToolTest {
         assertThat(json.path("status").asText()).isEqualTo("TIMED_OUT");
         assertThat(json.path("diagnostics").path("code").asText()).isEqualTo("POLL_TIMEOUT");
         assertThat(json.path("diagnostics").path("lastKnownStatus").asText()).isEqualTo("SUBMITTED");
+    }
+
+    @Test
+    void retriesATimedOutSubmissionWithTheSameIdempotencyKey() throws Exception {
+        DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        DevLogStoryAgentTool tool = new DevLogStoryAgentTool(
+                client, objectMapper, 0, 50, 0, principalProvider());
+        UUID taskId = UUID.randomUUID();
+        AtomicInteger attempts = new AtomicInteger();
+        CountDownLatch firstAttemptStarted = new CountDownLatch(1);
+        Map<String, Object> submitted = Map.of(
+                "status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId);
+
+        when(client.submitStoryContextAgentTask(any(), any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    if (attempts.incrementAndGet() == 1) {
+                        firstAttemptStarted.countDown();
+                        Thread.sleep(TimeUnit.SECONDS.toMillis(10));
+                    }
+                    return submitted;
+                });
+
+        JsonNode json = objectMapper.readTree(
+                tool.execute("devlog-ai", null, "intent", null, null, "request-1"));
+
+        assertThat(firstAttemptStarted.await(1, TimeUnit.SECONDS)).isTrue();
+        assertThat(json.path("diagnostics").path("code").asText()).isEqualTo("POLL_TIMEOUT");
+        assertThat(json.path("aiTaskId").asText()).isEqualTo(taskId.toString());
+        assertThat(attempts).hasValue(2);
+        verify(client, org.mockito.Mockito.times(2)).submitStoryContextAgentTask(
+                eq("devlog-ai"), eq((UUID) null), eq("Bearer test"), eq("request-1"),
+                eq(""), any(DevlogProjectContextClient.SubmitRequest.class));
+    }
+
+    @Test
+    void returnsSubmissionTimeoutWhenSameKeyRecoveryAlsoTimesOut() throws Exception {
+        DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        DevLogStoryAgentTool tool = new DevLogStoryAgentTool(
+                client, objectMapper, 100, 20, 0, principalProvider());
+        AtomicInteger attempts = new AtomicInteger();
+
+        when(client.submitStoryContextAgentTask(any(), any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    attempts.incrementAndGet();
+                    Thread.sleep(TimeUnit.SECONDS.toMillis(10));
+                    return Map.of();
+                });
+
+        long startedAt = System.nanoTime();
+        JsonNode json = objectMapper.readTree(
+                tool.execute("devlog-ai", null, "intent with secret payload", null, null, "request-1"));
+        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
+
+        assertThat(json.path("status").asText()).isEqualTo("TIMED_OUT");
+        assertThat(json.path("diagnostics").path("code").asText()).isEqualTo("SUBMISSION_TIMEOUT");
+        assertThat(json.path("diagnostics").path("resumeRequired").asBoolean()).isTrue();
+        assertThat(json.path("diagnostics").path("resumeAction").asText())
+                .isEqualTo("RETRY_WITH_SAME_IDEMPOTENCY_KEY");
+        assertThat(attempts).hasValue(2);
+        assertThat(elapsedMs).isLessThan(500);
+        assertThat(json.toString()).doesNotContain("Bearer test", "intent with secret payload");
+        verify(client, never()).getStoryContextAgentSnapshot(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void concurrentEquivalentResumesObserveOneTaskIdentity() throws Exception {
+        DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        DevLogStoryAgentTool tool = new DevLogStoryAgentTool(
+                client, objectMapper, 0, 1_000, 0, principalProvider());
+        UUID taskId = UUID.randomUUID();
+        CountDownLatch submissionsStarted = new CountDownLatch(2);
+        Map<String, Object> submitted = Map.of(
+                "status", "SUBMITTED", "aiTaskId", taskId, "snapshotId", taskId);
+
+        when(client.submitStoryContextAgentTask(any(), any(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    submissionsStarted.countDown();
+                    assertThat(submissionsStarted.await(1, TimeUnit.SECONDS)).isTrue();
+                    return submitted;
+                });
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<String> first = executor.submit(
+                    () -> tool.execute("devlog-ai", null, "intent", null, null, "same-key"));
+            Future<String> second = executor.submit(
+                    () -> tool.execute("devlog-ai", null, "intent", null, null, "same-key"));
+
+            JsonNode firstJson = objectMapper.readTree(first.get(2, TimeUnit.SECONDS));
+            JsonNode secondJson = objectMapper.readTree(second.get(2, TimeUnit.SECONDS));
+            assertThat(firstJson.path("aiTaskId").asText()).isEqualTo(taskId.toString());
+            assertThat(secondJson.path("aiTaskId").asText()).isEqualTo(taskId.toString());
+            verify(client, org.mockito.Mockito.times(2)).submitStoryContextAgentTask(
+                    eq("devlog-ai"), eq((UUID) null), eq("Bearer test"), eq("same-key"),
+                    eq(""), any(DevlogProjectContextClient.SubmitRequest.class));
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

@@ -510,6 +510,7 @@ public class StoryContextSubmissionService {
                 "bytes", 0, "tokens", 0, "elapsedMillis", 0, "providerOutputTokens", 0));
         investigation.put("actions", List.of());
         investigation.put("ledger", Map.of("actionCount", 0, "results", 0, "empty", 0, "rejected", 0));
+        investigation.put("requiredEvidence", true);
         investigation.put("initialized", true);
         snapshot.put("investigation", investigation);
     }
