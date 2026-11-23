@@ -30,6 +30,7 @@ from evaluations.devlog_ai_abc_runner.live_execution import (
     require_live_provider_environment,
     resolve_live_story,
 )
+from evaluations.devlog_ai_abc_runner.provenance import current_head
 from evaluations.comparative_baseline.collection_runtime import ProviderRequest, TransportFailure
 from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
 
@@ -37,7 +38,7 @@ from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
 ROOT = Path(__file__).parents[1].parent
 MANIFEST_PATH = ROOT / "docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json"
 ORACLE_PATH = ROOT / "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json"
-REVISION = "60fae3e0e1104d0ffbe3832c1f578ed532b1268a"
+REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
 
 
 def manifest() -> dict:
@@ -169,6 +170,27 @@ def test_core_live_adapter_preserves_mcp_shape_when_task_identity_is_missing() -
     assert len(result["mcpResponse"]["responseDigest"]) == 64
 
 
+def test_mcp_response_diagnostic_detects_nested_failure_fields() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "A_DEVLOG_CURRENT",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223,
+                         story_path=None, files=("docs/story.md",)),
+        manifest(),
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {
+            "status": "FAILED",
+            "diagnostics": {
+                "failureCode": "CORE_FAILURE",
+                "failureMessage": "bounded failure",
+            },
+        }),
+    )
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, manifest())
+
+    assert result["mcpResponse"]["failureCodePresent"] is True
+    assert result["mcpResponse"]["failureMessagePresent"] is True
+
+
 def test_core_live_adapter_classifies_plain_mcp_text_and_bounds_credentials() -> None:
     adapter = CoreLiveTreatmentAdapter(
         "A_DEVLOG_CURRENT",
@@ -219,6 +241,11 @@ def valid_authorization() -> dict:
     value = manifest()
     oracle = accepted_oracle()
     return {
+        "artifactVersion": "bounded-live-evaluation-authorization-v1",
+        "issuedBy": "CORE",
+        "authorizationId": "authorization-1",
+        "planId": "plan-1",
+        "planDigest": "b" * 64,
         "authorizationStatus": "AUTHORIZED",
         "approverId": "q1-test-approver",
         "approvedAt": "2026-01-01T00:00:00Z",
@@ -269,8 +296,9 @@ def test_live_preflight_is_static_and_fails_closed(tmp_path: Path, monkeypatch: 
     assert all(item["status"] == "LIVE_ENTRYPOINT_IDENTIFIED" for item in report["entrypoints"])
     assert all(item["adapterStatus"] == "CONTROLLED_ADAPTER_AVAILABLE" for item in report["entrypoints"])
     assert report["provenance"]["sourceSnapshot"]["revision"] == REVISION
-    assert report["provenance"]["runtimeRevision"] != REVISION
-    assert "executed runtime revision does not match the frozen manifest" in report["criticalBlockers"]
+    assert report["provenance"]["runtimeRevision"] == current_head(ROOT)
+    assert "approved pricing contract is missing" in report["criticalBlockers"]
+    assert "executed runtime revision does not match the frozen manifest" not in report["criticalBlockers"]
     assert all(item["status"] == "LIVE_ENTRYPOINT_IDENTIFIED" for item in report["entrypoints"])
     assert not (tmp_path / "q1-live-run").exists()
 
@@ -321,6 +349,8 @@ def test_non_metered_oauth_authorization_uses_operational_ceiling_only() -> None
         ("expiresAtEpochSeconds", 2_000_000_000, "expired"),
         ("budgets", {"maxModelTurns": 9}, "limits"),
         ("pricingStatus", "PENDING", "pricing"),
+        ("issuedBy", "MCP", "issued by Core"),
+        ("planDigest", "not-a-digest", "plan digest"),
         ("apiKey", "secret", "credentials"),
     ],
 )
@@ -452,6 +482,7 @@ def test_live_adapters_require_chatgpt_oauth_before_provider_execution() -> None
         environment={
             "LLM_PROVIDER": "openai_chatgpt",
             "CHATGPT_OAUTH_ENABLED": "true",
+            "DEVLOG_LIVE_REMOTE_PROVIDER": "true",
             "LLM_MODEL": "gpt-5.6-luna",
         },
     )

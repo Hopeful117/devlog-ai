@@ -21,6 +21,7 @@ def validate_prepared_plan(
     manifest: Mapping[str, Any],
     oracle: Mapping[str, Any],
     authorization: Mapping[str, Any] | None = None,
+    pricing_contract: Mapping[str, Any] | None = None,
     repository_root: str | Path,
     now: datetime | None = None,
 ) -> Mapping[str, Any]:
@@ -67,10 +68,15 @@ def validate_prepared_plan(
         raise PreparedPlanError("preparation provider/model mismatch")
     if plan.get("runtimeIdentities") != Q1_RUNTIME_IDENTITIES:
         raise PreparedPlanError("preparation runtime identities mismatch")
+    plan_pricing = plan.get("pricingContract")
+    pricing_artifact = pricing_contract or plan_pricing
     try:
-        validate_pricing_contract(plan.get("pricingContract"))
+        validate_pricing_contract(pricing_artifact)
     except (PricingContractError, TypeError) as error:
         raise PreparedPlanError("preparation pricing contract is invalid") from error
+    if not isinstance(plan_pricing, Mapping) or not isinstance(pricing_artifact, Mapping) \
+            or plan_pricing.get("digest") != pricing_artifact.get("digest"):
+        raise PreparedPlanError("preparation pricing digest mismatch")
     root = Path(repository_root).resolve()
     actual_revision = current_head(root)
     if actual_revision != plan.get("runtimeRevision"):
@@ -96,4 +102,8 @@ def validate_prepared_plan(
             raise PreparedPlanError("preparation pricing is not campaign-authorized")
         if authorization.get("provider") != plan.get("provider") or authorization.get("model") != plan.get("model"):
             raise PreparedPlanError("preparation provider/model is not campaign-authorized")
+        if authorization.get("planId") != plan_response.get("planId"):
+            raise PreparedPlanError("preparation plan is not campaign-authorized")
+        if authorization.get("planDigest") != plan_response.get("planDigest"):
+            raise PreparedPlanError("preparation plan digest is not campaign-authorized")
     return plan

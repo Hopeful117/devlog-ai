@@ -74,15 +74,24 @@ public class InvestigationCapabilityExecutionService {
         Set<String> references = new HashSet<>();
         long remainingBytes = action.maximumBytes();
         long remainingTokens = action.maximumTokens();
+        int evidenceCount = 0;
+        int authorizedPathMatches = 0;
+        int revisionMatches = 0;
         for (RepositoryEvidence evidence : context.evidence()) {
             if (evidence == null || !references.add(evidence.reference())) {
                 continue;
             }
+            evidenceCount++;
             String path = evidence.provenance() == null ? null : evidence.provenance().originatingFile();
             String revision = resolvedRevision(evidence);
-            if (!authorizedPath(path, action, scope) || !action.revision().equals(revision)) {
+            if (!authorizedPath(path, action, scope)) {
                 continue;
             }
+            authorizedPathMatches++;
+            if (!action.revision().equals(revision)) {
+                continue;
+            }
+            revisionMatches++;
             TrustTier trustTier = TrustTierClassifier.publicTrustTier(
                     evidence.kind(), evidence.provenance().sourceType());
             if (trustTier == null || evidence.reference() == null || evidence.reference().isBlank()) {
@@ -125,8 +134,18 @@ public class InvestigationCapabilityExecutionService {
         InvestigationCapabilityResult.Outcome outcome = projected.isEmpty()
                 ? InvestigationCapabilityResult.Outcome.EMPTY
                 : InvestigationCapabilityResult.Outcome.RESULTS;
+        String emptyReason = outcome == InvestigationCapabilityResult.Outcome.EMPTY
+                ? "NO_AUTHORIZED_EVIDENCE_MATCH"
+                : null;
+        String emptyMessage = outcome == InvestigationCapabilityResult.Outcome.EMPTY
+                ? "No evidence matched the authorized path and revision"
+                + " (candidates=" + evidenceCount
+                + ", pathMatches=" + authorizedPathMatches
+                + ", revisionMatches=" + revisionMatches + ")"
+                : null;
         return new InvestigationCapabilityResult(projectId, storyId, action.actionId(), action.kind(),
-                action.projectSlug(), action.revision(), outcome, projected, null, null);
+                action.projectSlug(), action.revision(), outcome, projected, emptyReason,
+                emptyMessage);
     }
 
     private boolean authorizedPath(String path, InvestigationAction action, InvestigationScope scope) {

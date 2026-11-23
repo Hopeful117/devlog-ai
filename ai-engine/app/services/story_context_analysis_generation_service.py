@@ -257,11 +257,11 @@ class StoryContextAnalysisGenerationService:
                 elif isinstance(decision, InvestigationActionDecision):
                     action = decision.action
 
+                action_accounting = self._action_payload(action, submission, traces)
                 response = await self._callback_client.execute_investigation_action(
                     submission.ai_task_id, submission.correlation_id,
-                    self._action_payload(action, submission, traces)
+                    action_accounting
                 )
-                action_accounting = self._action_payload(action, submission, traces)
                 action_result = response.get("result")
                 if not isinstance(action_result, dict):
                     raise _InvestigationTerminal("INVESTIGATION_RESULT_INVALID")

@@ -2,9 +2,14 @@ package com.hopeful117.devlogai.evaluation.livepreparation;
 
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
+import com.hopeful117.devlogai.collection.workspace.SynchronizedWorkspace;
+import com.hopeful117.devlogai.collection.workspace.WorkspaceManager;
 import com.hopeful117.devlogai.project.entity.Project;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
+import com.hopeful117.devlogai.source.entity.Source;
+import com.hopeful117.devlogai.source.entity.SourceType;
+import com.hopeful117.devlogai.source.repository.SourceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -30,14 +35,16 @@ public class LiveEvaluationPreparationService {
     private static final Pattern ARTIFACT_NAMESPACE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_/-]{0,119}");
     private static final String MANIFEST_ID = "devlog-ai-abc-first-test";
     private static final String MANIFEST_VERSION = "1.1.0";
-    private static final String MANIFEST_DIGEST = "c533be54e8189273f6fb81956a1587330f513cfefbe2512032063afc096f06bd";
-    private static final String SOURCE_REVISION = "60fae3e0e1104d0ffbe3832c1f578ed532b1268a";
+    private static final String MANIFEST_DIGEST = "bcd538cc5a40c6d270098145181bdc421caee9cc1f215d4692d1168726482465";
+    private static final String SOURCE_REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b";
     private static final String ORACLE_DIGEST = "2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e";
     private static final String PRICING_DIGEST = "0b48079816061d0660476bf2bb5d08572ff5f3378be7d5f3ba77d4013c229fbd";
     private static final List<String> OBSERVATIONS = List.of(
             "Q1-A-DEVLOG-CURRENT-r1",
             "Q1-B-DIRECT-INVESTIGATOR-r1",
             "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1");
+    private static final List<String> CONDITIONS = List.of(
+            "A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST");
     private static final Map<String, Object> OPERATIONAL_LIMITS = Map.of(
             "maxModelTurns", 8,
             "maxProviderCalls", 8,
@@ -61,6 +68,8 @@ public class LiveEvaluationPreparationService {
     private final ProjectRepository projectRepository;
     private final CoreProjectAuthorizationService authorizationService;
     private final LiveEvaluationPreparationRepository repository;
+    private final SourceRepository sourceRepository;
+    private final WorkspaceManager workspaceManager;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -90,9 +99,10 @@ public class LiveEvaluationPreparationService {
             }
             return LiveEvaluationPreparationResponse.from(existing.get());
         }
-        List<String> blockers = blockers(request);
+        boolean runtimeVerified = verifyRuntimeRevision(project, request.runtimeRevision());
+        List<String> blockers = blockers(request, runtimeVerified);
         Instant now = clock.instant();
-        Map<String, Object> plan = plan(request, blockers, now.plus(PLAN_TTL));
+        Map<String, Object> plan = plan(request, blockers, runtimeVerified, now.plus(PLAN_TTL));
         String planDigest = digest(plan);
         LiveEvaluationPreparation preparation = repository.save(LiveEvaluationPreparation.builder()
                 .project(project)
@@ -127,7 +137,7 @@ public class LiveEvaluationPreparationService {
                         "networkCalls", 0), List.of("project or delegation authorization is not established"));
     }
 
-    private List<String> blockers(LiveEvaluationPreparationRequest request) {
+    private List<String> blockers(LiveEvaluationPreparationRequest request, boolean runtimeVerified) {
         List<String> blockers = new ArrayList<>();
         if (!MANIFEST_ID.equals(request.manifestId()) || !MANIFEST_VERSION.equals(request.manifestVersion())
                 || !MANIFEST_DIGEST.equals(request.manifestDigest())) {
@@ -146,7 +156,7 @@ public class LiveEvaluationPreparationService {
         if (!Objects.equals(request.runtimeAttestation().get("runtimeRevision"), request.runtimeRevision())) {
             blockers.add("runtime attestation revision does not match runtime revision");
         }
-        blockers.add("runtime worktree cannot be independently verified by Core");
+        if (!runtimeVerified) blockers.add("runtime worktree cannot be independently verified by Core");
         if (!"ACCEPTED".equals(request.oracleStatus())) {
             blockers.add("oracle is not explicitly accepted");
         }
@@ -180,7 +190,8 @@ public class LiveEvaluationPreparationService {
         return List.copyOf(blockers);
     }
 
-    private Map<String, Object> plan(LiveEvaluationPreparationRequest request, List<String> blockers, Instant expiresAt) {
+    private Map<String, Object> plan(LiveEvaluationPreparationRequest request, List<String> blockers,
+                                     boolean runtimeVerified, Instant expiresAt) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("capability", "bounded-live-evaluation-preparation-v1");
         result.put("benchmarkId", "devlog-ai-abc");
@@ -189,15 +200,20 @@ public class LiveEvaluationPreparationService {
         result.put("manifestId", MANIFEST_ID);
         result.put("manifestVersion", MANIFEST_VERSION);
         result.put("manifestDigest", MANIFEST_DIGEST);
+        result.put("campaignId", MANIFEST_ID);
         result.put("oracleStatus", "ACCEPTED");
         result.put("oracleDigest", ORACLE_DIGEST);
         result.put("sourceRevision", SOURCE_REVISION);
         result.put("runtimeRevision", request.runtimeRevision());
         result.put("runtimeAttestation", Map.of(
                 "runtimeRevision", request.runtimeRevision(),
-                "coreVerified", false));
+                "coreVerified", runtimeVerified));
         result.put("runtimeIdentities", RUNTIME_IDENTITIES);
         result.put("operationalLimits", OPERATIONAL_LIMITS);
+        result.put("authorizedObservationIds", OBSERVATIONS);
+        result.put("authorizedConditions", CONDITIONS);
+        result.put("budgets", OPERATIONAL_LIMITS);
+        result.put("limits", OPERATIONAL_LIMITS);
         result.put("provider", "openai_chatgpt");
         result.put("model", "gpt-5.6-luna");
         result.put("pricingContract", Map.of(
@@ -205,6 +221,10 @@ public class LiveEvaluationPreparationService {
                 "provider", "openai_chatgpt", "authentication", "CHATGPT_OAUTH",
                 "currency", "NOT_APPLICABLE", "billingModel", "CHATGPT_OAUTH_SUBSCRIPTION_NOT_METERED",
                 "costCeilingPolicy", "OPERATIONAL_LIMITS_ONLY", "digest", PRICING_DIGEST));
+        result.put("pricingStatus", "APPROVED");
+        result.put("pricingVersion", "q1-chatgpt-oauth-pricing-v1");
+        result.put("pricingDigest", PRICING_DIGEST);
+        result.put("costCeiling", Map.of("currency", "NOT_APPLICABLE", "maxAmount", "NOT_MEASURED"));
         result.put("artifactNamespace", request.artifactNamespace());
         result.put("observationIds", OBSERVATIONS);
         result.put("expiresAt", expiresAt.toString());
@@ -212,6 +232,21 @@ public class LiveEvaluationPreparationService {
         result.put("providerCalls", 0);
         result.put("networkCalls", 0);
         return Collections.unmodifiableMap(result);
+    }
+
+    private boolean verifyRuntimeRevision(Project project, String runtimeRevision) {
+        try {
+            Source source = sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(project.getId())
+                    .stream()
+                    .filter(candidate -> candidate.getType() == SourceType.GIT_REPOSITORY)
+                    .findFirst()
+                    .orElse(null);
+            if (source == null) return false;
+            SynchronizedWorkspace workspace = workspaceManager.synchronize(source, runtimeRevision);
+            return runtimeRevision.equals(workspace.resolvedRevision());
+        } catch (RuntimeException ignored) {
+            return false;
+        }
     }
 
     private String digest(Object value) {

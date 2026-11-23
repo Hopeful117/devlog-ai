@@ -24,7 +24,7 @@ def test_devlog_corpus_has_eight_versioned_cases_and_no_trading_os() -> None:
     benchmark = load(BENCHMARK)
     assert benchmark["status"] == "PROPOSED_HUMAN_REVIEW"
     assert benchmark["repositoryId"] == "git:github.com/Hopeful117/devlog-ai"
-    assert benchmark["repositoryRevision"] == "60fae3e0e1104d0ffbe3832c1f578ed532b1268a"
+    assert benchmark["repositoryRevision"] == "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
     assert [case["caseId"] for case in benchmark["questions"]] == [f"Q{i}" for i in range(1, 9)]
     assert all(case["version"] == "1.0.0" for case in benchmark["questions"])
     assert all("Trading OS" not in case["question"] for case in benchmark["questions"])

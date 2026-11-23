@@ -82,6 +82,11 @@ LIVE_ENTRYPOINTS = (
 )
 
 _REQUIRED_AUTH_KEYS = {
+    "artifactVersion",
+    "issuedBy",
+    "authorizationId",
+    "planId",
+    "planDigest",
     "authorizationStatus",
     "approverId",
     "approvedAt",
@@ -174,6 +179,15 @@ def validate_live_authorization(
         raise LiveAuthorizationError("authorization must not contain credentials")
     if authorization["authorizationStatus"] != "AUTHORIZED":
         raise LiveAuthorizationError("authorization status is not AUTHORIZED")
+    if authorization["artifactVersion"] != "bounded-live-evaluation-authorization-v1":
+        raise LiveAuthorizationError("authorization artifact version is invalid")
+    if authorization["issuedBy"] != "CORE":
+        raise LiveAuthorizationError("authorization must be issued by Core")
+    for key in ("authorizationId", "planId", "planDigest"):
+        if not isinstance(authorization[key], str) or not authorization[key].strip():
+            raise LiveAuthorizationError(f"authorization {key} is invalid")
+    if not _is_sha256(authorization["planDigest"]):
+        raise LiveAuthorizationError("authorization plan digest is invalid")
     for key in ("approverId", "approvedAt"):
         if not isinstance(authorization[key], str) or not authorization[key].strip():
             raise LiveAuthorizationError(f"authorization {key} is invalid")
@@ -331,7 +345,7 @@ def live_preflight(
         blockers.append("source snapshot does not match the frozen manifest")
     if not isinstance(identity.get("runtimeRevision"), str) or not identity["runtimeRevision"]:
         blockers.append("runtime revision cannot be identified")
-    elif authorization is None or authorization.get("runtimeRevision") != identity["runtimeRevision"]:
+    elif authorization is not None and authorization.get("runtimeRevision") != identity["runtimeRevision"]:
         blockers.append("executed runtime revision does not match the frozen manifest")
     harness = identity.get("harness", {})
     if not isinstance(harness.get("sha256"), str) or len(harness["sha256"]) != 64:

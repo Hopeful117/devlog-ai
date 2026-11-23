@@ -8,7 +8,7 @@ from typing import Any
 from app.schemas.story_context_analysis import ProviderStoryContextAnalysisResult
 
 
-REVISION = "60fae3e0e1104d0ffbe3832c1f578ed532b1268a"
+REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
 _DIGEST = "0" * 64
 
 

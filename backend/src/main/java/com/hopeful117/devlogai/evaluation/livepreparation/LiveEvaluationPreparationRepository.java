@@ -21,6 +21,6 @@ public interface LiveEvaluationPreparationRepository extends JpaRepository<LiveE
             @Param("keyHash") String keyHash,
             @Param("scopeHash") String scopeHash);
 
-    @Query(value = "select pg_advisory_xact_lock(hashtextextended(:lockKey, 0))", nativeQuery = true)
+    @Query(value = "with lock_result as materialized (select pg_advisory_xact_lock(hashtextextended(:lockKey, 0))) select 1 from lock_result", nativeQuery = true)
     Long acquirePreparationLock(@Param("lockKey") String lockKey);
 }

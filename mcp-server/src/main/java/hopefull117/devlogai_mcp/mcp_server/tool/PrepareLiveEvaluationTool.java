@@ -4,7 +4,9 @@ import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
 import hopefull117.devlogai_mcp.mcp_server.service.CoreCallPolicy;
 import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
+import hopefull117.devlogai_mcp.mcp_server.service.McpHumanConfirmationSigner;
 import io.modelcontextprotocol.spec.McpError;
+import io.modelcontextprotocol.spec.McpSchema;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -23,6 +25,7 @@ public class PrepareLiveEvaluationTool {
     private final DevlogProjectContextClient client;
     private final ObjectMapper objectMapper;
     private final McpAuthenticatedPrincipalProvider principalProvider;
+    private final McpHumanConfirmationSigner confirmationSigner;
 
     @McpTool(
             name = "prepare_bounded_live_evaluation",
@@ -90,6 +93,126 @@ public class PrepareLiveEvaluationTool {
         } catch (Exception exception) {
             throw CoreCallPolicy.map(exception, "Preparation plan not found", true,
                     "reading bounded live evaluation preparation");
+        }
+    }
+
+    @McpTool(
+            name = "request_bounded_live_evaluation_authorization",
+            description = "Request human approval for one exact bounded live evaluation plan")
+    public String requestAuthorization(
+            @McpArg(description = "Preparation plan UUID", required = true) UUID planId,
+            @McpArg(description = "Preparation plan digest", required = true) String planDigest,
+            @McpArg(description = "Stable idempotency key", required = true) String idempotencyKey,
+            McpSyncRequestContext requestContext) {
+        var principal = principalProvider.currentPrincipal(requestContext)
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        if (principal.bearerToken() == null || principal.bearerToken().isBlank()) {
+            throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
+        }
+        try {
+            return objectMapper.writeValueAsString(client.requestLiveEvaluationAuthorization(
+                    principal.bearerToken(), principal.delegationToken(), idempotencyKey,
+                    new DevlogProjectContextClient.LiveEvaluationAuthorizationRequest(planId, planDigest)));
+        } catch (McpError error) {
+            throw error;
+        } catch (Exception exception) {
+            throw CoreCallPolicy.map(exception, "Authorization plan not found", true,
+                    "requesting bounded live evaluation authorization");
+        }
+    }
+
+    @McpTool(
+            name = "approve_bounded_live_evaluation_authorization",
+            description = "Approve one exact bounded live evaluation authorization as the human principal")
+    public String approveAuthorization(
+            @McpArg(description = "Authorization request UUID", required = true) UUID authorizationId,
+            @McpArg(description = "Preparation plan digest", required = true) String planDigest,
+            McpSyncRequestContext requestContext) {
+        var principal = principalProvider.currentPrincipal(requestContext)
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        if (principal.bearerToken() == null || principal.bearerToken().isBlank()) {
+            throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
+        }
+        try {
+            if (principal.kind() == McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN) {
+                return objectMapper.writeValueAsString(client.approveLiveEvaluationAuthorization(
+                        authorizationId, planDigest, null, principal.bearerToken(), principal.delegationToken()));
+            }
+            if (!requestContext.elicitEnabled()) {
+                throw CoreCallPolicy.invalidParams("MCP client must support elicitation for human approval");
+            }
+            var response = requestContext.elicit(McpSchema.ElicitFormRequest.builder(
+                            "Confirm LIVE execution for authorization " + authorizationId
+                                    + " with plan digest " + planDigest + ".",
+                            Map.of(
+                                    "type", "object",
+                                    "properties", Map.of("confirmation", Map.of(
+                                            "type", "string",
+                                            "enum", List.of("APPROVE", "REJECT"))),
+                                    "required", List.of("confirmation")))
+                    .build());
+            if (response.action() != McpSchema.ElicitResult.Action.ACCEPT
+                    || !"APPROVE".equals(response.content().get("confirmation"))) {
+                return objectMapper.writeValueAsString(Map.of(
+                        "status", "REJECTED",
+                        "authorizationId", authorizationId,
+                        "reason", "human approval was not accepted"));
+            }
+            String proof = confirmationSigner.sign(authorizationId, planDigest);
+            return objectMapper.writeValueAsString(client.approveLiveEvaluationAuthorization(
+                    authorizationId, planDigest, proof, principal.bearerToken(), principal.delegationToken()));
+        } catch (McpError error) {
+            throw error;
+        } catch (Exception exception) {
+            throw CoreCallPolicy.map(exception, "Authorization request not found", false,
+                    "approving bounded live evaluation authorization");
+        }
+    }
+
+    @McpTool(
+            name = "get_bounded_live_evaluation_authorization",
+            description = "Read one bounded live evaluation authorization artifact")
+    public String getAuthorization(
+            @McpArg(description = "Authorization UUID", required = true) UUID authorizationId,
+            McpSyncRequestContext requestContext) {
+        var principal = principalProvider.currentPrincipal(requestContext)
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        if (principal.bearerToken() == null || principal.bearerToken().isBlank()) {
+            throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
+        }
+        try {
+            return objectMapper.writeValueAsString(client.getLiveEvaluationAuthorization(
+                    authorizationId, principal.bearerToken(), principal.delegationToken()));
+        } catch (McpError error) {
+            throw error;
+        } catch (Exception exception) {
+            throw CoreCallPolicy.map(exception, "Authorization request not found", true,
+                    "reading bounded live evaluation authorization");
+        }
+    }
+
+    @McpTool(
+            name = "consume_bounded_live_evaluation_authorization",
+            description = "Consume one approved bounded live evaluation authorization before provider execution")
+    public String consumeAuthorization(
+            @McpArg(description = "Authorization UUID", required = true) UUID authorizationId,
+            @McpArg(description = "Preparation plan digest", required = true) String planDigest,
+            @McpArg(description = "Stable execution idempotency key", required = true) String executionIdempotencyKey,
+            McpSyncRequestContext requestContext) {
+        var principal = principalProvider.currentPrincipal(requestContext)
+                .orElseThrow(() -> ResourceSupport.unauthenticated("Authentication is required"));
+        if (principal.bearerToken() == null || principal.bearerToken().isBlank()) {
+            throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
+        }
+        try {
+            return objectMapper.writeValueAsString(client.consumeLiveEvaluationAuthorization(
+                    authorizationId, planDigest, executionIdempotencyKey,
+                    principal.bearerToken(), principal.delegationToken()));
+        } catch (McpError error) {
+            throw error;
+        } catch (Exception exception) {
+            throw CoreCallPolicy.map(exception, "Authorization request cannot be consumed", false,
+                    "consuming bounded live evaluation authorization");
         }
     }
 }
