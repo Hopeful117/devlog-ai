@@ -51,6 +51,13 @@ def _failure_message(error: Exception) -> str:
     retry_message = getattr(error, "retry_message", None)
     if isinstance(retry_message, str):
         return retry_message[:5000]
+    if isinstance(error, ValidationError):
+        # Pydantic v2 can leave str(error) empty for provider-native structured
+        # outputs. Preserve bounded field-level diagnostics for Core traces.
+        try:
+            return json.dumps(error.errors(include_url=False), default=str)[:5000]
+        except Exception:
+            return "Structured output validation failed"
     return str(error)[:5000]
 
 
