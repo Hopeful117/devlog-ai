@@ -5,6 +5,56 @@
 This document describes the local MCP actor and delegation configuration. It
 contains no bearer, delegation token, OAuth token or other secret value.
 
+## MCP Tools Catalog
+
+### Context and investigation
+
+| Tool | Description |
+|------|-------------|
+| `devlog_story_agent` | Submits a Story Context Agent task. Returns structured, trust-tiered EngineeringContext for a project and intent. Requires `projectSlug`, `intent`, `idempotencyKey`. |
+| `get_engineering_context` | Returns raw EngineeringContext for a project and intent. Requires `projectSlug`, `intent`, `files`. |
+| `analyze_story_context` | Submits a Story-scoped context analysis (deprecated flow — prefer `devlog_story_agent`). |
+| `search_project_history` | Keyword search over imported git commits (messages + file paths). Requires `projectSlug`, `query`. |
+| `resolve_engineering_story` | Resolves an Engineering Story by number within a project. |
+| `get_devlog_context_trace` | Returns diagnostics for a previous Story Context execution. |
+
+### Project administration
+
+| Tool | Description |
+|------|-------------|
+| `register_project` | Registers a new DevLog project. |
+| `sync_project_history` | Triggers a git history import for a project's active source. |
+| `sync_project_stories` | Synchronises Engineering Stories from the repository into DevLog. |
+
+### Proposal review and acceptance
+
+Typical sequence: `list_pending_proposals` → `get_proposal_review` → `validate_proposal`.
+
+| Tool | Description |
+|------|-------------|
+| `list_pending_proposals` | Lists all proposals with status `PROPOSED` (pending human review) for a project. Returns `id`, `type`, `analysisId`, `sourceIndex`, `confidence`, `createdAt`, and a payload summary. |
+| `get_proposal_review` | Returns a paginated review page for an analysis (PROPOSED items first). Includes full payload, evidence references, supporting facts, and existing validation decision. Use `analysisId` from `list_pending_proposals`. |
+| `validate_proposal` | Accepts or rejects a proposal. `ACCEPTED` promotes it to trusted knowledge (Insight, EngineeringEvent, etc.). Requires authenticated MCP principal. Optional `insightSeverity` (LOW/MEDIUM/HIGH/CRITICAL) for INSIGHT proposals. |
+
+### Companion and diagnostics
+
+| Tool | Description |
+|------|-------------|
+| `open_devlog_companion` | Opens the DevLog Companion showing recent MCP tool activity for a project. |
+| `story_context_agent_get_snapshot_authenticated` | Returns the snapshot from a previous Story Context Agent execution. |
+| `story_context_agent_get_projection` | Returns the projection from a previous Story Context Agent execution. |
+
+### Live evaluation
+
+| Tool | Description |
+|------|-------------|
+| `prepare_bounded_live_evaluation` | Prepares a bounded live evaluation run. |
+| `get_bounded_live_evaluation_preparation` | Returns the preparation status for a live evaluation. |
+| `request_bounded_live_evaluation_authorization` | Requests human authorization for a live evaluation. |
+| `get_bounded_live_evaluation_authorization` | Returns the current authorization status. |
+| `approve_bounded_live_evaluation_authorization` | Approves a live evaluation authorization (human gate). |
+| `consume_bounded_live_evaluation_authorization` | Consumes an approved authorization to start the live run. |
+
 ## Repository mapping
 
 The canonical DevLog project mapping for this repository is:

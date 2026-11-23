@@ -19,6 +19,7 @@ public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthentic
     private final String issuer;
     private final String configuredBearerToken;
     private final String configuredActorClientId;
+    private final String configuredAgentPrincipalId;
     private final String configuredDelegationToken;
     private final ObjectProvider<JwtDecoder> jwtDecoder;
 
@@ -27,6 +28,7 @@ public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthentic
         this.issuer = issuer == null ? "" : issuer.trim();
         this.configuredBearerToken = configuredBearerToken == null ? "" : configuredBearerToken.trim();
         this.configuredActorClientId = "";
+        this.configuredAgentPrincipalId = "";
         this.configuredDelegationToken = "";
         this.jwtDecoder = jwtDecoder;
     }
@@ -36,11 +38,13 @@ public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthentic
             @Value("${devlog.security.oidc.issuer-uri:}") String issuer,
             @Value("${devlog.security.oidc.bearer-token:}") String configuredBearerToken,
             @Value("${devlog.security.mcp.actor-client-id:}") String configuredActorClientId,
+            @Value("${devlog.security.mcp.agent-principal-id:}") String configuredAgentPrincipalId,
             @Value("${devlog.security.mcp.delegation-token:}") String configuredDelegationToken,
             ObjectProvider<JwtDecoder> jwtDecoder) {
         this.issuer = issuer == null ? "" : issuer.trim();
         this.configuredBearerToken = configuredBearerToken == null ? "" : configuredBearerToken.trim();
         this.configuredActorClientId = configuredActorClientId == null ? "" : configuredActorClientId.trim();
+        this.configuredAgentPrincipalId = configuredAgentPrincipalId == null ? "" : configuredAgentPrincipalId.trim();
         this.configuredDelegationToken = configuredDelegationToken == null ? "" : configuredDelegationToken.trim();
         this.jwtDecoder = jwtDecoder;
         if (!this.issuer.isBlank() && this.configuredBearerToken.isBlank()) {
@@ -126,8 +130,11 @@ public class FailClosedMcpAuthenticatedPrincipalProvider implements McpAuthentic
         }
         String effectiveDelegation = delegationToken == null || delegationToken.isBlank()
                 ? configuredDelegationToken : delegationToken;
+        String resolvedPrincipalId = technicalActor
+                ? (configuredAgentPrincipalId.isBlank() ? actorId : configuredAgentPrincipalId)
+                : jwt.getSubject();
         return Optional.of(new McpPrincipal(
-                technicalActor ? actorId : jwt.getSubject(),
+                resolvedPrincipalId,
                 technicalActor ? PrincipalKind.AI_AGENT : PrincipalKind.HUMAN,
                 issuer, authorization, effectiveDelegation));
     }
