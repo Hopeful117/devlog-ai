@@ -27,17 +27,21 @@ class ServerInfoResourceTest {
 
         assertThat(result.path("name").asText()).isEqualTo("devlog-mcp");
         assertThat(result.path("version").asText()).isEqualTo("0.1.0");
-        assertThat(result.path("status").asText()).isEqualTo("ready");
-        assertThat(names(result.path("tools"))).containsExactly(
-                "analyze_story_context",
-                "devlog_story_agent",
-                "get_bounded_live_evaluation_preparation",
+         assertThat(result.path("status").asText()).isEqualTo("ready");
+         assertThat(names(result.path("tools"))).containsExactly(
+                 "analyze_story_context",
+                 "approve_bounded_live_evaluation_authorization",
+                 "consume_bounded_live_evaluation_authorization",
+                 "devlog_story_agent",
+                 "get_bounded_live_evaluation_authorization",
+                 "get_bounded_live_evaluation_preparation",
                 "get_devlog_context_trace",
                 "get_engineering_context",
                 "open_devlog_companion",
                 "prepare_bounded_live_evaluation",
-                "register_project",
-                "resolve_engineering_story",
+                 "register_project",
+                 "request_bounded_live_evaluation_authorization",
+                 "resolve_engineering_story",
                 "search_project_history",
                 "story_context_agent_follow_up_authenticated",
                 "story_context_agent_get_projection",

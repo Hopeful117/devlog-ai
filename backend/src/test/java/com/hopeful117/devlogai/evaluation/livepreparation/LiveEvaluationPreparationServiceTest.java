@@ -130,7 +130,18 @@ class LiveEvaluationPreparationServiceTest {
                                 "digest", "0b48079816061d0660476bf2bb5d08572ff5f3378be7d5f3ba77d4013c229fbd"),
                         "q1/run", List.of("Q1-A-DEVLOG-CURRENT-r1", "Q1-B-DIRECT-INVESTIGATOR-r1", "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1")));
 
-        assertEquals(LiveEvaluationPreparationStatus.READY, response.status());
-        assertEquals(true, ((Map<?, ?>) response.plan().get("runtimeAttestation")).get("coreVerified"));
-    }
+         assertEquals(LiveEvaluationPreparationStatus.READY, response.status());
+         assertEquals(true, ((Map<?, ?>) response.plan().get("runtimeAttestation")).get("coreVerified"));
+         assertEquals("devlog-ai-abc-first-test", response.plan().get("campaignId"));
+         assertEquals(List.of("A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST"),
+                 response.plan().get("authorizedConditions"));
+         assertEquals(response.plan().get("operationalLimits"), response.plan().get("budgets"));
+         assertEquals(response.plan().get("operationalLimits"), response.plan().get("limits"));
+         assertEquals("APPROVED", response.plan().get("pricingStatus"));
+         assertEquals("q1-chatgpt-oauth-pricing-v1", response.plan().get("pricingVersion"));
+         assertEquals("0b48079816061d0660476bf2bb5d08572ff5f3378be7d5f3ba77d4013c229fbd",
+                 response.plan().get("pricingDigest"));
+         assertEquals(Map.of("currency", "NOT_APPLICABLE", "maxAmount", "NOT_MEASURED"),
+                 response.plan().get("costCeiling"));
+     }
 }

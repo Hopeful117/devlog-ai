@@ -285,6 +285,20 @@ public class DevLogStoryAgentTool {
         String bearerToken = principal.bearerToken();
         String initialStatus = stringValue(initialExecution.get("status"));
         if (isTerminal(initialStatus)) {
+            if (("FAILED".equals(initialStatus) || "NOT_ESTABLISHED".equals(initialStatus))
+                    && !(initialExecution.get("diagnostics") instanceof Map<?, ?>)) {
+                UUID taskId = executionId(initialExecution);
+                try {
+                    Map<String, Object> taskStatus = callUntil(
+                            operationDeadline,
+                            () -> client.getStoryContextAgentSnapshot(taskId, principal.principalId(),
+                                    principal.kind().name(), principal.authenticationSource(), bearerToken,
+                                    principal.delegationToken()));
+                    return executionWithStatus(initialExecution, taskStatus);
+                } catch (RuntimeException ignored) {
+                    // Preserve the original terminal response when the diagnostic read is unavailable.
+                }
+            }
             return initialExecution;
         }
 

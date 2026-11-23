@@ -229,3 +229,30 @@ def test_failed_trace_keeps_bounded_redacted_validation_diagnostic_in_normal_mod
     assert trace.validation_diagnostics == "causal answer contains token=[REDACTED]"
     assert trace.system_prompt is None
     assert trace.raw_model_response is None
+
+
+def test_investigation_no_evidence_failure_exposes_bounded_counts():
+    from app.services.story_context_analysis_generation_service import (
+        StoryContextAnalysisGenerationService,
+        _InvestigationTerminal,
+    )
+
+    error = _InvestigationTerminal(
+        "INVESTIGATION_INCOMPLETE_NO_EVIDENCE",
+        "Required citable evidence was not returned (resultActions=1, evidenceItems=2, citableItems=0)",
+    )
+
+    assert "resultActions=1" in StoryContextAnalysisGenerationService._callback_error_message(error)
+    assert "citableItems=0" in StoryContextAnalysisGenerationService._callback_error_message(error)
+
+
+def test_pydantic_validation_failure_keeps_field_diagnostics():
+    from app.services.interaction_trace import _failure_message
+
+    with pytest.raises(ValidationError) as captured:
+        InvestigationCapabilityResult.model_validate({"outcome": "INVALID"})
+
+    message = _failure_message(captured.value)
+
+    assert "protocolVersion" in message
+    assert len(message) <= 5000

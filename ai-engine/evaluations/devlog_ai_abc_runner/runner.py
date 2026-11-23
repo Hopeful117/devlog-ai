@@ -453,6 +453,7 @@ def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, reposi
             authorization=authorization,
             prepared_plan=prepared_plan,
             oracle=oracle,
+            pricing_contract=pricing_contract or manifest_value.get("pricingContract"),
             observation_ids=observation_ids,
         )
     if mode == LIVE_PREFLIGHT:

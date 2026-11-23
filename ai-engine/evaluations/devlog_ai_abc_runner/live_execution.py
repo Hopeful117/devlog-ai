@@ -47,6 +47,7 @@ def _mcp_response_diagnostic(response: Mapping[str, Any]) -> dict[str, Any]:
     """Keep response shape evidence without persisting project content."""
     encoded = json.dumps(response, sort_keys=True, separators=(",", ":"), default=str)
     diagnostics = response.get("diagnostics")
+    nested_diagnostics = diagnostics if isinstance(diagnostics, Mapping) else {}
     return {
         "responseDigest": hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
         "responseKeys": sorted(str(key) for key in response),
@@ -55,6 +56,8 @@ def _mcp_response_diagnostic(response: Mapping[str, Any]) -> dict[str, Any]:
         "snapshotIdPresent": bool(response.get("snapshotId")),
         "resultPresent": bool(response.get("result")),
         "diagnosticKeys": sorted(str(key) for key in diagnostics) if isinstance(diagnostics, Mapping) else [],
+        "failureCodePresent": bool(response.get("failureCode") or nested_diagnostics.get("failureCode")),
+        "failureMessagePresent": bool(response.get("failureMessage") or nested_diagnostics.get("failureMessage")),
     }
 
 
@@ -670,6 +673,9 @@ class ChatGptOAuthTransport:
                     "remoteProviderEndpoint": endpoint,
                     "remoteProviderErrorCode": error_payload.get("code"),
                     "remoteProviderErrorFields": error_payload.get("fields", []),
+                    "remoteProviderErrorProviderFields": sorted(
+                        str(key) for key in error_payload.get("providerError", {})
+                    ) if isinstance(error_payload.get("providerError"), dict) else [],
                 },
             )
         result = response.json()
@@ -894,6 +900,11 @@ def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config:
         raise LiveConfigurationError("B live execution requires LLM_PROVIDER=openai_chatgpt")
     if values.get("CHATGPT_OAUTH_ENABLED", "false").strip().lower() != "true":
         raise LiveConfigurationError("B live execution requires CHATGPT_OAUTH_ENABLED=true")
+    if values.get("DEVLOG_LIVE_REMOTE_PROVIDER", "false").strip().lower() != "true":
+        raise LiveConfigurationError(
+            "B live execution requires DEVLOG_LIVE_REMOTE_PROVIDER=true; "
+            "the local binding store is not a live provider boundary"
+        )
     model = values.get("LLM_MODEL", manifest["model"]).strip()
     return {
         "A_DEVLOG_CURRENT": CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, manifest, mcp),
@@ -902,7 +913,7 @@ def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config:
     }
 
 
-def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], authorization: Mapping[str, Any], prepared_plan: Mapping[str, Any] | None = None, oracle: Mapping[str, Any] | None = None, environment: Mapping[str, str] | None = None, observation_ids: tuple[str, ...] | None = None):
+def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], authorization: Mapping[str, Any], prepared_plan: Mapping[str, Any] | None = None, oracle: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, environment: Mapping[str, str] | None = None, observation_ids: tuple[str, ...] | None = None):
     root = Path(repository_root).resolve()
     if prepared_plan is None or oracle is None:
         raise LiveConfigurationError("live execution requires an authoritative Core preparation plan")
@@ -910,6 +921,8 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
     expected_plan_digest = prepared_plan.get("planDigest")
     if not isinstance(plan_id, str) or not plan_id or not isinstance(expected_plan_digest, str):
         raise LiveConfigurationError("live execution requires a Core preparation plan identity")
+    if authorization.get("planId") != plan_id or authorization.get("planDigest") != expected_plan_digest:
+        raise LiveConfigurationError("live authorization is not bound to the Core preparation plan")
     if current_head(root) != authorization["runtimeRevision"]:
         raise LiveConfigurationError("live execution requires HEAD to equal the authorized runtime revision")
     try:
@@ -939,12 +952,39 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
                 oracle=oracle,
                 repository_root=root,
                 authorization=authorization,
+                pricing_contract=pricing_contract,
             )
         except PreparedPlanError as error:
             raise LiveConfigurationError(str(error)) from error
         config = resolve_live_story(config, mcp)
         adapters = live_adapters(repository_root=root, manifest=manifest, config=config, mcp=mcp,
                                  environment=environment)
+        authorization_id = authorization.get("authorizationId")
+        if not isinstance(authorization_id, str) or not authorization_id.strip():
+            raise LiveConfigurationError("live authorization requires an authorization identity")
+        execution_key = (environment or os.environ).get("DEVLOG_LIVE_EXECUTION_IDEMPOTENCY_KEY", "").strip()
+        if not execution_key:
+            execution_key = hashlib.sha256(json.dumps({
+                "authorizationId": authorization_id,
+                "planId": plan_id,
+                "planDigest": expected_plan_digest,
+                "manifestDigest": manifest.get("manifestDigest"),
+                "observationIds": list(observation_ids) if observation_ids else [
+                    item["observationId"] for item in manifest["observations"]
+                ],
+            }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        try:
+            consumed = mcp.tool("consume_bounded_live_evaluation_authorization", {
+                "authorizationId": authorization_id,
+                "planDigest": expected_plan_digest,
+                "executionIdempotencyKey": execution_key,
+            })
+        except (RuntimeError, TimeoutError) as error:
+            raise LiveConfigurationError(
+                "live authorization consumption could not be confirmed; execution was not started"
+            ) from error
+        if not isinstance(consumed, Mapping) or consumed.get("status") != "CONSUMED":
+            raise LiveConfigurationError("Core did not consume the live authorization")
         return run_dry_run(
             manifest_path=manifest_path,
             output_root=output_root,

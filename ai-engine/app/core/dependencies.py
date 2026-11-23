@@ -12,7 +12,7 @@ from app.providers.gemini import GeminiLlmProvider
 from app.providers.anthropic import AnthropicLlmProvider
 from app.providers.openrouter import OpenRouterLlmProvider
 from app.providers.chatgpt import OpenAiChatGptProvider
-from app.services.embedding_service import EmbeddingService
+from app.services.embedding_service import EmbeddingProviderUnavailable, EmbeddingService
 from app.services.insight_generation_service import InsightGenerationService
 from app.services.task_processing_service import AiTaskProcessingService
 from app.services.deliverable_generation_service import DeliverableGenerationService
@@ -147,6 +147,19 @@ def get_embedding_service() -> EmbeddingService:
             max_output_tokens=settings.llm_max_output_tokens,
         )
         return EmbeddingService(provider=provider)
+    if settings.llm_provider == "openai_chatgpt":
+        class UnavailableEmbeddingProvider:
+            @property
+            def embedding_model_identifier(self) -> str:
+                return "unavailable"
+
+            async def embed(self, texts: list[str], model: str) -> list[list[float]]:
+                raise EmbeddingProviderUnavailable(
+                    "Embeddings require LLM_PROVIDER=openai with LLM_API_KEY; "
+                    "ChatGPT OAuth is not an embeddings provider"
+                )
+
+        return EmbeddingService(provider=UnavailableEmbeddingProvider())
     return EmbeddingService(provider=build_llm_provider(settings))
 
 
