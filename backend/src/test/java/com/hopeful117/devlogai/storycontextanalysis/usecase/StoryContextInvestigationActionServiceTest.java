@@ -125,6 +125,32 @@ class StoryContextInvestigationActionServiceTest {
     }
 
     @Test
+    void accountsUnavailableInvestigationResultExactlyOnceWithoutGrounding() {
+        AiTask task = task(snapshotWithGrounding());
+        when(repository.findByIdForUpdate(TASK_ID)).thenReturn(Optional.of(task));
+        when(authorization.isAuthorized(any(), eq(PROJECT_ID), eq("MCP_STORY_AGENT_EXECUTE"))).thenReturn(true);
+        when(executor.execute(eq(PROJECT_ID), eq(STORY_ID), any(), any(), any(), any(), any()))
+                .thenReturn(new InvestigationCapabilityResult(PROJECT_ID, STORY_ID, "action-1",
+                        InvestigationActionKind.READ_EVIDENCE_RANGE, "devlog", REVISION,
+                        InvestigationCapabilityResult.Outcome.UNAVAILABLE, List.of(),
+                        "EVIDENCE_UNAVAILABLE", "document unavailable"));
+
+        var response = service().execute(principal(), TASK_ID, request());
+        Map<String, Object> investigation = (Map<String, Object>) task.getContextSnapshot().get("investigation");
+        Map<String, Object> usage = (Map<String, Object>) investigation.get("usage");
+        List<?> actions = (List<?>) investigation.get("actions");
+
+        assertThat(response.result()).containsEntry("outcome", "UNAVAILABLE")
+                .containsEntry("rejectionCode", "EVIDENCE_UNAVAILABLE");
+        assertThat(actions).hasSize(1);
+        assertThat(investigation).containsEntry("accountedProviderGenerationCount", 1);
+        assertThat(usage).containsEntry("steps", 1).containsEntry("retrievalCalls", 1)
+                .containsEntry("evidenceItems", 0).containsEntry("providerOutputTokens", 0);
+        Map<String, Object> contract = (Map<String, Object>) task.getContextSnapshot().get("groundingContract");
+        assertThat(contract.get("allowedGroundingReferences")).asList().isEmpty();
+    }
+
+    @Test
     void appendsCitableRetrievedEvidenceToFinalGroundingAndReferenceMapping() {
         AiTask task = task(snapshotWithGrounding());
         when(repository.findByIdForUpdate(TASK_ID)).thenReturn(Optional.of(task));
@@ -259,9 +285,14 @@ class StoryContextInvestigationActionServiceTest {
     }
 
     private InvestigationCapabilityResult result(boolean citable, String reference) {
+        return result(InvestigationCapabilityResult.Outcome.RESULTS, citable, reference);
+    }
+
+    private InvestigationCapabilityResult result(
+            InvestigationCapabilityResult.Outcome outcome, boolean citable, String reference) {
         return new InvestigationCapabilityResult(PROJECT_ID, STORY_ID, "action-1",
                 InvestigationActionKind.SEARCH_EVIDENCE, "devlog", REVISION,
-                InvestigationCapabilityResult.Outcome.RESULTS,
+                outcome,
                 List.of(new InvestigationCapabilityResult.Evidence(reference, "SOURCE_FILE", "backend/App.java",
                         REVISION, "REPOSITORY", "app-1", "bounded summary",
                         com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier.TECHNICAL_EVIDENCE,

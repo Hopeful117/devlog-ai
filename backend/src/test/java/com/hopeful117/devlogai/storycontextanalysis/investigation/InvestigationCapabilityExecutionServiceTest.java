@@ -1,5 +1,10 @@
 package com.hopeful117.devlogai.storycontextanalysis.investigation;
 
+import com.hopeful117.devlogai.evidence.resolution.DocumentResolutionPayload;
+import com.hopeful117.devlogai.evidence.resolution.EvidenceResolutionFacade;
+import com.hopeful117.devlogai.evidence.resolution.EvidenceResolutionException;
+import com.hopeful117.devlogai.evidence.resolution.EvidenceResolutionFailureCode;
+import com.hopeful117.devlogai.evidence.resolution.EvidenceResolutionResult;
 import com.hopeful117.devlogai.projectcontext.ProjectContextProvider;
 import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
 import com.hopeful117.devlogai.projectcontext.RepositoryContextAdapter;
@@ -14,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +44,8 @@ class InvestigationCapabilityExecutionServiceTest {
 
     @Mock ProjectContextProvider projectContextProvider;
     @Mock RepositoryContextAdapter repositoryContextAdapter;
+    @Mock EvidenceResolutionFacade evidenceResolutionFacade;
+    @Mock EvidenceResolutionResult evidenceResolutionResult;
     @Mock ProjectContextSnapshot snapshot;
 
     private InvestigationCapabilityExecutionService service;
@@ -45,7 +53,7 @@ class InvestigationCapabilityExecutionServiceTest {
     @BeforeEach
     void setUp() {
         service = new InvestigationCapabilityExecutionService(
-                projectContextProvider, repositoryContextAdapter);
+                projectContextProvider, repositoryContextAdapter, evidenceResolutionFacade);
     }
 
     @Test
@@ -85,6 +93,87 @@ class InvestigationCapabilityExecutionServiceTest {
             assertThat(value.startLine()).isEqualTo(2);
             assertThat(value.endLine()).isEqualTo(3);
         });
+    }
+
+    @Test
+    void readResolvesAuthorizedStoryDocumentWhenContextEvidenceHasNoContent() {
+        var action = new ReadEvidenceRangeRequest("action-story", "devlog", REVISION,
+                "inspect Story", "docs/stories/0230/story.md", 2, 3, 1, 10_000, 2_000);
+        var sourceId = UUID.randomUUID();
+        when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
+        when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
+                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null)))
+                .thenReturn(contextWithRevisionScope(sourceId, storyEvidence(action.path())));
+        when(evidenceResolutionFacade.resolve(any())).thenReturn(evidenceResolutionResult);
+        when(evidenceResolutionResult.payload())
+                .thenReturn(new DocumentResolutionPayload(
+                        action.path(), REVISION, "one\ntwo\nthree\nfour"));
+
+        var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
+                InvestigationUsage.empty(), Set.of());
+
+        assertThat(result.outcome()).isEqualTo(InvestigationCapabilityResult.Outcome.RESULTS);
+        assertThat(result.evidence()).singleElement().satisfies(value -> {
+            assertThat(value.reference()).isEqualTo("story:" + STORY_ID);
+            assertThat(value.content()).isEqualTo("two\nthree");
+            assertThat(value.citable()).isTrue();
+        });
+    }
+
+    @Test
+    void missingStoryRevisionScopeIsExplicitlyUnavailable() {
+        var action = new ReadEvidenceRangeRequest("action-story-no-scope", "devlog", REVISION,
+                "inspect Story", "docs/stories/0230/story.md", 1, 2, 1, 10_000, 2_000);
+        when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
+        when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
+                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null)))
+                .thenReturn(context(storyEvidence(action.path())));
+
+        var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
+                InvestigationUsage.empty(), Set.of());
+
+        assertThat(result.outcome()).isEqualTo(InvestigationCapabilityResult.Outcome.UNAVAILABLE);
+        assertThat(result.rejectionCode()).isEqualTo("EVIDENCE_UNAVAILABLE");
+        verifyNoInteractions(evidenceResolutionFacade);
+    }
+
+    @Test
+    void evidenceWithoutResolvedRevisionIsExplicitlyUnavailable() {
+        var action = new ReadEvidenceRangeRequest("action-no-revision", "devlog", REVISION,
+                "inspect source", "backend/Main.java", 1, 2, 1, 10_000, 2_000);
+        when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
+        when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
+                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null)))
+                .thenReturn(contextWithRevisionScope(UUID.randomUUID(),
+                        evidenceWithoutRevision(action.path())));
+
+        var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
+                InvestigationUsage.empty(), Set.of());
+
+        assertThat(result.outcome()).isEqualTo(InvestigationCapabilityResult.Outcome.UNAVAILABLE);
+        assertThat(result.rejectionCode()).isEqualTo("EVIDENCE_UNAVAILABLE");
+    }
+
+    @Test
+    void unavailableStoryDocumentRemainsExplicitlyUnavailable() {
+        var action = new ReadEvidenceRangeRequest("action-story-missing", "devlog", REVISION,
+                "inspect Story", "docs/stories/0230/story.md", 1, 2, 1, 10_000, 2_000);
+        var sourceId = UUID.randomUUID();
+        when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
+        when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
+                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null)))
+                .thenReturn(contextWithRevisionScope(sourceId, storyEvidence(action.path())));
+        when(evidenceResolutionFacade.resolve(any())).thenThrow(new EvidenceResolutionException(
+                EvidenceResolutionFailureCode.EVIDENCE_NO_LONGER_RESOLVABLE,
+                "document:" + sourceId + ":" + action.path() + "@" + REVISION,
+                sourceId, "unavailable"));
+
+        var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
+                InvestigationUsage.empty(), Set.of());
+
+        assertThat(result.outcome()).isEqualTo(InvestigationCapabilityResult.Outcome.UNAVAILABLE);
+        assertThat(result.rejectionCode()).isEqualTo("EVIDENCE_UNAVAILABLE");
+        assertThat(result.evidence()).isEmpty();
     }
 
     @Test
@@ -160,8 +249,19 @@ class InvestigationCapabilityExecutionServiceTest {
 
     private static RepositoryContext context(RepositoryEvidence... evidence) {
         return new RepositoryContext("v1", null, List.of(), "v1", List.of(), List.of(evidence),
-                Map.of(), new RepositoryContext.ContextBudget(10, 2_000, 10, 10_000),
+                Map.of(), com.hopeful117.devlogai.repositorycontext.RepositoryContextDiagnostics.empty(),
+                new RepositoryContext.ContextBudget(10, 2_000, 10, 10_000),
                 0, 0, 0, false, List.of(), List.of(), "digest");
+    }
+
+    private static RepositoryContext contextWithRevisionScope(
+            UUID sourceId, RepositoryEvidence... evidence) {
+        return new RepositoryContext("v1", null, List.of(), "v1", List.of(), List.of(evidence),
+                Map.of(), com.hopeful117.devlogai.repositorycontext.RepositoryContextDiagnostics.empty(),
+                new RepositoryContext.ContextBudget(10, 2_000, 10, 10_000),
+                0, 0, 0, false, List.of(), List.of(), "digest", List.of(),
+                new com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope(
+                        PROJECT_ID, sourceId, REVISION, Path.of("/workspace"), "TEST"));
     }
 
     private static RepositoryEvidence evidence(String path, String revision, String text) {
@@ -173,5 +273,24 @@ class InvestigationCapabilityExecutionServiceTest {
                 new com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent(
                         com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.COMPLETE,
                         text, null, null, null, revision));
+    }
+
+    private static RepositoryEvidence storyEvidence(String path) {
+        return new RepositoryEvidence(RepositoryContextLayer.ROADMAP, "ENGINEERING_STORY",
+                "story:" + STORY_ID, "Story 0230", Instant.EPOCH,
+                EvidenceScore.unscored(), List.of(),
+                new RepositoryEvidence.EvidenceProvenance(
+                        "ENGINEERING_STORY", path, path, STORY_ID.toString()),
+                Map.of(), 1, List.of());
+    }
+
+    private static RepositoryEvidence evidenceWithoutRevision(String path) {
+        return new RepositoryEvidence(RepositoryContextLayer.RELATED_SOURCE_CODE, "SOURCE_FILE",
+                "file:" + path, "Source", Instant.EPOCH, EvidenceScore.unscored(), List.of(),
+                new RepositoryEvidence.EvidenceProvenance("GIT", "source", path, path),
+                Map.of(), 1, List.of(),
+                new com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent(
+                        com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.COMPLETE,
+                        "one\ntwo", null, null, null, null));
     }
 }
