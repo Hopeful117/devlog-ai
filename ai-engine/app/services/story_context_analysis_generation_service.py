@@ -107,9 +107,9 @@ logger = logging.getLogger(__name__)
 class _InvestigationTerminal(ValueError):
     retryable = False
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, detail: str | None = None) -> None:
         self.code = code
-        super().__init__(code)
+        super().__init__(detail or code)
 
 
 class StoryContextAnalysisGenerationService:
@@ -360,7 +360,25 @@ class StoryContextAnalysisGenerationService:
             raise ValueError("Investigation final prompt is missing")
         if (submission.metadata.get("investigation", {}).get("requiredEvidence") is True
                 and not self._has_usable_investigation_evidence(submission, results)):
-            raise _InvestigationTerminal("INVESTIGATION_INCOMPLETE_NO_EVIDENCE")
+            result_count = sum(1 for result in results if result.get("outcome") == "RESULTS")
+            evidence_count = sum(
+                len(result.get("evidence", []))
+                for result in results
+                if result.get("outcome") == "RESULTS" and isinstance(result.get("evidence"), list)
+            )
+            citable_count = sum(
+                1
+                for result in results
+                if result.get("outcome") == "RESULTS"
+                for evidence in result.get("evidence", [])
+                if isinstance(evidence, dict) and evidence.get("citable") is True
+            )
+            raise _InvestigationTerminal(
+                "INVESTIGATION_INCOMPLETE_NO_EVIDENCE",
+                "Required citable evidence was not returned "
+                f"(resultActions={result_count}, evidenceItems={evidence_count}, "
+                f"citableItems={citable_count})",
+            )
         output = provider_result_to_internal(provider_result)
         self._synchronize_output_classification(output)
         self._validate_output(output, submission.selected_knowledge, submission.grounding_contract or {})
@@ -1048,6 +1066,8 @@ class StoryContextAnalysisGenerationService:
             return "Grounding validation failed; inspect the bounded interaction trace diagnostics."
         if getattr(error, "failure_category", None) == "STRUCTURAL_CONTRACT_ERROR":
             return "Structured output contract validation failed."
+        if getattr(error, "code", None) == "INVESTIGATION_INCOMPLETE_NO_EVIDENCE":
+            return f"Investigation completed without citable evidence: {str(error)[:300]}"
         return "LLM output validation failed."
 
     def _failure_execution_metadata(
