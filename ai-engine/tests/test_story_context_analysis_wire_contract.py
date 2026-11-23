@@ -12,6 +12,7 @@ import app.services.story_context_analysis_generation_service as generation_modu
 from app.providers.chatgpt import ChatGptProviderError
 from app.schemas.story_context_analysis import (
     GroundingMetadata,
+    OutputClassification,
     ProviderStoryContextAnalysisResult,
     StoryContextAnalysisResult,
     provider_result_to_internal,
@@ -85,6 +86,33 @@ def test_objective_understanding_preserves_explicit_grounding():
 def test_python_keeps_confidence_rationale_internally():
     assert _result().confidence.level == "HIGH"
     assert _result().confidence.rationale == "bounded"
+
+
+def test_output_classification_drops_non_finding_references_before_validation():
+    result = _result().model_copy(update={
+        "output_classification": OutputClassification.model_validate({
+            "entries": [
+                {
+                    "findingReference": "objectiveUnderstanding",
+                    "classification": "RECOMMENDATION",
+                    "grounded": False,
+                    "rationale": "bounded",
+                },
+                {
+                    "findingReference": "missingInformation[0]",
+                    "classification": "RECOMMENDATION",
+                    "grounded": False,
+                    "rationale": "not a finding",
+                },
+            ]
+        })
+    })
+
+    generation_module.StoryContextAnalysisGenerationService._synchronize_output_classification(result)
+
+    assert [entry.finding_reference for entry in result.output_classification.entries] == [
+        "objectiveUnderstanding"
+    ]
 
 
 def _provider_payload(confidence: str) -> dict:
@@ -380,7 +408,7 @@ async def test_initialized_investigation_executes_one_action_and_returns_final(m
 
 
 @pytest.mark.asyncio
-async def test_investigation_retries_final_output_contract_failure_once(monkeypatch):
+async def test_investigation_repairs_stale_final_classification_without_retry(monkeypatch):
     request = _investigation_request()
     invalid_final = _final_decision()
     invalid_final["result"]["outputClassification"]["entries"][0]["findingReference"] = (
@@ -396,9 +424,8 @@ async def test_investigation_retries_final_output_contract_failure_once(monkeypa
 
     await service.process(request, UUID("00000000-0000-0000-0000-00000000000b"))
 
-    assert traces.calls == 3
-    assert len(traces.retry_reasons) == 1
-    assert "Core's deterministic output validation" in traces.prompts[2]
+    assert traces.calls == 2
+    assert len(traces.retry_reasons) == 0
     assert callback.results[0].status.value == "COMPLETED"
 
 

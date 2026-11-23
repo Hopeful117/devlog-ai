@@ -373,11 +373,15 @@ class StoryContextAnalysisGenerationService:
                 for evidence in result.get("evidence", [])
                 if isinstance(evidence, dict) and evidence.get("citable") is True
             )
+            outcome_counts: dict[str, int] = {}
+            for result in results:
+                outcome = result.get("outcome", "UNKNOWN")
+                outcome_counts[str(outcome)] = outcome_counts.get(str(outcome), 0) + 1
             raise _InvestigationTerminal(
                 "INVESTIGATION_INCOMPLETE_NO_EVIDENCE",
                 "Required citable evidence was not returned "
                 f"(resultActions={result_count}, evidenceItems={evidence_count}, "
-                f"citableItems={citable_count})",
+                f"citableItems={citable_count}, outcomes={outcome_counts})",
             )
         output = provider_result_to_internal(provider_result)
         self._synchronize_output_classification(output)
@@ -400,7 +404,7 @@ class StoryContextAnalysisGenerationService:
 
     @staticmethod
     def _synchronize_output_classification(output: StoryContextAnalysisResult) -> None:
-        """Fill omitted redundant classifications from the already supplied grounding metadata."""
+        """Canonicalize redundant classifications from the supplied grounding metadata."""
         findings = [
             ("objectiveUnderstanding", output.objective_understanding),
             *[
@@ -428,7 +432,11 @@ class StoryContextAnalysisGenerationService:
                 for index, finding in enumerate(output.impacted_component_findings)
             ],
         ]
-        entries = list(output.output_classification.entries)
+        valid_references = {reference for reference, _ in findings}
+        entries = [
+            entry for entry in output.output_classification.entries
+            if entry.finding_reference in valid_references
+        ]
         classified_references = {entry.finding_reference for entry in entries}
         entries.extend(
             [
@@ -587,11 +595,19 @@ class StoryContextAnalysisGenerationService:
         provider_output = await traces.generate_and_validate(
             prompt,
             ProviderStoryContextAnalysisResult,
-            lambda output: self._validate_output(
-                provider_result_to_internal(output), context, grounding_contract
-            ),
+            lambda output: self._validate_one_shot_output(output, context, grounding_contract),
         )
         return provider_result_to_internal(provider_output)
+
+    def _validate_one_shot_output(
+        self,
+        output: ProviderStoryContextAnalysisResult,
+        context: dict[str, object],
+        grounding_contract: dict[str, object],
+    ) -> None:
+        internal = provider_result_to_internal(output)
+        self._synchronize_output_classification(internal)
+        self._validate_output(internal, context, grounding_contract)
 
     def _is_follow_up(self, submission: AiTaskSubmissionRequest) -> bool:
         return isinstance(submission.metadata.get("parentSnapshotId"), str)

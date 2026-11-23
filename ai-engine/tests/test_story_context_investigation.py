@@ -246,6 +246,23 @@ def test_investigation_no_evidence_failure_exposes_bounded_counts():
     assert "citableItems=0" in StoryContextAnalysisGenerationService._callback_error_message(error)
 
 
+def test_investigation_no_evidence_failure_includes_outcome_breakdown():
+    from app.services.story_context_analysis_generation_service import (
+        StoryContextAnalysisGenerationService,
+        _InvestigationTerminal,
+    )
+
+    error = _InvestigationTerminal(
+        "INVESTIGATION_INCOMPLETE_NO_EVIDENCE",
+        "Required citable evidence was not returned "
+        "(resultActions=2, evidenceItems=1, citableItems=0, outcomes={'EMPTY': 1, 'REJECTED': 1})",
+    )
+
+    message = StoryContextAnalysisGenerationService._callback_error_message(error)
+    assert "outcomes=" in message
+    assert "REJECTED" in message
+
+
 def test_pydantic_validation_failure_keeps_field_diagnostics():
     from app.services.interaction_trace import _failure_message
 

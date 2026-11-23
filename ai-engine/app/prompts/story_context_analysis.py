@@ -341,6 +341,8 @@ class StoryContextAnalysisPromptBuilder:
               "the range must be bounded, startLine >= 1, endLine >= startLine, and contain at most 500 lines. "
               "Never use READ_EVIDENCE_RANGE to request a whole document or omit its locator fields; use SEARCH_EVIDENCE "
               "first when the exact file or line range is unknown. If all capability results contain no evidence, "
+              "inspect the result outcome and stop reason before choosing the next action; when the requested file is known, "
+              "use one bounded READ_EVIDENCE_RANGE on that exact authorized path rather than repeating a broad search. "
               "do not claim an evidence-grounded objective understanding: leave its summary empty and its grounding null, "
               "leave grounded finding arrays empty, and express remaining work only as ungrounded recommendations or "
               "missing information.\n"
