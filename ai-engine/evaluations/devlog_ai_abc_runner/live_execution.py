@@ -841,7 +841,7 @@ def prepare_live_evaluation(
     identity = execution_identity(root, runtime_revision=current_head(root))
     namespace = values.get("DEVLOG_LIVE_ARTIFACT_NAMESPACE", "q1/" + current_head(root)[:12]).strip()
     request = {
-        "benchmarkId": "devlog-ai-q1-abc",
+        "benchmarkId": "devlog-ai-abc",
         "benchmarkVersion": "1.0.0",
         "caseId": manifest["caseId"],
         "manifestId": manifest["manifestId"],
