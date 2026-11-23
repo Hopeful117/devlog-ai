@@ -30,8 +30,8 @@ public class LiveEvaluationPreparationService {
     private static final Pattern ARTIFACT_NAMESPACE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_/-]{0,119}");
     private static final String MANIFEST_ID = "devlog-ai-abc-first-test";
     private static final String MANIFEST_VERSION = "1.1.0";
-    private static final String MANIFEST_DIGEST = "c533be54e8189273f6fb81956a1587330f513cfefbe2512032063afc096f06bd";
-    private static final String SOURCE_REVISION = "60fae3e0e1104d0ffbe3832c1f578ed532b1268a";
+    private static final String MANIFEST_DIGEST = "bcd538cc5a40c6d270098145181bdc421caee9cc1f215d4692d1168726482465";
+    private static final String SOURCE_REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b";
     private static final String ORACLE_DIGEST = "2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e";
     private static final String PRICING_DIGEST = "0b48079816061d0660476bf2bb5d08572ff5f3378be7d5f3ba77d4013c229fbd";
     private static final List<String> OBSERVATIONS = List.of(
