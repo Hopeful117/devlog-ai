@@ -1,6 +1,11 @@
 package com.hopeful117.devlogai.storycontextanalysis.investigation;
 
 import com.hopeful117.devlogai.contracts.engineeringcontext.TrustTier;
+import com.hopeful117.devlogai.evidence.resolution.DocumentResolutionPayload;
+import com.hopeful117.devlogai.evidence.resolution.EvidenceResolutionFacade;
+import com.hopeful117.devlogai.evidence.resolution.EvidenceResolutionException;
+import com.hopeful117.devlogai.evidence.resolution.EvidenceResolutionMode;
+import com.hopeful117.devlogai.evidence.resolution.EvidenceResolutionRequest;
 import com.hopeful117.devlogai.engineeringcontext.mapper.TrustTierClassifier;
 import com.hopeful117.devlogai.projectcontext.ProjectContextProvider;
 import com.hopeful117.devlogai.projectcontext.ProjectContextSnapshot;
@@ -22,6 +27,7 @@ import java.util.UUID;
 public class InvestigationCapabilityExecutionService {
     private final ProjectContextProvider projectContextProvider;
     private final RepositoryContextAdapter repositoryContextAdapter;
+    private final EvidenceResolutionFacade evidenceResolutionFacade;
 
     public InvestigationCapabilityResult execute(
             UUID projectId,
@@ -74,15 +80,38 @@ public class InvestigationCapabilityExecutionService {
         Set<String> references = new HashSet<>();
         long remainingBytes = action.maximumBytes();
         long remainingTokens = action.maximumTokens();
+        int evidenceCount = 0;
+        int authorizedPathMatches = 0;
+        int revisionMatches = 0;
         for (RepositoryEvidence evidence : context.evidence()) {
             if (evidence == null || !references.add(evidence.reference())) {
                 continue;
             }
+            evidenceCount++;
             String path = evidence.provenance() == null ? null : evidence.provenance().originatingFile();
             String revision = resolvedRevision(evidence);
-            if (!authorizedPath(path, action, scope) || !action.revision().equals(revision)) {
+            if (!authorizedPath(path, action, scope)) {
                 continue;
             }
+            authorizedPathMatches++;
+            ResolvedEvidence resolved = resolveEvidence(evidence, action, context);
+            if (resolved.unavailable()) {
+                return unavailable(projectId, storyId, action, resolved.message());
+            }
+            if (resolved.evidence() != null) {
+                evidence = resolved.evidence();
+                path = evidence.provenance() == null ? path : evidence.provenance().originatingFile();
+                revision = resolvedRevision(evidence);
+            }
+            if (revision == null || revision.isBlank()) {
+                return unavailable(projectId, storyId, action,
+                        "Authorized evidence has no resolved revision");
+            }
+            if (!action.revision().equals(revision)) {
+                continue;
+            }
+            revisionMatches++;
+            String evidenceReference = resolved.reference();
             TrustTier trustTier = TrustTierClassifier.publicTrustTier(
                     evidence.kind(), evidence.provenance().sourceType());
             if (trustTier == null || evidence.reference() == null || evidence.reference().isBlank()) {
@@ -114,7 +143,7 @@ public class InvestigationCapabilityExecutionService {
             long payloadTokens = estimateTokens(payloadBytes);
             if (payloadBytes == 0 && projected.size() > 0) break;
             projected.add(new InvestigationCapabilityResult.Evidence(
-                    evidence.reference(), evidence.kind(), path, revision,
+                    evidenceReference, evidence.kind(), path, revision,
                     evidence.provenance().sourceType(), evidence.provenance().identifier(),
                     summary, trustTier,
                     path != null && evidence.reference() != null, content, startLine, endLine));
@@ -125,8 +154,65 @@ public class InvestigationCapabilityExecutionService {
         InvestigationCapabilityResult.Outcome outcome = projected.isEmpty()
                 ? InvestigationCapabilityResult.Outcome.EMPTY
                 : InvestigationCapabilityResult.Outcome.RESULTS;
+        String emptyReason = outcome == InvestigationCapabilityResult.Outcome.EMPTY
+                ? "NO_AUTHORIZED_EVIDENCE_MATCH"
+                : null;
+        String emptyMessage = outcome == InvestigationCapabilityResult.Outcome.EMPTY
+                ? "No evidence matched the authorized path and revision"
+                + " (candidates=" + evidenceCount
+                + ", pathMatches=" + authorizedPathMatches
+                + ", revisionMatches=" + revisionMatches + ")"
+                : null;
         return new InvestigationCapabilityResult(projectId, storyId, action.actionId(), action.kind(),
-                action.projectSlug(), action.revision(), outcome, projected, null, null);
+                action.projectSlug(), action.revision(), outcome, projected, emptyReason,
+                emptyMessage);
+    }
+
+    private ResolvedEvidence resolveEvidence(
+            RepositoryEvidence evidence,
+            InvestigationAction action,
+            RepositoryContext context) {
+        if (!(action instanceof ReadEvidenceRangeRequest read)
+                || evidence.content() != null && evidence.content().text() != null) {
+            return ResolvedEvidence.available(evidence, evidence.reference());
+        }
+        if (!"ENGINEERING_STORY".equals(evidence.kind())
+                || evidence.provenance() == null
+                || !read.path().equals(evidence.provenance().originatingFile())) {
+            return ResolvedEvidence.available(evidence, evidence.reference());
+        }
+        if (context.revisionScope() == null
+                || context.revisionScope().sourceId() == null
+                || !action.revision().equals(context.revisionScope().resolvedRevision())) {
+            return ResolvedEvidence.unavailable(
+                    "Authorized Story document has no matching source revision scope");
+        }
+
+        String documentReference = "document:" + context.revisionScope().sourceId()
+                + ":" + read.path() + "@" + action.revision();
+        try {
+            var result = evidenceResolutionFacade.resolve(new EvidenceResolutionRequest(
+                    documentReference, EvidenceResolutionMode.CURRENT));
+            if (!(result.payload() instanceof DocumentResolutionPayload payload)
+                    || !action.revision().equals(payload.revision())
+                    || !read.path().equals(payload.path())) {
+                return ResolvedEvidence.unavailable(
+                        "Resolved Story document did not match the authorized path and revision");
+            }
+            var content = new com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent(
+                    com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.COMPLETE,
+                    payload.content(), null, null, null, payload.revision());
+            return ResolvedEvidence.available(evidence.withContent(content), evidence.reference());
+        } catch (EvidenceResolutionException exception) {
+            return ResolvedEvidence.unavailable("Authorized Story document is unavailable");
+        }
+    }
+
+    private InvestigationCapabilityResult unavailable(
+            UUID projectId, UUID storyId, InvestigationAction action, String message) {
+        return new InvestigationCapabilityResult(projectId, storyId, action.actionId(), action.kind(),
+                action.projectSlug(), action.revision(), InvestigationCapabilityResult.Outcome.UNAVAILABLE,
+                List.of(), "EVIDENCE_UNAVAILABLE", message);
     }
 
     private boolean authorizedPath(String path, InvestigationAction action, InvestigationScope scope) {
@@ -183,5 +269,16 @@ public class InvestigationCapabilityExecutionService {
 
     private long estimateTokens(long bytes) {
         return bytes == 0 ? 0 : (bytes + 3) / 4;
+    }
+
+    private record ResolvedEvidence(
+            RepositoryEvidence evidence, String reference, boolean unavailable, String message) {
+        static ResolvedEvidence available(RepositoryEvidence evidence, String reference) {
+            return new ResolvedEvidence(evidence, reference, false, null);
+        }
+
+        static ResolvedEvidence unavailable(String message) {
+            return new ResolvedEvidence(null, null, true, message);
+        }
     }
 }
