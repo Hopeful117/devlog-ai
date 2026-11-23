@@ -12,6 +12,18 @@ from app.schemas.story_context_investigation import InvestigationDecisionRespons
 from tests.intent_fixtures import prompt_request
 
 
+@pytest.mark.asyncio
+async def test_chatgpt_oauth_does_not_masquerade_as_embedding_provider():
+    provider = OpenAiChatGptProvider(
+        resolver=None, endpoint="https://api.openai.com/v1/responses",
+        model="test", timeout_seconds=1, token_endpoint=None,
+        client_id=None, resource=None, max_output_tokens=2000,
+    )
+
+    with pytest.raises(ChatGptProviderError, match="does not provide an embeddings operation"):
+        await provider.embed(["text"], "text-embedding-3-small")
+
+
 class StreamResponse:
     status_code = 200
 

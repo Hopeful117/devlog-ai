@@ -111,6 +111,8 @@ class InvestigationCapabilityExecutionServiceTest {
 
         assertThat(result.outcome()).isEqualTo(InvestigationCapabilityResult.Outcome.EMPTY);
         assertThat(result.evidence()).isEmpty();
+        assertThat(result.rejectionCode()).isEqualTo("NO_AUTHORIZED_EVIDENCE_MATCH");
+        assertThat(result.rejectionMessage()).contains("authorized path and revision");
     }
 
     @Test

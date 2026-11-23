@@ -125,8 +125,14 @@ public class InvestigationCapabilityExecutionService {
         InvestigationCapabilityResult.Outcome outcome = projected.isEmpty()
                 ? InvestigationCapabilityResult.Outcome.EMPTY
                 : InvestigationCapabilityResult.Outcome.RESULTS;
+        String emptyReason = outcome == InvestigationCapabilityResult.Outcome.EMPTY
+                ? "NO_AUTHORIZED_EVIDENCE_MATCH"
+                : null;
         return new InvestigationCapabilityResult(projectId, storyId, action.actionId(), action.kind(),
-                action.projectSlug(), action.revision(), outcome, projected, null, null);
+                action.projectSlug(), action.revision(), outcome, projected, emptyReason,
+                outcome == InvestigationCapabilityResult.Outcome.EMPTY
+                        ? "No evidence matched the authorized path and revision"
+                        : null);
     }
 
     private boolean authorizedPath(String path, InvestigationAction action, InvestigationScope scope) {

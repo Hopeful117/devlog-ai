@@ -50,6 +50,13 @@ class OpenAiChatGptProvider:
         self._resource = resource
         self._last_usage: dict[str, int | None] = {}
 
+    async def embed(self, texts: list[str], model: str) -> list[list[float]]:
+        """Keep OAuth chat credentials from being misused as embedding credentials."""
+        raise ChatGptProviderError(
+            "ChatGPT OAuth does not provide an embeddings operation; configure a separate embedding provider",
+            status="UNSUPPORTED",
+        )
+
     async def generate_structured(self, request: Prompt,
                                   response_model: type[StructuredOutput]) -> StructuredOutput:
         return (await self.generate_structured_with_trace(request, response_model)).output

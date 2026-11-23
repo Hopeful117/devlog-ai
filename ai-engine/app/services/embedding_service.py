@@ -6,6 +6,10 @@ from app.schemas.embedding import EmbeddingRequest, EmbeddingResponse
 logger = logging.getLogger(__name__)
 
 
+class EmbeddingProviderUnavailable(RuntimeError):
+    """Raised when the configured LLM cannot serve embedding requests."""
+
+
 class EmbeddingProvider(Protocol):
     async def embed(self, texts: list[str], model: str) -> list[list[float]]: ...
 

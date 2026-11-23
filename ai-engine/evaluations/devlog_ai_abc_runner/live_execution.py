@@ -55,6 +55,8 @@ def _mcp_response_diagnostic(response: Mapping[str, Any]) -> dict[str, Any]:
         "snapshotIdPresent": bool(response.get("snapshotId")),
         "resultPresent": bool(response.get("result")),
         "diagnosticKeys": sorted(str(key) for key in diagnostics) if isinstance(diagnostics, Mapping) else [],
+        "failureCodePresent": bool(response.get("failureCode")),
+        "failureMessagePresent": bool(response.get("failureMessage")),
     }
 
 
@@ -894,6 +896,11 @@ def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config:
         raise LiveConfigurationError("B live execution requires LLM_PROVIDER=openai_chatgpt")
     if values.get("CHATGPT_OAUTH_ENABLED", "false").strip().lower() != "true":
         raise LiveConfigurationError("B live execution requires CHATGPT_OAUTH_ENABLED=true")
+    if values.get("DEVLOG_LIVE_REMOTE_PROVIDER", "false").strip().lower() != "true":
+        raise LiveConfigurationError(
+            "B live execution requires DEVLOG_LIVE_REMOTE_PROVIDER=true; "
+            "the local binding store is not a live provider boundary"
+        )
     model = values.get("LLM_MODEL", manifest["model"]).strip()
     return {
         "A_DEVLOG_CURRENT": CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, manifest, mcp),

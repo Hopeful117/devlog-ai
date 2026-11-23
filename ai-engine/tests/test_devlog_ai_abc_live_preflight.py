@@ -454,6 +454,7 @@ def test_live_adapters_require_chatgpt_oauth_before_provider_execution() -> None
         environment={
             "LLM_PROVIDER": "openai_chatgpt",
             "CHATGPT_OAUTH_ENABLED": "true",
+            "DEVLOG_LIVE_REMOTE_PROVIDER": "true",
             "LLM_MODEL": "gpt-5.6-luna",
         },
     )
