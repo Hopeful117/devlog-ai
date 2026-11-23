@@ -7,7 +7,7 @@
   "campaignId": "devlog-ai-abc-first-test",
   "manifestId": "devlog-ai-abc-first-test",
   "manifestVersion": "1.1.0",
-  "manifestDigest": "c533be54e8189273f6fb81956a1587330f513cfefbe2512032063afc096f06bd",
+  "manifestDigest": "bcd538cc5a40c6d270098145181bdc421caee9cc1f215d4692d1168726482465",
   "oracleStatus": "Q1_ORACLE_ACCEPTED",
   "oracleDigest": "2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e",
   "authorizedObservationIds": [
@@ -20,8 +20,8 @@
     "B_DIRECT_INVESTIGATOR",
     "C_DEVLOG_ENGINEERING_ANALYST"
   ],
-  "repositoryRevision": "60fae3e0e1104d0ffbe3832c1f578ed532b1268a",
-  "runtimeRevision": "94cdcf44cd6871550de283efc665e21c7cc0c1ff",
+  "repositoryRevision": "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b",
+  "runtimeRevision": "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b",
   "provider": "openai_chatgpt",
   "model": "gpt-5.6-luna",
   "budgets": {

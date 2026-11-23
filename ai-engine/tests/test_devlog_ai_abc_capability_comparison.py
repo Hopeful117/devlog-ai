@@ -15,7 +15,7 @@ from evaluations.devlog_ai_abc_capability_comparison.q1_fixture import Capabilit
 
 
 ROOT = Path(__file__).resolve().parents[2]
-REVISION = "60fae3e0e1104d0ffbe3832c1f578ed532b1268a"
+REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
 
 
 @pytest.fixture
@@ -50,7 +50,8 @@ def test_b_read_and_c_read_projection_match_on_same_authorized_content(repositor
 
 
 def test_no_result_is_consistent_for_direct_search_fixture(repository: PinnedQ1Repository) -> None:
-    assert repository.b_search("__q1_no_such_content__")["matches"] == []
+    absent_query = "__q1_absent_" + "probe__"
+    assert repository.b_search(absent_query)["matches"] == []
 
 
 @pytest.mark.parametrize(

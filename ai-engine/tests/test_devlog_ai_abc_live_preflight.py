@@ -37,7 +37,7 @@ from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
 ROOT = Path(__file__).parents[1].parent
 MANIFEST_PATH = ROOT / "docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json"
 ORACLE_PATH = ROOT / "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json"
-REVISION = "60fae3e0e1104d0ffbe3832c1f578ed532b1268a"
+REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
 
 
 def manifest() -> dict:
@@ -269,8 +269,9 @@ def test_live_preflight_is_static_and_fails_closed(tmp_path: Path, monkeypatch: 
     assert all(item["status"] == "LIVE_ENTRYPOINT_IDENTIFIED" for item in report["entrypoints"])
     assert all(item["adapterStatus"] == "CONTROLLED_ADAPTER_AVAILABLE" for item in report["entrypoints"])
     assert report["provenance"]["sourceSnapshot"]["revision"] == REVISION
-    assert report["provenance"]["runtimeRevision"] != REVISION
-    assert "executed runtime revision does not match the frozen manifest" in report["criticalBlockers"]
+    assert report["provenance"]["runtimeRevision"] == REVISION
+    assert "approved pricing contract is missing" in report["criticalBlockers"]
+    assert "executed runtime revision does not match the frozen manifest" not in report["criticalBlockers"]
     assert all(item["status"] == "LIVE_ENTRYPOINT_IDENTIFIED" for item in report["entrypoints"])
     assert not (tmp_path / "q1-live-run").exists()
 

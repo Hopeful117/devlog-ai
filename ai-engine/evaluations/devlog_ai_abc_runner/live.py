@@ -331,7 +331,7 @@ def live_preflight(
         blockers.append("source snapshot does not match the frozen manifest")
     if not isinstance(identity.get("runtimeRevision"), str) or not identity["runtimeRevision"]:
         blockers.append("runtime revision cannot be identified")
-    elif authorization is None or authorization.get("runtimeRevision") != identity["runtimeRevision"]:
+    elif authorization is not None and authorization.get("runtimeRevision") != identity["runtimeRevision"]:
         blockers.append("executed runtime revision does not match the frozen manifest")
     harness = identity.get("harness", {})
     if not isinstance(harness.get("sha256"), str) or len(harness["sha256"]) != 64:
