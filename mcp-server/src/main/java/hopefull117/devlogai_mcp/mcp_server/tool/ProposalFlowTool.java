@@ -152,7 +152,7 @@ public class ProposalFlowTool {
             String decision,
             @McpToolParam(description = "Optional comment explaining the decision (max 2000 characters)", required = false)
             @Nullable String comment,
-            @McpToolParam(description = "Insight severity for INSIGHT proposals: LOW, MEDIUM, HIGH, or CRITICAL", required = false)
+            @McpToolParam(description = "Insight severity for INSIGHT proposals: INFO, WARNING, or CRITICAL", required = false)
             @Nullable String insightSeverity,
             McpSyncRequestContext requestContext
     ) {
@@ -175,8 +175,8 @@ public class ProposalFlowTool {
             validatedBy = UUID.fromString(principal.principalId());
         } catch (IllegalArgumentException e) {
             throw ResourceSupport.invalidParams(
-                    "Cannot validate — the MCP principal ID '%s' is not a valid UUID. "
-                            + "Use the DevLog web interface to validate this proposal."
+                    ("Cannot validate — the MCP principal ID '%s' is not a valid UUID. "
+                            + "Use the DevLog web interface to validate this proposal.")
                                     .formatted(principal.principalId()));
         }
 

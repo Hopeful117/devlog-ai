@@ -73,7 +73,7 @@ class FailClosedMcpAuthenticatedPrincipalProviderTest {
         when(decoders.getIfAvailable(org.mockito.ArgumentMatchers.any())).thenReturn(decoder);
 
         var provider = new FailClosedMcpAuthenticatedPrincipalProvider(
-                "https://issuer.example", "token", "devlog-mcp", "delegation", decoders);
+                "https://issuer.example", "token", "devlog-mcp", "", "delegation", decoders);
 
         assertThat(provider.currentPrincipal()).hasValueSatisfying(principal -> {
             assertThat(principal.principalId()).isEqualTo("devlog-mcp");
@@ -97,7 +97,7 @@ class FailClosedMcpAuthenticatedPrincipalProviderTest {
         when(decoders.getIfAvailable(org.mockito.ArgumentMatchers.any())).thenReturn(decoder);
 
         var provider = new FailClosedMcpAuthenticatedPrincipalProvider(
-                "https://issuer.example", "token", "devlog-mcp", "delegation", decoders);
+                "https://issuer.example", "token", "devlog-mcp", "", "delegation", decoders);
 
         assertThat(provider.currentPrincipal()).isEmpty();
     }
