@@ -30,6 +30,7 @@ from evaluations.devlog_ai_abc_runner.live_execution import (
     require_live_provider_environment,
     resolve_live_story,
 )
+from evaluations.devlog_ai_abc_runner.provenance import current_head
 from evaluations.comparative_baseline.collection_runtime import ProviderRequest, TransportFailure
 from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
 
@@ -269,7 +270,7 @@ def test_live_preflight_is_static_and_fails_closed(tmp_path: Path, monkeypatch: 
     assert all(item["status"] == "LIVE_ENTRYPOINT_IDENTIFIED" for item in report["entrypoints"])
     assert all(item["adapterStatus"] == "CONTROLLED_ADAPTER_AVAILABLE" for item in report["entrypoints"])
     assert report["provenance"]["sourceSnapshot"]["revision"] == REVISION
-    assert report["provenance"]["runtimeRevision"] == REVISION
+    assert report["provenance"]["runtimeRevision"] == current_head(ROOT)
     assert "approved pricing contract is missing" in report["criticalBlockers"]
     assert "executed runtime revision does not match the frozen manifest" not in report["criticalBlockers"]
     assert all(item["status"] == "LIVE_ENTRYPOINT_IDENTIFIED" for item in report["entrypoints"])
