@@ -154,6 +154,53 @@ class DevLogStoryAgentToolTest {
     }
 
     @Test
+    void readsThePersistedAnalysisWhenSubmissionIsAlreadyCompleted() throws Exception {
+        DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper, 100, 0, principalProvider());
+        UUID taskId = UUID.randomUUID();
+        when(client.submitStoryContextAgentTask(any(), any(), any(), any(), any(), any()))
+                .thenReturn(Map.of("status", "COMPLETED", "aiTaskId", taskId,
+                        "contextDigest", "initial-context"));
+        when(client.getStoryContextAgentResultAuthenticated(taskId, "Bearer test", ""))
+                .thenReturn(new com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResponse(
+                        null, Map.of()));
+
+        JsonNode json = objectMapper.readTree(
+                tool.execute("devlog-ai", null, "intent", null, null, "request-1"));
+
+        assertThat(json.path("status").asText()).isEqualTo("COMPLETED");
+        assertThat(json.path("result").path("contextDigest").asText()).isEqualTo("initial-context");
+        verify(client).getStoryContextAgentResultAuthenticated(taskId, "Bearer test", "");
+        verify(client, never()).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test",
+                "Bearer test", "");
+    }
+
+    @Test
+    void failsAnInitiallyCompletedSubmissionWhenItsResultIsUnavailable() throws Exception {
+        DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper, 100, 0, principalProvider());
+        UUID taskId = UUID.randomUUID();
+        when(client.submitStoryContextAgentTask(any(), any(), any(), any(), any(), any()))
+                .thenReturn(Map.of("status", "COMPLETED", "aiTaskId", taskId));
+        when(client.getStoryContextAgentResultAuthenticated(taskId, "Bearer test", ""))
+                .thenThrow(new IllegalStateException("analysis endpoint returned no result"));
+
+        JsonNode json = objectMapper.readTree(
+                tool.execute("devlog-ai", null, "intent", null, null, "request-1"));
+
+        assertThat(json.path("status").asText()).isEqualTo("FAILED");
+        assertThat(json.path("diagnostics").path("code").asText())
+                .isEqualTo("COMPLETED_RESULT_UNAVAILABLE");
+        assertThat(json.path("diagnostics").path("underlyingStatus").asText())
+                .isEqualTo("COMPLETED");
+        verify(client).getStoryContextAgentResultAuthenticated(taskId, "Bearer test", "");
+        verify(client, never()).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test",
+                "Bearer test", "");
+    }
+
+    @Test
     void preservesNullSnapshotValuesWhilePolling() throws Exception {
         DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
         ObjectMapper objectMapper = new ObjectMapper();
@@ -343,7 +390,7 @@ class DevLogStoryAgentToolTest {
     }
 
     @Test
-    void exposesACompletedTaskWhenItsStructuredResultCannotBeRead() throws Exception {
+    void exposesFailureWhenACompletedTaskHasNoReadableStructuredResult() throws Exception {
         DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
         ObjectMapper objectMapper = new ObjectMapper();
         DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper, 100, 0, principalProvider());
@@ -360,12 +407,14 @@ class DevLogStoryAgentToolTest {
         JsonNode json = objectMapper.readTree(
                 tool.execute("trading-os", null, "intent", null, null, "request-1"));
 
-        assertThat(json.path("status").asText()).isEqualTo("COMPLETED");
+        assertThat(json.path("status").asText()).isEqualTo("FAILED");
         assertThat(json.path("result").isMissingNode()).isTrue();
         assertThat(json.path("diagnostics").path("code").asText())
                 .isEqualTo("COMPLETED_RESULT_UNAVAILABLE");
         assertThat(json.path("diagnostics").path("aiTaskId").asText())
                 .isEqualTo(taskId.toString());
+        assertThat(json.path("diagnostics").path("underlyingStatus").asText())
+                .isEqualTo("COMPLETED");
         verify(client).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test", "Bearer test", "");
         verify(client).getStoryContextAgentResultAuthenticated(taskId, "Bearer test", "");
     }

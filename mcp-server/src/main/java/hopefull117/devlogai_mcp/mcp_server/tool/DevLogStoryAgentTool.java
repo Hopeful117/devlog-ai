@@ -285,6 +285,21 @@ public class DevLogStoryAgentTool {
         String bearerToken = principal.bearerToken();
         String initialStatus = stringValue(initialExecution.get("status"));
         if (isTerminal(initialStatus)) {
+            if ("COMPLETED".equals(initialStatus)) {
+                UUID taskId = executionId(initialExecution);
+                try {
+                    StoryContextAnalysisResponse analysis = callUntil(
+                            operationDeadline,
+                            () -> client.getStoryContextAgentResultAuthenticated(
+                                    taskId, bearerToken, principal.delegationToken()));
+                    return completedExecution(initialExecution, initialExecution, analysis);
+                } catch (DeadlineExceededException exception) {
+                    return completedWithoutResult(initialExecution, taskId, exception);
+                } catch (RuntimeException exception) {
+                    log.warn("Initially completed Story Agent task {} has no readable result", taskId, exception);
+                    return completedWithoutResult(initialExecution, taskId, exception);
+                }
+            }
             if (("FAILED".equals(initialStatus) || "NOT_ESTABLISHED".equals(initialStatus))
                     && !(initialExecution.get("diagnostics") instanceof Map<?, ?>)) {
                 UUID taskId = executionId(initialExecution);
@@ -397,13 +412,14 @@ public class DevLogStoryAgentTool {
             UUID taskId,
             RuntimeException exception) {
         Map<String, Object> incomplete = new LinkedHashMap<>(execution);
-        incomplete.put("status", "COMPLETED");
+        incomplete.put("status", "FAILED");
         incomplete.put("diagnostics", Map.of(
-                "status", "COMPLETED",
+                "status", "FAILED",
                 "code", "COMPLETED_RESULT_UNAVAILABLE",
                 "message", "The agent completed, but its structured result could not be read.",
                 "aiTaskId", taskId.toString(),
-                "cause", exception.getClass().getSimpleName()));
+                "cause", exception.getClass().getSimpleName(),
+                "underlyingStatus", "COMPLETED"));
         return incomplete;
     }
 

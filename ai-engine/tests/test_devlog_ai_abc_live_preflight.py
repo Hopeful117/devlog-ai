@@ -218,11 +218,65 @@ def test_core_live_adapter_rejects_completed_response_without_result() -> None:
         SimpleNamespace(tool=lambda *_args, **_kwargs: {"status": "COMPLETED", "aiTaskId": "task-id"}),
     )
 
-    result = adapter.execute({"observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1"}, manifest())
+    result = adapter.execute(
+        {"observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1"},
+        manifest(),
+    )
 
     assert result["executionStatus"] == "RUNTIME_FAILURE"
     assert result["errorType"] == "MCP_COMPLETED_RESULT_UNAVAILABLE"
     assert result["taskId"] == "task-id"
+
+
+def test_core_live_adapter_rejects_c_source_revision_mismatch() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "C_DEVLOG_ENGINEERING_ANALYST",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223,
+                         story_path=None, files=("docs/story.md",)),
+        {**manifest(), "repositoryRevision": "authorized-revision"},
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {
+            "status": "COMPLETED",
+            "aiTaskId": "task-id",
+            "result": {
+                "scope": {"resolvedRevision": "different-revision"},
+                "analysis": {},
+            },
+        }),
+    )
+
+    result = adapter.execute(
+        {"observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1"},
+        {**manifest(), "repositoryRevision": "authorized-revision"},
+    )
+
+    assert result["errorType"] == "Q1_SOURCE_REVISION_MISMATCH"
+    assert result["sourceRevision"] == "authorized-revision"
+    assert result["resolvedRevision"] == "different-revision"
+
+
+def test_core_live_adapter_accepts_c_source_revision_from_nested_result() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "C_DEVLOG_ENGINEERING_ANALYST",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223,
+                         story_path=None, files=("docs/story.md",)),
+        {**manifest(), "repositoryRevision": "authorized-revision"},
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {
+            "status": "COMPLETED",
+            "aiTaskId": "task-id",
+            "result": {
+                "scope": {"resolvedRevision": "authorized-revision"},
+                "analysis": {},
+            },
+        }),
+    )
+
+    result = adapter.execute(
+        {"observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1"},
+        {**manifest(), "repositoryRevision": "authorized-revision"},
+    )
+
+    assert result["executionStatus"] == "COMPLETED"
+    assert result["integrationStatus"] == "LIVE_CORE_CALLBACK_COMPLETED"
 
 
 def approved_pricing() -> dict:

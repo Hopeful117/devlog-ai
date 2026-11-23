@@ -25,6 +25,7 @@ import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
 import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.AnalyzeStoryContextUseCase;
+import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -50,6 +51,7 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
     private final CommunicationDecisionService communicationDecisionService;
     private final AnalysisCommunicationUseCase analysisCommunicationUseCase;
     private final AiInteractionTracePersistenceService interactionTracePersistenceService;
+    private final StoryContextAnalysisRepository storyContextAnalysisRepository;
 
     @Override
     @Transactional
@@ -554,6 +556,14 @@ public class AiTaskResultServiceImpl implements AiTaskResultService {
             // for the empty legacy duplicate; all v1 terminal callbacks are
             // persisted with and compared against terminalCallbackDigest.
             if (task.getTerminalCallbackDigest() == null && isEmptyLegacyTerminalCallback(request)) {
+                if (task.getStatus() == AiTaskStatus.COMPLETED
+                        && storyContextAnalysisRepository.findByAiTaskId(task.getId()).isEmpty()) {
+                    throw new AiTaskResultConflictException(
+                            "AI_TASK_INVALID_TERMINAL_RESULT",
+                            task.getStatus(),
+                            "Story Context task completed without a persisted analysis result."
+                    );
+                }
                 persistInteractionTraces(task, request);
                 return acknowledgement(task, true);
             }

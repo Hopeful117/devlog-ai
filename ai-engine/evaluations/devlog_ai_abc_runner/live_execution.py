@@ -343,6 +343,54 @@ class CoreLiveTreatmentAdapter:
                 "taskId": task_id,
                 "mcpResponse": response_diagnostic,
             }
+        if self.condition == "C_DEVLOG_ENGINEERING_ANALYST":
+            scope = result.get("scope")
+            resolved_revision = scope.get("resolvedRevision") if isinstance(scope, dict) else None
+            expected_revision = manifest.get("repositoryRevision")
+            if not isinstance(expected_revision, str) or not expected_revision:
+                return {
+                    "executionMode": "LIVE",
+                    "executionStatus": "RUNTIME_FAILURE",
+                    "integrationStatus": "LIVE_CORE_MCP_BOUNDARY_FAILURE",
+                    "providerCalls": 0,
+                    "externalProviderCalls": 0,
+                    "externalNetworkCalls": 0,
+                    "networkCalls": 0,
+                    "errorType": "Q1_SOURCE_REVISION_UNAVAILABLE",
+                    "errorMessage": "Q1 manifest does not contain an expected source revision",
+                    "taskId": task_id,
+                    "mcpResponse": response_diagnostic,
+                }
+            if not isinstance(resolved_revision, str) or not resolved_revision:
+                return {
+                    "executionMode": "LIVE",
+                    "executionStatus": "RUNTIME_FAILURE",
+                    "integrationStatus": "LIVE_CORE_MCP_BOUNDARY_FAILURE",
+                    "providerCalls": 0,
+                    "externalProviderCalls": 0,
+                    "externalNetworkCalls": 0,
+                    "networkCalls": 0,
+                    "errorType": "Q1_SOURCE_REVISION_UNAVAILABLE",
+                    "errorMessage": "Core did not return a resolved source revision for C",
+                    "taskId": task_id,
+                    "mcpResponse": response_diagnostic,
+                }
+            if resolved_revision != expected_revision:
+                return {
+                    "executionMode": "LIVE",
+                    "executionStatus": "RUNTIME_FAILURE",
+                    "integrationStatus": "LIVE_CORE_MCP_BOUNDARY_FAILURE",
+                    "providerCalls": 0,
+                    "externalProviderCalls": 0,
+                    "externalNetworkCalls": 0,
+                    "networkCalls": 0,
+                    "errorType": "Q1_SOURCE_REVISION_MISMATCH",
+                    "errorMessage": "Core source revision does not match the authorized Q1 revision",
+                    "taskId": task_id,
+                    "sourceRevision": expected_revision,
+                    "resolvedRevision": resolved_revision,
+                    "mcpResponse": response_diagnostic,
+                }
         completed = execution_status == "COMPLETED"
         return {
             "executionMode": "LIVE",

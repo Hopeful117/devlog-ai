@@ -27,6 +27,7 @@ import com.hopeful117.devlogai.proposal.entity.ValidatableProposal;
 import com.hopeful117.devlogai.proposal.repository.ValidatableProposalRepository;
 import com.hopeful117.devlogai.contracts.engineeringcontext.StoryContextAnalysisResult;
 import com.hopeful117.devlogai.storycontextanalysis.usecase.AnalyzeStoryContextUseCase;
+import com.hopeful117.devlogai.storycontextanalysis.repository.StoryContextAnalysisRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -83,6 +84,9 @@ class AiTaskResultServiceTest {
 
     @Mock
     private AiInteractionTracePersistenceService interactionTracePersistenceService;
+
+    @Mock
+    private StoryContextAnalysisRepository storyContextAnalysisRepository;
 
     @InjectMocks
     private AiTaskResultServiceImpl service;
@@ -626,6 +630,8 @@ class AiTaskResultServiceTest {
 
         when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
                 .thenReturn(Optional.of(task));
+        when(storyContextAnalysisRepository.findByAiTaskId(task.getId()))
+                .thenReturn(Optional.of(mock(com.hopeful117.devlogai.storycontextanalysis.entity.StoryContextAnalysis.class)));
         when(proposalRepository.countByAiTaskId(task.getId())).thenReturn(0L);
 
         AiTaskResultRequest request = new AiTaskResultRequest(
@@ -639,6 +645,30 @@ class AiTaskResultServiceTest {
         assertEquals(AiTaskStatus.COMPLETED, result.taskStatus());
         verify(analyzeStoryContextUseCase).validateCoreIssuedIdentities(task, request.promptExecution());
         verify(analyzeStoryContextUseCase, never()).handleCallback(any(), any());
+    }
+
+    @Test
+    void shouldRejectLegacyCompletedStoryContextCallbackWithoutPersistedAnalysis() {
+        UUID correlationId = UUID.randomUUID();
+        AiTask task = task(correlationId, AiTaskStatus.COMPLETED);
+        task.setIntentId("engineering-story-context-analysis");
+        task.setIntentVersion("v1");
+
+        when(aiTaskRepository.findByCorrelationIdForUpdate(correlationId))
+                .thenReturn(Optional.of(task));
+        when(storyContextAnalysisRepository.findByAiTaskId(task.getId()))
+                .thenReturn(Optional.empty());
+
+        AiTaskResultRequest request = new AiTaskResultRequest(
+                correlationId, "job-42", AiTaskResultStatus.COMPLETED,
+                Instant.now(), List.of(), null, promptMetadata(), null, null);
+
+        AiTaskResultConflictException exception = assertThrows(
+                AiTaskResultConflictException.class,
+                () -> service.handle(correlationId, request));
+
+        assertEquals("AI_TASK_INVALID_TERMINAL_RESULT", exception.getCode());
+        verify(interactionTracePersistenceService, never()).persist(any(), any());
     }
 
     @Test
