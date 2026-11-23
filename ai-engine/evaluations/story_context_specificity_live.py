@@ -13,6 +13,7 @@ import os
 import re
 import select
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -29,7 +30,8 @@ DEFAULT_OUTPUT = Path("/tmp/opencode/story0210-live")
 
 
 class McpClient:
-    def __init__(self, jar: Path, launcher: Path | None = None, read_timeout_seconds: float = 180.0):
+    def __init__(self, jar: Path, launcher: Path | None = None, read_timeout_seconds: float = 180.0,
+                 elicitation_handler: Any | None = None):
         command = [str(launcher)] if launcher is not None else ["java", "-jar", str(jar)]
         self.process = subprocess.Popen(
             command,
@@ -43,9 +45,10 @@ class McpClient:
         )
         self.request_id = 0
         self.read_timeout_seconds = read_timeout_seconds
+        self.elicitation_handler = elicitation_handler or self._prompt_elicitation
         self.call("initialize", {
             "protocolVersion": "2025-06-18",
-            "capabilities": {},
+            "capabilities": {"elicitation": {"form": {}}},
             "clientInfo": {"name": "story-0158-live-runner", "version": "1.0"},
         })
         self.notify("notifications/initialized", {})
@@ -66,6 +69,9 @@ class McpClient:
             if not line:
                 raise RuntimeError("MCP process exited before returning a response")
             value = json.loads(line)
+            if value.get("method") == "elicitation/create" and "id" in value:
+                self._respond_to_elicitation(value)
+                continue
             if value.get("id") == self.request_id:
                 if "error" in value:
                     raise RuntimeError(json.dumps(value["error"]))
@@ -87,6 +93,19 @@ class McpClient:
     def _send(self, value: dict[str, Any]) -> None:
         self.process.stdin.write(json.dumps(value) + "\n")
         self.process.stdin.flush()
+
+    def _respond_to_elicitation(self, request: dict[str, Any]) -> None:
+        result = self.elicitation_handler(request.get("params", {}))
+        self._send({"jsonrpc": "2.0", "id": request["id"], "result": result})
+
+    @staticmethod
+    def _prompt_elicitation(params: dict[str, Any]) -> dict[str, Any]:
+        message = params.get("message", "Confirm the requested MCP operation")
+        print(f"MCP confirmation required: {message}", file=sys.stderr, flush=True)
+        answer = input("Type APPROVE or REJECT: ").strip().upper()
+        if answer == "APPROVE":
+            return {"action": "accept", "content": {"confirmation": "APPROVE"}}
+        return {"action": "decline", "content": {"confirmation": "REJECT"}}
 
 
 def stable_idempotency_key(

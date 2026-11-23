@@ -102,4 +102,8 @@ def validate_prepared_plan(
             raise PreparedPlanError("preparation pricing is not campaign-authorized")
         if authorization.get("provider") != plan.get("provider") or authorization.get("model") != plan.get("model"):
             raise PreparedPlanError("preparation provider/model is not campaign-authorized")
+        if authorization.get("planId") != plan_response.get("planId"):
+            raise PreparedPlanError("preparation plan is not campaign-authorized")
+        if authorization.get("planDigest") != plan_response.get("planDigest"):
+            raise PreparedPlanError("preparation plan digest is not campaign-authorized")
     return plan

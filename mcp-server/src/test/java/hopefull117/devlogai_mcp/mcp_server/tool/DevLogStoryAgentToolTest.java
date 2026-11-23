@@ -101,6 +101,32 @@ class DevLogStoryAgentToolTest {
     }
 
     @Test
+    void enrichesAnAlreadyFailedSubmissionWithCoreDiagnostics() throws Exception {
+        DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper,
+                25_000, 2_000, principalProvider());
+        UUID taskId = UUID.randomUUID();
+        when(client.submitStoryContextAgentTask(any(), any(), any(), any(), any(), any()))
+                .thenReturn(Map.of("status", "FAILED", "aiTaskId", taskId, "snapshotId", taskId));
+        when(client.getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test",
+                "Bearer test", ""))
+                .thenReturn(Map.of("id", taskId, "status", "FAILED",
+                        "failureCode", "INVESTIGATION_FAILED",
+                        "failureMessage", "bounded failure"));
+
+        JsonNode json = objectMapper.readTree(
+                tool.execute("devlog-ai", null, "intent", null, null, "request-1"));
+
+        assertThat(json.path("diagnostics").path("failureCode").asText())
+                .isEqualTo("INVESTIGATION_FAILED");
+        assertThat(json.path("diagnostics").path("failureMessage").asText())
+                .isEqualTo("bounded failure");
+        verify(client).getStoryContextAgentSnapshot(taskId, "test-principal", "HUMAN", "test",
+                "Bearer test", "");
+    }
+
+    @Test
     void pollsUntilCompletionAndReadsThePersistedAnalysis() throws Exception {
         DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
         ObjectMapper objectMapper = new ObjectMapper();

@@ -51,7 +51,23 @@ async def complete_chatgpt(
             headers=request.headers,
         )
         payload = EvaluationProviderRequest.model_validate_json(raw_body)
-        return await _complete(payload)
+        result = await _complete(payload)
+        if result.get("status") == "FAILED":
+            provider_error = result.get("providerError")
+            safe_provider_error = {}
+            if isinstance(provider_error, dict):
+                for key in ("type", "code", "param", "message"):
+                    value = provider_error.get(key)
+                    if isinstance(value, str) and value:
+                        safe_provider_error[key] = value[:500]
+            return JSONResponse(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                content={
+                    "code": result.get("code", "PROVIDER_FAILED"),
+                    "providerError": safe_provider_error,
+                },
+            )
+        return result
     except ServiceAuthenticationError:
         return _error("INVALID_SERVICE_AUTHENTICATION")
     except ValidationError as error:
@@ -77,6 +93,24 @@ async def complete_chatgpt(
         )
     except httpx.HTTPError:
         return _error("PROVIDER_CONNECTION_ERROR", status.HTTP_502_BAD_GATEWAY)
+    except ValueError:
+        logger.warning(
+            "Remote provider credential or binding resolution failed",
+            extra={"event": "REMOTE_PROVIDER_BINDING_RESOLUTION_FAILED"},
+        )
+        return _error("CREDENTIAL_BINDING_RESOLUTION_FAILED", status.HTTP_409_CONFLICT)
+    except (KeyError, OSError, TypeError):
+        logger.exception(
+            "Remote provider configuration failed",
+            extra={"event": "REMOTE_PROVIDER_CONFIGURATION_FAILED"},
+        )
+        return _error("PROVIDER_CONFIGURATION_ERROR", status.HTTP_503_SERVICE_UNAVAILABLE)
+    except Exception:
+        logger.exception(
+            "Remote provider execution failed unexpectedly",
+            extra={"event": "REMOTE_PROVIDER_INTERNAL_ERROR"},
+        )
+        return _error("PROVIDER_INTERNAL_ERROR", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 async def _complete(payload: EvaluationProviderRequest) -> dict:

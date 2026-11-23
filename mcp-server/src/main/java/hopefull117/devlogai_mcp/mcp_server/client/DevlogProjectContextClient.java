@@ -164,6 +164,40 @@ public interface DevlogProjectContextClient {
             @RequestHeader("X-DevLog-Delegation") String delegation
     );
 
+    @PostExchange("/live-evaluation-authorizations/requests")
+    Map<String, Object> requestLiveEvaluationAuthorization(
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestBody LiveEvaluationAuthorizationRequest request
+    );
+
+    @PostExchange("/live-evaluation-authorizations/{authorizationId}/approve")
+    Map<String, Object> approveLiveEvaluationAuthorization(
+            @PathVariable UUID authorizationId,
+            @RequestParam String planDigest,
+            @RequestHeader(value = "X-DevLog-MCP-Human-Confirmation", required = false)
+            String mcpHumanConfirmation,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation
+    );
+
+    @GetExchange("/live-evaluation-authorizations/{authorizationId}")
+    Map<String, Object> getLiveEvaluationAuthorization(
+            @PathVariable UUID authorizationId,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation
+    );
+
+    @PostExchange("/live-evaluation-authorizations/{authorizationId}/consume")
+    Map<String, Object> consumeLiveEvaluationAuthorization(
+            @PathVariable UUID authorizationId,
+            @RequestParam String planDigest,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation
+    );
+
     record AnalyzeContextRequest(List<String> files, Map<String, Object> guidance) {}
 
     record SubmitRequest(String intent, List<String> files, Map<String, Object> guidance) {}
@@ -198,6 +232,8 @@ public interface DevlogProjectContextClient {
             String artifactNamespace,
             List<String> observationIds
     ) {}
+
+    record LiveEvaluationAuthorizationRequest(UUID planId, String planDigest) {}
 
     record AnalyzeContextResponse(UUID aiTaskId) {}
 

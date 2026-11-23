@@ -257,9 +257,16 @@ PYTHONPATH=ai-engine uv run --project ai-engine python -m evaluations.devlog_ai_
 ```
 
 `LIVE_PREPARE` performs no provider call. It is not a substitute for the
-campaign authorization or the final live preflight. With the current
+final human approval or the final live preflight. With the current
 provider-free runtime attestation boundary it is expected to return `BLOCKED`
 until Core-side attestation verification is available.
+
+For a `READY` plan, use the authenticated MCP tools
+`request_bounded_live_evaluation_authorization` and
+`approve_bounded_live_evaluation_authorization`. Approval must be performed by
+the human principal against the exact `planId` and `planDigest`. The returned
+Core artifact is the only authorization document accepted by the runner; do not
+edit or reconstruct it locally.
 
 Before `LIVE`, reserve the B treatment task through the existing authenticated
 MCP task-binding flow and export its returned `aiTaskId` as
@@ -269,6 +276,13 @@ The authorization document must also bind `runtimeRevision` to the exact clean
 checkout commit used for execution. `repositoryRevision` remains the frozen
 source snapshot used by the oracle; it is not a substitute for the executable
 runtime revision.
+
+The runner consumes the approved authorization through
+`consume_bounded_live_evaluation_authorization` after all provider-free checks
+and immediately before the first provider call. Consumption is atomic and
+single-use. If consumption times out or its result cannot be confirmed, the
+runner does not start execution and must not retry automatically; obtain a new
+human approval after resolving the ambiguity.
 
 The standalone runner does not load `.env` implicitly. Load the local environment
 explicitly through `--env-file`; explicit process variables still take precedence.

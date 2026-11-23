@@ -43,6 +43,8 @@ public class LiveEvaluationPreparationService {
             "Q1-A-DEVLOG-CURRENT-r1",
             "Q1-B-DIRECT-INVESTIGATOR-r1",
             "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1");
+    private static final List<String> CONDITIONS = List.of(
+            "A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST");
     private static final Map<String, Object> OPERATIONAL_LIMITS = Map.of(
             "maxModelTurns", 8,
             "maxProviderCalls", 8,
@@ -198,6 +200,7 @@ public class LiveEvaluationPreparationService {
         result.put("manifestId", MANIFEST_ID);
         result.put("manifestVersion", MANIFEST_VERSION);
         result.put("manifestDigest", MANIFEST_DIGEST);
+        result.put("campaignId", MANIFEST_ID);
         result.put("oracleStatus", "ACCEPTED");
         result.put("oracleDigest", ORACLE_DIGEST);
         result.put("sourceRevision", SOURCE_REVISION);
@@ -207,6 +210,10 @@ public class LiveEvaluationPreparationService {
                 "coreVerified", runtimeVerified));
         result.put("runtimeIdentities", RUNTIME_IDENTITIES);
         result.put("operationalLimits", OPERATIONAL_LIMITS);
+        result.put("authorizedObservationIds", OBSERVATIONS);
+        result.put("authorizedConditions", CONDITIONS);
+        result.put("budgets", OPERATIONAL_LIMITS);
+        result.put("limits", OPERATIONAL_LIMITS);
         result.put("provider", "openai_chatgpt");
         result.put("model", "gpt-5.6-luna");
         result.put("pricingContract", Map.of(
@@ -214,6 +221,10 @@ public class LiveEvaluationPreparationService {
                 "provider", "openai_chatgpt", "authentication", "CHATGPT_OAUTH",
                 "currency", "NOT_APPLICABLE", "billingModel", "CHATGPT_OAUTH_SUBSCRIPTION_NOT_METERED",
                 "costCeilingPolicy", "OPERATIONAL_LIMITS_ONLY", "digest", PRICING_DIGEST));
+        result.put("pricingStatus", "APPROVED");
+        result.put("pricingVersion", "q1-chatgpt-oauth-pricing-v1");
+        result.put("pricingDigest", PRICING_DIGEST);
+        result.put("costCeiling", Map.of("currency", "NOT_APPLICABLE", "maxAmount", "NOT_MEASURED"));
         result.put("artifactNamespace", request.artifactNamespace());
         result.put("observationIds", OBSERVATIONS);
         result.put("expiresAt", expiresAt.toString());
