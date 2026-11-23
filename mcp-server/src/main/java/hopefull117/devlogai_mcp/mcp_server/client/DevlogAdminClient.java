@@ -59,4 +59,10 @@ public interface DevlogAdminClient {
             @PathVariable("projectId") UUID projectId,
             @RequestParam(value = "revision", required = false) String revision
     );
+
+    @PostExchange("/validations")
+    String validateProposalAuthenticated(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody Map<String, Object> request
+    );
 }

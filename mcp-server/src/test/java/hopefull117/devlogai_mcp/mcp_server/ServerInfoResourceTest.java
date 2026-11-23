@@ -37,6 +37,8 @@ class ServerInfoResourceTest {
                  "get_bounded_live_evaluation_preparation",
                 "get_devlog_context_trace",
                 "get_engineering_context",
+                "get_proposal_review",
+                "list_pending_proposals",
                 "open_devlog_companion",
                 "prepare_bounded_live_evaluation",
                  "register_project",
@@ -49,7 +51,8 @@ class ServerInfoResourceTest {
                 "story_context_agent_prepare_task_binding",
                 "story_context_agent_submit_task",
                 "sync_project_history",
-                "sync_project_stories");
+                "sync_project_stories",
+                "validate_proposal");
         assertThat(values(result.path("tools"), "description"))
                 .allSatisfy(description -> assertThat(description).isNotBlank());
         assertThat(result.path("prompts").isArray()).isTrue();
