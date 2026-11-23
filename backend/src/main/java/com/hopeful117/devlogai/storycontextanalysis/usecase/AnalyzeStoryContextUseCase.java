@@ -132,7 +132,7 @@ public class AnalyzeStoryContextUseCase {
         List<String> requestedFiles = files == null ? List.of() : List.copyOf(files);
         SubmissionIdentity identity = submissionIdentity(
                 projectSlug, storyId, requestedIntent, requestedFiles, null, guidance, idempotencyKey, principal);
-        Optional<UUID> existingSubmission = existingSubmission(identity);
+        Optional<UUID> existingSubmission = existingSubmission(identity, true);
         if (existingSubmission.isPresent()) {
             return existingSubmission.get();
         }
@@ -157,7 +157,7 @@ public class AnalyzeStoryContextUseCase {
         SubmissionIdentity identity = submissionIdentity(
                 prepared.projectSlug(), prepared.storyId(), prepared.intent(), prepared.files(),
                 prepared.question(), guidance, idempotencyKey, principal);
-        Optional<UUID> existingSubmission = existingSubmission(identity);
+        Optional<UUID> existingSubmission = existingSubmission(identity, true);
         if (existingSubmission.isPresent()) {
             return existingSubmission.get();
         }
@@ -186,10 +186,15 @@ public class AnalyzeStoryContextUseCase {
         List<String> requestedFiles = files == null ? List.of() : List.copyOf(files);
         SubmissionIdentity identity = submissionIdentity(
                 projectSlug, storyId, requestedIntent, requestedFiles, null, guidance, idempotencyKey, principal);
-        Optional<UUID> existingReservation = existingSubmission(identity);
+        Optional<UUID> existingReservation = existingSubmission(identity, false);
         if (existingReservation.isPresent()) {
             return existingReservation.get();
         }
+        // A fresh credential-binding reservation must create a fresh task even
+        // when an equivalent task exists with an expired binding. Keep retries
+        // idempotent through the key lookup above, while avoiding the unique
+        // submission-digest constraint for a deliberately new reservation.
+        identity = reservationIdentity(identity);
         return reservePrepared(
                 prepare(projectSlug, storyId, requestedIntent, requestedFiles), guidance, identity, principal, provider);
     }
@@ -257,7 +262,17 @@ public class AnalyzeStoryContextUseCase {
                 digestService.sha256(digestService.canonicalJson(scope)));
     }
 
-    private Optional<UUID> existingSubmission(SubmissionIdentity identity) {
+    private SubmissionIdentity reservationIdentity(SubmissionIdentity identity) {
+        if (identity.idempotencyKeyHash() == null) {
+            return identity;
+        }
+        return new SubmissionIdentity(
+                digestService.sha256(identity.submissionDigest() + ":" + identity.idempotencyKeyHash()),
+                identity.idempotencyKeyHash(),
+                identity.idempotencyScopeHash());
+    }
+
+    private Optional<UUID> existingSubmission(SubmissionIdentity identity, boolean reuseEquivalentSubmission) {
         String lockKey = identity.idempotencyKeyHash() == null
                 ? identity.submissionDigest() : identity.idempotencyKeyHash();
         aiTaskRepository.acquireSubmissionLock(lockKey);
@@ -276,9 +291,13 @@ public class AnalyzeStoryContextUseCase {
                 throw new com.hopeful117.devlogai.shared.exception.ConflictException(
                         "Idempotency-Key is already bound to a legacy unscoped request");
             }
-            // The submission digest is also unique. A retried equivalent request
-            // with a new runtime idempotency key must reuse that task instead of
-            // reaching the database unique constraint.
+            // The submission digest is also unique. Ordinary retried equivalent
+            // requests with a new runtime idempotency key reuse that task. A
+            // credential-binding reservation deliberately opts out so an old
+            // equivalent task cannot return an expired binding.
+            if (!reuseEquivalentSubmission) {
+                return Optional.empty();
+            }
             Optional<AiTask> equivalent = aiTaskRepository.findBySubmissionDigest(identity.submissionDigest());
             return equivalent == null ? Optional.empty() : equivalent.map(AiTask::getId);
         }

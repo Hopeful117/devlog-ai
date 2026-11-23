@@ -16,6 +16,7 @@ def test_story_context_prompt_uses_only_java_authored_grounding_contract() -> No
     assert "groundingContractVersion\":\"story-context-grounding/v1" in prompt.user_message
     assert "allowedGroundingReferences" in prompt.user_message
     assert "SELECTED KNOWLEDGE" in prompt.user_message
+    assert "Do not add missingInformation, implementationQuestions, implementationPreparation, uncertainties, or provenance items to outputClassification" in prompt.user_message
 
     empty_contract_prompt = builder.build(
         request.model_copy(update={"grounding_contract": {}})
