@@ -485,10 +485,10 @@ async def test_investigation_budget_stop_is_bounded(monkeypatch):
 
     await service.process(request, UUID("00000000-0000-0000-0000-000000000007"))
 
-    assert traces.calls == 3
-    assert len(traces.retry_reasons) == 1
-    assert "FINAL now" in traces.prompts[2]
-    assert callback.results[0].status.value == "COMPLETED"
+    assert traces.calls == 2
+    assert not traces.retry_reasons
+    assert callback.results[0].status.value == "FAILED"
+    assert callback.results[0].error.code == "BUDGET_EXHAUSTED"
 
 
 @pytest.mark.asyncio

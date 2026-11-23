@@ -60,6 +60,7 @@ def _request(*, initialized: bool, maximum_steps: int = 2):
             "executionId": str(request.ai_task_id),
             "parentTaskId": str(request.ai_task_id),
             "scope": {"projectSlug": "devlog", "revision": REVISION},
+            "requiredEvidence": True,
             "budget": {
                 "maximumSteps": maximum_steps, "maximumRetrievalCalls": 2,
                 "maximumEvidenceItems": 4, "maximumBytes": 4000, "maximumTokens": 1000,
@@ -169,7 +170,9 @@ class _Callback:
             "actionId": action["actionId"],
             "outcome": self.outcome,
             "kind": action["kind"], "projectSlug": action["projectSlug"], "revision": action["revision"],
-            "evidence": ([{"reference": VALID_REFERENCE}] if self.outcome == "RESULTS" else []),
+            "evidence": ([{
+                "reference": VALID_REFERENCE, "revision": REVISION, "citable": True,
+            }] if self.outcome == "RESULTS" else []),
             "groundingContract": contract,
             "groundingDigest": hashlib.sha256(
                 json.dumps(contract, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
@@ -197,7 +200,7 @@ def _service(monkeypatch, traces, callback):
     [
         ("broad-truncated", [_plan(UUID(int=1)), _final()], "RESULTS", 1, "COMPLETED", None),
         ("targeted-valid", [_plan(UUID(int=2)), _final()], "RESULTS", 1, "COMPLETED", None),
-        ("empty-abstention", [_plan(UUID(int=3)), _final("NO_RELEVANT_EVIDENCE")], "EMPTY", 1, "COMPLETED", None),
+        ("empty-abstention", [_plan(UUID(int=3)), _final("NO_RELEVANT_EVIDENCE")], "EMPTY", 1, "FAILED", "INVESTIGATION_INCOMPLETE_NO_EVIDENCE"),
         ("action-rejection", [_plan(UUID(int=4))], "REJECTED", 1, "FAILED", "INVESTIGATION_ACTION_REJECTED"),
         ("budget-exhaustion", [_plan(UUID(int=5)), {"phase": "ACTION", "action": _plan(UUID(int=5))["plan"]["actions"][0]}], "RESULTS", 1, "FAILED", "BUDGET_EXHAUSTED"),
     ],
@@ -230,7 +233,7 @@ async def test_story0184_compares_one_shot_v1_with_bounded_scenario(
         if scenario == "action-rejection":
             assert len(bounded_traces.decisions) == 1
         if scenario == "budget-exhaustion":
-            assert len(bounded_traces.decisions) == 2
+            assert len(bounded_traces.decisions) == 1
         return
 
     assert result.prompt_execution.protocol_version == "story-context-agent-protocol/v1"

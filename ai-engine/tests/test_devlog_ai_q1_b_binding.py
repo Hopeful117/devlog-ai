@@ -42,7 +42,8 @@ def test_binding_runs_native_v4_and_reads_real_q1_snapshot() -> None:
     assert result["nativeV4Output"]["executionStatus"] == "COMPLETED"
     assert result["nativeV4Output"]["rawOutput"]["toolTrace"][0]["executionStatus"] == "EXECUTED_SUCCESS"
     assert result["nativeV4Output"]["rawOutput"]["toolTrace"][0]["repositoryRevision"] == Q1_SOURCE_REVISION
-    assert result["nativeV4Output"]["rawOutput"]["finalResponse"]["questionId"] == "CASE-03"
+    # Q1-B uses the protocol question id Q1; CASE-03 is an oracle case id.
+    assert result["nativeV4Output"]["rawOutput"]["finalResponse"]["questionId"] == "Q1"
     assert result["nativeV4RepositoryRevision"] != Q1_SOURCE_REVISION
     assert hashlib.sha256(V4_MANIFEST.read_bytes()).hexdigest() == before
 

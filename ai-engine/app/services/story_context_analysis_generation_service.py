@@ -245,7 +245,7 @@ class StoryContextAnalysisGenerationService:
             while True:
                 if isinstance(decision, InvestigationFinalDecision):
                     await self._complete_investigation(
-                        submission, external_job_id, prompt, traces, decision.stop_reason, decision.result
+                        submission, external_job_id, prompt, traces, decision.stop_reason, decision.result, results
                     )
                     return
                 if actions_taken >= maximum_steps:
@@ -340,9 +340,7 @@ class StoryContextAnalysisGenerationService:
     ) -> None:
         decision = response.root
         if final_required and not isinstance(decision, InvestigationFinalDecision):
-            raise StoryContextAnalysisOutputValidationError(
-                "Investigation action budget is exhausted; FINAL decision is required"
-            )
+            raise _InvestigationTerminal("BUDGET_EXHAUSTED")
         if isinstance(decision, InvestigationFinalDecision):
             self._synchronize_output_classification(decision.result)
             self._validate_output(
@@ -356,9 +354,13 @@ class StoryContextAnalysisGenerationService:
         prompt: Prompt | None, traces: InteractionTraceCollector,
         stop_reason,
         provider_result: ProviderStoryContextAnalysisResult,
+        results: list[dict[str, object]],
     ) -> None:
         if prompt is None:
             raise ValueError("Investigation final prompt is missing")
+        if (submission.metadata.get("investigation", {}).get("requiredEvidence") is True
+                and not self._has_usable_investigation_evidence(submission, results)):
+            raise _InvestigationTerminal("INVESTIGATION_INCOMPLETE_NO_EVIDENCE")
         output = provider_result_to_internal(provider_result)
         self._synchronize_output_classification(output)
         self._validate_output(output, submission.selected_knowledge, submission.grounding_contract or {})
@@ -430,6 +432,7 @@ class StoryContextAnalysisGenerationService:
             generation_count, elapsed_millis, output_tokens = 1, 0, getattr(
                 traces, "last_provider_output_tokens", 0
             )
+
         else:
             generation_count, elapsed_millis, output_tokens = accounting_delta()
         payload = action.model_dump(mode="json", by_alias=True, exclude_none=True)
@@ -464,6 +467,36 @@ class StoryContextAnalysisGenerationService:
                 "endLine": payload.pop("endLine"),
             }
         return payload
+
+    @staticmethod
+    def _has_usable_investigation_evidence(
+        submission: AiTaskSubmissionRequest, results: list[dict[str, object]]
+    ) -> bool:
+        investigation = submission.metadata.get("investigation")
+        if not isinstance(investigation, dict) or investigation.get("requiredEvidence") is not True:
+            return True
+        scope = investigation.get("scope") if isinstance(investigation, dict) else None
+        revision = scope.get("revision") if isinstance(scope, dict) else None
+        if not isinstance(revision, str) or not revision:
+            return False
+        for result in results:
+            if not isinstance(result, dict) or result.get("outcome") != "RESULTS":
+                continue
+            evidence_items = result.get("evidence")
+            if not isinstance(evidence_items, list):
+                continue
+            for evidence in evidence_items:
+                if not isinstance(evidence, dict):
+                    continue
+                evidence_revision = evidence.get("revision")
+                if (isinstance(evidence_revision, str)
+                        and evidence_revision
+                        and evidence.get("citable") is True
+                        and evidence_revision == revision
+                        and isinstance(evidence.get("reference"), str)
+                        and evidence["reference"].strip()):
+                    return True
+        return False
 
     @staticmethod
     def _validate_investigation_identity(submission, result: InvestigationCapabilityResult) -> None:
@@ -980,6 +1013,8 @@ class StoryContextAnalysisGenerationService:
     def _investigation_stop_reason(error_code: str) -> str:
         if error_code == "BUDGET_EXHAUSTED":
             return "BUDGET_EXHAUSTED"
+        if error_code == "INVESTIGATION_INCOMPLETE_NO_EVIDENCE":
+            return "NO_RELEVANT_EVIDENCE"
         if error_code in {"INVESTIGATION_ACTION_REJECTED", "ACTION_REJECTED"}:
             return "ACTION_REJECTED"
         if error_code in {"PROVIDER_INCOMPLETE_RESPONSE", "PROVIDER_INCOMPLETE"}:

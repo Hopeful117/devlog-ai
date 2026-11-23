@@ -143,6 +143,40 @@ def test_missing_provider_output_measurement_fails_closed():
         collector.provider_accounting_delta()
 
 
+def test_completed_investigation_requires_citable_evidence_from_the_scoped_revision():
+    from app.services.story_context_analysis_generation_service import StoryContextAnalysisGenerationService
+
+    submission = SimpleNamespace(
+        metadata={"investigation": {
+            "requiredEvidence": True,
+            "scope": {"revision": "revision-1"},
+        }}
+    )
+    assert not StoryContextAnalysisGenerationService._has_usable_investigation_evidence(
+        submission, [{"outcome": "EMPTY", "evidence": []}]
+    )
+    assert not StoryContextAnalysisGenerationService._has_usable_investigation_evidence(
+        submission, [{"outcome": "RESULTS", "evidence": [
+            {"reference": "evidence-1", "revision": "other-revision", "citable": True}
+        ]}]
+    )
+    assert not StoryContextAnalysisGenerationService._has_usable_investigation_evidence(
+        submission, [{"outcome": "RESULTS", "evidence": [
+            {"reference": "evidence-1", "revision": "revision-1"}
+        ]}]
+    )
+    assert not StoryContextAnalysisGenerationService._has_usable_investigation_evidence(
+        submission, [{"outcome": "RESULTS", "evidence": [
+            {"reference": "evidence-1", "citable": True}
+        ]}]
+    )
+    assert StoryContextAnalysisGenerationService._has_usable_investigation_evidence(
+        submission, [{"outcome": "RESULTS", "evidence": [
+            {"reference": "evidence-1", "revision": "revision-1", "citable": True}
+        ]}]
+    )
+
+
 def test_failed_trace_keeps_bounded_redacted_validation_diagnostic_in_normal_mode():
     from datetime import datetime, timezone
 

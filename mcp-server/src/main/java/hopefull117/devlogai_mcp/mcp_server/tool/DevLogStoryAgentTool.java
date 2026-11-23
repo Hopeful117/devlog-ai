@@ -34,17 +34,21 @@ public class DevLogStoryAgentTool {
     // a bounded timeout response can still return the aiTaskId for resumption.
     private static final long DEFAULT_POLL_TIMEOUT_MS = 90_000L;
     private static final long MAX_POLL_TIMEOUT_MS = 90_000L;
+    private static final long DEFAULT_SUBMISSION_TIMEOUT_MS = 10_000L;
+    private static final long MAX_SUBMISSION_TIMEOUT_MS = 30_000L;
     private static final long DEFAULT_POLL_INTERVAL_MS = 2_000L;
 
     private final DevlogProjectContextClient client;
     private final ObjectMapper objectMapper;
     private final long pollTimeoutMs;
+    private final long submissionTimeoutMs;
     private final long pollIntervalMs;
     private final McpAuthenticatedPrincipalProvider principalProvider;
     private final McpToolObservabilityService observability;
 
     public DevLogStoryAgentTool(DevlogProjectContextClient client, ObjectMapper objectMapper) {
-        this(client, objectMapper, DEFAULT_POLL_TIMEOUT_MS, DEFAULT_POLL_INTERVAL_MS,
+        this(client, objectMapper, DEFAULT_POLL_TIMEOUT_MS, DEFAULT_SUBMISSION_TIMEOUT_MS,
+                DEFAULT_POLL_INTERVAL_MS,
                 () -> java.util.Optional.empty(), null);
     }
 
@@ -54,23 +58,51 @@ public class DevLogStoryAgentTool {
             long pollTimeoutMs,
             long pollIntervalMs,
             McpAuthenticatedPrincipalProvider principalProvider) {
-        this(client, objectMapper, pollTimeoutMs, pollIntervalMs, principalProvider, null);
+        this(client, objectMapper, pollTimeoutMs, DEFAULT_SUBMISSION_TIMEOUT_MS,
+                pollIntervalMs, principalProvider, null);
+    }
+
+    public DevLogStoryAgentTool(
+            DevlogProjectContextClient client,
+            ObjectMapper objectMapper,
+            long pollTimeoutMs,
+            long submissionTimeoutMs,
+            long pollIntervalMs,
+            McpAuthenticatedPrincipalProvider principalProvider) {
+        this(client, objectMapper, pollTimeoutMs, submissionTimeoutMs, pollIntervalMs,
+                principalProvider, null);
+    }
+
+    public DevLogStoryAgentTool(
+            DevlogProjectContextClient client,
+            ObjectMapper objectMapper,
+            long pollTimeoutMs,
+            long pollIntervalMs,
+            McpAuthenticatedPrincipalProvider principalProvider,
+            @Nullable McpToolObservabilityService observability) {
+        this(client, objectMapper, pollTimeoutMs, DEFAULT_SUBMISSION_TIMEOUT_MS,
+                pollIntervalMs, principalProvider, observability);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public DevLogStoryAgentTool(
-            DevlogProjectContextClient client,
-            ObjectMapper objectMapper,
+             DevlogProjectContextClient client,
+             ObjectMapper objectMapper,
              @Value("${devlog.story-agent.poll.timeout-ms:90000}") long pollTimeoutMs,
-            @Value("${devlog.story-agent.poll.interval-ms:2000}") long pollIntervalMs,
+             @Value("${devlog.story-agent.submit.timeout-ms:10000}") long submissionTimeoutMs,
+             @Value("${devlog.story-agent.poll.interval-ms:2000}") long pollIntervalMs,
             McpAuthenticatedPrincipalProvider principalProvider,
             @Nullable McpToolObservabilityService observability) {
         if (pollTimeoutMs < 0 || pollTimeoutMs > MAX_POLL_TIMEOUT_MS || pollIntervalMs < 0) {
             throw new IllegalArgumentException("Story Agent polling timeout must be between 0 and 90000 ms");
         }
+        if (submissionTimeoutMs < 0 || submissionTimeoutMs > MAX_SUBMISSION_TIMEOUT_MS) {
+            throw new IllegalArgumentException("Story Agent submission timeout must be between 0 and 30000 ms");
+        }
         this.client = client;
         this.objectMapper = objectMapper;
         this.pollTimeoutMs = pollTimeoutMs;
+        this.submissionTimeoutMs = submissionTimeoutMs;
         this.pollIntervalMs = pollIntervalMs;
         this.principalProvider = principalProvider;
         this.observability = observability;
@@ -137,6 +169,8 @@ public class DevLogStoryAgentTool {
             throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
         }
         Map<String, Object> execution;
+        long operationDeadline = System.nanoTime()
+                + Math.max(pollTimeoutMs, submissionTimeoutMs * 2) * 1_000_000L;
         try {
             String effectiveQuestion = question == null || question.isBlank() ? intent : question;
             Map<String, Object> effectiveGuidance = guidance == null
@@ -146,25 +180,94 @@ public class DevLogStoryAgentTool {
             if (!STORY_CONTEXT_ANALYSIS_INTENT.equals(intent)) {
                 effectiveGuidance.put("callerIntent", intent);
             }
-            execution = client.submitStoryContextAgentTask(
-                    projectSlug,
-                    storyId,
-                    bearerToken,
-                    idempotencyKey,
-                    principal.delegationToken(),
+            DevlogProjectContextClient.SubmitRequest request =
                     new DevlogProjectContextClient.SubmitRequest(
-                            STORY_CONTEXT_ANALYSIS_INTENT, files, effectiveGuidance));
+                            STORY_CONTEXT_ANALYSIS_INTENT, files, effectiveGuidance);
+            execution = submitWithBoundedResume(
+                    projectSlug, storyId, bearerToken, principal.delegationToken(), idempotencyKey, request,
+                    operationDeadline);
+            if (execution == null) {
+                execution = submissionTimeoutExecution(idempotencyKey, 2);
+            }
         } catch (RuntimeException exception) {
             log.error("Story Agent backend submission failed projectSlug={} storyId={} hasQuestion={} fileCount={} hasGuidance={} hasIdempotencyKey={}",
                     projectSlug, storyId, question != null, files == null ? 0 : files.size(),
                     guidance != null && !guidance.isEmpty(), idempotencyKey != null, exception);
             throw exception;
         }
-        execution = awaitTerminalExecution(execution, principal);
+        execution = awaitTerminalExecution(execution, principal, operationDeadline);
         try {
             return objectMapper.writeValueAsString(execution);
         } catch (Exception exception) {
             throw new IllegalStateException("Unable to serialize DevLog Story Agent response", exception);
+        }
+    }
+
+    private Map<String, Object> submitWithBoundedResume(
+            String projectSlug,
+            @Nullable UUID storyId,
+            String bearerToken,
+            String delegationToken,
+            String idempotencyKey,
+            DevlogProjectContextClient.SubmitRequest request,
+            long operationDeadline) {
+        Map<String, Object> execution = submitOnce(
+                projectSlug, storyId, bearerToken, delegationToken, idempotencyKey, request,
+                operationDeadline);
+        if (execution != null) {
+            return execution;
+        }
+
+        // The first request may have reached Core before its response was lost.
+        // Reuse the same key once so Core's existing idempotency contract can
+        // return the original task instead of creating a duplicate.
+        return submitOnce(projectSlug, storyId, bearerToken, delegationToken, idempotencyKey, request,
+                operationDeadline);
+    }
+
+    private Map<String, Object> submitOnce(
+            String projectSlug,
+            @Nullable UUID storyId,
+            String bearerToken,
+            String delegationToken,
+            String idempotencyKey,
+            DevlogProjectContextClient.SubmitRequest request,
+            long operationDeadline) {
+        long deadline = Math.min(operationDeadline,
+                System.nanoTime() + submissionTimeoutMs * 1_000_000L);
+        try {
+            return callUntil(deadline, () -> client.submitStoryContextAgentTask(
+                    projectSlug, storyId, bearerToken, idempotencyKey, delegationToken, request));
+        } catch (DeadlineExceededException exception) {
+            return null;
+        }
+    }
+
+    private Map<String, Object> submissionTimeoutExecution(String idempotencyKey, int attempts) {
+        Map<String, Object> diagnostics = new LinkedHashMap<>();
+        diagnostics.put("status", "TIMED_OUT");
+        diagnostics.put("code", "SUBMISSION_TIMEOUT");
+        diagnostics.put("lastKnownStatus", "SUBMISSION_IN_PROGRESS");
+        diagnostics.put("attempts", attempts);
+        diagnostics.put("resumeRequired", true);
+        diagnostics.put("resumeAction", "RETRY_WITH_SAME_IDEMPOTENCY_KEY");
+        diagnostics.put("idempotencyKeyHash", digest(idempotencyKey));
+        return new LinkedHashMap<>(Map.of(
+                "status", "TIMED_OUT",
+                "diagnostics", diagnostics));
+    }
+
+    private String digest(String value) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder result = new StringBuilder(bytes.length * 2);
+            for (byte current : bytes) {
+                result.append(String.format("%02x", current));
+            }
+            return result.toString();
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
     }
 
@@ -177,7 +280,8 @@ public class DevLogStoryAgentTool {
 
     private Map<String, Object> awaitTerminalExecution(
             Map<String, Object> initialExecution,
-            McpAuthenticatedPrincipalProvider.McpPrincipal principal) {
+            McpAuthenticatedPrincipalProvider.McpPrincipal principal,
+            long operationDeadline) {
         String bearerToken = principal.bearerToken();
         String initialStatus = stringValue(initialExecution.get("status"));
         if (isTerminal(initialStatus)) {
@@ -185,7 +289,8 @@ public class DevLogStoryAgentTool {
         }
 
         UUID taskId = executionId(initialExecution);
-        long deadline = System.nanoTime() + pollTimeoutMs * 1_000_000L;
+        long deadline = Math.min(operationDeadline,
+                System.nanoTime() + pollTimeoutMs * 1_000_000L);
         Map<String, Object> latestExecution = new LinkedHashMap<>(initialExecution);
 
         while (System.nanoTime() < deadline) {
