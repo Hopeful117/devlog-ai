@@ -215,6 +215,9 @@ def validate_live_authorization(
         raise LiveAuthorizationError("pricing version does not match approved contract")
     if authorization["pricingDigest"] != pricing_contract.get("digest") or not _is_sha256(authorization["pricingDigest"]):
         raise LiveAuthorizationError("pricing digest does not match approved contract")
+    now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
+    if not isinstance(authorization["expiresAtEpochSeconds"], int) or authorization["expiresAtEpochSeconds"] <= now:
+        raise LiveAuthorizationError("authorization is expired or has an invalid expiration")
     if not isinstance(authorization["costCeiling"], dict):
         raise LiveAuthorizationError("cost ceiling is missing")
     if not isinstance(authorization["costCeiling"].get("currency"), str) \
@@ -229,9 +232,6 @@ def validate_live_authorization(
         return
     if isinstance(maximum_cost, bool) or not isinstance(maximum_cost, (int, float)) or not math.isfinite(maximum_cost) or maximum_cost <= 0:
         raise LiveAuthorizationError("cost ceiling maxAmount is invalid")
-    now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
-    if not isinstance(authorization["expiresAtEpochSeconds"], int) or authorization["expiresAtEpochSeconds"] <= now:
-        raise LiveAuthorizationError("authorization is expired or has an invalid expiration")
 
 
 def live_preflight(

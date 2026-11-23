@@ -148,6 +148,22 @@ public interface DevlogProjectContextClient {
             @RequestBody StoryAgentRequest request
     );
 
+    @PostExchange("/live-evaluation-preparations/projects/{projectSlug}")
+    Map<String, Object> prepareLiveEvaluation(
+            @PathVariable String projectSlug,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestBody LiveEvaluationPreparationRequest request
+    );
+
+    @GetExchange("/live-evaluation-preparations/{planId}")
+    Map<String, Object> getLiveEvaluationPreparation(
+            @PathVariable UUID planId,
+            @RequestHeader("Authorization") String authorization,
+            @RequestHeader("X-DevLog-Delegation") String delegation
+    );
+
     record AnalyzeContextRequest(List<String> files, Map<String, Object> guidance) {}
 
     record SubmitRequest(String intent, List<String> files, Map<String, Object> guidance) {}
@@ -161,6 +177,27 @@ public interface DevlogProjectContextClient {
             this(storyId, intent, null, files, guidance);
         }
     }
+
+    record LiveEvaluationPreparationRequest(
+            String benchmarkId,
+            String benchmarkVersion,
+            String caseId,
+            String manifestId,
+            String manifestVersion,
+            String manifestDigest,
+            String oracleStatus,
+            String oracleDigest,
+            String sourceRevision,
+            String runtimeRevision,
+            Map<String, Object> runtimeAttestation,
+            Map<String, Object> runtimeIdentities,
+            Map<String, Object> operationalLimits,
+            String provider,
+            String model,
+            Map<String, Object> pricingContract,
+            String artifactNamespace,
+            List<String> observationIds
+    ) {}
 
     record AnalyzeContextResponse(UUID aiTaskId) {}
 

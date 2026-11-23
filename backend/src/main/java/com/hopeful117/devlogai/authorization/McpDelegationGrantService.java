@@ -29,7 +29,8 @@ public class McpDelegationGrantService {
     private static final Set<String> ALLOWED_SCOPES = Set.of(
             "MCP_ENGINEERING_CONTEXT_READ",
             "MCP_STORY_AGENT_EXECUTE",
-            "MCP_STORY_AGENT_READ_RESULT");
+            "MCP_STORY_AGENT_READ_RESULT",
+            "MCP_LIVE_EVALUATION_PREPARE");
 
     private final McpDelegationGrantRepository grantRepository;
     private final ProjectRepository projectRepository;
