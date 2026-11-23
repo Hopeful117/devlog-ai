@@ -31,9 +31,11 @@ class ServerInfoResourceTest {
         assertThat(names(result.path("tools"))).containsExactly(
                 "analyze_story_context",
                 "devlog_story_agent",
+                "get_bounded_live_evaluation_preparation",
                 "get_devlog_context_trace",
                 "get_engineering_context",
                 "open_devlog_companion",
+                "prepare_bounded_live_evaluation",
                 "register_project",
                 "resolve_engineering_story",
                 "search_project_history",

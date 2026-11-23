@@ -34,6 +34,7 @@ from evaluations.comparative_baseline_v4.runtime import V4CollectionRuntime
 from .q1_b_binding import Q1PinnedRepositoryTools, _q1_runtime_input, load_q1_b_config
 from .runner import TreatmentAdapter, run_dry_run
 from .provenance import Q1_SOURCE_REVISION, assert_reproducible_worktree, current_head, verify_commit
+from .prepared_plan import PreparedPlanError, validate_prepared_plan
 from evaluations.story_context_specificity_live import McpClient
 
 
@@ -817,6 +818,74 @@ def reserve_live_task_binding(environment: Mapping[str, str] | None = None) -> d
     }
 
 
+def prepare_live_evaluation(
+    *,
+    manifest: Mapping[str, Any],
+    oracle: Mapping[str, Any],
+    repository_root: str | Path,
+    output_root: str | Path,
+    pricing_contract: Mapping[str, Any],
+    environment: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Request a Core preparation plan without creating a task or provider client."""
+
+    root = Path(repository_root).resolve()
+    values = os.environ if environment is None else environment
+    idempotency_key = values.get("DEVLOG_LIVE_PREPARATION_IDEMPOTENCY_KEY", "").strip()
+    if not idempotency_key:
+        raise LiveConfigurationError(
+            "LIVE_PREPARE requires DEVLOG_LIVE_PREPARATION_IDEMPOTENCY_KEY"
+        )
+    config = LiveConfiguration.from_environment(environment, require_task_id=False)
+    identity = execution_identity(root, runtime_revision=current_head(root))
+    namespace = values.get("DEVLOG_LIVE_ARTIFACT_NAMESPACE", "q1/" + current_head(root)[:12]).strip()
+    request = {
+        "benchmarkId": "devlog-ai-q1-abc",
+        "benchmarkVersion": "1.0.0",
+        "caseId": manifest["caseId"],
+        "manifestId": manifest["manifestId"],
+        "manifestVersion": manifest["version"],
+        "manifestDigest": canonical_manifest_digest(manifest),
+        "oracleStatus": oracle.get("status"),
+        "oracleDigest": oracle.get("canonicalDigest"),
+        "sourceRevision": manifest["repositoryRevision"],
+        "runtimeRevision": identity["runtimeRevision"],
+        "runtimeAttestation": {
+            "runtimeRevision": identity["runtimeRevision"],
+            "reproducible": identity["worktree"].get("reproducible") is True,
+            # Core cannot verify the caller's worktree claim over MCP; this must
+            # remain false until a trusted Core-side attestation exists.
+            "coreVerified": False,
+            "harnessSha256": identity["harness"].get("sha256"),
+        },
+        "runtimeIdentities": identity["runtimeIdentities"],
+        "operationalLimits": manifest["technicalBudgets"],
+        "provider": manifest["provider"],
+        "model": manifest["model"],
+        "pricingContract": dict(pricing_contract),
+        "artifactNamespace": namespace,
+        "observationIds": [item["observationId"] for item in manifest["observations"]],
+    }
+    try:
+        mcp = McpClient(config.mcp_launcher, launcher=config.mcp_launcher,
+                        read_timeout_seconds=config.mcp_read_timeout_seconds)
+    except (OSError, RuntimeError, TimeoutError) as error:
+        raise LiveConfigurationError("MCP authenticated transport could not be started") from error
+    try:
+        result = mcp.tool("prepare_bounded_live_evaluation", {
+            "projectSlug": config.project_slug,
+            "idempotencyKey": idempotency_key,
+            **request,
+        })
+    except (OSError, RuntimeError, TimeoutError) as error:
+        raise LiveConfigurationError("MCP live evaluation preparation failed") from error
+    finally:
+        mcp.close()
+    if not isinstance(result, dict):
+        raise LiveConfigurationError("MCP live evaluation preparation response must be an object")
+    return result
+
+
 def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config: LiveConfiguration,
                   mcp: McpClient, environment: Mapping[str, str] | None = None) -> dict[str, TreatmentAdapter]:
     values = os.environ if environment is None else environment
@@ -832,8 +901,14 @@ def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config:
     }
 
 
-def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], authorization: Mapping[str, Any], environment: Mapping[str, str] | None = None, observation_ids: tuple[str, ...] | None = None):
+def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], authorization: Mapping[str, Any], prepared_plan: Mapping[str, Any] | None = None, oracle: Mapping[str, Any] | None = None, environment: Mapping[str, str] | None = None, observation_ids: tuple[str, ...] | None = None):
     root = Path(repository_root).resolve()
+    if prepared_plan is None or oracle is None:
+        raise LiveConfigurationError("live execution requires an authoritative Core preparation plan")
+    plan_id = prepared_plan.get("planId")
+    expected_plan_digest = prepared_plan.get("planDigest")
+    if not isinstance(plan_id, str) or not plan_id or not isinstance(expected_plan_digest, str):
+        raise LiveConfigurationError("live execution requires a Core preparation plan identity")
     if current_head(root) != authorization["runtimeRevision"]:
         raise LiveConfigurationError("live execution requires HEAD to equal the authorized runtime revision")
     try:
@@ -848,6 +923,24 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
     except (OSError, RuntimeError, TimeoutError) as error:
         raise LiveConfigurationError("MCP authenticated transport could not be started") from error
     try:
+        authoritative_plan = mcp.tool("get_bounded_live_evaluation_preparation", {"planId": plan_id})
+        if (
+            not isinstance(authoritative_plan, dict)
+            or authoritative_plan.get("planId") != plan_id
+            or authoritative_plan.get("projectSlug") != config.project_slug
+            or authoritative_plan.get("planDigest") != expected_plan_digest
+        ):
+            raise LiveConfigurationError("Core preparation plan changed or could not be re-read authoritatively")
+        try:
+            validate_prepared_plan(
+                authoritative_plan,
+                manifest=manifest,
+                oracle=oracle,
+                repository_root=root,
+                authorization=authorization,
+            )
+        except PreparedPlanError as error:
+            raise LiveConfigurationError(str(error)) from error
         config = resolve_live_story(config, mcp)
         adapters = live_adapters(repository_root=root, manifest=manifest, config=config, mcp=mcp,
                                  environment=environment)

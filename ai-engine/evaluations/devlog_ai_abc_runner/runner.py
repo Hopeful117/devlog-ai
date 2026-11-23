@@ -392,17 +392,43 @@ def run_live_preflight(*, manifest_path: str | Path, oracle_path: str | Path, ou
     )
 
 
-def run_live_prepare() -> dict[str, Any]:
-    from .live_execution import reserve_live_task_binding
+def run_live_prepare(
+    *,
+    manifest_path: str | Path,
+    oracle_path: str | Path | None,
+    repository_root: str | Path,
+    output_root: str | Path,
+    pricing_contract: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if oracle_path is None:
+        raise ManifestValidationError("LIVE_PREPARE requires the Q1 oracle path")
+    if pricing_contract is None:
+        raise ManifestValidationError("LIVE_PREPARE requires the approved pricing contract")
+    from .live import load_q1_oracle
+    from .live_execution import prepare_live_evaluation
 
-    return reserve_live_task_binding()
+    manifest = load_manifest(Path(manifest_path))
+    oracle = load_q1_oracle(oracle_path, expected_revision=manifest["repositoryRevision"])
+    return prepare_live_evaluation(
+        manifest=manifest,
+        oracle=oracle,
+        repository_root=repository_root,
+        output_root=output_root,
+        pricing_contract=pricing_contract,
+    )
 
 
-def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, activate_live: bool = False, observation_ids: tuple[str, ...] | None = None) -> RunResult | dict[str, Any]:
+def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None, prepared_plan: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, activate_live: bool = False, observation_ids: tuple[str, ...] | None = None) -> RunResult | dict[str, Any]:
     if mode == LIVE_PREPARE:
         if not activate_live:
             raise LiveNotAuthorized("LIVE_PREPARE requires the explicit --activate-live flag")
-        return run_live_prepare()
+        return run_live_prepare(
+            manifest_path=manifest_path,
+            oracle_path=oracle_path,
+            repository_root=repository_root,
+            output_root=output_root,
+            pricing_contract=pricing_contract,
+        )
     if mode == LIVE:
         if authorization is None:
             raise LiveNotAuthorized("LIVE_NOT_AUTHORIZED: Q1 live execution requires a separate explicit authorization")
@@ -425,6 +451,8 @@ def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, reposi
             repository_root=repository_root,
             manifest=manifest_value,
             authorization=authorization,
+            prepared_plan=prepared_plan,
+            oracle=oracle,
             observation_ids=observation_ids,
         )
     if mode == LIVE_PREFLIGHT:
@@ -464,6 +492,7 @@ def main() -> None:
     parser.add_argument("--mode", choices=(DRY_RUN, INTEGRATION_SIMULATION, LIVE_PREFLIGHT, LIVE_PREPARE, LIVE), default=DRY_RUN)
     parser.add_argument("--oracle")
     parser.add_argument("--authorization")
+    parser.add_argument("--prepared-plan")
     parser.add_argument("--pricing")
     parser.add_argument("--activate-live", action="store_true", help="explicitly authorize live preflight activation")
     parser.add_argument("--env-file", help="load a dotenv file without overriding explicit environment variables")
@@ -488,6 +517,12 @@ def main() -> None:
             pricing_contract = json.loads(Path(args.pricing).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise SystemExit("pricing contract cannot be loaded") from error
+    prepared_plan = None
+    if args.prepared_plan:
+        try:
+            prepared_plan = json.loads(Path(args.prepared_plan).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise SystemExit("prepared plan cannot be loaded") from error
     result = run(
         mode=args.mode,
         manifest_path=args.manifest,
@@ -495,6 +530,7 @@ def main() -> None:
         repository_root=args.repository_root,
         oracle_path=args.oracle,
         authorization=authorization,
+        prepared_plan=prepared_plan,
         pricing_contract=pricing_contract,
         activate_live=args.activate_live,
         observation_ids=tuple(args.observation_ids) if args.observation_ids else None,

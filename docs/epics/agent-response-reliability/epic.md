@@ -74,6 +74,7 @@ verification ou insuffisante.
 4. [Story 0221 - Bounded Live Provider Captures and Attribution](../../stories/0221-bounded-live-provider-captures/story.md)
 5. Story a definir - Specificite, abstention et confiance calibree
 6. Story a definir - Evaluation agentique et pilote sur Stories reelles
+7. [Story 0228 - MCP Live Evaluation Preparation](../../stories/0228-mcp-live-evaluation-preparation/story.md)
 
 Les Stories 0158, 0173, 0176, 0178 et 0209 sont des dependances ou travaux a
 reconcilier. Elles ne sont pas dupliquees par cette epic.

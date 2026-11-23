@@ -141,6 +141,35 @@ integration status; it does not authorize external provider execution:
 - C: `StoryContextAnalysisGenerationService` -> Core investigation callback
   actions -> Core validation/persistence.
 
+## Core Preparation Plan
+
+The bounded live evaluation can be prepared through the Core-owned MCP tools
+without creating an AI task or contacting a provider:
+
+- `prepare_bounded_live_evaluation` validates the benchmark/case identities,
+  manifest and oracle digests, runtime attestation, operational ceilings,
+  non-metered OAuth pricing contract, and isolated logical artifact namespace.
+- Core does not trust a caller's `reproducible` claim. Unless a trusted
+  Core-verifiable runtime attestation is present, the immutable plan is
+  `BLOCKED`; the current runner deliberately reports `coreVerified=false`.
+- The result is an immutable Core plan with status `READY`, `BLOCKED`, or
+  `NOT_AUTHORIZED`. A repeated request with the same authorized idempotency
+  scope and equivalent inputs returns the existing plan.
+- `get_bounded_live_evaluation_preparation` reads the plan for an authorized
+  caller. MCP only forwards the authenticated bearer/delegation context; it
+  does not inspect Git, read credentials, construct a provider, or create an
+  output directory.
+- The runner must re-read and validate the plan digest, expiry, manifest/oracle
+  identities, campaign bindings, runtime revision and clean worktree
+  immediately before live execution. It must fetch the authoritative plan by
+  `planId` immediately before constructing provider adapters. A plan never
+  replaces the separate campaign authorization.
+
+Preparation responses must report `providerCalls=0` and `networkCalls=0`. The
+ChatGPT OAuth contract remains `NOT_MEASURED` with
+`CHATGPT_OAUTH_SUBSCRIPTION_NOT_METERED`, `NOT_APPLICABLE`, and
+`OPERATIONAL_LIMITS_ONLY`; it must never be represented as zero cost.
+
 ## Integration Simulation Without Provider
 
 The runner also supports a credential-free `INTEGRATION_SIMULATION` mode. It
@@ -199,16 +228,14 @@ export DEVLOG_LIVE_PROJECT_SLUG=...
 export DEVLOG_LIVE_STORY_NUMBER=223
 export DEVLOG_LIVE_FILES=docs/stories/0223-agentic-quality-real-story-pilot/story.md
 export DEVLOG_LIVE_B_TASK_ID=...
+export DEVLOG_LIVE_PREPARATION_IDEMPOTENCY_KEY=...
 ```
 
-Before live execution, reserve the B treatment task through the authenticated
-MCP launcher. The launcher obtains and renews the technical Keycloak bearer
-privately; the evaluation runner never receives or reads that bearer. The MCP
-Story resolver maps `DEVLOG_LIVE_STORY_NUMBER` to the Core-owned Story UUID.
-The task-binding tool then creates the task and its user-bound ChatGPT
-credential binding without dispatching a provider request and prints only the
-returned task identity. Export the returned `aiTaskId` as
-`DEVLOG_LIVE_B_TASK_ID`.
+First request the Core-owned preparation plan through the authenticated MCP
+launcher. The launcher obtains and renews the technical Keycloak bearer
+privately; the evaluation runner never receives or reads that bearer. The
+preparation call performs no provider call and does not create an AI task or
+credential binding.
 
 The resolver is read-only: the Story must already be registered in Core under
 the target project. It never creates a Story from a repository file. If the
@@ -221,12 +248,21 @@ PYTHONPATH=ai-engine uv run --project ai-engine python -m evaluations.devlog_ai_
   --activate-live \
   --env-file .env \
   --manifest docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json \
+  --oracle docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json \
+  --pricing docs/evaluation/devlog-ai-q1-chatgpt-oauth-pricing-draft-v1.json \
   --repository-root /path/to/clean/frozen/devlog-ai \
-  --output-root /tmp/q1-live-prepare
+  --output-root /tmp/q1-live-prepare \
+  > /secure/path/q1-prepared-plan.json
 ```
 
 `LIVE_PREPARE` performs no provider call. It is not a substitute for the
-campaign authorization or the final live preflight.
+campaign authorization or the final live preflight. With the current
+provider-free runtime attestation boundary it is expected to return `BLOCKED`
+until Core-side attestation verification is available.
+
+Before `LIVE`, reserve the B treatment task through the existing authenticated
+MCP task-binding flow and export its returned `aiTaskId` as
+`DEVLOG_LIVE_B_TASK_ID`. Then pass the exact Core response back to the runner:
 
 The authorization document must also bind `runtimeRevision` to the exact clean
 checkout commit used for execution. `repositoryRevision` remains the frozen
@@ -255,6 +291,7 @@ PYTHONPATH=ai-engine uv run --project ai-engine python -m evaluations.devlog_ai_
   --oracle docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json \
   --authorization /secure/path/q1-authorization.json \
   --pricing /secure/path/q1-pricing.json \
+  --prepared-plan /secure/path/q1-prepared-plan.json \
   --repository-root /path/to/clean/frozen/devlog-ai \
   --output-root data/devlog-ai-q1-live-<run-id>
 ```
