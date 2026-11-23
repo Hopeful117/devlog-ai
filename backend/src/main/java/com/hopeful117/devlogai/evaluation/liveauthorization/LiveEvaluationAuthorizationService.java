@@ -137,6 +137,7 @@ public class LiveEvaluationAuthorizationService {
         artifact.put("authorizationId", authorization.getId().toString());
         artifact.put("planId", preparation.getId().toString());
         artifact.put("planDigest", preparation.getPlanDigest());
+        artifact.put("repositoryRevision", artifact.get("sourceRevision"));
         artifact.put("approverId", principal.principalId());
         artifact.put("approvedAt", now.toString());
         artifact.put("expiresAtEpochSeconds", expiresAt.getEpochSecond());
