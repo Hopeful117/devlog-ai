@@ -902,7 +902,7 @@ def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config:
     }
 
 
-def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], authorization: Mapping[str, Any], prepared_plan: Mapping[str, Any] | None = None, oracle: Mapping[str, Any] | None = None, environment: Mapping[str, str] | None = None, observation_ids: tuple[str, ...] | None = None):
+def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], authorization: Mapping[str, Any], prepared_plan: Mapping[str, Any] | None = None, oracle: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, environment: Mapping[str, str] | None = None, observation_ids: tuple[str, ...] | None = None):
     root = Path(repository_root).resolve()
     if prepared_plan is None or oracle is None:
         raise LiveConfigurationError("live execution requires an authoritative Core preparation plan")
@@ -939,6 +939,7 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
                 oracle=oracle,
                 repository_root=root,
                 authorization=authorization,
+                pricing_contract=pricing_contract,
             )
         except PreparedPlanError as error:
             raise LiveConfigurationError(str(error)) from error
