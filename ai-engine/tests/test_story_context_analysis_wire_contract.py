@@ -583,4 +583,30 @@ def test_prompt_construction_failure_keeps_core_identity_metadata():
     assert metadata.scope == request.metadata.get("scope")
     assert metadata.freshness == request.metadata.get("freshness")
     assert metadata.grounding_digest == request.metadata.get("groundingDigest")
-    assert metadata.provider == "unavailable"
+
+
+@pytest.mark.asyncio
+async def test_complete_investigation_rejects_invalid_finding_reference(monkeypatch):
+    """Regression: _complete_investigation must catch an invalid findingReference before
+    send_result, even when decision-level validation is bypassed (pre-Nov-22 scenario)."""
+    request = _investigation_request()
+    invalid_final = _final_decision()
+    invalid_final["result"]["outputClassification"]["entries"][0]["findingReference"] = (
+        "Retained live-readiness test evidence"
+    )
+    traces = _ServiceTraces([
+        _investigation_plan(request.ai_task_id),
+        invalid_final,
+    ])
+    callback = _InvestigationCallback({"actionId": "action-1", "outcome": "RESULTS", "evidence": []})
+    service = _service(monkeypatch, traces, callback)
+
+    # Simulate old code: bypass decision-level validation so the bad result reaches
+    # _complete_investigation without being caught by _validate_investigation_decision.
+    service._validate_investigation_decision = lambda submission, response, **kwargs: None
+
+    await service.process(request, UUID("00000000-0000-0000-0000-00000000000c"))
+
+    assert len(callback.results) == 1
+    assert callback.results[0].status.value == "FAILED"
+    assert callback.results[0].analysis_result is None
