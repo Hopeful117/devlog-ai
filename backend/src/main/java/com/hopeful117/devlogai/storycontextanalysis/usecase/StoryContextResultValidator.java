@@ -27,6 +27,23 @@ public final class StoryContextResultValidator {
             throw new IllegalStateException("Context digest mismatch: expected " + expectedDigest + ", got " + actualDigest);
         }
 
+        boolean hasFindings = !result.architectureFindings().isEmpty()
+                || !result.decisionFindings().isEmpty()
+                || !result.evidenceFindings().isEmpty()
+                || !result.historicalContext().isEmpty()
+                || !result.constraintFindings().isEmpty()
+                || !result.impactedComponentFindings().isEmpty();
+        boolean hasObjective = result.objectiveUnderstanding() != null
+                && !result.objectiveUnderstanding().summary().isBlank();
+        boolean hasGrounding = result.objectiveUnderstanding() != null
+                && result.objectiveUnderstanding().grounding() != null;
+        if (!hasFindings && !hasObjective && !hasGrounding) {
+            throw new IllegalStateException(
+                    "Analysis result is fully empty: no findings, no objective summary, "
+                    + "and no grounding metadata. "
+                    + "The AI engine could not produce a substantive response.");
+        }
+
         validateObjectiveUnderstanding(result.objectiveUnderstanding(), allowedRefSet);
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.architectureFindings(), allowedRefSet, true);
         AnalyzeStoryContextUseCase.validateGroundedFindings(result.decisionFindings(), allowedRefSet, true);

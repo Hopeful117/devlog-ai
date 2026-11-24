@@ -23,6 +23,11 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
             "MILESTONE", "CHALLENGE", "ENGINEERING_EVENT", "FACT",
             "OBSERVATION");
 
+    private static final Set<String> CORE_KNOWLEDGE_GUARANTEED_KINDS =
+            Set.of("INSIGHT", "DECISION", "ENGINEERING_EVENT", "ENGINEERING_STORY");
+
+    private static final int CORE_KNOWLEDGE_MINIMUM_FLOOR = 10;
+
     @Override
     public SelectionResult select(List<RepositoryEvidence> ranked, ContextRequest request) {
         Deduplication deduplication = deduplicate(ranked);
@@ -34,6 +39,7 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
 
         selectRequestedFiles(candidates, request, state);
         selectDiverseEvidence(candidates, request, policy, state);
+        selectCoreKnowledgeFloor(candidates, request, state);
         selectKnowledgeFloor(candidates, request, policy, state);
         for (RepositoryEvidence candidate : candidates)
             if (!state.selectedReferences.contains(candidate.reference()))
@@ -86,6 +92,30 @@ public class BudgetedDiverseEvidenceSelector implements EvidenceSelector {
                 add(candidate, "SELECTED_BY_DIVERSITY", state);
                 represented.add(candidate.layer());
             }
+        }
+    }
+
+    /**
+     * Unconditional CORE_KNOWLEDGE floor: guarantees a minimum of
+     * {@value #CORE_KNOWLEDGE_MINIMUM_FLOOR} CORE_KNOWLEDGE-sourced Insights,
+     * Decisions, EngineeringEvents and Stories are admitted regardless of
+     * relevance score. A focused file scope lowers relevance scores for
+     * knowledge items below the precision-policy gate, starving them from the
+     * ordinary floor. This pass runs before that gate to prevent cascading
+     * grounding failures (F1 / F2 from qualitative evaluation 2026-11-24).
+     */
+    private void selectCoreKnowledgeFloor(List<RepositoryEvidence> candidates,
+            ContextRequest request, SelectionState state) {
+        int reserved = 0;
+        for (RepositoryEvidence candidate : candidates) {
+            if (reserved >= CORE_KNOWLEDGE_MINIMUM_FLOOR) return;
+            if (candidate.provenance() == null) continue;
+            if (!"CORE_KNOWLEDGE".equals(candidate.provenance().sourceType())) continue;
+            if (!CORE_KNOWLEDGE_GUARANTEED_KINDS.contains(candidate.kind())) continue;
+            if (state.selectedReferences.contains(candidate.reference())) continue;
+            if (!fits(candidate, state, request)) return;
+            add(candidate, "SELECTED_BY_CORE_KNOWLEDGE_FLOOR", state);
+            reserved++;
         }
     }
 

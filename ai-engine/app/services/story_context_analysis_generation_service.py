@@ -668,6 +668,22 @@ class StoryContextAnalysisGenerationService:
             + output.impacted_component_findings
         )
 
+        causal_claims = getattr(output, "causal_claims", [])
+        causal_assessment = getattr(output, "causal_assessment", None)
+        causal_required = (grounding_contract.get("causalAnswerRequired") is True
+                           or grounding_contract.get("causalContractVersion") == "V2")
+        if (not all_findings
+                and not output.objective_understanding.summary.strip()
+                and output.objective_understanding.grounding is None
+                and not causal_claims
+                and causal_assessment is None
+                and not causal_required):
+            raise StoryContextAnalysisOutputValidationError(
+                "Result is fully empty: no findings, no objective understanding summary, "
+                "no grounding metadata, and no causal content. "
+                "The context was too constrained to produce a substantive response."
+            )
+
         objective_grounding = output.objective_understanding.grounding
         if output.objective_understanding.summary.strip() and objective_grounding is None:
             raise StoryContextAnalysisMissingEvidenceError(
@@ -910,6 +926,8 @@ class StoryContextAnalysisGenerationService:
                 for file in requested
             )
         }
+        if not file_grounded_refs:
+            return
         findings = (
             output.architecture_findings
             + output.decision_findings
