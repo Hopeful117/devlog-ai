@@ -2,7 +2,7 @@
 
 ## Status
 
-IMPLEMENTATION AUTHORIZED - pending human acceptance.
+ACCEPTED — 2026-11-24.
 
 ## Objective
 
