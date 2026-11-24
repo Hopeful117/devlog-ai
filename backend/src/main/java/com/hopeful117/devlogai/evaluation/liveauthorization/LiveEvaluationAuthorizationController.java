@@ -31,12 +31,10 @@ public class LiveEvaluationAuthorizationController {
     public ResponseEntity<LiveEvaluationAuthorizationResponse> approve(
             @PathVariable UUID authorizationId,
             @RequestParam String planDigest,
-            @RequestHeader(value = "X-DevLog-MCP-Human-Confirmation", required = false)
-            String mcpHumanConfirmation,
             HttpServletRequest servletRequest) {
         var principal = principalResolver.resolve(servletRequest)
                 .orElseThrow(UnauthenticatedPrincipalException::new);
-        return ResponseEntity.ok(service.approve(authorizationId, planDigest, principal, mcpHumanConfirmation));
+        return ResponseEntity.ok(service.approve(authorizationId, planDigest, principal));
     }
 
     @GetMapping("/{authorizationId}")
