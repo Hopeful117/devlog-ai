@@ -2,7 +2,6 @@ package com.hopeful117.devlogai.evaluation.liveauthorization;
 
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
-import com.hopeful117.devlogai.authorization.PrincipalKind;
 import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparation;
 import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparationRepository;
 import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparationStatus;
@@ -14,18 +13,14 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
 import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import org.springframework.beans.factory.annotation.Value;
 
 @Service
+@RequiredArgsConstructor
 public class LiveEvaluationAuthorizationService {
     private static final String SCOPE = "MCP_LIVE_EVALUATION_AUTHORIZE";
     private static final String EXECUTE_SCOPE = "MCP_LIVE_EVALUATION_EXECUTE";
@@ -36,20 +31,6 @@ public class LiveEvaluationAuthorizationService {
     private final LiveEvaluationAuthorizationRepository authorizationRepository;
     private final CoreProjectAuthorizationService authorizationService;
     private final Clock clock;
-    private final String mcpHumanConfirmationSecret;
-
-    public LiveEvaluationAuthorizationService(
-            LiveEvaluationPreparationRepository preparationRepository,
-            LiveEvaluationAuthorizationRepository authorizationRepository,
-            CoreProjectAuthorizationService authorizationService,
-            Clock clock,
-            @Value("${devlog.mcp.human-confirmation.secret:${devlog.service-auth.secret:}}") String mcpHumanConfirmationSecret) {
-        this.preparationRepository = preparationRepository;
-        this.authorizationRepository = authorizationRepository;
-        this.authorizationService = authorizationService;
-        this.clock = clock;
-        this.mcpHumanConfirmationSecret = mcpHumanConfirmationSecret;
-    }
 
     @Transactional
     public LiveEvaluationAuthorizationResponse request(
@@ -95,22 +76,13 @@ public class LiveEvaluationAuthorizationService {
     @Transactional
     public LiveEvaluationAuthorizationResponse approve(UUID authorizationId, String planDigest,
                                                        AuthenticatedPrincipal principal) {
-        return approve(authorizationId, planDigest, principal, null);
-    }
-
-    @Transactional
-    public LiveEvaluationAuthorizationResponse approve(UUID authorizationId, String planDigest,
-                                                       AuthenticatedPrincipal principal,
-                                                       String mcpHumanConfirmation) {
         requirePrincipal(principal);
-        boolean mcpConfirmed = principal.kind() == PrincipalKind.AI_AGENT
-                && verifyMcpHumanConfirmation(authorizationId, planDigest, mcpHumanConfirmation);
-        if (principal.kind() != PrincipalKind.HUMAN && !mcpConfirmed) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only a human principal may approve execution");
-        }
         LiveEvaluationAuthorization authorization = authorizationRepository.findForUpdate(authorizationId)
                 .orElseThrow(() -> new EntityNotFoundException("Live evaluation authorization", authorizationId));
         authorize(principal, authorization.getPreparation());
+        if (authorization.getRequesterId().equals(principal.principalId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "self-approval is not permitted");
+        }
         if (!authorization.getPlanDigest().equals(planDigest)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "plan digest does not match authorization request");
         }
@@ -143,11 +115,7 @@ public class LiveEvaluationAuthorizationService {
         artifact.put("approvedAt", now.toString());
         artifact.put("expiresAtEpochSeconds", expiresAt.getEpochSecond());
         artifact.remove("blockers");
-        String approverId = mcpConfirmed
-                ? "mcp-elicitation:" + principal.principalId()
-                : principal.principalId();
-        artifact.put("approverId", approverId);
-        authorization = updateApproved(authorization, approverId, now, expiresAt, artifact);
+        authorization = updateApproved(authorization, principal.principalId(), now, expiresAt, artifact);
         return LiveEvaluationAuthorizationResponse.from(authorization);
     }
 
@@ -254,27 +222,4 @@ public class LiveEvaluationAuthorizationService {
         }
     }
 
-    private boolean verifyMcpHumanConfirmation(UUID authorizationId, String planDigest, String proof) {
-        if (proof == null || proof.isBlank() || mcpHumanConfirmationSecret == null
-                || mcpHumanConfirmationSecret.isBlank()) return false;
-        String[] parts = proof.split("\\.", -1);
-        if (parts.length != 2) return false;
-        long timestamp;
-        try {
-            timestamp = Long.parseLong(parts[0]);
-        } catch (NumberFormatException exception) {
-            return false;
-        }
-        if (Math.abs(clock.instant().getEpochSecond() - timestamp) > 120) return false;
-        String payload = authorizationId + "\n" + planDigest + "\n" + timestamp;
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(mcpHumanConfirmationSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String expected = HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
-            return MessageDigest.isEqual(expected.getBytes(StandardCharsets.US_ASCII),
-                    parts[1].getBytes(StandardCharsets.US_ASCII));
-        } catch (NoSuchAlgorithmException | InvalidKeyException exception) {
-            throw new IllegalStateException("HMAC-SHA256 is unavailable", exception);
-        }
-    }
 }
