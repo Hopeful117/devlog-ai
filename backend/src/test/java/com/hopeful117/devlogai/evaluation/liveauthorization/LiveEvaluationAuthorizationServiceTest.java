@@ -9,13 +9,10 @@ import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparat
 import com.hopeful117.devlogai.project.entity.Project;
 import org.junit.jupiter.api.Test;
 
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -59,7 +56,7 @@ class LiveEvaluationAuthorizationServiceTest {
         when(authorizations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(access.isAuthorized(any(), eq(project), anyString())).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
-                preparations, authorizations, access, Clock.fixed(now, ZoneOffset.UTC), "test-secret");
+                preparations, authorizations, access, Clock.fixed(now, ZoneOffset.UTC));
 
         LiveEvaluationAuthorizationResponse result = service.approve(
                 authorizationId, digest, new AuthenticatedPrincipal("human", PrincipalKind.HUMAN, "test"));
@@ -96,7 +93,7 @@ class LiveEvaluationAuthorizationServiceTest {
         when(authorizations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(access.isAuthorized(any(), eq(project), anyString())).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
-                preparations, authorizations, access, Clock.fixed(now, ZoneOffset.UTC), "test-secret");
+                preparations, authorizations, access, Clock.fixed(now, ZoneOffset.UTC));
         LiveEvaluationAuthorizationRequest request = new LiveEvaluationAuthorizationRequest(planId, digest);
 
         service.request(request, "same-key", new AuthenticatedPrincipal("requester-a", PrincipalKind.AI_AGENT, "test"));
@@ -137,7 +134,7 @@ class LiveEvaluationAuthorizationServiceTest {
         when(access.isAuthorized(any(), eq(project), eq("MCP_LIVE_EVALUATION_EXECUTE"))).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
                 mock(LiveEvaluationPreparationRepository.class), authorizations, access,
-                Clock.fixed(now, ZoneOffset.UTC), "test-secret");
+                Clock.fixed(now, ZoneOffset.UTC));
         AuthenticatedPrincipal runner = new AuthenticatedPrincipal("runner", PrincipalKind.AI_AGENT, "test");
 
         assertEquals(LiveEvaluationAuthorizationStatus.CONSUMED,
@@ -172,7 +169,7 @@ class LiveEvaluationAuthorizationServiceTest {
     }
 
     @Test
-    void anAgentCanApproveOnlyWithAnInteractiveMcpProof() throws Exception {
+    void anAgentPrincipalCanApproveDirectly() {
         UUID planId = UUID.randomUUID();
         UUID authorizationId = UUID.randomUUID();
         String digest = "a".repeat(64);
@@ -193,20 +190,43 @@ class LiveEvaluationAuthorizationServiceTest {
         when(access.isAuthorized(any(), eq(project), eq("MCP_LIVE_EVALUATION_AUTHORIZE"))).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
                 mock(LiveEvaluationPreparationRepository.class), authorizations, access,
-                Clock.fixed(now, ZoneOffset.UTC), "test-secret");
-
-        long timestamp = now.getEpochSecond();
-        String payload = authorizationId + "\n" + digest + "\n" + timestamp;
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec("test-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        String proof = timestamp + "." + java.util.HexFormat.of().formatHex(
-                mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
+                Clock.fixed(now, ZoneOffset.UTC));
 
         LiveEvaluationAuthorizationResponse result = service.approve(
-                authorizationId, digest, new AuthenticatedPrincipal("agent", PrincipalKind.AI_AGENT, "test"), proof);
+                authorizationId, digest, new AuthenticatedPrincipal("approver-agent", PrincipalKind.AI_AGENT, "test"));
 
         assertEquals(LiveEvaluationAuthorizationStatus.APPROVED, result.status());
-        assertEquals("mcp-elicitation:agent", result.artifact().get("approverId"));
+        assertEquals("approver-agent", result.artifact().get("approverId"));
+    }
+
+    @Test
+    void selfApprovalIsRejected() {
+        UUID planId = UUID.randomUUID();
+        UUID authorizationId = UUID.randomUUID();
+        String digest = "a".repeat(64);
+        Instant now = Instant.parse("2026-11-23T05:00:00Z");
+        Project project = Project.builder().id(UUID.randomUUID()).slug("devlog-ai").build();
+        LiveEvaluationPreparation preparation = LiveEvaluationPreparation.builder()
+                .id(planId).project(project).principalId("same-agent").planDigest(digest)
+                .status(LiveEvaluationPreparationStatus.READY).planSnapshot(Map.of())
+                .createdAt(now).expiresAt(now.plusSeconds(3600)).build();
+        LiveEvaluationAuthorization pending = LiveEvaluationAuthorization.builder()
+                .id(authorizationId).preparation(preparation).requesterId("same-agent")
+                .planDigest(digest).status(LiveEvaluationAuthorizationStatus.PENDING)
+                .createdAt(now).expiresAt(now.plusSeconds(600)).build();
+        LiveEvaluationAuthorizationRepository authorizations = mock(LiveEvaluationAuthorizationRepository.class);
+        when(authorizations.findForUpdate(authorizationId)).thenReturn(Optional.of(pending));
+        CoreProjectAuthorizationService access = mock(CoreProjectAuthorizationService.class);
+        when(access.isAuthorized(any(), eq(project), eq("MCP_LIVE_EVALUATION_AUTHORIZE"))).thenReturn(true);
+        LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
+                mock(LiveEvaluationPreparationRepository.class), authorizations, access,
+                Clock.fixed(now, ZoneOffset.UTC));
+
+        org.springframework.web.server.ResponseStatusException ex = assertThrows(
+                org.springframework.web.server.ResponseStatusException.class,
+                () -> service.approve(authorizationId, digest,
+                        new AuthenticatedPrincipal("same-agent", PrincipalKind.AI_AGENT, "test")));
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatusCode());
     }
 
     private static String sha256(String value) {
