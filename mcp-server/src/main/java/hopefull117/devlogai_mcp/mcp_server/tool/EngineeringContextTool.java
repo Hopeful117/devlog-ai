@@ -9,13 +9,19 @@ import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 import java.util.List;
 import java.util.UUID;
 
 @Component
 public class EngineeringContextTool {
+    static final int DEFAULT_MAX_CHARS = 25_000;
+    private static final String TRUNCATION_WARNING = "RESPONSE_SIZE_TRUNCATED";
+
     private final DevlogProjectContextClient devlogProjectContextClient;
     private final ObjectMapper objectMapper;
     private final McpAuthenticatedPrincipalProvider principalProvider;
@@ -63,7 +69,7 @@ public class EngineeringContextTool {
         if (principalProvider == null) {
             EngineeringContext engineeringContext = devlogProjectContextClient.getEngineeringContext(
                     projectSlug, intent, files, storyId);
-            return objectMapper.writeValueAsString(engineeringContext);
+            return boundedJson(objectMapper.writeValueAsString(engineeringContext));
         }
         return getEngineeringContext(projectSlug, intent, files, storyId, null);
     }
@@ -94,6 +100,42 @@ public class EngineeringContextTool {
                         principal.delegationToken()
                 );
 
-        return objectMapper.writeValueAsString(engineeringContext);
+        return boundedJson(objectMapper.writeValueAsString(engineeringContext));
+    }
+
+    String boundedJson(String json) {
+        if (json.length() <= DEFAULT_MAX_CHARS) {
+            return json;
+        }
+        try {
+            ObjectNode root = (ObjectNode) objectMapper.readTree(json);
+            trimArray(root, "evidence");
+            trimArray(root, "sections");
+            json = objectMapper.writeValueAsString(root);
+            JsonNode metadataNode = root.path("metadata");
+            if (!metadataNode.isMissingNode() && metadataNode.isObject()) {
+                ObjectNode metadata = (ObjectNode) metadataNode;
+                JsonNode warningsNode = metadata.path("warnings");
+                ArrayNode warnings = warningsNode.isArray()
+                        ? (ArrayNode) warningsNode
+                        : metadata.putArray("warnings");
+                warnings.add(TRUNCATION_WARNING);
+                json = objectMapper.writeValueAsString(root);
+            }
+        } catch (Exception e) {
+            return json.substring(0, DEFAULT_MAX_CHARS) + "\n...[response truncated]";
+        }
+        return json;
+    }
+
+    private void trimArray(ObjectNode root, String field) throws Exception {
+        JsonNode node = root.path(field);
+        if (!node.isArray()) {
+            return;
+        }
+        ArrayNode array = (ArrayNode) node;
+        while (objectMapper.writeValueAsString(root).length() > DEFAULT_MAX_CHARS && array.size() > 0) {
+            array.remove(array.size() - 1);
+        }
     }
 }

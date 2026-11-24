@@ -60,6 +60,35 @@ public interface DevlogAdminClient {
             @RequestParam(value = "revision", required = false) String revision
     );
 
+    @PostExchange("/projects/{projectId}/stories")
+    String registerStoryAuthenticated(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("projectId") UUID projectId,
+            @RequestBody Map<String, Object> request
+    );
+
+    @PostExchange("/projects/{projectId}/stories/{storyId}/start")
+    String startStoryImplementationAuthenticated(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("storyId") UUID storyId,
+            @RequestBody Map<String, Object> request
+    );
+
+    @PostExchange("/projects/{projectId}/stories/{storyId}/complete")
+    String completeStoryImplementationAuthenticated(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("projectId") UUID projectId,
+            @PathVariable("storyId") UUID storyId,
+            @RequestBody Map<String, Object> request
+    );
+
+    @GetExchange("/projects/{projectId}/stories")
+    String listProjectStoriesAuthenticated(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("projectId") UUID projectId
+    );
+
     @PostExchange("/validations")
     String validateProposalAuthenticated(
             @RequestHeader("Authorization") String authorization,
