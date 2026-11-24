@@ -9,6 +9,7 @@ import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparat
 import com.hopeful117.devlogai.project.entity.Project;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
@@ -161,7 +162,7 @@ class LiveEvaluationAuthorizationServiceTest {
         when(access.isAuthorized(any(), eq(project), eq("MCP_LIVE_EVALUATION_EXECUTE"))).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
                 mock(LiveEvaluationPreparationRepository.class), authorizations, access,
-                Clock.fixed(Instant.parse("2026-11-23T05:00:00Z"), ZoneOffset.UTC), "test-secret");
+                Clock.fixed(Instant.parse("2026-11-23T05:00:00Z"), ZoneOffset.UTC));
 
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.consume(authorizationId, "a".repeat(64), "execution-2",
