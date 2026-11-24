@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import tools.jackson.databind.JsonNode;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -204,5 +206,56 @@ class EngineeringContextToolUnitTest {
                 .isEqualTo("2026-08-01T10:15:30Z");
         assertThat(json.at("/metadata/warnings/0").asText())
                 .isEqualTo("CONTENT_ENRICHMENT_TRUNCATED");
+    }
+
+    @Test
+    void shouldReturnJsonUnchangedWhenBelowMaxChars() {
+        String small = "{\"key\":\"value\"}";
+        assertThat(engineeringContextTool.boundedJson(small)).isEqualTo(small);
+    }
+
+    @Test
+    void shouldTruncateEvidenceWhenJsonExceedsMaxChars() throws Exception {
+        String longContent = "x".repeat(1000);
+        int itemCount = 40;
+        StringBuilder sb = new StringBuilder("{\"evidence\":[");
+        for (int i = 0; i < itemCount; i++) {
+            if (i > 0) sb.append(",");
+            sb.append("{\"kind\":\"COMMIT_DIFF\",\"content\":\"").append(longContent).append("\"}");
+        }
+        sb.append("],\"sections\":[],\"metadata\":{\"warnings\":[]}}");
+        String input = sb.toString();
+
+        assertThat(input.length()).isGreaterThan(EngineeringContextTool.DEFAULT_MAX_CHARS);
+
+        String result = engineeringContextTool.boundedJson(input);
+
+        assertThat(result.length()).isLessThanOrEqualTo(EngineeringContextTool.DEFAULT_MAX_CHARS);
+        JsonNode root = new tools.jackson.databind.ObjectMapper().readTree(result);
+        assertThat(root.path("evidence").size()).isLessThan(itemCount);
+        assertThat(root.path("metadata").path("warnings").toString())
+                .contains("RESPONSE_SIZE_TRUNCATED");
+    }
+
+    @Test
+    void shouldProduceValidJsonAfterTruncation() throws Exception {
+        String longContent = "y".repeat(2000);
+        StringBuilder sb = new StringBuilder("{\"evidence\":[");
+        for (int i = 0; i < 20; i++) {
+            if (i > 0) sb.append(",");
+            sb.append("{\"kind\":\"SOURCE_FILE\",\"text\":\"").append(longContent).append("\"}");
+        }
+        sb.append("],\"sections\":[{\"title\":\"section\",\"text\":\"").append(longContent)
+                .append("\"}],\"metadata\":{\"warnings\":[\"EXISTING_WARNING\"]}}");
+        String input = sb.toString();
+
+        String result = engineeringContextTool.boundedJson(input);
+
+        assertThat(result.length()).isLessThanOrEqualTo(EngineeringContextTool.DEFAULT_MAX_CHARS);
+        JsonNode root = new tools.jackson.databind.ObjectMapper().readTree(result);
+        assertThat(root.isObject()).isTrue();
+        assertThat(root.path("metadata").path("warnings").toString())
+                .contains("EXISTING_WARNING")
+                .contains("RESPONSE_SIZE_TRUNCATED");
     }
 }
