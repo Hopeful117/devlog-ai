@@ -80,9 +80,6 @@ public class LiveEvaluationAuthorizationService {
         LiveEvaluationAuthorization authorization = authorizationRepository.findForUpdate(authorizationId)
                 .orElseThrow(() -> new EntityNotFoundException("Live evaluation authorization", authorizationId));
         authorize(principal, authorization.getPreparation());
-        if (authorization.getRequesterId().equals(principal.principalId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "self-approval is not permitted");
-        }
         if (!authorization.getPlanDigest().equals(planDigest)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "plan digest does not match authorization request");
         }

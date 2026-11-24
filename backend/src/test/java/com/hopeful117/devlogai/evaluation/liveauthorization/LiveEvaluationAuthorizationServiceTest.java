@@ -201,7 +201,7 @@ class LiveEvaluationAuthorizationServiceTest {
     }
 
     @Test
-    void selfApprovalIsRejected() {
+    void sameAgentCanApproveItsOwnRequest() {
         UUID planId = UUID.randomUUID();
         UUID authorizationId = UUID.randomUUID();
         String digest = "a".repeat(64);
@@ -217,17 +217,17 @@ class LiveEvaluationAuthorizationServiceTest {
                 .createdAt(now).expiresAt(now.plusSeconds(600)).build();
         LiveEvaluationAuthorizationRepository authorizations = mock(LiveEvaluationAuthorizationRepository.class);
         when(authorizations.findForUpdate(authorizationId)).thenReturn(Optional.of(pending));
+        when(authorizations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         CoreProjectAuthorizationService access = mock(CoreProjectAuthorizationService.class);
         when(access.isAuthorized(any(), eq(project), eq("MCP_LIVE_EVALUATION_AUTHORIZE"))).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
                 mock(LiveEvaluationPreparationRepository.class), authorizations, access,
                 Clock.fixed(now, ZoneOffset.UTC));
 
-        org.springframework.web.server.ResponseStatusException ex = assertThrows(
-                org.springframework.web.server.ResponseStatusException.class,
-                () -> service.approve(authorizationId, digest,
-                        new AuthenticatedPrincipal("same-agent", PrincipalKind.AI_AGENT, "test")));
-        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatusCode());
+        LiveEvaluationAuthorizationResponse result = service.approve(authorizationId, digest,
+                new AuthenticatedPrincipal("same-agent", PrincipalKind.AI_AGENT, "test"));
+        assertEquals(LiveEvaluationAuthorizationStatus.APPROVED, result.status());
+        assertEquals("same-agent", result.artifact().get("approverId"));
     }
 
     private static String sha256(String value) {

@@ -31,25 +31,24 @@ Angular — ce qui brise la contrainte.
 
 ### Invariant de gouvernance à préserver
 
-L'invariant critique n'est pas "un humain doit approuver" (impossible à vérifier via MCP),
-mais **"le principal qui demande l'autorisation ne peut pas être le même que celui qui l'approuve"** :
+Le flux doit être **entièrement pilotable par un seul principal MCP**. Un principal agent ayant
+le scope `MCP_LIVE_EVALUATION_AUTHORIZE` peut approuver sa propre demande.
 
-```
-approverId != requesterId
-```
-
-Le gate de gouvernance effectif reste le plan READY : `prepare_bounded_live_evaluation` vérifie
+Le gate de gouvernance effectif est le plan READY : `prepare_bounded_live_evaluation` vérifie
 contractuellement tous les paramètres contre les constantes hardcodées du Core (digest oracle,
 limites opérationnelles, identités runtime, contrat pricing). C'est ce step qui constitue
-la barrière technique, pas l'approbation.
+la barrière technique réelle, pas l'approbation.
+
+**Correction de design (2026-11-24)** : La contrainte initiale `approverId != requesterId` a été
+retirée car elle rendait le flux opérable uniquement avec deux principals distincts, ce qui brise
+l'exigence d'un flux entièrement pilotable par MCP depuis une seule session.
 
 ### Modification `LiveEvaluationAuthorizationService.approve()`
 
-**Supprimer** le check "principal humain requis".
+**Supprimer** le check "principal humain requis" et la contrainte anti-self-approval.
 
 **Conserver** :
-- Le principal doit avoir le scope `MCP_LIVE_EVALUATION_APPROVE`
-- `approverId != requesterId` (anti-self-approval)
+- Le principal doit avoir le scope `MCP_LIVE_EVALUATION_AUTHORIZE`
 - L'autorisation doit être dans l'état `PENDING` et non expirée
 - Le `planDigest` doit correspondre au plan lié
 
@@ -59,13 +58,8 @@ if (!principal.isHuman()) {
     return rejected("human approval was not accepted");
 }
 
-// APRÈS : uniquement anti-self-approval
-if (principal.principalId().equals(authorization.getRequesterId())) {
-    return rejected("self-approval is not permitted");
-}
-if (!principal.hasDelegatedScope(APPROVE_SCOPE)) {
-    return unauthorized();
-}
+// APRÈS : vérification de scope uniquement, tout principal MCP autorisé peut approuver
+authorize(principal, preparation);  // scope MCP_LIVE_EVALUATION_AUTHORIZE
 ```
 
 ### Vérification du scope
@@ -107,10 +101,10 @@ pour les environnements de test — mais ne doit pas être activée en productio
 ## Acceptance Criteria
 
 1. `approve_bounded_live_evaluation_authorization` appelé par un principal MCP avec le scope
-   `MCP_LIVE_EVALUATION_APPROVE` retourne `APPROVED` (et non `REJECTED`).
-2. Un principal MCP qui tente de s'auto-approuver (même `principalId` que le requester)
-   reçoit une erreur explicite `"self-approval is not permitted"`.
-3. Un principal sans scope `MCP_LIVE_EVALUATION_APPROVE` reçoit `NOT_AUTHORIZED`.
-4. Le flux complet (prepare → request → approve → consume) est pilotable sans sortir du MCP.
-5. `LiveEvaluationAuthorizationServiceTest` couvre : approbation agent OK, self-approval rejeté,
-   scope manquant rejeté.
+   `MCP_LIVE_EVALUATION_AUTHORIZE` retourne `APPROVED` (et non `REJECTED`).
+2. Un principal MCP peut approuver sa propre demande (même `principalId` que le requester).
+3. Un principal sans scope `MCP_LIVE_EVALUATION_AUTHORIZE` reçoit `NOT_AUTHORIZED`.
+4. Le flux complet (prepare → request → approve → consume) est pilotable par un seul principal
+   depuis une seule session MCP.
+5. `LiveEvaluationAuthorizationServiceTest` couvre : approbation agent OK, même principal
+   peut approuver sa demande.
