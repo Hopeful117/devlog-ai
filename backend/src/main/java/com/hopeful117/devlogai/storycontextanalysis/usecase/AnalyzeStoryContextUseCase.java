@@ -265,11 +265,18 @@ public class AnalyzeStoryContextUseCase {
             Optional<AiTask> existing = aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(
                     identity.idempotencyKeyHash(), identity.idempotencyScopeHash());
             if (existing.isPresent()) {
-                if (!Objects.equals(existing.get().getSubmissionDigest(), identity.submissionDigest())) {
+                AiTask existingTask = existing.get();
+                // TIMED_OUT indicates a transient infrastructure failure (e.g. AI engine processed
+                // the task but the callback to Core failed). Allow a retry with the same key so
+                // the caller gets a fresh task rather than the permanently stuck timed-out one.
+                if (existingTask.getStatus() == AiTaskStatus.TIMED_OUT) {
+                    return Optional.empty();
+                }
+                if (!Objects.equals(existingTask.getSubmissionDigest(), identity.submissionDigest())) {
                     throw new com.hopeful117.devlogai.shared.exception.ConflictException(
                             "Idempotency-Key was already used for a different request");
                 }
-                return Optional.of(existing.get().getId());
+                return Optional.of(existingTask.getId());
             }
             if (aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHashIsNull(
                     identity.idempotencyKeyHash()).isPresent()) {

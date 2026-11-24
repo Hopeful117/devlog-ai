@@ -529,6 +529,41 @@ class AnalyzeStoryContextUseCaseTest {
     }
 
     @Test
+    void timedOutTaskIsNotReturnedByIdempotencyLookupAllowingRetry() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        AiTask timedOut = AiTask.builder().id(UUID.randomUUID())
+                .submissionDigest("same-request")
+                .status(AiTaskStatus.TIMED_OUT)
+                .build();
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                "grant-1", projectId.toString(), "MCP_STORY_AGENT_EXECUTE");
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectId), any())).thenReturn(true);
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(any(), any()))
+                .thenReturn(Optional.of(timedOut));
+        when(engineeringContextFacade.getCanonicalEngineeringContext(any(), any(), any(), any()))
+                .thenReturn(null);
+
+        // A TIMED_OUT task must not be returned as an idempotent hit; Core must attempt to
+        // build a new context (which may fail here due to null canonical context, but the key
+        // assertion is that the idempotency guard does NOT short-circuit).
+        assertThrows(IllegalStateException.class,
+                () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null,
+                        "retry-key", principal, "chatgpt"));
+        verify(engineeringContextFacade).getCanonicalEngineeringContext(
+                PROJECT_SLUG, INTENT_ID, List.of(), storyId);
+        verify(analysisRepository, never()).save(any(Analysis.class));
+    }
+
+    @Test
     void delegatedExecutionRechecksHumanProjectMembership() {
         UUID projectId = UUID.randomUUID();
         Project project = project(projectId);
