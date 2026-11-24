@@ -4,9 +4,7 @@ import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.resource.ResourceSupport;
 import hopefull117.devlogai_mcp.mcp_server.service.CoreCallPolicy;
 import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
-import hopefull117.devlogai_mcp.mcp_server.service.McpHumanConfirmationSigner;
 import io.modelcontextprotocol.spec.McpError;
-import io.modelcontextprotocol.spec.McpSchema;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.mcp.annotation.McpArg;
 import org.springframework.ai.mcp.annotation.McpTool;
@@ -25,8 +23,6 @@ public class PrepareLiveEvaluationTool {
     private final DevlogProjectContextClient client;
     private final ObjectMapper objectMapper;
     private final McpAuthenticatedPrincipalProvider principalProvider;
-    private final McpHumanConfirmationSigner confirmationSigner;
-
     @McpTool(
             name = "prepare_bounded_live_evaluation",
             description = "Prepare a bounded live evaluation through Core without provider calls or execution")
@@ -134,33 +130,8 @@ public class PrepareLiveEvaluationTool {
             throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
         }
         try {
-            if (principal.kind() == McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN) {
-                return objectMapper.writeValueAsString(client.approveLiveEvaluationAuthorization(
-                        authorizationId, planDigest, null, principal.bearerToken(), principal.delegationToken()));
-            }
-            if (!requestContext.elicitEnabled()) {
-                throw CoreCallPolicy.invalidParams("MCP client must support elicitation for human approval");
-            }
-            var response = requestContext.elicit(McpSchema.ElicitFormRequest.builder(
-                            "Confirm LIVE execution for authorization " + authorizationId
-                                    + " with plan digest " + planDigest + ".",
-                            Map.of(
-                                    "type", "object",
-                                    "properties", Map.of("confirmation", Map.of(
-                                            "type", "string",
-                                            "enum", List.of("APPROVE", "REJECT"))),
-                                    "required", List.of("confirmation")))
-                    .build());
-            if (response.action() != McpSchema.ElicitResult.Action.ACCEPT
-                    || !"APPROVE".equals(response.content().get("confirmation"))) {
-                return objectMapper.writeValueAsString(Map.of(
-                        "status", "REJECTED",
-                        "authorizationId", authorizationId,
-                        "reason", "human approval was not accepted"));
-            }
-            String proof = confirmationSigner.sign(authorizationId, planDigest);
             return objectMapper.writeValueAsString(client.approveLiveEvaluationAuthorization(
-                    authorizationId, planDigest, proof, principal.bearerToken(), principal.delegationToken()));
+                    authorizationId, planDigest, null, principal.bearerToken(), principal.delegationToken()));
         } catch (McpError error) {
             throw error;
         } catch (Exception exception) {
