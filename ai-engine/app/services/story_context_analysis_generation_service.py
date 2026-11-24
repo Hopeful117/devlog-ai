@@ -381,8 +381,8 @@ class StoryContextAnalysisGenerationService:
             )
         output = provider_result_to_internal(provider_result)
         self._synchronize_output_classification(output)
-        self._validate_output(output, submission.selected_knowledge, submission.grounding_contract or {})
         output = self._apply_execution_provenance(output, prompt)
+        self._validate_output(output, submission.selected_knowledge, submission.grounding_contract or {})
         await self._callback_client.send_result(
             submission.ai_task_id, submission.correlation_id,
             AiTaskResultRequest(
