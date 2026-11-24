@@ -74,7 +74,9 @@ public class DevLogStoryAgentService implements DevLogStoryAgent {
 
     private Map<String, Object> result(AiTaskResponse task) {
         if (task.status() != AiTaskStatus.COMPLETED) {
-            return Map.of();
+            Map<String, Object> partial = new LinkedHashMap<>();
+            putIfPresent(partial, task.contextSnapshot(), "scope");
+            return partial;
         }
 
         return analysisQueryService.findResponseByAiTaskId(task.id())

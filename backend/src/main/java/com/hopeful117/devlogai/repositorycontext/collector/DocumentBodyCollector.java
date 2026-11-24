@@ -363,7 +363,7 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
 
     private String resolveAdrPath(String adrNumber) {
         String padded = adrNumber;
-        while (padded.length() < 4) {
+        while (padded.length() < 3) {
             padded = "0" + padded;
         }
         return "docs/decisions/ADR-" + padded + ".md";

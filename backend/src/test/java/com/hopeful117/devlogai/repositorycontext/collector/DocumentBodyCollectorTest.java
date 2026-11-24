@@ -364,7 +364,7 @@ class DocumentBodyCollectorTest {
     }
 
     private String adrPath(int number) {
-        return "docs/decisions/ADR-%04d.md".formatted(number);
+        return "docs/decisions/ADR-%03d.md".formatted(number);
     }
 
     private List<String> paths(List<RepositoryEvidence> evidence) {
