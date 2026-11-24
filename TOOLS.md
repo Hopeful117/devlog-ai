@@ -36,6 +36,17 @@ Typical sequence: `list_pending_proposals` → `get_proposal_review` → `valida
 | `get_proposal_review` | Returns a paginated review page for an analysis (PROPOSED items first). Includes full payload, evidence references, supporting facts, and existing validation decision. Use `analysisId` from `list_pending_proposals`. |
 | `validate_proposal` | Accepts or rejects a proposal. `ACCEPTED` promotes it to trusted knowledge (Insight, EngineeringEvent, etc.). Requires authenticated MCP principal. Optional `insightSeverity` (LOW/MEDIUM/HIGH/CRITICAL) for INSIGHT proposals. |
 
+### Engineering Story lifecycle
+
+Typical sequence: `register_engineering_story` → `start_story_implementation` → `complete_story_implementation`. Use `list_project_stories` to inspect current state. All mutating operations require an authenticated human MCP principal — the tool-call approval in the MCP client serves as the confirmation gate.
+
+| Tool | Description |
+|------|-------------|
+| `register_engineering_story` | Registers a new Engineering Story in a DevLog project. Requires `projectSlug`, `title`, `storyNumber`, `storyPath` (repo-relative path to the story document). |
+| `list_project_stories` | Returns all Engineering Stories for a project. Requires `projectSlug`. |
+| `start_story_implementation` | Transitions a story to IN_PROGRESS, recording the base commit. Requires `projectSlug`, `storyNumber`, `baseCommit` (40- or 64-char hex SHA). |
+| `complete_story_implementation` | Transitions a story to COMPLETED, recording the target commit. Requires `projectSlug`, `storyNumber`, `targetCommit` (40- or 64-char hex SHA). |
+
 ### Companion and diagnostics
 
 | Tool | Description |
