@@ -55,7 +55,7 @@ public class InvestigationCapabilityExecutionService {
                     projectId,
                     action.purpose(),
                     snapshot,
-                    requestedFiles(action),
+                    requestedFiles(action, scope),
                     storyId,
                     searchQuestion(action),
                     // Story 0242: every action reads the task's pinned revision.
@@ -85,6 +85,7 @@ public class InvestigationCapabilityExecutionService {
         int evidenceCount = 0;
         int authorizedPathMatches = 0;
         int revisionMatches = 0;
+        int unrevisionedPathMatches = 0;
         for (RepositoryEvidence evidence : context.evidence()) {
             if (evidence == null || !references.add(evidence.reference())) {
                 continue;
@@ -106,8 +107,11 @@ public class InvestigationCapabilityExecutionService {
                 revision = resolvedRevision(evidence);
             }
             if (revision == null || revision.isBlank()) {
-                return unavailable(projectId, storyId, action,
-                        "Authorized evidence has no resolved revision");
+                // Story 0244 (D-2): an unrevisioned item (for example commit or
+                // diff evidence touching the same file) is never projected, but
+                // it must not hide revisioned evidence for the same path.
+                unrevisionedPathMatches++;
+                continue;
             }
             if (!action.revision().equals(revision)) {
                 continue;
@@ -152,6 +156,10 @@ public class InvestigationCapabilityExecutionService {
             remainingBytes -= utf8Bytes(content);
             remainingTokens -= estimateTokens(utf8Bytes(content));
             if (projected.size() == action.resultLimit()) break;
+        }
+        if (projected.isEmpty() && revisionMatches == 0 && unrevisionedPathMatches > 0) {
+            return unavailable(projectId, storyId, action,
+                    "Authorized evidence has no resolved revision");
         }
         InvestigationCapabilityResult.Outcome outcome = projected.isEmpty()
                 ? InvestigationCapabilityResult.Outcome.EMPTY
@@ -243,8 +251,20 @@ public class InvestigationCapabilityExecutionService {
         return evidence.content() == null ? null : evidence.content().revision();
     }
 
-    private List<String> requestedFiles(InvestigationAction action) {
-        return action instanceof ReadEvidenceRangeRequest read ? List.of(read.path()) : List.of();
+    /**
+     * Story 0244 (D-1): a search is scoped to its path prefix, or else to the
+     * authorized prefixes, so retrieval ranks in-scope candidates instead of
+     * selecting project-wide evidence that the path filter then discards.
+     */
+    private List<String> requestedFiles(InvestigationAction action, InvestigationScope scope) {
+        if (action instanceof ReadEvidenceRangeRequest read) return List.of(read.path());
+        if (action instanceof SearchEvidenceRequest search) {
+            if (search.pathPrefix() != null && !search.pathPrefix().isBlank()) {
+                return List.of(search.pathPrefix());
+            }
+            return scope.allowedPathPrefixes();
+        }
+        return List.of();
     }
 
     private String searchQuestion(InvestigationAction action) {

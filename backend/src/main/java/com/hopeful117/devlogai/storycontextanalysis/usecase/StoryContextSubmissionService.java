@@ -52,6 +52,11 @@ public class StoryContextSubmissionService {
     private static final long MAX_INVESTIGATION_TOKENS = 2_000_000L;
     private static final long MAX_INVESTIGATION_ELAPSED_MILLIS = 600_000L;
     private static final int MAX_INVESTIGATION_PROVIDER_OUTPUT_TOKENS = 100_000;
+    /** Story 0244: time beyond the investigation budget for submission, dispatch and the final callback. */
+    static final long INVESTIGATION_DEADLINE_MARGIN_SECONDS = 120L;
+
+    @org.springframework.beans.factory.annotation.Value("${ai-task.timeout-seconds:300}")
+    private long taskTimeoutSeconds = 300L;
 
     private final IntentCatalog intentCatalog;
     private final AiTaskService aiTaskService;
@@ -255,6 +260,7 @@ public class StoryContextSubmissionService {
         Map<String, Object> lossAccounting = objectMapper.convertValue(lossLedger, Map.class);
         snapshot.put("lossAccounting", lossAccounting);
         task.setContextSnapshot(snapshot);
+        applyInvestigationDeadline(task, snapshot.get("investigation"));
         aiTaskRepository.save(task);
         if (!budget.accepted()) {
             aiTaskService.failSubmission(task.getId(),
@@ -288,6 +294,25 @@ public class StoryContextSubmissionService {
     private String boundedMessage(String message) {
         if (message == null || message.isBlank()) return "AI Engine submission failed";
         return message.length() <= 5000 ? message : message.substring(0, 5000);
+    }
+
+    /**
+     * Story 0244: an investigation task may legitimately run for its whole
+     * authorized elapsed budget. Its deadline covers that budget plus a fixed
+     * margin, never less than the default task timeout. Other tasks keep the
+     * default deadline set at submission.
+     */
+    void applyInvestigationDeadline(AiTask task, Object investigation) {
+        if (task.getDeadlineAt() != null
+                || !(investigation instanceof Map<?, ?> initialized)
+                || !Boolean.TRUE.equals(initialized.get("initialized"))
+                || !(initialized.get("budget") instanceof Map<?, ?> budget)
+                || !(budget.get("maximumElapsedMillis") instanceof Number elapsed)) {
+            return;
+        }
+        long budgetSeconds = Math.min(elapsed.longValue(), MAX_INVESTIGATION_ELAPSED_MILLIS) / 1000L;
+        long seconds = Math.max(taskTimeoutSeconds, budgetSeconds + INVESTIGATION_DEADLINE_MARGIN_SECONDS);
+        task.setDeadlineAt(java.time.Instant.now().plusSeconds(seconds));
     }
 
     private Map<String, Object> budgetAccounting(StoryContextBudgetPreflight.Result budget) {

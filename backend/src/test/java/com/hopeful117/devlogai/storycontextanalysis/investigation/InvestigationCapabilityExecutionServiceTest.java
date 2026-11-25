@@ -127,7 +127,7 @@ class InvestigationCapabilityExecutionServiceTest {
         var sourceId = UUID.randomUUID();
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
         when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
-                eq(snapshot), eq(List.of()), eq(STORY_ID), eq(action.query()), eq(REVISION)))
+                eq(snapshot), eq(List.of("docs")), eq(STORY_ID), eq(action.query()), eq(REVISION)))
                 .thenReturn(contextWithRevisionScope(sourceId, storyEvidence("docs/q1.md")));
         when(evidenceResolutionFacade.resolve(any())).thenReturn(evidenceResolutionResult);
         when(evidenceResolutionResult.payload())
@@ -266,6 +266,64 @@ class InvestigationCapabilityExecutionServiceTest {
                         + (value.content() == null ? 0 : value.content().getBytes(java.nio.charset.StandardCharsets.UTF_8).length))
                 .sum();
         assertThat(bytes).isLessThanOrEqualTo(10);
+    }
+
+    @Test
+    void searchIsScopedToItsPathPrefix() {
+        var action = search("action-scoped", 2);
+        when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
+        when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
+                eq(snapshot), eq(List.of("backend")), eq(STORY_ID), eq(action.query()), eq(REVISION)))
+                .thenReturn(context(evidence("backend/Main.java", REVISION, "match")));
+
+        var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
+                InvestigationUsage.empty(), Set.of());
+
+        assertThat(result.outcome()).isEqualTo(InvestigationCapabilityResult.Outcome.RESULTS);
+    }
+
+    @Test
+    void searchWithoutPathPrefixIsScopedToAuthorizedPrefixes() {
+        var action = new SearchEvidenceRequest("action-unprefixed", "devlog", REVISION, "find source",
+                "match", null, 2, 10_000, 2_000);
+        when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
+        when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
+                eq(snapshot), eq(List.of("backend", "docs")), eq(STORY_ID), eq(action.query()), eq(REVISION)))
+                .thenReturn(context(evidence("docs/adr.md", REVISION, "match")));
+
+        var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
+                InvestigationUsage.empty(), Set.of());
+
+        assertThat(result.evidence()).singleElement()
+                .satisfies(value -> assertThat(value.path()).isEqualTo("docs/adr.md"));
+    }
+
+    @Test
+    void unrevisionedItemDoesNotHideRevisionedEvidenceForTheSamePath() {
+        var action = new ReadEvidenceRangeRequest("action-mixed", "devlog", REVISION,
+                "inspect source", "backend/Main.java", 1, 2, 1, 10_000, 2_000);
+        when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
+        when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
+                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null), eq(REVISION)))
+                .thenReturn(context(
+                        diffEvidenceWithoutRevision(action.path()),
+                        evidence(action.path(), REVISION, "one\ntwo\nthree")));
+
+        var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
+                InvestigationUsage.empty(), Set.of());
+
+        assertThat(result.outcome()).isEqualTo(InvestigationCapabilityResult.Outcome.RESULTS);
+        assertThat(result.evidence()).singleElement().satisfies(value -> {
+            assertThat(value.revision()).isEqualTo(REVISION);
+            assertThat(value.content()).isEqualTo("one\ntwo");
+        });
+    }
+
+    private static RepositoryEvidence diffEvidenceWithoutRevision(String path) {
+        return new RepositoryEvidence(RepositoryContextLayer.COMMIT_DIFF, "COMMIT_DIFF",
+                "diff:" + path, "Diff", Instant.EPOCH, EvidenceScore.unscored(), List.of(),
+                new RepositoryEvidence.EvidenceProvenance("GIT", "commit", path, "abc123:" + path),
+                Map.of(), 1, List.of());
     }
 
     private static SearchEvidenceRequest search(String id, int resultLimit) {

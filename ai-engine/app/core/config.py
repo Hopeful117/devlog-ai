@@ -24,6 +24,7 @@ class Settings:
     )
     sca_callback_secret: str = ""
     core_callback_timeout_seconds: float = 5.0
+    core_investigation_action_timeout_seconds: float = 30.0
     core_callback_max_attempts: int = 5
     core_callback_initial_delay_ms: int = 100
     core_callback_max_delay_ms: int = 1_000
@@ -89,6 +90,9 @@ class Settings:
             sca_callback_secret=service_auth_secret or "",
             core_callback_timeout_seconds=float(
                 os.getenv("CORE_CALLBACK_TIMEOUT_SECONDS", "5")
+            ),
+            core_investigation_action_timeout_seconds=float(
+                os.getenv("CORE_INVESTIGATION_ACTION_TIMEOUT_SECONDS", "30")
             ),
             core_callback_max_attempts=int(
                 os.getenv("CORE_CALLBACK_MAX_ATTEMPTS", "5")
@@ -179,6 +183,8 @@ class Settings:
             raise ValueError("LLM_MAX_RETRIES must not be negative")
         if self.core_callback_timeout_seconds <= 0:
             raise ValueError("CORE_CALLBACK_TIMEOUT_SECONDS must be positive")
+        if self.core_investigation_action_timeout_seconds <= 0:
+            raise ValueError("CORE_INVESTIGATION_ACTION_TIMEOUT_SECONDS must be positive")
         if self.core_callback_max_attempts <= 0:
             raise ValueError("CORE_CALLBACK_MAX_ATTEMPTS must be positive")
         if self.core_callback_initial_delay_ms < 0:

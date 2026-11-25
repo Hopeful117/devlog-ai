@@ -491,6 +491,106 @@ async def test_investigation_budget_stop_is_bounded(monkeypatch):
     assert callback.results[0].error.code == "BUDGET_EXHAUSTED"
 
 
+class _SequencedInvestigationCallback(_InvestigationCallback):
+    """Returns one scripted Core action result per call (Story 0244)."""
+
+    def __init__(self, action_results):
+        super().__init__({})
+        self._scripted = list(action_results)
+
+    async def execute_investigation_action(self, ai_task_id, correlation_id, action):
+        self.action_result = self._scripted.pop(0)
+        return await super().execute_investigation_action(ai_task_id, correlation_id, action)
+
+
+def _evidence(count, summary="s" * 40):
+    return [{"reference": f"file:backend/F{i}.java@revision-1", "path": f"backend/F{i}.java",
+             "revision": "revision-1", "summary": summary} for i in range(count)]
+
+
+def _second_action(result_limit=5, max_bytes=1000, max_tokens=250):
+    return {"phase": "ACTION", "action": {
+        "kind": "SEARCH_EVIDENCE", "actionId": "action-2", "projectSlug": "devlog",
+        "revision": "revision-1", "purpose": "more evidence", "query": "callback",
+        "pathPrefix": "backend", "resultLimit": result_limit, "maximumBytes": max_bytes,
+        "maximumTokens": max_tokens,
+    }}
+
+
+@pytest.mark.asyncio
+async def test_investigation_clamps_action_limits_to_remaining_budget(monkeypatch):
+    request = _investigation_request()
+    plan = _investigation_plan(request.ai_task_id)
+    plan["plan"]["actions"][0]["resultLimit"] = 8
+    traces = _ServiceTraces([plan, _second_action(result_limit=5, max_bytes=64000, max_tokens=8000),
+                             _final_decision()])
+    callback = _SequencedInvestigationCallback([
+        {"actionId": "action-1", "outcome": "RESULTS", "evidence": _evidence(8)},
+        {"actionId": "action-2", "outcome": "RESULTS", "evidence": _evidence(2)},
+    ])
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-0000000000c1"))
+
+    consumed_bytes = 8 * 40
+    assert callback.actions[1]["limits"] == {
+        "resultLimit": 2,
+        "maximumBytes": 64000 - consumed_bytes,
+        "maximumTokens": 8000 - consumed_bytes // 4,
+    }
+    assert callback.results[0].status.value == "COMPLETED"
+
+
+@pytest.mark.asyncio
+async def test_investigation_finalizes_with_gathered_evidence_after_budget_refusal(monkeypatch):
+    request = _investigation_request()
+    traces = _ServiceTraces([_investigation_plan(request.ai_task_id), _second_action(), _final_decision()])
+    callback = _SequencedInvestigationCallback([
+        {"actionId": "action-1", "outcome": "RESULTS", "evidence": _evidence(1)},
+        {"actionId": "action-2", "outcome": "REJECTED", "rejectionCode": "BUDGET_EXHAUSTED",
+         "stopReason": "BUDGET_EXHAUSTED"},
+    ])
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-0000000000c2"))
+
+    assert len(callback.actions) == 2
+    assert traces.calls == 3
+    assert callback.results[0].status.value == "COMPLETED"
+
+
+@pytest.mark.asyncio
+async def test_investigation_budget_refusal_without_evidence_stays_terminal(monkeypatch):
+    request = _investigation_request()
+    traces = _ServiceTraces([_investigation_plan(request.ai_task_id)])
+    callback = _SequencedInvestigationCallback([
+        {"actionId": "action-1", "outcome": "REJECTED", "rejectionCode": "BUDGET_EXHAUSTED"},
+    ])
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-0000000000c3"))
+
+    assert callback.results[0].status.value == "FAILED"
+    assert callback.results[0].error.code == "BUDGET_EXHAUSTED"
+
+
+@pytest.mark.asyncio
+async def test_investigation_finalizes_without_sending_action_when_budget_is_spent(monkeypatch):
+    request = _investigation_request()
+    plan = _investigation_plan(request.ai_task_id)
+    plan["plan"]["actions"][0]["resultLimit"] = 10
+    traces = _ServiceTraces([plan, _second_action(), _final_decision()])
+    callback = _SequencedInvestigationCallback([
+        {"actionId": "action-1", "outcome": "RESULTS", "evidence": _evidence(10)},
+    ])
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-0000000000c4"))
+
+    assert len(callback.actions) == 1
+    assert callback.results[0].status.value == "COMPLETED"
+
+
 @pytest.mark.asyncio
 async def test_investigation_provider_incomplete_is_terminal(monkeypatch):
     request = _investigation_request()

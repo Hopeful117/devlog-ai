@@ -409,6 +409,9 @@ class StoryContextAnalysisPromptBuilder:
                + ("The action budget is exhausted. Return FINAL now; do not return PLAN or ACTION.\n"
                   if final_required else "")
               + "Final findings must cite only evidence references authorized in the Core grounding contract. "
+             # Story 0244: the FINAL step gets the same exact citable list as v1 (Story 0243).
+             + self._citable_references_block(request.grounding_contract)
+             + ""
              "In FINAL, outputClassification must include exactly one matching entry for objectiveUnderstanding whenever "
              "the result contains objectiveUnderstanding.grounding, including when all finding arrays are empty.\n"
               + OUTPUT_CLASSIFICATION_RULE + REFERENCE_VERBATIM_RULE + "\n"
@@ -558,6 +561,7 @@ class StoryContextAnalysisPromptBuilder:
             "present in the corresponding output array. Remove stale classification entries instead "
             "of inventing identifiers. Do not add evidence or references outside the authorized contract.\n"
             + _classification_retry_rule(error_message)
+            + _unknown_reference_retry_rule(error_message)
         )
         content = f"{SYSTEM_MESSAGE}\n\n{corrective_user_message}"
         content_digest = hashlib.sha256(content.encode()).hexdigest()

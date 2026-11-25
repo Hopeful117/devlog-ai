@@ -92,6 +92,7 @@ def get_task_processing_service() -> AiTaskProcessingService:
         settings.core_base_url,
         callback_secret=settings.sca_callback_secret,
         timeout=settings.core_callback_timeout_seconds,
+        investigation_action_timeout=settings.core_investigation_action_timeout_seconds,
         max_attempts=settings.core_callback_max_attempts,
         initial_delay_ms=settings.core_callback_initial_delay_ms,
         max_delay_ms=settings.core_callback_max_delay_ms,

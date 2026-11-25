@@ -338,8 +338,10 @@ class CoreLiveTreatmentAdapter:
                         "maximumEvidenceItems": 15,
                         "maximumBytes": 30_000,
                         "maximumTokens": 7_500,
-                        "maximumElapsedMillis": 120_000,
-                         "maximumProviderOutputTokens": 12_000,
+                        # Story 0244 (human decision): room for one FINAL synthesis
+                        # plus one corrective retry at measured provider latency.
+                        "maximumElapsedMillis": 300_000,
+                        "maximumProviderOutputTokens": 24_000,
                     },
                 }
             }

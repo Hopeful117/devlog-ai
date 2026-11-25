@@ -49,6 +49,7 @@ class CoreCallbackClient:
         callback_secret: str,
         transport: httpx.AsyncBaseTransport | None = None,
         timeout: float = 5.0,
+        investigation_action_timeout: float | None = None,
         max_attempts: int = 5,
         initial_delay_ms: int = 100,
         max_delay_ms: int = 1_000,
@@ -64,6 +65,12 @@ class CoreCallbackClient:
         self._callback_secret = callback_secret.encode("utf-8")
         self._transport = transport
         self._timeout = timeout
+        # Story 0244: a scoped investigation action runs Core retrieval and
+        # in-scope ranking, which can exceed the short callback timeout. It is
+        # still bounded by the investigation elapsed-time budget enforced by Core.
+        if investigation_action_timeout is not None and investigation_action_timeout <= 0:
+            raise ValueError("investigation_action_timeout must be positive")
+        self._investigation_action_timeout = investigation_action_timeout or timeout
         self._max_attempts = max_attempts
         self._initial_delay_ms = initial_delay_ms
         self._max_delay_ms = max_delay_ms
@@ -197,7 +204,8 @@ class CoreCallbackClient:
             hashlib.sha256,
         ).hexdigest()
         async with httpx.AsyncClient(
-            base_url=self._base_url, transport=self._transport, timeout=self._timeout
+            base_url=self._base_url, transport=self._transport,
+            timeout=self._investigation_action_timeout,
         ) as client:
             response = await client.post(
                 path,

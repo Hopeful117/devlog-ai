@@ -336,3 +336,39 @@ def test_corrective_retry_quotes_rejected_references() -> None:
     assert "- file:s/ai-engine/app/schemas/x.py@r" in rule
     assert "- file:s:ai-engine/app/schemas/y.py@r" in rule
     assert _unknown_reference_retry_rule("some other failure") == ""
+
+
+def test_investigation_prompt_and_retry_carry_citable_references() -> None:
+    """Story 0244: the investigation FINAL step gets the Story 0243 citable list and retry rule."""
+    base_request = load_scenario(SCENARIO_ID).prompt_request
+    request = base_request.model_copy(update={
+        "metadata": {
+            **base_request.metadata,
+            "investigation": {
+                "initialized": True,
+                "protocolVersion": "story-context-agent-protocol/v2",
+                "executionId": str(base_request.ai_task_id),
+                "parentTaskId": str(base_request.ai_task_id),
+                "scope": {"projectSlug": "devlog-ai", "revision": "revision-1", "allowedPathPrefixes": ["docs"]},
+                "budget": {
+                    "maximumSteps": 2, "maximumRetrievalCalls": 2, "maximumEvidenceItems": 10,
+                    "maximumBytes": 10000, "maximumTokens": 2000, "maximumElapsedMillis": 60000,
+                    "maximumProviderOutputTokens": 4000,
+                },
+            },
+        },
+        "grounding_contract": {
+            **(base_request.grounding_contract or {}),
+            "allowedGroundingReferences": [{"ref": "file:s:docs/A.md@r"}],
+        },
+    })
+    builder = StoryContextAnalysisPromptBuilder()
+
+    prompt = builder.build_investigation(request, [], final_required=True)
+    retry = builder.investigation_corrective_retry(
+        prompt, ValueError("Finding references unknown evidence: ['file:s:docs/B.md@r']"))
+
+    assert "CITABLE REFERENCES (EXACT, EXHAUSTIVE, AUTHORITATIVE)" in prompt.user_message
+    assert "- file:s:docs/A.md@r" in prompt.user_message
+    assert "UNKNOWN REFERENCE CORRECTION" in retry.user_message
+    assert "- file:s:docs/B.md@r" in retry.user_message
