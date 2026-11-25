@@ -13,6 +13,7 @@ from app.schemas.story_context_analysis import (
     EvidenceAssertion,
     EvidenceLocator,
     EvidenceRef,
+    ImpactedComponentFinding,
     ObjectiveUnderstanding,
     maximum_defensible_classification,
 )
@@ -99,6 +100,30 @@ def test_unknown_finding_reference_uses_grounding_taxonomy():
 
     with pytest.raises(StoryContextAnalysisUnknownReferenceError):
         service._validate_output(output, {}, grounding_contract("allowed"))
+
+
+def test_impacted_component_outside_requested_file_scope_raises_retryable_grounding_error():
+    service = StoryContextAnalysisGenerationService.__new__(StoryContextAnalysisGenerationService)
+    finding = ImpactedComponentFinding.model_validate({
+        "componentName": "AnalyzeStoryContextUseCase",
+        "impactDescription": "Cites only evidence outside the requested file.",
+        "impactType": "MODIFIED",
+        "grounding": {
+            "evidenceReferences": [{"reference": "other-ref"}],
+            "classification": "AI_INTERPRETATION",
+            "grounded": True,
+            "relationType": "POSSIBLE_RELEVANCE",
+        },
+    })
+    output = type("Output", (), {
+        "architecture_findings": [], "decision_findings": [], "evidence_findings": [],
+        "historical_context": [], "constraint_findings": [], "impacted_component_findings": [finding],
+    })()
+    context = {"request": {"files": ["docs/story.md"]}}
+    typed_list = [{"ref": "file:docs/story.md"}, {"ref": "other-ref"}]
+
+    with pytest.raises(StoryContextAnalysisRequestedFileScopeError, match="AnalyzeStoryContextUseCase"):
+        service._validate_requested_file_grounding(output, context, typed_list)
 
 
 def test_factual_finding_without_evidence_is_rejected():
