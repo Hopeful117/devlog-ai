@@ -543,6 +543,94 @@ def test_live_adapters_require_chatgpt_oauth_before_provider_execution() -> None
     assert set(adapters) == {"A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST"}
 
 
+def test_live_execution_reserves_fresh_b_binding_per_authorization_before_consumption(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    from evaluations.devlog_ai_abc_runner import live_execution
+
+    calls: list[tuple[str, dict]] = []
+
+    class FakeMcp:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            calls.append((name, arguments))
+            if name == "get_bounded_live_evaluation_preparation":
+                return {"planId": "plan-1", "projectSlug": "devlog-ai", "planDigest": "digest-1"}
+            if name == "story_context_agent_prepare_task_binding":
+                return {"aiTaskId": "00000000-0000-0000-0000-0000000000b2"}
+            if name == "consume_bounded_live_evaluation_authorization":
+                return {"status": "CONSUMED"}
+            raise AssertionError(name)
+
+        def close(self) -> None:
+            pass
+
+    captured: dict = {}
+    monkeypatch.setattr(live_execution, "McpClient", FakeMcp)
+    monkeypatch.setattr(live_execution, "current_head", lambda root: "rev-1")
+    monkeypatch.setattr(live_execution, "assert_reproducible_worktree", lambda root: None)
+    monkeypatch.setattr(live_execution, "require_live_provider_environment", lambda env: None)
+    monkeypatch.setattr(live_execution, "validate_prepared_plan", lambda *a, **k: None)
+    monkeypatch.setattr(live_execution, "resolve_live_story", lambda config, mcp: config)
+    monkeypatch.setattr(
+        live_execution, "run_dry_run",
+        lambda **kwargs: captured.update(kwargs) or "RAN",
+    )
+
+    result = live_execution.run_live_execution(
+        manifest_path=tmp_path / "manifest.json",
+        output_root=tmp_path / "out",
+        repository_root=tmp_path,
+        manifest={"model": "gpt-5.6-luna", "manifestDigest": "m", "observations": []},
+        authorization={"planId": "plan-1", "planDigest": "digest-1", "runtimeRevision": "rev-1",
+                       "authorizationId": "auth-42"},
+        prepared_plan={"planId": "plan-1", "planDigest": "digest-1"},
+        oracle={},
+        environment={
+            "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+            "DEVLOG_LIVE_STORY_NUMBER": "223",
+            "DEVLOG_LIVE_FILES": "docs/a.md",
+            "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+            "LLM_PROVIDER": "openai_chatgpt",
+            "CHATGPT_OAUTH_ENABLED": "true",
+            "DEVLOG_LIVE_REMOTE_PROVIDER": "true",
+        },
+    )
+
+    assert result == "RAN"
+    names = [name for name, _ in calls]
+    assert names.index("story_context_agent_prepare_task_binding") < names.index(
+        "consume_bounded_live_evaluation_authorization")
+    reservation = dict(calls)["story_context_agent_prepare_task_binding"]
+    assert reservation["idempotencyKey"] == "q1-live-binding-auth-42"
+    b_adapter = captured["adapters"]["B_DIRECT_INVESTIGATOR"]
+    assert "00000000-0000-0000-0000-0000000000b2" in repr(vars(b_adapter))
+
+
+def test_live_adapters_refuse_b_without_reserved_binding() -> None:
+    configuration = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    }, require_task_id=False)
+
+    with pytest.raises(LiveConfigurationError, match="reserved credential-binding task"):
+        live_adapters(
+            repository_root=ROOT,
+            manifest={"model": "gpt-5.6-luna"},
+            config=configuration,
+            mcp=object(),
+            environment={
+                "LLM_PROVIDER": "openai_chatgpt",
+                "CHATGPT_OAUTH_ENABLED": "true",
+                "DEVLOG_LIVE_REMOTE_PROVIDER": "true",
+            },
+        )
+
+
 def test_mcp_error_diagnostic_is_bounded_and_redacts_credentials() -> None:
     error = RuntimeError(json.dumps({
         "code": -32001,

@@ -833,6 +833,29 @@ def resolve_live_story(config: LiveConfiguration, mcp: McpClient) -> LiveConfigu
     return replace(config, story_id=story_id, story_path=story_path)
 
 
+def _reserve_task_binding(mcp: McpClient, config: LiveConfiguration, idempotency_key: str) -> dict[str, Any]:
+    try:
+        result = mcp.tool("story_context_agent_prepare_task_binding", {
+            "projectSlug": config.project_slug,
+            "storyId": config.story_id,
+            "files": list(config.files),
+            "intent": "engineering-story-context-analysis",
+            "idempotencyKey": idempotency_key,
+        })
+    except (OSError, RuntimeError, TimeoutError) as error:
+        raise LiveConfigurationError("MCP task binding reservation failed") from error
+    if not isinstance(result, dict):
+        raise LiveConfigurationError("MCP task binding response must be an object")
+    task_id = result.get("aiTaskId")
+    if not isinstance(task_id, str) or not task_id:
+        raise LiveConfigurationError("Core binding reservation did not return aiTaskId")
+    try:
+        UUID(task_id)
+    except ValueError as error:
+        raise LiveConfigurationError("Core binding reservation returned an invalid aiTaskId") from error
+    return result
+
+
 def reserve_live_task_binding(environment: Mapping[str, str] | None = None) -> dict[str, Any]:
     """Reserve a Core task/binding through MCP without dispatching provider work."""
 
@@ -844,24 +867,11 @@ def reserve_live_task_binding(environment: Mapping[str, str] | None = None) -> d
         raise LiveConfigurationError("MCP authenticated transport could not be started") from error
     try:
         config = resolve_live_story(config, mcp)
-        result = mcp.tool("story_context_agent_prepare_task_binding", {
-            "projectSlug": config.project_slug,
-            "storyId": config.story_id,
-            "files": list(config.files),
-            "intent": "engineering-story-context-analysis",
-            "idempotencyKey": os.getenv(
-                "DEVLOG_LIVE_BINDING_IDEMPOTENCY_KEY", "q1-live-binding-prepare"
-            ),
-        })
-    except (OSError, RuntimeError, TimeoutError) as error:
-        raise LiveConfigurationError("MCP task binding reservation failed") from error
+        result = _reserve_task_binding(mcp, config, os.getenv(
+            "DEVLOG_LIVE_BINDING_IDEMPOTENCY_KEY", "q1-live-binding-prepare"
+        ))
     finally:
         mcp.close()
-    if not isinstance(result, dict):
-        raise LiveConfigurationError("MCP task binding response must be an object")
-    task_id = result.get("aiTaskId")
-    if not isinstance(task_id, str) or not task_id:
-        raise LiveConfigurationError("Core binding reservation did not return aiTaskId")
     return {
         **result,
         "storyReference": {
@@ -941,8 +951,7 @@ def prepare_live_evaluation(
     return result
 
 
-def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config: LiveConfiguration,
-                  mcp: McpClient, environment: Mapping[str, str] | None = None) -> dict[str, TreatmentAdapter]:
+def require_b_live_environment(environment: Mapping[str, str] | None = None) -> None:
     values = os.environ if environment is None else environment
     if values.get("LLM_PROVIDER", "openai_chatgpt").strip().lower() != "openai_chatgpt":
         raise LiveConfigurationError("B live execution requires LLM_PROVIDER=openai_chatgpt")
@@ -953,6 +962,14 @@ def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config:
             "B live execution requires DEVLOG_LIVE_REMOTE_PROVIDER=true; "
             "the local binding store is not a live provider boundary"
         )
+
+
+def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config: LiveConfiguration,
+                  mcp: McpClient, environment: Mapping[str, str] | None = None) -> dict[str, TreatmentAdapter]:
+    require_b_live_environment(environment)
+    if config.b_task_id is None:
+        raise LiveConfigurationError("B live execution requires a reserved credential-binding task")
+    values = os.environ if environment is None else environment
     model = values.get("LLM_MODEL", manifest["model"]).strip()
     return {
         "A_DEVLOG_CURRENT": CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, manifest, mcp),
@@ -978,7 +995,7 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
     except ValueError as error:
         raise LiveConfigurationError(str(error)) from error
     require_live_provider_environment(environment)
-    config = LiveConfiguration.from_environment(environment)
+    config = LiveConfiguration.from_environment(environment, require_task_id=False)
     try:
         mcp = McpClient(config.mcp_launcher, launcher=config.mcp_launcher,
                         read_timeout_seconds=config.mcp_read_timeout_seconds)
@@ -1005,11 +1022,17 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
         except PreparedPlanError as error:
             raise LiveConfigurationError(str(error)) from error
         config = resolve_live_story(config, mcp)
-        adapters = live_adapters(repository_root=root, manifest=manifest, config=config, mcp=mcp,
-                                 environment=environment)
+        require_b_live_environment(environment)
         authorization_id = authorization.get("authorizationId")
         if not isinstance(authorization_id, str) or not authorization_id.strip():
             raise LiveConfigurationError("live authorization requires an authorization identity")
+        if config.b_task_id is None:
+            # Bindings expire after minutes, so B gets a fresh one per authorization,
+            # reserved before consumption so a reservation failure leaves the authorization unused.
+            reservation = _reserve_task_binding(mcp, config, f"q1-live-binding-{authorization_id}")
+            config = replace(config, b_task_id=UUID(reservation["aiTaskId"]))
+        adapters = live_adapters(repository_root=root, manifest=manifest, config=config, mcp=mcp,
+                                 environment=environment)
         execution_key = (environment or os.environ).get("DEVLOG_LIVE_EXECUTION_IDEMPOTENCY_KEY", "").strip()
         if not execution_key:
             execution_key = hashlib.sha256(json.dumps({

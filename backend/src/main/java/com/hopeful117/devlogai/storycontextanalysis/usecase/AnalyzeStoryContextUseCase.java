@@ -8,6 +8,8 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBindingStatus;
+import com.hopeful117.devlogai.aicredentialbinding.repository.AiCredentialBindingRepository;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
@@ -57,6 +59,7 @@ public class AnalyzeStoryContextUseCase {
     private final StoryContextCallbackService callbackService;
     private final StoryContextSubmissionService submissionService;
     private final AnalysisRepository analysisRepository;
+    private final AiCredentialBindingRepository credentialBindingRepository;
     private static final TaskSnapshotEvidenceResolver evidenceResolver = new TaskSnapshotEvidenceResolver();
 
     /** Read-only projection path; it performs no task creation or second selection. */
@@ -266,23 +269,8 @@ public class AnalyzeStoryContextUseCase {
                     identity.idempotencyKeyHash(), identity.idempotencyScopeHash());
             if (existing.isPresent()) {
                 AiTask existingTask = existing.get();
-                // TIMED_OUT indicates a transient infrastructure failure (e.g. AI engine processed
-                // the task but the callback to Core failed). Allow a retry with the same key so
-                // the caller gets a fresh task rather than the permanently stuck timed-out one.
-                // Clear submissionDigest to unblock the unique constraint so the new task can be
-                // inserted with the same digest (the fallback findBySubmissionDigest path also
-                // relies on this being null to avoid re-resolving to the stuck task).
-                if (existingTask.getStatus() == AiTaskStatus.TIMED_OUT
-                        || existingTask.getStatus() == AiTaskStatus.FAILED) {
-                    // TIMED_OUT: transient infrastructure failure (AI engine processed but callback failed).
-                    // FAILED: terminal AI failure (e.g. BUDGET_EXHAUSTED). Allow retry with same key so
-                    // the caller is not permanently stuck on the failed task.
-                    // Clear all unique-constraint fields so a fresh task can be created without hitting
-                    // any uk_ai_task_sca_* constraint on the retired record.
-                    existingTask.setSubmissionDigest(null);
-                    existingTask.setIdempotencyKeyHash(null);
-                    existingTask.setIdempotencyScopeHash(null);
-                    aiTaskRepository.save(existingTask);
+                if (isRetired(existingTask)) {
+                    retire(existingTask);
                     return Optional.empty();
                 }
                 if (!Objects.equals(existingTask.getSubmissionDigest(), identity.submissionDigest())) {
@@ -299,11 +287,44 @@ public class AnalyzeStoryContextUseCase {
             // The submission digest is also unique. A retried equivalent request
             // with a new runtime idempotency key must reuse that task instead of
             // reaching the database unique constraint.
-            Optional<AiTask> equivalent = aiTaskRepository.findBySubmissionDigest(identity.submissionDigest());
-            return equivalent == null ? Optional.empty() : equivalent.map(AiTask::getId);
+            return reusableEquivalent(identity.submissionDigest());
         }
-        Optional<AiTask> equivalent = aiTaskRepository.findBySubmissionDigest(identity.submissionDigest());
-        return equivalent == null ? Optional.empty() : equivalent.map(AiTask::getId);
+        return reusableEquivalent(identity.submissionDigest());
+    }
+
+    private Optional<UUID> reusableEquivalent(String submissionDigest) {
+        Optional<AiTask> equivalent = aiTaskRepository.findBySubmissionDigest(submissionDigest);
+        if (equivalent == null || equivalent.isEmpty()) {
+            return Optional.empty();
+        }
+        if (isRetired(equivalent.get())) {
+            retire(equivalent.get());
+            return Optional.empty();
+        }
+        return equivalent.map(AiTask::getId);
+    }
+
+    // A failed, timed-out, or credential-expired reservation must never be served as an
+    // idempotent hit: callers would be permanently stuck on a dead task.
+    private boolean isRetired(AiTask task) {
+        if (task.getStatus() == AiTaskStatus.FAILED || task.getStatus() == AiTaskStatus.TIMED_OUT) {
+            return true;
+        }
+        if (task.getStatus() != AiTaskStatus.CREATED || task.getCredentialBindingId() == null) {
+            return false;
+        }
+        return credentialBindingRepository.findById(task.getCredentialBindingId())
+                .map(binding -> binding.getStatus() != AiCredentialBindingStatus.ACTIVE
+                        || !binding.getExpiresAt().isAfter(Instant.now()))
+                .orElse(true);
+    }
+
+    // Clears every unique-constraint field so a replacement task can reuse the same identity.
+    private void retire(AiTask task) {
+        task.setSubmissionDigest(null);
+        task.setIdempotencyKeyHash(null);
+        task.setIdempotencyScopeHash(null);
+        aiTaskRepository.save(task);
     }
 
     private record SubmissionIdentity(
