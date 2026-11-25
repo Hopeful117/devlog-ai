@@ -22,17 +22,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ProjectUnderstandingControllerWebMvcTest extends ControllerWebMvcTestSupport {
+    private static final com.hopeful117.devlogai.authorization.AuthenticatedPrincipal PRINCIPAL =
+            new com.hopeful117.devlogai.authorization.AuthenticatedPrincipal(
+                    "agent", com.hopeful117.devlogai.authorization.PrincipalKind.AI_AGENT, "test");
+    private static final com.hopeful117.devlogai.authorization.AuthenticatedPrincipalResolver PRINCIPALS =
+            request -> java.util.Optional.of(PRINCIPAL);
+
     @Test
     void exposesTheTypedExecutionContract() throws Exception {
         ProjectUnderstandingService service = mock(ProjectUnderstandingService.class);
         UUID projectId = UUID.randomUUID();
         UUID sourceId = UUID.randomUUID();
         UUID analysisId = UUID.randomUUID();
-        when(service.execute(eq(projectId), any())).thenReturn(new ProjectUnderstandingResponse(
+        when(service.execute(eq(projectId), any(), any())).thenReturn(new ProjectUnderstandingResponse(
                 analysisId, AnalysisStatus.IN_PROGRESS, sourceId, "main", "describe-project", "v1",
                 ProjectUnderstandingOutcome.CREATED, Map.of("id", sourceId.toString())));
 
-        mockMvc(new ProjectUnderstandingController(service)).perform(
+        mockMvc(new ProjectUnderstandingController(service, PRINCIPALS)).perform(
                         post("/api/v1/projects/{id}/understanding-executions", projectId)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("""
@@ -45,7 +51,7 @@ class ProjectUnderstandingControllerWebMvcTest extends ControllerWebMvcTestSuppo
 
         var captor = ArgumentCaptor.forClass(
                 com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingRequest.class);
-        verify(service).execute(eq(projectId), captor.capture());
+        verify(service).execute(eq(projectId), captor.capture(), eq(PRINCIPAL));
         assertThat(captor.getValue().sourceId()).isEqualTo(sourceId);
     }
 
@@ -53,7 +59,7 @@ class ProjectUnderstandingControllerWebMvcTest extends ControllerWebMvcTestSuppo
     void rejectsMissingSourceAndOversizedRevision() throws Exception {
         ProjectUnderstandingService service = mock(ProjectUnderstandingService.class);
         UUID projectId = UUID.randomUUID();
-        mockMvc(new ProjectUnderstandingController(service)).perform(
+        mockMvc(new ProjectUnderstandingController(service, PRINCIPALS)).perform(
                         post("/api/v1/projects/{id}/understanding-executions", projectId)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"targetRevision\":\"%s\"}".formatted("x".repeat(256))))

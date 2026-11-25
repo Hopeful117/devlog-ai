@@ -257,3 +257,83 @@ def test_story_0210_acceptability_baseline_is_replayable() -> None:
         "STALE_OR_UNKNOWN": 1,
         "NOT_EVALUATED": 1,
     }
+
+
+STORY_REF = "document:source:docs/stories/0223-agentic-quality-real-story-pilot/story.md@" + REVISION
+
+
+def live_mcp_story_payload(summary: str, confidence: str) -> dict:
+    """Mirror the Core MCP live shape observed in Q1 run 28 (Story 0237 AC-4)."""
+
+    grounding = {
+        "classification": "FACTUAL_EXTRACTION",
+        "evidenceReferences": [{"reference": STORY_REF, "resource": "source", "role": None}],
+        "grounded": True,
+        "relationType": "EXPLICIT",
+    }
+    analysis = {
+        "objectiveUnderstanding": {"summary": summary, "grounding": grounding},
+        "architectureFindings": [{"title": "T", "description": "Core owns scope.", "grounding": grounding}],
+        "decisionFindings": [],
+        "evidenceFindings": [],
+        "constraintFindings": [],
+        "impactedComponentFindings": [],
+        "historicalContext": [],
+        "causalClaims": [],
+        "causalAssessment": None,
+        "missingInformation": [{"description": "Q1 oracle is not retained.", "reason": "budget"}],
+        "uncertainties": [{"description": "Q1 question wording is absent.", "reason": "scope"}],
+        "confidence": confidence,
+        "outputClassification": {"entries": [
+            {"findingReference": "architectureFindings[0]", "classification": "FACTUAL_EXTRACTION", "grounded": True},
+        ]},
+    }
+    freshness = {"state": "UNKNOWN", "status": "UNKNOWN", "warnings": ["PROJECT_CONTEXT_STALE"]}
+    return {
+        "executionMode": "LIVE",
+        "executionStatus": "COMPLETED",
+        "finalResponse": {
+            "analysis": {
+                "analysis": analysis,
+                "contextFreshness": freshness,
+                "executionScope": {"resolvedRevision": REVISION},
+                "provenance": {},
+            },
+            "freshness": freshness,
+            "contextDigest": "a" * 64,
+        },
+    }
+
+
+def test_live_mcp_story_shape_is_unwrapped_into_claims_answer_and_limitations() -> None:
+    answer = normalize_story_context(raw(
+        live_mcp_story_payload("Core authorizes then Python generates.", "HIGH"), treatment="C"))
+
+    assert answer["answerText"] == "Core authorizes then Python generates."
+    assert [claim["statement"] for claim in answer["claims"]] == ["Core owns scope."]
+    assert answer["claims"][0]["claimType"] == "FACT"
+    assert answer["claims"][0]["evidenceReferences"] == [STORY_REF]
+    assert answer["confidence"] == "HIGH"
+    assert answer["abstention"] is False
+    assert answer["limitations"] == ["Q1 question wording is absent.", "Q1 oracle is not retained."]
+    assert "NO_EXPLICIT_ASSERTION_EXTRACTED" not in answer["normalizationWarnings"]
+    assert "ANSWER_TEXT_NOT_AVAILABLE" not in answer["normalizationWarnings"]
+    assert "ABSTENTION_FROM_SUMMARY_MARKER" in answer["normalizationWarnings"]
+
+
+def test_not_established_summary_is_an_explicit_abstention() -> None:
+    answer = normalize_story_context(raw(
+        live_mcp_story_payload("NOT_ESTABLISHED: the Q1 oracle is omitted.", "LOW"), treatment="A"))
+
+    assert answer["abstention"] is True
+    assert answer["confidence"] == "LOW"
+
+
+def test_live_mcp_story_shape_keeps_container_freshness_for_acceptability() -> None:
+    payload = live_mcp_story_payload("Core authorizes.", "MEDIUM")
+    answer = normalize_story_context(raw(payload, treatment="A"))
+    again = normalize_story_context(raw(payload, treatment="A"))
+
+    assert answer == again
+    assert answer["acceptability"]["status"] == "NOT_EVALUATED"
+    assert answer["acceptability"]["semanticEvaluated"] is False

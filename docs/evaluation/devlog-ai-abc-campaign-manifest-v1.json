@@ -1,0 +1,692 @@
+{
+  "manifestId": "devlog-ai-abc-campaign",
+  "version": "1.0.0",
+  "status": "PROPOSED_DO_NOT_EXECUTE",
+  "benchmarkId": "devlog-ai-abc",
+  "benchmarkVersion": "1.0.0",
+  "caseIds": [
+    "Q1",
+    "Q2",
+    "Q3",
+    "Q4",
+    "Q5",
+    "Q6",
+    "Q7",
+    "Q8"
+  ],
+  "caseVersions": {
+    "Q1": "1.0.0",
+    "Q2": "1.0.0",
+    "Q3": "1.0.0",
+    "Q4": "1.0.0",
+    "Q5": "1.0.0",
+    "Q6": "1.0.0",
+    "Q7": "1.0.0",
+    "Q8": "1.0.0"
+  },
+  "repositoryId": "git:github.com/Hopeful117/devlog-ai",
+  "repositoryRevision": "0673d1d32433cdaff054d5f1defd1bedd01c0039",
+  "sourceSnapshot": {
+    "repositoryId": "git:github.com/Hopeful117/devlog-ai",
+    "revision": "0673d1d32433cdaff054d5f1defd1bedd01c0039",
+    "readMode": "pinned_git_object"
+  },
+  "runtimeIdentities": {
+    "A": {
+      "runtime": "java-core-story-context-one-shot",
+      "entrypoint": "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java",
+      "promptVersion": "story-context-agent-protocol/v1",
+      "answerContract": "story-context-analysis-result-v1"
+    },
+    "B": {
+      "runtime": "comparative-v4-direct-investigator",
+      "entrypoint": "ai-engine/evaluations/comparative_baseline_v4/runtime.py",
+      "configuration": "docs/evaluation/devlog-ai-q1-b-direct-config-v1.json",
+      "promptVersion": "comparative-v4-common-answer-1.0.0",
+      "answerContract": "comparative-v4-common-answer-1.0.0"
+    },
+    "C": {
+      "runtime": "python-core-bounded-investigation",
+      "entrypoint": "ai-engine/app/services/story_context_analysis_generation_service.py",
+      "promptVersion": "story-context-agent-protocol/v2",
+      "answerContract": "story-context-analysis-result-v1"
+    }
+  },
+  "harnessIdentity": {
+    "identityVersion": "devlog-ai-q1-harness-identity-v1",
+    "paths": [
+      "ai-engine/evaluations/devlog_ai_abc_runner",
+      "ai-engine/evaluations/devlog_ai_abc_normalization",
+      "ai-engine/tests/test_devlog_ai_abc_runner.py",
+      "ai-engine/tests/test_devlog_ai_abc_preflight.py",
+      "ai-engine/tests/test_devlog_ai_abc_live_preflight.py",
+      "docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json",
+      "docs/evaluation/devlog-ai-q1-b-direct-config-v1.json",
+      "docs/evaluation/devlog-ai-abc-benchmark-v1.json",
+      "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/StoryContextCoreIntegrationTest.java",
+      "docs/evaluation/devlog-ai-abc-campaign-manifest-v1.json"
+    ]
+  },
+  "experimentType": "END_TO_END_SYSTEM_COMPARISON",
+  "controlledContextValueComparison": "DEFERRED",
+  "conditions": [
+    "A_DEVLOG_CURRENT",
+    "B_DIRECT_INVESTIGATOR",
+    "C_DEVLOG_ENGINEERING_ANALYST"
+  ],
+  "provider": "openai_chatgpt",
+  "model": "gpt-5.6-luna",
+  "promptVersions": {
+    "A": "story-context-agent-protocol/v1",
+    "B": "comparative-v4-common-answer-1.0.0",
+    "C": "story-context-agent-protocol/v2"
+  },
+  "answerContracts": {
+    "A": "story-context-analysis-result-v1",
+    "B": "comparative-v4-common-answer-1.0.0",
+    "C": "story-context-analysis-result-v1"
+  },
+  "evaluationNormalization": {
+    "status": "READY_PROVIDER_FREE",
+    "contract": "devlog-abc-claim-evidence-normalization-v1",
+    "scope": "evaluation_only",
+    "mustPreserve": [
+      "claim text",
+      "evidence references",
+      "uncertainty",
+      "technical status",
+      "raw answer identity"
+    ]
+  },
+  "toolEnvelope": {
+    "parityMode": "END_TO_END_SYSTEM_COMPARISON",
+    "BAllowedOperations": [
+      "read_file",
+      "search_repository",
+      "git_log",
+      "git_show",
+      "git_diff",
+      "inspect_commit"
+    ],
+    "CAllowedActions": [
+      "SEARCH_EVIDENCE",
+      "READ_EVIDENCE_RANGE",
+      "GET_HISTORY",
+      "GET_DECISIONS",
+      "GET_INSIGHTS",
+      "GET_EVENTS"
+    ],
+    "capabilityDifferencePolicy": "record_actual_capabilities_do_not_equalize",
+    "commonSubsetNormalization": "evaluation_only_not_execution_constraint"
+  },
+  "technicalBudgets": {
+    "maxModelTurns": 8,
+    "maxProviderCalls": 8,
+    "maxToolOrActionOperations": 8,
+    "maxReadBytesPerOperation": 64000,
+    "maxReadTokensPerOperation": 8000,
+    "maxWallClockSeconds": 120,
+    "maxOutputTokensPerResponse": 32768
+  },
+  "stopConditions": [
+    "FINAL_ANSWER",
+    "BUDGET_EXHAUSTED",
+    "PROVIDER_INCOMPLETE",
+    "PROVIDER_TIMEOUT",
+    "TOOL_OR_ACTION_FAILURE",
+    "REVISION_MISMATCH",
+    "GROUNDING_FAILURE"
+  ],
+  "metrics": [
+    "technicalStatus",
+    "semanticEligibility",
+    "weightedQuality",
+    "requiredClaimRecall",
+    "unsupportedClaimRate",
+    "evidenceSupportRate",
+    "toolOrActionCount",
+    "inputOutputTokens",
+    "latencyMs",
+    "cost"
+  ],
+  "technicalSuccess": [
+    "all identities match",
+    "repository revision is pinned",
+    "a valid terminal answer or explicit technical failure is classified",
+    "RAW and derived artifacts replay without provider calls",
+    "no oracle material enters treatment input",
+    "the evaluation-only output normalization adapter passes deterministic contract tests",
+    "the actual capability envelope and technical completion status are recorded per observation"
+  ],
+  "humanEvaluation": {
+    "blind": true,
+    "evaluateNativeAndNormalizedArtifacts": true,
+    "displayProjectionForAAndC": "evaluation-only exact structured text projection",
+    "narrativeQualityComparable": false
+  },
+  "humanAuthorizationRequired": [
+    "acceptance of per-case scopeFiles",
+    "one Core live authorization per case batch",
+    "approval of artifact destinations"
+  ],
+  "cost": "NOT_CALCULATED_UNTIL_PROVIDER_AND_PRICING_ARE_AUTHORIZED",
+  "repetitions": 3,
+  "observations": [
+    {
+      "observationId": "Q1-A-DEVLOG-CURRENT-r1",
+      "caseId": "Q1",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q1-B-DIRECT-INVESTIGATOR-r1",
+      "caseId": "Q1",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1",
+      "caseId": "Q1",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q1-A-DEVLOG-CURRENT-r2",
+      "caseId": "Q1",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q1-B-DIRECT-INVESTIGATOR-r2",
+      "caseId": "Q1",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r2",
+      "caseId": "Q1",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q1-A-DEVLOG-CURRENT-r3",
+      "caseId": "Q1",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q1-B-DIRECT-INVESTIGATOR-r3",
+      "caseId": "Q1",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r3",
+      "caseId": "Q1",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q2-A-DEVLOG-CURRENT-r1",
+      "caseId": "Q2",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q2-B-DIRECT-INVESTIGATOR-r1",
+      "caseId": "Q2",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q2-C-DEVLOG-ENGINEERING-ANALYST-r1",
+      "caseId": "Q2",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q2-A-DEVLOG-CURRENT-r2",
+      "caseId": "Q2",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q2-B-DIRECT-INVESTIGATOR-r2",
+      "caseId": "Q2",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q2-C-DEVLOG-ENGINEERING-ANALYST-r2",
+      "caseId": "Q2",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q2-A-DEVLOG-CURRENT-r3",
+      "caseId": "Q2",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q2-B-DIRECT-INVESTIGATOR-r3",
+      "caseId": "Q2",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q2-C-DEVLOG-ENGINEERING-ANALYST-r3",
+      "caseId": "Q2",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q3-A-DEVLOG-CURRENT-r1",
+      "caseId": "Q3",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q3-B-DIRECT-INVESTIGATOR-r1",
+      "caseId": "Q3",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q3-C-DEVLOG-ENGINEERING-ANALYST-r1",
+      "caseId": "Q3",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q3-A-DEVLOG-CURRENT-r2",
+      "caseId": "Q3",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q3-B-DIRECT-INVESTIGATOR-r2",
+      "caseId": "Q3",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q3-C-DEVLOG-ENGINEERING-ANALYST-r2",
+      "caseId": "Q3",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q3-A-DEVLOG-CURRENT-r3",
+      "caseId": "Q3",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q3-B-DIRECT-INVESTIGATOR-r3",
+      "caseId": "Q3",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q3-C-DEVLOG-ENGINEERING-ANALYST-r3",
+      "caseId": "Q3",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q4-A-DEVLOG-CURRENT-r1",
+      "caseId": "Q4",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q4-B-DIRECT-INVESTIGATOR-r1",
+      "caseId": "Q4",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q4-C-DEVLOG-ENGINEERING-ANALYST-r1",
+      "caseId": "Q4",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q4-A-DEVLOG-CURRENT-r2",
+      "caseId": "Q4",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q4-B-DIRECT-INVESTIGATOR-r2",
+      "caseId": "Q4",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q4-C-DEVLOG-ENGINEERING-ANALYST-r2",
+      "caseId": "Q4",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q4-A-DEVLOG-CURRENT-r3",
+      "caseId": "Q4",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q4-B-DIRECT-INVESTIGATOR-r3",
+      "caseId": "Q4",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q4-C-DEVLOG-ENGINEERING-ANALYST-r3",
+      "caseId": "Q4",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q5-A-DEVLOG-CURRENT-r1",
+      "caseId": "Q5",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q5-B-DIRECT-INVESTIGATOR-r1",
+      "caseId": "Q5",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q5-C-DEVLOG-ENGINEERING-ANALYST-r1",
+      "caseId": "Q5",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q5-A-DEVLOG-CURRENT-r2",
+      "caseId": "Q5",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q5-B-DIRECT-INVESTIGATOR-r2",
+      "caseId": "Q5",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q5-C-DEVLOG-ENGINEERING-ANALYST-r2",
+      "caseId": "Q5",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q5-A-DEVLOG-CURRENT-r3",
+      "caseId": "Q5",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q5-B-DIRECT-INVESTIGATOR-r3",
+      "caseId": "Q5",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q5-C-DEVLOG-ENGINEERING-ANALYST-r3",
+      "caseId": "Q5",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q6-A-DEVLOG-CURRENT-r1",
+      "caseId": "Q6",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q6-B-DIRECT-INVESTIGATOR-r1",
+      "caseId": "Q6",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q6-C-DEVLOG-ENGINEERING-ANALYST-r1",
+      "caseId": "Q6",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q6-A-DEVLOG-CURRENT-r2",
+      "caseId": "Q6",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q6-B-DIRECT-INVESTIGATOR-r2",
+      "caseId": "Q6",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q6-C-DEVLOG-ENGINEERING-ANALYST-r2",
+      "caseId": "Q6",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q6-A-DEVLOG-CURRENT-r3",
+      "caseId": "Q6",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q6-B-DIRECT-INVESTIGATOR-r3",
+      "caseId": "Q6",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q6-C-DEVLOG-ENGINEERING-ANALYST-r3",
+      "caseId": "Q6",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q7-A-DEVLOG-CURRENT-r1",
+      "caseId": "Q7",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q7-B-DIRECT-INVESTIGATOR-r1",
+      "caseId": "Q7",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q7-C-DEVLOG-ENGINEERING-ANALYST-r1",
+      "caseId": "Q7",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q7-A-DEVLOG-CURRENT-r2",
+      "caseId": "Q7",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q7-B-DIRECT-INVESTIGATOR-r2",
+      "caseId": "Q7",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q7-C-DEVLOG-ENGINEERING-ANALYST-r2",
+      "caseId": "Q7",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q7-A-DEVLOG-CURRENT-r3",
+      "caseId": "Q7",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q7-B-DIRECT-INVESTIGATOR-r3",
+      "caseId": "Q7",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q7-C-DEVLOG-ENGINEERING-ANALYST-r3",
+      "caseId": "Q7",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q8-A-DEVLOG-CURRENT-r1",
+      "caseId": "Q8",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q8-B-DIRECT-INVESTIGATOR-r1",
+      "caseId": "Q8",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q8-C-DEVLOG-ENGINEERING-ANALYST-r1",
+      "caseId": "Q8",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q8-A-DEVLOG-CURRENT-r2",
+      "caseId": "Q8",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q8-B-DIRECT-INVESTIGATOR-r2",
+      "caseId": "Q8",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q8-C-DEVLOG-ENGINEERING-ANALYST-r2",
+      "caseId": "Q8",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 2,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q8-A-DEVLOG-CURRENT-r3",
+      "caseId": "Q8",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q8-B-DIRECT-INVESTIGATOR-r3",
+      "caseId": "Q8",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q8-C-DEVLOG-ENGINEERING-ANALYST-r3",
+      "caseId": "Q8",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 3,
+      "status": "PREPARED_NOT_EXECUTED"
+    }
+  ],
+  "campaignReadiness": {
+    "storyReference": "docs/stories/0223-agentic-quality-real-story-pilot/story.md",
+    "matrix": "8 questions x 3 conditions x 3 repetitions = 72 observations",
+    "executionUnit": "CASE_BATCH (3 conditions x 3 repetitions), one Core authorization per batch (Story 0239 D2)",
+    "campaignCeilings": {
+      "maxObservations": 72,
+      "maxWallClockSeconds": 10800
+    },
+    "oracleStatus": "ALL_CASES_ACCEPTED_CANONICAL_DIGESTS_FROZEN",
+    "scopeStatus": "SCOPE_FILES_PROPOSED_HUMAN_REVIEW",
+    "liveStatus": "CAMPAIGN_LIVE_NOT_AUTHORIZED"
+  }
+}

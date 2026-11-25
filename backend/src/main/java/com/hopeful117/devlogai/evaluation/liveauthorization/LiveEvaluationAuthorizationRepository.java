@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,4 +28,7 @@ public interface LiveEvaluationAuthorizationRepository extends JpaRepository<Liv
             + "join fetch authorization.preparation preparation "
             + "where authorization.id = :id")
     Optional<LiveEvaluationAuthorization> findForUpdate(@Param("id") UUID id);
+
+    List<LiveEvaluationAuthorization> findByStatusAndPreparation_Project_Id(
+            LiveEvaluationAuthorizationStatus status, UUID projectId);
 }

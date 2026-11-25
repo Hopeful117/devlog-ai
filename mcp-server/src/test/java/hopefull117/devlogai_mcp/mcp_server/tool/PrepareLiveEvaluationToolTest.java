@@ -2,7 +2,6 @@ package hopefull117.devlogai_mcp.mcp_server.tool;
 
 import hopefull117.devlogai_mcp.mcp_server.client.DevlogProjectContextClient;
 import hopefull117.devlogai_mcp.mcp_server.service.McpAuthenticatedPrincipalProvider;
-import hopefull117.devlogai_mcp.mcp_server.service.McpHumanConfirmationSigner;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -27,7 +26,7 @@ class PrepareLiveEvaluationToolTest {
                         "agent-1", McpAuthenticatedPrincipalProvider.PrincipalKind.AI_AGENT,
                         "test", "Bearer test", "delegation"));
         PrepareLiveEvaluationTool tool = new PrepareLiveEvaluationTool(
-                client, new ObjectMapper(), principal, mock(McpHumanConfirmationSigner.class));
+                client, new ObjectMapper(), principal);
 
         String result = tool.prepare(
                 "devlog-ai", "q1-prepare-1", "q1", "1", "Q1", "manifest", "1", "a".repeat(64),
@@ -54,7 +53,7 @@ class PrepareLiveEvaluationToolTest {
                         "human-1", McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN,
                         "test", "Bearer test", "delegation"));
         PrepareLiveEvaluationTool tool = new PrepareLiveEvaluationTool(
-                client, new ObjectMapper(), principal, mock(McpHumanConfirmationSigner.class));
+                client, new ObjectMapper(), principal);
 
         String result = tool.approveAuthorization(authorizationId, "a".repeat(64), null);
 
@@ -76,7 +75,7 @@ class PrepareLiveEvaluationToolTest {
                         "agent-1", McpAuthenticatedPrincipalProvider.PrincipalKind.AI_AGENT,
                         "test", "Bearer test", "delegation"));
         PrepareLiveEvaluationTool tool = new PrepareLiveEvaluationTool(
-                client, new ObjectMapper(), principal, mock(McpHumanConfirmationSigner.class));
+                client, new ObjectMapper(), principal);
 
         String result = tool.consumeAuthorization(authorizationId, "a".repeat(64), "execution-1", null);
 

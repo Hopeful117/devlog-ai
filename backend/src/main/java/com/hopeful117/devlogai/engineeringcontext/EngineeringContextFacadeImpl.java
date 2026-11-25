@@ -65,9 +65,20 @@ public class EngineeringContextFacadeImpl implements EngineeringContextFacade {
     @Override
     public CanonicalEngineeringContext getCanonicalEngineeringContext(
             String projectSlug, String intent, List<String> files, UUID storyId, String question) {
+        return getCanonicalEngineeringContext(projectSlug, intent, files, storyId, question, null);
+    }
+
+    @Override
+    public CanonicalEngineeringContext getCanonicalEngineeringContext(
+            String projectSlug, String intent, List<String> files, UUID storyId, String question,
+            String revision) {
         var project = projectService.getBySlug(projectSlug);
         var projectContext = projectContextProvider.build(project.getId());
-        var repositoryContext = question == null
+        boolean pinned = revision != null && !revision.isBlank();
+        var repositoryContext = pinned
+                ? repositoryContextAdapter.buildRepositoryContext(
+                        project.getId(), intent, projectContext, files, storyId, question, revision)
+                : question == null
                 ? repositoryContextAdapter.buildRepositoryContext(project.getId(), intent, projectContext, files, storyId)
                 : repositoryContextAdapter.buildRepositoryContext(
                         project.getId(), intent, projectContext, files, storyId, question);

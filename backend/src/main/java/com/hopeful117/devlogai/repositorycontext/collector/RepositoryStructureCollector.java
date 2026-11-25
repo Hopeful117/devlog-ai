@@ -66,6 +66,17 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
     private final SourceRepository sourceRepository;
     private final WorkspaceManager workspaceManager;
     private final EvidenceFactory evidenceFactory;
+    /** Story 0243 (R5): reads requested file content to rank it; optional. */
+    private com.hopeful117.devlogai.collection.collector.SecureRepositoryContentReader contentReader;
+
+    static final String REQUESTED_SCOPE_RELEVANCE = "requestedScopeRelevance";
+    private static final int MAX_RANKED_REQUESTED_READS = 200;
+    private static final long MAX_RANKED_READ_BYTES = 96_000;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setContentReader(com.hopeful117.devlogai.collection.collector.SecureRepositoryContentReader contentReader) {
+        this.contentReader = contentReader;
+    }
 
     public RepositoryStructureCollector(
             SecureRepositoryScanner scanner,
@@ -150,7 +161,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             // File-level evidence (new)
             evidence.addAll(produceModuleEvidence(scan, source.getId().toString(), request));
             evidence.addAll(produceFileLevelEvidence(scan, source.getId().toString(),
-                    workspace.resolvedRevision(), request));
+                    workspace.resolvedRevision(), request, workspace));
 
             return evidence.stream()
                     .map(item -> withReferenceSemantics(item, source.getId().toString(),
@@ -452,13 +463,65 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
             RepositoryScan scan,
             String sourceId,
             String resolvedRevision,
-            com.hopeful117.devlogai.repositorycontext.ContextRequest request
+            com.hopeful117.devlogai.repositorycontext.ContextRequest request,
+            SynchronizedWorkspace workspace
     ) {
         Set<String> storyTerms = extractStoryTerms(request);
         Map<FileEvidenceKind, List<RepositoryEvidence>> candidates =
                 collectFileCandidates(scan, sourceId, resolvedRevision, request);
         sortFileCandidates(candidates, storyTerms);
+        rankRequestedCandidates(candidates, scan, request, workspace);
         return allocateFileCandidates(candidates);
+    }
+
+    /**
+     * Story 0243 (R5): orders requested files by their deterministic relevance
+     * to the objective before the file-evidence cap applies, and exposes the
+     * score so the ranker orders them the same way. Content is read only for a
+     * bounded number of small requested files, through the secure reader.
+     */
+    private void rankRequestedCandidates(
+            Map<FileEvidenceKind, List<RepositoryEvidence>> candidates,
+            RepositoryScan scan,
+            ContextRequest request,
+            SynchronizedWorkspace workspace
+    ) {
+        List<RepositoryEvidence> requested = candidates.get(FileEvidenceKind.REQUESTED);
+        if (requested == null || requested.isEmpty()) return;
+        Set<String> query = RequestedScopeRelevance.queryStems(
+                request.intent() == null ? null : request.intent().objective());
+        if (query.isEmpty()) return;
+        Map<String, Long> sizes = new java.util.HashMap<>();
+        scan.files().forEach(file -> sizes.put(file.relativePath(), file.size()));
+        int reads = 0;
+        Map<String, Integer> scores = new java.util.HashMap<>();
+        for (RepositoryEvidence evidence : requested) {
+            String path = evidence.provenance().originatingFile();
+            String content = null;
+            if (contentReader != null && workspace != null && reads < MAX_RANKED_REQUESTED_READS
+                    && sizes.getOrDefault(path, Long.MAX_VALUE) <= MAX_RANKED_READ_BYTES) {
+                reads++;
+                var result = contentReader.readComplete(workspace, path, (int) MAX_RANKED_READ_BYTES);
+                if (result.status() == com.hopeful117.devlogai.collection.collector
+                        .SecureRepositoryContentReader.ReadResult.Status.COMPLETE) {
+                    content = result.text();
+                }
+            }
+            scores.put(evidence.reference(), RequestedScopeRelevance.score(path, query, content));
+        }
+        List<RepositoryEvidence> ranked = requested.stream()
+                .map(evidence -> {
+                    Map<String, String> metadata = new LinkedHashMap<>(evidence.extractionMetadata());
+                    metadata.put(REQUESTED_SCOPE_RELEVANCE,
+                            Integer.toString(scores.getOrDefault(evidence.reference(), 0)));
+                    return evidence.withExtractionMetadata(metadata);
+                })
+                .sorted(java.util.Comparator.comparingInt((RepositoryEvidence evidence) ->
+                                scores.getOrDefault(evidence.reference(), 0)).reversed()
+                        .thenComparing(evidence -> evidence.provenance().originatingFile()))
+                .toList();
+        requested.clear();
+        requested.addAll(ranked);
     }
 
     private Map<FileEvidenceKind, List<RepositoryEvidence>> collectFileCandidates(
@@ -479,7 +542,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                     ? FileEvidenceKind.REQUESTED
                     : classify(path);
             if (kind != null) candidates.get(kind).add(fileEvidence(
-                    kind, path, sourceId, resolvedRevision, request));
+                    kind, requestedEvidenceKind(kind, path), path, sourceId, resolvedRevision, request));
         }
         return candidates;
     }
@@ -531,8 +594,20 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
         return null;
     }
 
+    /**
+     * Story 0243: a requested file keeps the evidence kind of what it is
+     * (source, test or configuration) instead of the generic CONFIG_FILE, so
+     * content enrichment treats a requested Java or Python file as source.
+     */
+    private String requestedEvidenceKind(FileEvidenceKind kind, String path) {
+        if (kind != FileEvidenceKind.REQUESTED) return kind.evidenceKind;
+        FileEvidenceKind classified = classify(path);
+        return classified == null ? kind.evidenceKind : classified.evidenceKind;
+    }
+
     private RepositoryEvidence fileEvidence(
             FileEvidenceKind kind,
+            String evidenceKind,
             String path,
             String sourceId,
             String resolvedRevision,
@@ -542,7 +617,7 @@ public class RepositoryStructureCollector implements RepositoryContextCollector 
                 metadata(),
                 new EvidenceFactory.EvidenceInput(
                         RepositoryContextLayer.RELATED_SOURCE_CODE,
-                        kind.evidenceKind,
+                        evidenceKind,
                         kind.referencePrefix + sourceId + ":" + path + "@" + resolvedRevision,
                         path,
                         Instant.now(),

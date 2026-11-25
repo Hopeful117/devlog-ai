@@ -131,12 +131,12 @@ class DocumentBodyCollectorTest {
         assertEquals(List.of(STORY_PATH, adrPath(1), adrPath(2), adrPath(3), adrPath(4)),
                 paths(result));
         verify(contentReader).readComplete(workspace, STORY_PATH, Integer.MAX_VALUE);
-        verify(contentReader).readComplete(workspace, adrPath(1), 4000);
-        verify(contentReader).readComplete(workspace, adrPath(2), 4000);
-        verify(contentReader).readComplete(workspace, adrPath(3), 4000);
-        verify(contentReader).readComplete(workspace, adrPath(4), 4000);
-        verify(contentReader, never()).readComplete(eq(workspace), eq(adrPath(5)), anyInt());
-        verify(contentReader, never()).readComplete(eq(workspace), eq(adrPath(6)), anyInt());
+        verify(contentReader).read(workspace, adrPath(1), 4000);
+        verify(contentReader).read(workspace, adrPath(2), 4000);
+        verify(contentReader).read(workspace, adrPath(3), 4000);
+        verify(contentReader).read(workspace, adrPath(4), 4000);
+        verify(contentReader, never()).read(eq(workspace), eq(adrPath(5)), anyInt());
+        verify(contentReader, never()).read(eq(workspace), eq(adrPath(6)), anyInt());
         verifyNoMoreInteractions(contentReader);
     }
 
@@ -156,7 +156,7 @@ class DocumentBodyCollectorTest {
         assertEquals(3, result.size());
         assertEquals(12000, totalContentCharacters(result));
         assertFalse(paths(result).contains(adrPath(3)));
-        verify(contentReader, never()).readComplete(eq(workspace), eq(adrPath(3)), anyInt());
+        verify(contentReader, never()).read(eq(workspace), eq(adrPath(3)), anyInt());
     }
 
     @Test
@@ -188,11 +188,11 @@ class DocumentBodyCollectorTest {
 
         assertEquals(List.of(adrPath(1)), paths(result));
         verify(contentReader).readComplete(workspace, STORY_PATH, Integer.MAX_VALUE);
-        verify(contentReader).readComplete(workspace, adrPath(1), 4000);
+        verify(contentReader).read(workspace, adrPath(1), 4000);
     }
 
     @Test
-    void constrainsPerDocumentLimitByRemainingAggregateBudget() {
+    void admitsADocumentTruncatedToTheRemainingAggregateBudget() {
         when(budgetPolicy.maxTotalCharacters()).thenReturn(5000);
         prepareWorkspace(null);
         stubDocuments(Map.of(
@@ -203,9 +203,13 @@ class DocumentBodyCollectorTest {
         List<RepositoryEvidence> result = collector.collect(
                 createContextRequest(createStory(), createScope()));
 
-        assertEquals(List.of(4000), contentLengths(result));
-        assertFalse(paths(result).contains(adrPath(1)));
-        verify(contentReader).readComplete(workspace, adrPath(1), 1000);
+        // Story 0243: the ADR is admitted truncated to the remaining 1000 characters
+        // with an explicit TRUNCATED status instead of being excluded.
+        assertEquals(List.of(4000, 1000), contentLengths(result));
+        assertTrue(paths(result).contains(adrPath(1)));
+        assertTrue(result.stream().anyMatch(evidence -> evidence.content().status()
+                == com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.TRUNCATED));
+        verify(contentReader).read(workspace, adrPath(1), 1000);
     }
 
     @Test
@@ -223,8 +227,8 @@ class DocumentBodyCollectorTest {
 
         assertEquals(List.of(1000, 3000, 1000), contentLengths(result));
         assertEquals(5000, totalContentCharacters(result));
-        verify(contentReader).readComplete(workspace, adrPath(1), 4000);
-        verify(contentReader).readComplete(workspace, adrPath(2), 1000);
+        verify(contentReader).read(workspace, adrPath(1), 4000);
+        verify(contentReader).read(workspace, adrPath(2), 1000);
     }
 
     @Test
@@ -242,7 +246,7 @@ class DocumentBodyCollectorTest {
 
         assertEquals(1, result.size());
         assertEquals(List.of(STORY_PATH), paths(result));
-        verify(contentReader, never()).readComplete(eq(workspace), eq(adrPath(2)), anyInt());
+        verify(contentReader, never()).read(eq(workspace), eq(adrPath(2)), anyInt());
         assertTrue(result.stream().noneMatch(evidence ->
                 evidence.content().status()
                         == com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.SKIPPED));
@@ -264,7 +268,7 @@ class DocumentBodyCollectorTest {
 
         assertEquals(1, result.size());
         assertEquals(List.of(STORY_PATH), paths(result));
-        verify(contentReader, never()).readComplete(eq(workspace), eq(adrPath(2)), anyInt());
+        verify(contentReader, never()).read(eq(workspace), eq(adrPath(2)), anyInt());
         assertTrue(result.stream().noneMatch(evidence ->
                 evidence.content().status()
                         == com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent.Status.UNAVAILABLE));
@@ -347,6 +351,35 @@ class DocumentBodyCollectorTest {
                                     : SecureRepositoryContentReader.ReadResult.Status.COMPLETE,
                             skipped ? null : text,
                             skipped ? "INPUT_TOO_LARGE" : null);
+                });
+        lenient().when(contentReader.read(eq(workspace), anyString(), anyInt()))
+                .thenAnswer(invocation -> {
+                    String path = invocation.getArgument(1);
+                    int maximum = invocation.getArgument(2);
+                    if (skippedPaths.contains(path)) {
+                        return new SecureRepositoryContentReader.ReadResult(
+                                SecureRepositoryContentReader.ReadResult.Status.SKIPPED,
+                                null, "INPUT_TOO_LARGE");
+                    }
+                    if (unavailablePaths.contains(path)) {
+                        return new SecureRepositoryContentReader.ReadResult(
+                                SecureRepositoryContentReader.ReadResult.Status.UNAVAILABLE,
+                                null, "FILE_UNAVAILABLE");
+                    }
+                    String text = documents.get(path);
+                    if (text == null) {
+                        return new SecureRepositoryContentReader.ReadResult(
+                                SecureRepositoryContentReader.ReadResult.Status.UNAVAILABLE,
+                                "", "NOT_FOUND");
+                    }
+                    // Story 0243: read() truncates oversized documents at the limit.
+                    boolean truncated = text.length() > maximum;
+                    return new SecureRepositoryContentReader.ReadResult(
+                            truncated
+                                    ? SecureRepositoryContentReader.ReadResult.Status.TRUNCATED
+                                    : SecureRepositoryContentReader.ReadResult.Status.COMPLETE,
+                            truncated ? text.substring(0, maximum) : text,
+                            truncated ? "CONTENT_TRUNCATED" : null);
                 });
     }
 

@@ -53,6 +53,25 @@ public interface DevlogAdminClient {
             @RequestParam(value = "revision", required = false) String revision
     );
 
+    @PostExchange("/projects/{projectId}/understanding-executions")
+    String executeProjectUnderstandingAuthenticated(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("projectId") UUID projectId,
+            @RequestBody Map<String, Object> request
+    );
+
+    @GetExchange("/analyses/{analysisId}")
+    String getAnalysisAuthenticated(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("analysisId") UUID analysisId
+    );
+
+    @GetExchange("/projects/{projectId}/freshness-checks/summary")
+    String getProjectFreshnessSummaryAuthenticated(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("projectId") UUID projectId
+    );
+
     @PostExchange("/projects/{projectId}/stories/synchronize")
     String synchronizeProjectStoriesAuthenticated(
             @RequestHeader("Authorization") String authorization,

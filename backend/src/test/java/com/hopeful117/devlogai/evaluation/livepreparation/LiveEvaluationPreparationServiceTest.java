@@ -35,7 +35,8 @@ class LiveEvaluationPreparationServiceTest {
                 mock(SourceRepository.class),
                 mock(WorkspaceManager.class),
                 new ObjectMapper(),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                LiveEvaluationContractRegistry.approved());
 
         LiveEvaluationPreparationResponse response = service.prepare(
                 "devlog-ai", "key", null,
@@ -63,7 +64,7 @@ class LiveEvaluationPreparationServiceTest {
         when(preparations.save(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         LiveEvaluationPreparationResponse response = new LiveEvaluationPreparationService(
-                projects, authorization, preparations, sources, workspaces, new ObjectMapper(), Clock.systemUTC()).prepare(
+                projects, authorization, preparations, sources, workspaces, new ObjectMapper(), Clock.systemUTC(), LiveEvaluationContractRegistry.approved()).prepare(
                 "devlog-ai", "key", new AuthenticatedPrincipal("principal", PrincipalKind.HUMAN, "test"),
                 new LiveEvaluationPreparationRequest(
                         "devlog-ai-abc", "1.0.0", "Q1", "devlog-ai-abc-first-test", "1.1.0",
@@ -101,7 +102,7 @@ class LiveEvaluationPreparationServiceTest {
         when(preparations.save(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         LiveEvaluationPreparationResponse response = new LiveEvaluationPreparationService(
-                projects, authorization, preparations, sources, workspaces, new ObjectMapper(), Clock.systemUTC()).prepare(
+                projects, authorization, preparations, sources, workspaces, new ObjectMapper(), Clock.systemUTC(), LiveEvaluationContractRegistry.approved()).prepare(
                 "devlog-ai", "key", new AuthenticatedPrincipal("principal", PrincipalKind.HUMAN, "test"),
                 new LiveEvaluationPreparationRequest(
                         "devlog-ai-abc", "1.0.0", "Q1", "devlog-ai-abc-first-test", "1.1.0",

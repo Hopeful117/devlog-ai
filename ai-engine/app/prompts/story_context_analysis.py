@@ -1,4 +1,5 @@
 import hashlib
+import re
 import json
 import uuid
 from dataclasses import dataclass
@@ -8,6 +9,7 @@ from pydantic import TypeAdapter
 from app.providers.base import GenerationPolicy, Prompt, PromptTraceability
 from app.prompts.structured_context import SHARED_STRUCTURED_CONTEXT_CONTRACT
 from app.schemas.ai_task import PromptRequest
+from app.prompts.reference_aliases import alias_for, citable_references, reference_aliases
 from app.schemas.story_context_agent_projection import StoryContextAgentProjectionV1
 from app.schemas.story_context_analysis import ProviderStoryContextAnalysisResult, StoryAgentFollowUpResult
 from app.schemas.story_context_investigation import InvestigationDecision, InvestigationInitialization
@@ -33,10 +35,31 @@ OUTPUT_CLASSIFICATION_RULE = (
 
 REFERENCE_VERBATIM_RULE = (
     "REFERENCE COPY RULE (AUTHORITATIVE): every evidence reference you emit, in findings, uncertainties, "
-    "implementation items, and causal assessments, must be copied character for character from an "
-    "authorized reference, including any @revision suffix. Never shorten, reformat, or reconstruct a "
-    "reference from a file path.\n"
+    "implementation items, and causal assessments, must be either the short alias of a citable reference "
+    "exactly as listed (for example R3) or the full authorized reference copied character for character, "
+    "including any @revision suffix. Prefer the alias. Never shorten, reformat, or reconstruct a "
+    "reference from a file path, and never invent an alias.\n"
 )
+
+
+
+
+def _unknown_reference_retry_rule(error_message: str) -> str:
+    """Story 0243: quote rejected references so the retry replaces or drops them."""
+    if "unknown evidence" not in error_message.casefold():
+        return ""
+    rejected = sorted(set(re.findall(r"(?:file|document|config|diff|git|story|insight|decision|event|fact|"
+                                     r"analysis|module|repository)[:/][^\s'\",\]]+", error_message))
+                      | set(re.findall(r"(?<![A-Za-z0-9])R[0-9]+(?![A-Za-z0-9])", error_message)))
+    listed = "".join(f"- {value}\n" for value in rejected) if rejected else "- (see error above)\n"
+    return (
+        "UNKNOWN REFERENCE CORRECTION (AUTHORITATIVE)\n"
+        "These references were rejected because they are not in CITABLE REFERENCES:\n"
+        + listed
+        + "Do not emit them again in any form. Replace each one with a reference copied verbatim from "
+        "CITABLE REFERENCES that directly supports the same statement; if none does, remove the "
+        "statement or move it to missingInformation as NOT_ESTABLISHED.\n"
+    )
 
 
 def _classification_retry_rule(error_message: str) -> str:
@@ -231,7 +254,8 @@ class StoryContextAnalysisPromptBuilder:
             f"{grounding_json}\n\n"
             "REQUESTED FILE SCOPE (AUTHORITATIVE)\n"
             f"{requested_file_scope}\n\n"
-            "SELECTED KNOWLEDGE\n"
+            + self._citable_references_block(request.grounding_contract)
+            + "SELECTED KNOWLEDGE\n"
             f"{knowledge_json}\n\n"
             "USER GUIDANCE (NON-AUTHORITATIVE)\n"
             f"{guidance_json}\n\n"
@@ -373,9 +397,13 @@ class StoryContextAnalysisPromptBuilder:
               "do not claim an evidence-grounded objective understanding: leave its summary empty and its grounding null, "
               "leave grounded finding arrays empty, and express remaining work only as ungrounded recommendations or "
               "missing information.\n"
-               + ("The action budget is exhausted. Return FINAL now; do not return PLAN or ACTION.\n"
+               + ("No further action is allowed: the action budget is exhausted or Core refused an action. "
+                  "Return FINAL now from the prior capability results; do not return PLAN or ACTION.\n"
                   if final_required else "")
               + "Final findings must cite only evidence references authorized in the Core grounding contract. "
+             # Story 0244: the FINAL step gets the same exact citable list as v1 (Story 0243).
+             + self._citable_references_block(request.grounding_contract)
+             + ""
              "In FINAL, outputClassification must include exactly one matching entry for objectiveUnderstanding whenever "
              "the result contains objectiveUnderstanding.grounding, including when all finding arrays are empty.\n"
               + OUTPUT_CLASSIFICATION_RULE + REFERENCE_VERBATIM_RULE + "\n"
@@ -418,6 +446,24 @@ class StoryContextAnalysisPromptBuilder:
     def _canonical(self, value: object) -> str:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
+    def _citable_references_block(self, grounding_contract: dict[str, object] | None) -> str:
+        """Story 0243: the exact, exhaustive list of references the answer may cite."""
+        aliases = reference_aliases(grounding_contract)
+        if not aliases:
+            return ""
+        return (
+            "CITABLE REFERENCES (EXACT, EXHAUSTIVE, AUTHORITATIVE)\n"
+            + "\n".join(f"- {alias} = {reference}" for alias, reference in aliases.items())
+            + "\nIn every evidence `reference` field, cite the alias (for example R1) exactly as listed; "
+            "it is resolved to the full reference before validation. The full reference copied character for character is "
+            "also accepted. An alias that is not in this list is rejected. Cite only references from this "
+            "list. A file, class, "
+            "module, or document that is merely mentioned inside evidence content (for example in an "
+            "import, a comment, or a code reference) is NOT citable unless its exact reference appears "
+            "in this list. Never build a reference from a path. If no listed reference supports a "
+            "statement, drop the statement or report it as NOT_ESTABLISHED in missingInformation.\n\n"
+        )
+
     def _requested_file_scope(
         self, projection: dict[str, object], grounding_contract: dict[str, object]
     ) -> str:
@@ -428,6 +474,7 @@ class StoryContextAnalysisPromptBuilder:
 
         files = [value for value in requested_files if isinstance(value, str) and value]
         references: dict[str, list[str]] = {file: [] for file in files}
+        aliases = alias_for(grounding_contract)
         allowed = grounding_contract.get("allowedGroundingReferences")
         if isinstance(allowed, list):
             for entry in allowed:
@@ -437,8 +484,12 @@ class StoryContextAnalysisPromptBuilder:
                 provenance = entry.get("provenance")
                 originating_file = provenance.get("originatingFile") if isinstance(provenance, dict) else None
                 for file in files:
-                    if reference == file or reference.endswith(f":{file}") or originating_file == file:
-                        references[file].append(reference)
+                    # Story 0243: a requested directory maps to the files under it.
+                    if (reference == file or reference.endswith(f":{file}") or originating_file == file
+                            or (isinstance(originating_file, str) and originating_file.startswith(f"{file}/"))
+                            or f":{file}/" in reference):
+                        # Story 0245: show the alias the model is asked to cite.
+                        references[file].append(aliases.get(reference, reference))
         return self._canonical({
             "files": files,
             "groundingReferences": references,
@@ -473,6 +524,7 @@ class StoryContextAnalysisPromptBuilder:
             "The failure category is explicit. For SEMANTIC_SUPPORT_ERROR, downgrade the claim to NOT_ESTABLISHED when support is insufficient; do not invent evidence or add references outside the authoritative contract.\n"
             "For GROUNDING_ERROR caused by requested file scope, remove every finding that does not cite an authorized reference for one of the requested files; return empty finding arrays, missingInformation, and implementationQuestions instead of using broad analysis references.\n"
             + _classification_retry_rule(error_message)
+            + _unknown_reference_retry_rule(error_message)
             + "Produce a corrected ProviderStoryContextAnalysisResult that satisfies all constraints. "
             "confidence must remain a scalar HIGH, MEDIUM, or LOW value."
         )
@@ -506,6 +558,7 @@ class StoryContextAnalysisPromptBuilder:
             "present in the corresponding output array. Remove stale classification entries instead "
             "of inventing identifiers. Do not add evidence or references outside the authorized contract.\n"
             + _classification_retry_rule(error_message)
+            + _unknown_reference_retry_rule(error_message)
         )
         content = f"{SYSTEM_MESSAGE}\n\n{corrective_user_message}"
         content_digest = hashlib.sha256(content.encode()).hexdigest()

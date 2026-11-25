@@ -116,6 +116,18 @@ public class DeterministicEvidenceRanker implements EvidenceRanker {
         int score = compositeScores.getOrDefault(evidence.reference(), terms.score(evidence));
         if (evidence.layer() == RepositoryContextLayer.CURRENT_ANALYSIS && score < 90)
             score = 90;
+        // Story 0243 (R5): a requested file's in-scope relevance (file name and
+        // content identifiers matched against the objective) is a floor for its
+        // semantic relevance, so requested files are ordered by relevance, not path.
+        String requestedRelevance = evidence.extractionMetadata() == null ? null
+                : evidence.extractionMetadata().get("requestedScopeRelevance");
+        if (requestedRelevance != null) {
+            try {
+                score = Math.max(score, Math.min(100, Integer.parseInt(requestedRelevance)));
+            } catch (NumberFormatException ignored) {
+                // Malformed metadata never raises relevance.
+            }
+        }
         return score;
     }
 

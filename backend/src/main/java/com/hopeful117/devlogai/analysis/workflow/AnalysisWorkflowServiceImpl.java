@@ -24,7 +24,14 @@ import com.hopeful117.devlogai.knowledge.selection.KnowledgeSelectionService;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledge;
 import com.hopeful117.devlogai.knowledge.selection.SelectedKnowledgePromptProjectionService;
 import com.hopeful117.devlogai.intent.service.IntentCatalog;
+import com.hopeful117.devlogai.ai.task.entity.AiTask;
+import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
+import com.hopeful117.devlogai.aicredentialbinding.service.AiEngineBindingClient;
+import com.hopeful117.devlogai.aicredentialbinding.service.AiTaskExecutionAuthorizationService;
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
+import com.hopeful117.devlogai.shared.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -49,8 +56,26 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
     private final KnowledgeSelectionService knowledgeSelectionService;
     private final SelectedKnowledgePromptProjectionService promptProjectionService;
 
+    private AiTaskExecutionAuthorizationService taskAuthorizationService;
+    private AiEngineBindingClient aiEngineBindingClient;
+    private AiTaskRepository aiTaskRepository;
+
+    @Autowired(required = false)
+    void setUserBoundExecution(AiTaskExecutionAuthorizationService taskAuthorizationService,
+                               AiEngineBindingClient aiEngineBindingClient,
+                               AiTaskRepository aiTaskRepository) {
+        this.taskAuthorizationService = taskAuthorizationService;
+        this.aiEngineBindingClient = aiEngineBindingClient;
+        this.aiTaskRepository = aiTaskRepository;
+    }
+
     @Override
     public AnalysisWorkflowResult start(UUID analysisId) {
+        return start(analysisId, null);
+    }
+
+    @Override
+    public AnalysisWorkflowResult start(UUID analysisId, AuthenticatedPrincipal principal) {
         boolean started = false;
         boolean selectionCompleted = false;
         AiTaskResponse createdTask = null;
@@ -71,6 +96,9 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
                     context, intent, guidance);
             createdTask = aiTaskService.attachSelectedKnowledge(createdTask.id(), selectedKnowledge);
             selectionCompleted = true;
+            if (principal != null) {
+                bindUserCredential(principal, createdTask.id());
+            }
             AiTaskSubmissionResponse submission = aiEngineClient.submit(
                     new PromptRequest(
                             createdTask.correlationId(),
@@ -119,6 +147,24 @@ public class AnalysisWorkflowServiceImpl implements AnalysisWorkflowService {
             }
             throw failure;
         }
+    }
+
+    /**
+     * Story 0241: issue the principal's provider credential binding for this
+     * AI task and register it with the AI Engine before submission, exactly
+     * like the Story Context path. Fails closed when user-bound execution is
+     * not configured or the principal's AI configuration is not READY.
+     */
+    private void bindUserCredential(AuthenticatedPrincipal principal, UUID taskId) {
+        if (taskAuthorizationService == null || aiEngineBindingClient == null || aiTaskRepository == null) {
+            throw new IllegalStateException("user-bound AI task authorization is not configured");
+        }
+        AiTask task = aiTaskRepository.findById(taskId)
+                .orElseThrow(() -> new EntityNotFoundException("AiTask", taskId));
+        // Binding only: outside Story Context, provider and model are recorded
+        // atomically with the prompt identity at callback time.
+        var authorization = taskAuthorizationService.authorizeAndIssueBinding(principal, task);
+        aiEngineBindingClient.register(authorization.binding());
     }
 
     private void markTaskFailed(

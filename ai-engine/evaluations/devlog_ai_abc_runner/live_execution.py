@@ -31,7 +31,14 @@ from evaluations.comparative_baseline.live_adapters import common_answer_schema,
 from evaluations.comparative_baseline_v4.protocol import SafetyCeilings, V4Assignment
 from evaluations.comparative_baseline_v4.runtime import V4CollectionRuntime
 
-from .q1_b_binding import Q1PinnedRepositoryTools, _q1_runtime_input, load_q1_b_config
+from .benchmark import (
+    BenchmarkCase,
+    BenchmarkCaseError,
+    assert_question_fidelity,
+    citable_scope_instruction,
+    load_case,
+)
+from .q1_b_binding import Q1PinnedRepositoryTools, _case_runtime_input, load_q1_b_config
 from .runner import TreatmentAdapter, run_dry_run
 from .provenance import Q1_SOURCE_REVISION, assert_reproducible_worktree, current_head, execution_identity, verify_commit
 from .prepared_plan import PreparedPlanError, validate_prepared_plan
@@ -252,10 +259,16 @@ class CoreLiveTreatmentAdapter:
     """Execute one Core-authorized Story Context treatment through MCP."""
 
     def __init__(self, condition: str, config: LiveConfiguration, manifest: Mapping[str, Any], mcp: McpClient,
-                 *, execution_scope: str | None = None, snapshot_grace_seconds: float = 30.0):
+                 *, case: BenchmarkCase, case_story_id: str | None = None,
+                 execution_scope: str | None = None, snapshot_grace_seconds: float = 30.0):
         self.condition = condition
         self.live_status = "LIVE_CORE_MCP_BOUNDARY"
         self._config = config
+        # Story 0237: question, scope and Story binding come from the frozen
+        # benchmark case, identical for every condition, never from runbook
+        # placeholders or from the credential-binding Story.
+        self._case = case
+        self._case_story_id = case_story_id
         self._manifest = manifest
         self._mcp = mcp
         self._execution_scope = execution_scope
@@ -315,18 +328,20 @@ class CoreLiveTreatmentAdapter:
             guidance = {
                 "investigation": {
                     "enabled": True,
-                    # Keep the live evaluation scoped to the requested artifact.
-                    # Broad repository prefixes let the model invent plausible
-                    # paths that Core correctly rejects as unavailable.
-                    "allowedPathPrefixes": list(self._config.files),
+                    # Story 0237: C investigates the same human-reviewed case
+                    # scope as A and B. Core still rejects any invented path
+                    # outside it (PATH_OUT_OF_SCOPE) or absent from the source.
+                    "allowedPathPrefixes": list(self._case.scope_files),
                     "budget": {
                         "maximumSteps": 5,
                         "maximumRetrievalCalls": 5,
                         "maximumEvidenceItems": 15,
                         "maximumBytes": 30_000,
                         "maximumTokens": 7_500,
-                        "maximumElapsedMillis": 120_000,
-                         "maximumProviderOutputTokens": 12_000,
+                        # Story 0244 (human decision): room for one FINAL synthesis
+                        # plus one corrective retry at measured provider latency.
+                        "maximumElapsedMillis": 300_000,
+                        "maximumProviderOutputTokens": 24_000,
                     },
                 }
             }
@@ -345,13 +360,22 @@ class CoreLiveTreatmentAdapter:
         request = {
             "projectSlug": self._config.project_slug,
             "intent": "engineering-story-context-analysis",
-            "question": "Q1 bounded live evaluation",
-            "files": list(self._config.files),
+            "question": self._case.question,
+            "files": list(self._case.scope_files),
             "guidance": guidance,
             "idempotencyKey": idempotency_key,
         }
-        if self._config.story_id is not None:
-            request["storyId"] = self._config.story_id
+        # Story 0242: pin A and C to the authorized source revision, never the
+        # source's moving current revision.
+        pinned_revision = manifest.get("repositoryRevision")
+        if isinstance(pinned_revision, str) and pinned_revision:
+            request["revision"] = pinned_revision
+        if self._case_story_id is not None:
+            request["storyId"] = self._case_story_id
+        try:
+            assert_question_fidelity(request["question"], self._case)
+        except BenchmarkCaseError as error:
+            raise LiveConfigurationError(str(error)) from error
         try:
             execution = self._mcp.tool("devlog_story_agent", request)
         except (OSError, RuntimeError, TimeoutError) as error:
@@ -398,7 +422,9 @@ class CoreLiveTreatmentAdapter:
                 "taskId": task_id,
                 "mcpResponse": response_diagnostic,
             }
-        if self.condition == "C_DEVLOG_ENGINEERING_ANALYST":
+        if self.condition in ("A_DEVLOG_CURRENT", "C_DEVLOG_ENGINEERING_ANALYST") \
+                and execution_status == "COMPLETED":
+            # Story 0242: A and C must both have run at the authorized revision.
             # MCP leaves scope at the top level when the task was already COMPLETED on submission.
             scope = result.get("scope") if isinstance(result.get("scope"), dict) else execution.get("scope")
             resolved_revision = scope.get("resolvedRevision") if isinstance(scope, dict) else None
@@ -461,10 +487,10 @@ class CoreLiveTreatmentAdapter:
             "taskId": task_id,
             "storyReference": {
                 "projectSlug": self._config.project_slug,
-                "storyNumber": self._config.story_number,
-                "storyId": self._config.story_id,
-                "storyPath": self._config.story_path,
+                "storyNumber": self._case.story_number,
+                "storyId": self._case_story_id,
             },
+            "benchmarkCase": self._case.identity(),
             "submission": {"status": "MCP_ACCEPTED", "aiTaskId": task_id},
             "finalResponse": result,
             "mcpExecution": execution,
@@ -475,13 +501,14 @@ class CoreLiveTreatmentAdapter:
 class ChatGptOAuthTransport:
     """Use the existing encrypted OAuth credential/binding boundary for V4."""
 
-    def __init__(self, *, task_id: UUID, model: str):
+    def __init__(self, *, task_id: UUID, model: str, scope_instruction: str):
         from app.core.config import get_settings
         from app.core.dependencies import get_credential_resolver, get_credential_store
         from app.services.chatgpt_oauth import ChatGptOAuthService, OAuthSessionStore, required_scopes_granted
 
         self._task_id = task_id
         self._model = model
+        self._scope_instruction = scope_instruction
         self._settings = get_settings()
         self._resolver = get_credential_resolver()
         self._refresh_service = ChatGptOAuthService(
@@ -524,16 +551,10 @@ class ChatGptOAuthTransport:
             phase = "REQUEST_BUILD"
             if request.mode == "AGENT_DIRECT_OPEN":
                 instructions = (
-                    "Use only the typed repository tools. Return the Q1 answer JSON after bounded inspection. "
-                    "Set questionId to Q1 and questionVersion to 1.0.0 in the final answer. "
-                    "Keep answerText concise and under 3000 characters. Persisted StoryContextAnalysis remains non-trusted. "
-                    "Cite only these Q1-authorized paths: backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java, "
-                    "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java, "
-                    "ai-engine/app/services/story_context_analysis_generation_service.py, "
-                    "ai-engine/app/schemas/story_context_investigation.py, "
-                    "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextCallbackService.java, "
-                    "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextResultValidator.java, and docs/decisions/ADR-067.md."
-                    " Every evidence excerpt must be copied verbatim from the returned tool content, must be at most 400 characters, and must not be paraphrased."
+                    "Use only the typed repository tools. Return the answer JSON after bounded inspection. "
+                    "Keep answerText concise and under 3000 characters. "
+                    + self._scope_instruction
+                    + " Every evidence excerpt must be copied verbatim from the returned tool content, must be at most 400 characters, and must not be paraphrased."
                 )
                 user_input: Any = serialize_v4_conversation(request.input_payload)
             else:
@@ -823,17 +844,37 @@ class DirectLiveTreatmentAdapter:
     condition = "B_DIRECT_INVESTIGATOR"
     live_status = "LIVE_CHATGPT_OAUTH_V4_BOUNDARY"
 
-    def __init__(self, repository_root: Path, task_id: UUID, model: str):
+    def __init__(self, repository_root: Path, task_id: UUID, model: str, *, case: BenchmarkCase):
         self._repository_root = repository_root
         self._task_id = task_id
         self._model = model
+        self._case = case
 
     def execute(self, observation: Mapping[str, Any], manifest: Mapping[str, Any]) -> dict[str, Any]:
         config = load_q1_b_config(self._repository_root, allow_live=True)
+        case = self._case
+        if config.get("questionId") == case.case_id:
+            # The B configuration freezes the Q1 question; it must stay identical.
+            try:
+                assert_question_fidelity(config.get("question"), case)
+            except BenchmarkCaseError as error:
+                raise LiveConfigurationError(f"B {error}") from error
+        try:
+            assert_question_fidelity(case.question, case)
+        except BenchmarkCaseError as error:
+            raise LiveConfigurationError(f"B {error}") from error
         verify_commit(self._repository_root, Q1_SOURCE_REVISION)
-        provider = ChatGptOAuthTransport(task_id=self._task_id, model=self._model)
+        repetition = int(observation.get("repetition", 1))
+        provider = ChatGptOAuthTransport(
+            task_id=self._task_id, model=self._model,
+            scope_instruction=(
+                f"Set questionId to {case.case_id} and questionVersion to {case.version} in the final answer. "
+                + citable_scope_instruction(case)
+            ),
+        )
         assignment = V4Assignment(
-            "q1-live-b", "Q1", "1.0.0", "Q1", "AGENT_DIRECT_OPEN", 1
+            f"{case.case_id.lower()}-live-b-r{repetition}", case.case_id, case.version, case.case_id,
+            "AGENT_DIRECT_OPEN", repetition,
         )
         runtime = V4CollectionRuntime(
             provider,
@@ -842,7 +883,7 @@ class DirectLiveTreatmentAdapter:
             run_id=str(observation["observationId"]),
             test_only=False,
         )
-        with _q1_runtime_input(config):
+        with _case_runtime_input(case.case_id, case.version, case.question, config["repository"]["revision"]):
             native = runtime.run_assignment(assignment)
         raw = native.get("rawOutput", {})
         return {
@@ -947,8 +988,17 @@ def prepare_live_evaluation(
     output_root: str | Path,
     pricing_contract: Mapping[str, Any],
     environment: Mapping[str, str] | None = None,
+    case_id: str | None = None,
 ) -> dict[str, Any]:
-    """Request a Core preparation plan without creating a task or provider client."""
+    """Request a Core preparation plan for one case batch without creating a task or provider client."""
+
+    from .campaign import CampaignError, batch_observation_ids
+
+    batch_case = case_id or manifest.get("caseId")
+    try:
+        batch_ids = batch_observation_ids(manifest, str(batch_case))
+    except CampaignError as error:
+        raise LiveConfigurationError(str(error)) from error
 
     root = Path(repository_root).resolve()
     values = os.environ if environment is None else environment
@@ -959,11 +1009,11 @@ def prepare_live_evaluation(
         )
     config = LiveConfiguration.from_environment(environment, require_task_id=False)
     identity = execution_identity(root, runtime_revision=current_head(root))
-    namespace = values.get("DEVLOG_LIVE_ARTIFACT_NAMESPACE", "q1/" + current_head(root)[:12]).strip()
+    namespace = values.get("DEVLOG_LIVE_ARTIFACT_NAMESPACE", f"{str(batch_case).lower()}/" + current_head(root)[:12]).strip()
     request = {
         "benchmarkId": "devlog-ai-abc",
         "benchmarkVersion": "1.0.0",
-        "caseId": manifest["caseId"],
+        "caseId": batch_case,
         "manifestId": manifest["manifestId"],
         "manifestVersion": manifest["version"],
         "manifestDigest": canonical_manifest_digest(manifest),
@@ -985,7 +1035,7 @@ def prepare_live_evaluation(
         "model": manifest["model"],
         "pricingContract": dict(pricing_contract),
         "artifactNamespace": namespace,
-        "observationIds": [item["observationId"] for item in manifest["observations"]],
+        "observationIds": batch_ids,
     }
     try:
         mcp = McpClient(config.mcp_launcher, launcher=config.mcp_launcher,
@@ -1021,7 +1071,8 @@ def require_b_live_environment(environment: Mapping[str, str] | None = None) -> 
 
 
 def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config: LiveConfiguration,
-                  mcp: McpClient, environment: Mapping[str, str] | None = None,
+                  mcp: McpClient, case: BenchmarkCase, case_story_id: str | None = None,
+                  environment: Mapping[str, str] | None = None,
                   execution_scope: str | None = None) -> dict[str, TreatmentAdapter]:
     require_b_live_environment(environment)
     if config.b_task_id is None:
@@ -1030,11 +1081,85 @@ def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config:
     model = values.get("LLM_MODEL", manifest["model"]).strip()
     return {
         "A_DEVLOG_CURRENT": CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, manifest, mcp,
+                                                     case=case, case_story_id=case_story_id,
                                                      execution_scope=execution_scope),
-        "B_DIRECT_INVESTIGATOR": DirectLiveTreatmentAdapter(repository_root, config.b_task_id, model),
+        "B_DIRECT_INVESTIGATOR": DirectLiveTreatmentAdapter(repository_root, config.b_task_id, model, case=case),
         "C_DEVLOG_ENGINEERING_ANALYST": CoreLiveTreatmentAdapter("C_DEVLOG_ENGINEERING_ANALYST", config, manifest, mcp,
+                                                                 case=case, case_story_id=case_story_id,
                                                                  execution_scope=execution_scope),
     }
+
+
+def load_live_case(repository_root: Path, manifest: Mapping[str, Any], case_id: str | None = None) -> BenchmarkCase:
+    """Load the frozen benchmark case that every live condition of a batch must receive."""
+
+    from .campaign import CampaignError, case_version
+
+    case_id = case_id or manifest.get("caseId")
+    if not isinstance(case_id, str) or not case_id:
+        raise LiveConfigurationError("live execution requires a case identity")
+    try:
+        case = load_case(repository_root, case_id)
+        expected_version = case_version(manifest, case_id)
+    except (BenchmarkCaseError, CampaignError, KeyError) as error:
+        raise LiveConfigurationError(f"benchmark case is not executable: {error}") from error
+    if case.version != expected_version:
+        raise LiveConfigurationError("benchmark case version does not match the manifest")
+    return case
+
+
+def resolve_case_story(case: BenchmarkCase, config: LiveConfiguration, mcp: McpClient) -> str | None:
+    """Resolve the case Story through Core; a case without a Story binds none."""
+
+    if case.story_number is None:
+        return None
+    try:
+        result = mcp.tool("resolve_engineering_story", {
+            "projectSlug": config.project_slug,
+            "storyNumber": case.story_number,
+        })
+    except (OSError, RuntimeError, TimeoutError) as error:
+        raise LiveConfigurationError("MCP case Story resolution failed") from error
+    story_id = result.get("id") if isinstance(result, dict) else None
+    if not isinstance(story_id, str) or result.get("storyNumber") != case.story_number:
+        raise LiveConfigurationError("MCP case Story resolution returned an unexpected Story")
+    try:
+        UUID(story_id)
+    except ValueError as error:
+        raise LiveConfigurationError("MCP case Story resolution returned an invalid id") from error
+    return story_id
+
+
+FRESHNESS_BLOCKING_STATES = frozenset({"UNKNOWN", "NOT_ESTABLISHED", "NO_BASELINE"})
+
+
+def require_known_freshness(case: BenchmarkCase, config: LiveConfiguration, mcp: McpClient,
+                            story_id: str | None) -> dict[str, Any]:
+    """Block a live run before authorization consumption when Core freshness is unknown.
+
+    Freshness is read from the Core-owned projection, which creates no task and
+    performs no provider call. The harness never derives freshness itself.
+    """
+
+    if story_id is None:
+        raise LiveConfigurationError("Q1_FRESHNESS_GATE_UNAVAILABLE: no Story is available for the Core projection")
+    try:
+        projection = mcp.tool("story_context_agent_get_projection", {
+            "projectSlug": config.project_slug,
+            "storyId": story_id,
+            "files": list(case.scope_files),
+            "intent": "engineering-story-context-analysis",
+        })
+    except (OSError, RuntimeError, TimeoutError) as error:
+        raise LiveConfigurationError("Q1_FRESHNESS_GATE_UNAVAILABLE: Core projection could not be read") from error
+    freshness = projection.get("freshness") if isinstance(projection, dict) else None
+    state = freshness.get("state") if isinstance(freshness, dict) else None
+    if not isinstance(state, str) or state.upper() in FRESHNESS_BLOCKING_STATES:
+        raise LiveConfigurationError(
+            f"Q1_FRESHNESS_UNKNOWN: Core reports freshness state {state!r}; refresh the project baseline "
+            "before live evaluation"
+        )
+    return {"state": state, "revisionConsistency": freshness.get("revisionConsistency")}
 
 
 def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, manifest: Mapping[str, Any], authorization: Mapping[str, Any], prepared_plan: Mapping[str, Any] | None = None, oracle: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, environment: Mapping[str, str] | None = None, observation_ids: tuple[str, ...] | None = None):
@@ -1082,15 +1207,26 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
             raise LiveConfigurationError(str(error)) from error
         config = resolve_live_story(config, mcp)
         require_b_live_environment(environment)
+        # Core is authoritative for the batch case; the plan names it.
+        plan_payload = authoritative_plan.get("plan") if isinstance(authoritative_plan.get("plan"), Mapping) else {}
+        batch_case_id = plan_payload.get("caseId") or manifest.get("caseId")
+        if observation_ids is not None and isinstance(plan_payload.get("observationIds"), list) \
+                and list(observation_ids) != plan_payload["observationIds"]:
+            raise LiveConfigurationError("live execution must run exactly the Core-authorized case batch")
+        case = load_live_case(root, manifest, case_id=batch_case_id)
+        case_story_id = resolve_case_story(case, config, mcp)
+        require_known_freshness(case, config, mcp, case_story_id or config.story_id)
         authorization_id = authorization.get("authorizationId")
         if not isinstance(authorization_id, str) or not authorization_id.strip():
             raise LiveConfigurationError("live authorization requires an authorization identity")
-        if config.b_task_id is None:
-            # Bindings expire after minutes, so B gets a fresh one per authorization,
-            # reserved before consumption so a reservation failure leaves the authorization unused.
-            reservation = _reserve_task_binding(mcp, config, f"q1-live-binding-{authorization_id}")
-            config = replace(config, b_task_id=UUID(reservation["aiTaskId"]))
+        # Bindings expire after minutes, so B always gets a fresh one per authorization,
+        # reserved before consumption so a reservation failure leaves the authorization unused.
+        # Story 0242: a static DEVLOG_LIVE_B_TASK_ID is ignored here; a stale task id made
+        # every B observation of campaign Q1 gate 1 fail on an unknown binding.
+        reservation = _reserve_task_binding(mcp, config, f"q1-live-binding-{authorization_id}")
+        config = replace(config, b_task_id=UUID(reservation["aiTaskId"]))
         adapters = live_adapters(repository_root=root, manifest=manifest, config=config, mcp=mcp,
+                                 case=case, case_story_id=case_story_id,
                                  environment=environment, execution_scope=authorization_id)
         execution_key = (environment or os.environ).get("DEVLOG_LIVE_EXECUTION_IDEMPOTENCY_KEY", "").strip()
         if not execution_key:

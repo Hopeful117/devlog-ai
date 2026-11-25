@@ -71,9 +71,14 @@ def normalize_story_context(raw: dict[str, Any]) -> dict[str, Any]:
     """Normalize A or C Story Context output without semantic interpretation."""
 
     envelope = RawEnvelope.from_mapping(raw)
-    payload = _final_payload(envelope.payload)
+    container = _final_payload(envelope.payload)
+    payload = _story_analysis(container)
     normalized = _base_answer(envelope, "A_DEVLOG_CURRENT" if envelope.treatment == "A" else envelope.treatment)
-    normalized["answerText"] = _optional_text(payload, "answer") or _optional_text(payload, "answerText")
+    normalized["answerText"] = (
+        _optional_text(payload, "answer")
+        or _optional_text(payload, "answerText")
+        or _story_summary(payload)
+    )
     if normalized["answerText"] is None:
         normalized["normalizationWarnings"].append("ANSWER_TEXT_NOT_AVAILABLE")
 
@@ -85,12 +90,12 @@ def normalize_story_context(raw: dict[str, Any]) -> dict[str, Any]:
         _story_reference_records(payload), envelope.repository_revision, envelope.payload
     )
     normalized["limitations"] = _story_limitations(payload)
-    normalized["abstention"] = _explicit_abstention(payload, normalized["normalizationWarnings"])
+    normalized["abstention"] = _story_abstention(payload, normalized["normalizationWarnings"])
     normalized["confidence"] = _explicit_confidence(payload, normalized["normalizationWarnings"])
     normalized["acceptability"] = classify_acceptability(
-        _story_acceptability_observation(envelope.payload, payload, normalized)
+        _story_acceptability_observation(envelope.payload, _with_container_freshness(payload, container), normalized)
     )
-    _finish(normalized, envelope, payload)
+    _finish(normalized, envelope, container)
     return normalized
 
 
@@ -210,6 +215,61 @@ def _final_payload(payload: dict[str, Any]) -> dict[str, Any]:
         if isinstance(candidate, dict):
             return candidate
     return payload
+
+
+_NOT_ESTABLISHED_MARKER = "NOT_ESTABLISHED"
+
+
+def _story_analysis(container: dict[str, Any]) -> dict[str, Any]:
+    """Return the Story Context analysis body.
+
+    The Core MCP execution wraps the persisted result as
+    ``finalResponse.analysis.analysis`` next to ``contextFreshness`` and
+    ``provenance``; replay fixtures may carry the body directly. Descend only
+    through ``analysis`` objects until the analysis contract is reached.
+    """
+
+    current = container
+    for _ in range(2):
+        if "objectiveUnderstanding" in current or "outputClassification" in current:
+            return current
+        nested = current.get("analysis")
+        if not isinstance(nested, dict):
+            return current
+        current = nested
+    return current
+
+
+def _story_summary(payload: dict[str, Any]) -> str | None:
+    understanding = payload.get("objectiveUnderstanding")
+    if not isinstance(understanding, dict):
+        return None
+    return _optional_text(understanding, "summary")
+
+
+def _story_abstention(payload: dict[str, Any], warnings: list[str]) -> bool | None:
+    """Copy explicit abstention, else the protocol's NOT_ESTABLISHED summary marker."""
+
+    if isinstance(payload.get("abstention"), bool):
+        return payload["abstention"]
+    summary = _story_summary(payload)
+    if summary is None:
+        warnings.append("ABSTENTION_NOT_EXPLICIT")
+        return None
+    warnings.append("ABSTENTION_FROM_SUMMARY_MARKER")
+    return summary.lstrip().startswith(_NOT_ESTABLISHED_MARKER)
+
+
+def _with_container_freshness(payload: dict[str, Any], container: dict[str, Any]) -> dict[str, Any]:
+    if "freshness" in payload or payload is container:
+        return payload
+    freshness = container.get("freshness")
+    if not isinstance(freshness, dict):
+        wrapper = container.get("analysis")
+        freshness = wrapper.get("contextFreshness") if isinstance(wrapper, dict) else None
+    if not isinstance(freshness, dict):
+        return payload
+    return {**payload, "freshness": freshness}
 
 
 def _story_claims(payload: dict[str, Any]) -> list[dict[str, Any]]:

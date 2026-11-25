@@ -126,7 +126,7 @@ class DocumentBodyCollectorIntegrationTest {
                 .findFirst().orElseThrow();
         assertEquals(DocumentStatus.ACCEPTED.name(),
                 adr.extractionMetadata().get("documentStatus"));
-        verify(contentReader).readComplete(workspace, ADR_PATH, 4000);
+        verify(contentReader).read(workspace, ADR_PATH, 4000);
     }
 
     @Test
@@ -144,7 +144,7 @@ class DocumentBodyCollectorIntegrationTest {
         assertEquals(DocumentStatus.SUPERSEDED.name(),
                 adr.extractionMetadata().get("documentStatus"));
         assertEquals("ADR-068", adr.extractionMetadata().get("supersededBy"));
-        verify(contentReader).readComplete(workspace, ADR_PATH, 4000);
+        verify(contentReader).read(workspace, ADR_PATH, 4000);
     }
 
     @Test
@@ -218,6 +218,24 @@ class DocumentBodyCollectorIntegrationTest {
                     String text = documents.get(path);
                     int maximum = invocation.getArgument(2);
                     boolean skipped = text.length() > maximum;
+                    return new SecureRepositoryContentReader.ReadResult(
+                            skipped
+                                    ? SecureRepositoryContentReader.ReadResult.Status.SKIPPED
+                                    : SecureRepositoryContentReader.ReadResult.Status.COMPLETE,
+                            skipped ? null : text,
+                            skipped ? "INPUT_TOO_LARGE" : null);
+                });
+        lenient().when(contentReader.read(eq(workspace), anyString(), anyInt()))
+                .thenAnswer(invocation -> {
+                    String path = invocation.getArgument(1);
+                    if (unavailablePaths.contains(path)) {
+                        return new SecureRepositoryContentReader.ReadResult(
+                                SecureRepositoryContentReader.ReadResult.Status.UNAVAILABLE,
+                                null, "FILE_UNAVAILABLE");
+                    }
+                    String text = documents.get(path);
+                    int maximum = invocation.getArgument(2);
+                    boolean skipped = false; // Story 0243: read() never skips for size
                     return new SecureRepositoryContentReader.ReadResult(
                             skipped
                                     ? SecureRepositoryContentReader.ReadResult.Status.SKIPPED

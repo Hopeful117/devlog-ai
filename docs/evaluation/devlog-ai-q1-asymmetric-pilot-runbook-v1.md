@@ -232,6 +232,17 @@ export DEVLOG_LIVE_REMOTE_PROVIDER=true
 export DEVLOG_LIVE_PREPARATION_IDEMPOTENCY_KEY=...
 ```
 
+Story 0237: `DEVLOG_LIVE_STORY_NUMBER` and `DEVLOG_LIVE_FILES` now identify
+only the Story used for the B credential binding and, when the case has no
+Story, for the Core freshness projection. They no longer define what A and C
+are asked. Every condition receives the exact frozen question and the
+`scopeFiles` of the case from `docs/evaluation/devlog-ai-abc-benchmark-v1.json`
+(A `files`, C `allowedPathPrefixes`, B citable paths). A Story is sent to A/C
+only when the case declares `storyNumber`. Before the B binding is reserved and
+the authorization is consumed, the runner reads Core freshness through
+`story_context_agent_get_projection` and stops with `Q1_FRESHNESS_UNKNOWN`
+when the state is `UNKNOWN`, `NOT_ESTABLISHED` or `NO_BASELINE`.
+
 First request the Core-owned preparation plan through the authenticated MCP
 launcher. The launcher obtains and renews the technical Keycloak bearer
 privately; the evaluation runner never receives or reads that bearer. The
@@ -357,3 +368,26 @@ simulation. Supplying `--mode LIVE` without the authorization, pricing,
 OAuth binding, Core boundary, or frozen clean worktree fails closed. No
 `LLM_API_KEY` is required for `openai_chatgpt`; the provider resolves the
 encrypted OAuth credential through the Core-issued task binding.
+
+
+## Campaign Execution (Story 0237 AC-6, Story 0239)
+
+The 8 x 3 x 3 campaign uses
+`docs/evaluation/devlog-ai-abc-campaign-manifest-v1.json` and runs as eight
+case batches. Each batch has one Core preparation, one authorization and one
+consumption, and Core refuses a second consumption of the same case. Every
+runner command takes `--case-id Qn`:
+
+```bash
+cd ai-engine && .venv/bin/python -m evaluations.devlog_ai_abc_runner.runner --manifest ../docs/evaluation/devlog-ai-abc-campaign-manifest-v1.json --output-root <new-dir> --repository-root .. --mode DRY_RUN --case-id Q1
+```
+
+LIVE_PREPARE and LIVE follow the Q1 flow above with `--case-id`. A LIVE step
+executes exactly the authorized batch.
+
+Aggregate the batch runs into the 72-cell assignment matrix. Missing cells
+stay `MISSING` and are never retried:
+
+```bash
+cd ai-engine && .venv/bin/python -m evaluations.devlog_ai_abc_runner.campaign --manifest ../docs/evaluation/devlog-ai-abc-campaign-manifest-v1.json --run-root <batch-run-1> --run-root <batch-run-2>
+```

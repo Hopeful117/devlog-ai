@@ -33,38 +33,6 @@ public class LiveEvaluationPreparationService {
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
     private static final Pattern REVISION = Pattern.compile("[0-9a-f]{40}|[0-9a-f]{64}");
     private static final Pattern ARTIFACT_NAMESPACE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_/-]{0,119}");
-    private static final String MANIFEST_ID = "devlog-ai-abc-first-test";
-    private static final String MANIFEST_VERSION = "1.1.0";
-    private static final String MANIFEST_DIGEST = "eaca1774647e4d9e15f0f6b77a98aa733a787895f0cde1f282933de3405dc598";
-    private static final String SOURCE_REVISION = "0673d1d32433cdaff054d5f1defd1bedd01c0039";
-    private static final String ORACLE_DIGEST = "2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e";
-    private static final String PRICING_DIGEST = "0b48079816061d0660476bf2bb5d08572ff5f3378be7d5f3ba77d4013c229fbd";
-    private static final List<String> OBSERVATIONS = List.of(
-            "Q1-A-DEVLOG-CURRENT-r1",
-            "Q1-B-DIRECT-INVESTIGATOR-r1",
-            "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1");
-    private static final List<String> CONDITIONS = List.of(
-            "A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST");
-    private static final Map<String, Object> OPERATIONAL_LIMITS = Map.of(
-            "maxModelTurns", 8,
-            "maxProviderCalls", 8,
-            "maxToolOrActionOperations", 8,
-            "maxReadBytesPerOperation", 64000,
-            "maxReadTokensPerOperation", 8000,
-            "maxWallClockSeconds", 120,
-            "maxOutputTokensPerResponse", 32768);
-    private static final Map<String, Object> RUNTIME_IDENTITIES = Map.of(
-            "A", Map.of("runtime", "java-core-story-context-one-shot", "entrypoint",
-                    "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java",
-                    "promptVersion", "story-context-agent-protocol/v1", "answerContract", "story-context-analysis-result-v1"),
-            "B", Map.of("runtime", "comparative-v4-direct-investigator", "entrypoint",
-                    "ai-engine/evaluations/comparative_baseline_v4/runtime.py", "configuration",
-                    "docs/evaluation/devlog-ai-q1-b-direct-config-v1.json", "promptVersion",
-                    "comparative-v4-common-answer-1.0.0", "answerContract", "comparative-v4-common-answer-1.0.0"),
-            "C", Map.of("runtime", "python-core-bounded-investigation", "entrypoint",
-                    "ai-engine/app/services/story_context_analysis_generation_service.py", "promptVersion",
-                    "story-context-agent-protocol/v2", "answerContract", "story-context-analysis-result-v1"));
-
     private final ProjectRepository projectRepository;
     private final CoreProjectAuthorizationService authorizationService;
     private final LiveEvaluationPreparationRepository repository;
@@ -72,6 +40,7 @@ public class LiveEvaluationPreparationService {
     private final WorkspaceManager workspaceManager;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final LiveEvaluationContractRegistry contracts;
 
     @Transactional
     public LiveEvaluationPreparationResponse prepare(
@@ -139,19 +108,26 @@ public class LiveEvaluationPreparationService {
 
     private List<String> blockers(LiveEvaluationPreparationRequest request, boolean runtimeVerified) {
         List<String> blockers = new ArrayList<>();
-        if (!MANIFEST_ID.equals(request.manifestId()) || !MANIFEST_VERSION.equals(request.manifestVersion())
-                || !MANIFEST_DIGEST.equals(request.manifestDigest())) {
-            blockers.add("manifest identity is not the approved Q1 contract");
+        Optional<LiveEvaluationContract> match = contracts.find(
+                request.manifestId(), request.manifestVersion(), request.manifestDigest());
+        if (match.isEmpty()) {
+            blockers.add("manifest identity is not an approved live evaluation contract");
         }
-        if (!"devlog-ai-abc".equals(request.benchmarkId()) || !"1.0.0".equals(request.benchmarkVersion())
-                || !"Q1".equals(request.caseId())) {
-            blockers.add("benchmark or case identity is not the approved Q1 contract");
+        LiveEvaluationContract contract = match.orElse(contracts.fallback());
+        if (!contract.benchmarkId().equals(request.benchmarkId())
+                || !contract.benchmarkVersion().equals(request.benchmarkVersion())
+                || !contract.hasCase(request.caseId())) {
+            blockers.add("benchmark or case identity is not in the approved contract");
         }
         if (!SHA256.matcher(request.manifestDigest()).matches()) blockers.add("manifest digest is invalid");
         if (!SHA256.matcher(request.oracleDigest()).matches()) blockers.add("oracle digest is invalid");
         if (!REVISION.matcher(request.sourceRevision()).matches()) blockers.add("source revision is invalid");
-        if (!SOURCE_REVISION.equals(request.sourceRevision())) blockers.add("source revision is not the approved Q1 snapshot");
-        if (!ORACLE_DIGEST.equals(request.oracleDigest())) blockers.add("oracle is not the approved Q1 oracle");
+        if (!contract.sourceRevision().equals(request.sourceRevision())) {
+            blockers.add("source revision is not the approved contract snapshot");
+        }
+        if (!request.oracleDigest().equals(contract.caseOracleDigests().get(request.caseId()))) {
+            blockers.add("oracle is not the approved oracle for the case");
+        }
         if (!REVISION.matcher(request.runtimeRevision()).matches()) blockers.add("runtime revision is invalid");
         if (!Objects.equals(request.runtimeAttestation().get("runtimeRevision"), request.runtimeRevision())) {
             blockers.add("runtime attestation revision does not match runtime revision");
@@ -165,68 +141,98 @@ public class LiveEvaluationPreparationService {
                 || request.artifactNamespace().startsWith("/")) {
             blockers.add("artifact namespace is invalid");
         }
-        if (!OBSERVATIONS.equals(request.observationIds())) {
-            blockers.add("observation set is not the approved Q1 set");
+        if (!contract.hasCase(request.caseId())
+                || !contract.observationIds(request.caseId()).equals(request.observationIds())) {
+            blockers.add("observation set is not the contract set for the case");
         }
-        if (!OPERATIONAL_LIMITS.equals(request.operationalLimits())) {
-            blockers.add("operational limits do not match the approved Q1 contract");
+        if (!contract.operationalLimits().equals(request.operationalLimits())) {
+            blockers.add("operational limits do not match the approved contract");
         }
-        if (!RUNTIME_IDENTITIES.equals(request.runtimeIdentities())) {
-            blockers.add("runtime identities do not match the approved Q1 contract");
+        if (!contract.runtimeIdentities().equals(request.runtimeIdentities())) {
+            blockers.add("runtime identities do not match the approved contract");
         }
         if (!"APPROVED".equals(request.pricingContract().get("status"))
                 || !"CHATGPT_OAUTH_SUBSCRIPTION_NOT_METERED".equals(request.pricingContract().get("billingModel"))
                 || !"NOT_APPLICABLE".equals(request.pricingContract().get("currency"))
                 || !"OPERATIONAL_LIMITS_ONLY".equals(request.pricingContract().get("costCeilingPolicy"))
-                || !PRICING_DIGEST.equals(request.pricingContract().get("digest"))
-                || !"q1-chatgpt-oauth-pricing-v1".equals(request.pricingContract().get("version"))
-                || !"openai_chatgpt".equals(request.pricingContract().get("provider"))
+                || !contract.pricingDigest().equals(request.pricingContract().get("digest"))
+                || !contract.pricingVersion().equals(request.pricingContract().get("version"))
+                || !contract.provider().equals(request.pricingContract().get("provider"))
                 || !"CHATGPT_OAUTH".equals(request.pricingContract().get("authentication"))) {
             blockers.add("non-metered OAuth pricing contract is not approved");
         }
-        if (!"openai_chatgpt".equals(request.provider()) || !"gpt-5.6-luna".equals(request.model())) {
-            blockers.add("provider or model is not the approved Q1 contract");
+        if (!contract.provider().equals(request.provider()) || !contract.model().equals(request.model())) {
+            blockers.add("provider or model is not the approved contract");
+        }
+        if (contract.maxCampaignObservations() != null
+                && contract.batchObservationCount() > contract.maxCampaignObservations()) {
+            blockers.add("case batch exceeds the campaign observation ceiling");
+        }
+        if (contract.maxCampaignWallClock() != null
+                && contract.batchWallClock().compareTo(contract.maxCampaignWallClock()) > 0) {
+            blockers.add("case batch exceeds the campaign wall-clock ceiling");
         }
         return List.copyOf(blockers);
     }
 
     private Map<String, Object> plan(LiveEvaluationPreparationRequest request, List<String> blockers,
                                      boolean runtimeVerified, Instant expiresAt) {
+        LiveEvaluationContract contract = contracts.find(
+                request.manifestId(), request.manifestVersion(), request.manifestDigest())
+                .orElse(contracts.fallback());
+        String caseId = contract.hasCase(request.caseId())
+                ? request.caseId() : contract.caseOracleDigests().keySet().iterator().next();
+        List<String> observations = contract.observationIds(caseId);
+        Map<String, Object> pricing = Map.of(
+                "status", "APPROVED", "version", contract.pricingVersion(),
+                "provider", contract.provider(), "authentication", "CHATGPT_OAUTH",
+                "currency", "NOT_APPLICABLE", "billingModel", "CHATGPT_OAUTH_SUBSCRIPTION_NOT_METERED",
+                "costCeilingPolicy", "OPERATIONAL_LIMITS_ONLY", "digest", contract.pricingDigest());
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("capability", "bounded-live-evaluation-preparation-v1");
-        result.put("benchmarkId", "devlog-ai-abc");
-        result.put("benchmarkVersion", "1.0.0");
-        result.put("caseId", "Q1");
-        result.put("manifestId", MANIFEST_ID);
-        result.put("manifestVersion", MANIFEST_VERSION);
-        result.put("manifestDigest", MANIFEST_DIGEST);
-        result.put("campaignId", MANIFEST_ID);
+        result.put("contractId", contract.contractId());
+        result.put("benchmarkId", contract.benchmarkId());
+        result.put("benchmarkVersion", contract.benchmarkVersion());
+        result.put("caseId", caseId);
+        result.put("manifestId", contract.manifestId());
+        result.put("manifestVersion", contract.manifestVersion());
+        result.put("manifestDigest", contract.manifestDigest());
+        result.put("campaignId", contract.contractId());
         result.put("oracleStatus", "ACCEPTED");
-        result.put("oracleDigest", ORACLE_DIGEST);
-        result.put("sourceRevision", SOURCE_REVISION);
+        result.put("oracleDigest", contract.caseOracleDigests().get(caseId));
+        result.put("sourceRevision", contract.sourceRevision());
         result.put("runtimeRevision", request.runtimeRevision());
         result.put("runtimeAttestation", Map.of(
                 "runtimeRevision", request.runtimeRevision(),
                 "coreVerified", runtimeVerified));
-        result.put("runtimeIdentities", RUNTIME_IDENTITIES);
-        result.put("operationalLimits", OPERATIONAL_LIMITS);
-        result.put("authorizedObservationIds", OBSERVATIONS);
-        result.put("authorizedConditions", CONDITIONS);
-        result.put("budgets", OPERATIONAL_LIMITS);
-        result.put("limits", OPERATIONAL_LIMITS);
-        result.put("provider", "openai_chatgpt");
-        result.put("model", "gpt-5.6-luna");
-        result.put("pricingContract", Map.of(
-                "status", "APPROVED", "version", "q1-chatgpt-oauth-pricing-v1",
-                "provider", "openai_chatgpt", "authentication", "CHATGPT_OAUTH",
-                "currency", "NOT_APPLICABLE", "billingModel", "CHATGPT_OAUTH_SUBSCRIPTION_NOT_METERED",
-                "costCeilingPolicy", "OPERATIONAL_LIMITS_ONLY", "digest", PRICING_DIGEST));
+        result.put("runtimeIdentities", contract.runtimeIdentities());
+        result.put("operationalLimits", contract.operationalLimits());
+        result.put("authorizedObservationIds", observations);
+        result.put("authorizedConditions", contract.conditions());
+        result.put("budgets", contract.operationalLimits());
+        result.put("limits", contract.operationalLimits());
+        result.put("provider", contract.provider());
+        result.put("model", contract.model());
+        result.put("pricingContract", pricing);
         result.put("pricingStatus", "APPROVED");
-        result.put("pricingVersion", "q1-chatgpt-oauth-pricing-v1");
-        result.put("pricingDigest", PRICING_DIGEST);
+        result.put("pricingVersion", contract.pricingVersion());
+        result.put("pricingDigest", contract.pricingDigest());
         result.put("costCeiling", Map.of("currency", "NOT_APPLICABLE", "maxAmount", "NOT_MEASURED"));
+        if (contract.hasCampaignCeiling()) {
+            Map<String, Object> ceiling = new LinkedHashMap<>();
+            ceiling.put("oneConsumptionPerCase", contract.oneConsumptionPerCase());
+            ceiling.put("batchObservations", contract.batchObservationCount());
+            ceiling.put("batchWallClockSeconds", contract.batchWallClock().toSeconds());
+            if (contract.maxCampaignObservations() != null) {
+                ceiling.put("maxObservations", contract.maxCampaignObservations());
+            }
+            if (contract.maxCampaignWallClock() != null) {
+                ceiling.put("maxWallClockSeconds", contract.maxCampaignWallClock().toSeconds());
+            }
+            result.put("campaignCeiling", ceiling);
+        }
         result.put("artifactNamespace", request.artifactNamespace());
-        result.put("observationIds", OBSERVATIONS);
+        result.put("observationIds", observations);
         result.put("expiresAt", expiresAt.toString());
         result.put("blockers", blockers);
         result.put("providerCalls", 0);

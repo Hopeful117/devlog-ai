@@ -60,7 +60,8 @@ public class SelectedFileContentEnricher {
         List<RepositoryEvidence> eligible = selection.selected().stream()
                 .filter(value -> ELIGIBLE_KINDS.contains(value.kind()))
                 .filter(value -> !"CONFIG_FILE".equals(value.kind())
-                        || requestedInObjective(value, request))
+                        || requestedInObjective(value, request)
+                        || requestedFile(value, request))
                 .toList();
         List<SelectedContentAllocationPolicy.Allocation> allocations =
                 allocationPolicy.allocate(eligible, request.guidance() == null
@@ -101,6 +102,16 @@ public class SelectedFileContentEnricher {
                 .mapToInt(RepositoryEvidence::estimatedTokens).sum();
         return new EnrichmentResult(new EvidenceSelector.SelectionResult(
                 selected, decisions, finalUsedTokens), List.copyOf(warnings));
+    }
+
+    /** Story 0243: an explicitly requested file is enriched whatever its kind. */
+    private boolean requestedFile(RepositoryEvidence evidence, ContextRequest request) {
+        if (request.guidance() == null || request.guidance().priorities().isEmpty()) return false;
+        String file = evidence.provenance() == null ? null : evidence.provenance().originatingFile();
+        if (file == null) return false;
+        String normalized = file.replace('\\', '/');
+        return request.guidance().priorities().stream().map(value -> value.replace('\\', '/'))
+                .anyMatch(requested -> normalized.equals(requested) || normalized.startsWith(requested + "/"));
     }
 
     private boolean requestedInObjective(RepositoryEvidence evidence, ContextRequest request) {

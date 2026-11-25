@@ -40,12 +40,20 @@ public class DevLogStoryAgentService implements DevLogStoryAgent {
             throw new IllegalArgumentException("Unsupported Story Agent intent: " + request.intent());
         }
         Map<String, Object> guidance = withNaturalIntent(request);
-        PreparedStoryContext prepared = analyzeStoryContextUseCase.prepare(
-                request.projectSlug(),
-                request.storyId(),
-                STORY_CONTEXT_ANALYSIS_INTENT,
-                request.files(),
-                request.question());
+        PreparedStoryContext prepared = request.revision() == null
+                ? analyzeStoryContextUseCase.prepare(
+                        request.projectSlug(),
+                        request.storyId(),
+                        STORY_CONTEXT_ANALYSIS_INTENT,
+                        request.files(),
+                        request.question())
+                : analyzeStoryContextUseCase.prepare(
+                        request.projectSlug(),
+                        request.storyId(),
+                        STORY_CONTEXT_ANALYSIS_INTENT,
+                        request.files(),
+                        request.question(),
+                        request.revision());
         var taskId = analyzeStoryContextUseCase.executePrepared(
                 prepared,
                 guidance,

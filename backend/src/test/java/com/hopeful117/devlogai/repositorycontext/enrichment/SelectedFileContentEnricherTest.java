@@ -95,6 +95,39 @@ class SelectedFileContentEnricherTest {
     }
 
     @Test
+    void enrichesARequestedNonSourceFileWithoutObjectiveMention() throws IOException {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        Files.createDirectories(workspacePath.resolve("docs/decisions"));
+        Files.writeString(workspacePath.resolve("docs/decisions/ADR-001.md"), "# ADR 1 decision");
+        Files.writeString(workspacePath.resolve("pom.xml"), "<project/>");
+        SourceRepository sources = mock(SourceRepository.class);
+        WorkspaceManager workspaces = mock(WorkspaceManager.class);
+        Source source = source(projectId, sourceId);
+        when(sources.findByIdAndProject_IdAndActiveTrue(sourceId, projectId)).thenReturn(Optional.of(source));
+        when(workspaces.synchronize(source, "abc123")).thenReturn(
+                new SynchronizedWorkspace(sourceId, workspacePath, "abc123"));
+        SelectedFileContentEnricher enricher = new SelectedFileContentEnricher(
+                new RepositoryContentPolicy(), new SelectedContentAllocationPolicy(),
+                new SecureRepositoryContentReader(new CollectorLimits()), sources, workspaces);
+        ContextRequest base = request(projectId, 1000);
+        ContextRequest request = new ContextRequest(base.analysisContext(), base.intent(),
+                new com.hopeful117.devlogai.intent.model.UserGuidance(
+                        "Inspect", null, null, null, null, List.of("docs/decisions")),
+                List.of(), base.contextPlan(), base.budget(), null);
+
+        var result = enricher.enrich(request, selection(List.of(
+                evidence(sourceId, "CONFIG_FILE", "docs/decisions/ADR-001.md"),
+                evidence(sourceId, "CONFIG_FILE", "pom.xml"))));
+
+        // Story 0243: the requested document is enriched; an unrequested config file is not.
+        RepositoryEvidence requested = result.selection().selected().get(0);
+        assertEquals(RepositoryEvidenceContent.Status.COMPLETE, requested.content().status());
+        assertEquals("# ADR 1 decision", requested.content().text());
+        assertNull(result.selection().selected().get(1).content());
+    }
+
+    @Test
     void preservesPathEvidenceWhenWorkspaceIsUnavailable() {
         UUID projectId = UUID.randomUUID();
         UUID sourceId = UUID.randomUUID();

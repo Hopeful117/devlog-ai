@@ -88,6 +88,35 @@ class RepositoryContextAdapterStoryScopeTest {
     }
 
     @Test
+    void noCommits_keepsExplicitlyRequestedFilesButDropsGitHistory() {
+        var storyId = UUID.randomUUID();
+        var snapshot = snapshotWithStory(storyId, null, null);
+        var requested = new RepositoryEvidence(
+                RepositoryContextLayer.RELATED_SOURCE_CODE, "SOURCE_FILE",
+                "file:" + SOURCE_ID + ":backend/src/main/java/App.java@rev",
+                "backend/src/main/java/App.java", Instant.now(), EvidenceScore.unscored(),
+                List.of(), new RepositoryEvidence.EvidenceProvenance(
+                        "REPOSITORY_STRUCTURE", SOURCE_ID.toString(), "backend/src/main/java/App.java", null),
+                java.util.Map.of(), 60, List.of());
+        var unrequested = new RepositoryEvidence(
+                RepositoryContextLayer.RELATED_SOURCE_CODE, "SOURCE_FILE",
+                "file:" + SOURCE_ID + ":frontend/src/main.ts@rev",
+                "frontend/src/main.ts", Instant.now(), EvidenceScore.unscored(),
+                List.of(), new RepositoryEvidence.EvidenceProvenance(
+                        "REPOSITORY_STRUCTURE", SOURCE_ID.toString(), "frontend/src/main.ts", null),
+                java.util.Map.of(), 60, List.of());
+        var context = contextWithEvidence(commitEvidence(SOURCE_ID, SHA_B),
+                changedFileEvidence(SOURCE_ID, SHA_B, "backend/src/main/java/App.java"),
+                requested, unrequested);
+
+        var result = adapter.filterByStoryScope(context, PROJECT_ID, snapshot, storyId, List.of("backend/src"));
+
+        // Story 0243: the requested file survives; commits, diffs and unrequested files do not.
+        assertThat(result.evidence()).extracting(RepositoryEvidence::reference)
+                .containsExactly(requested.reference());
+    }
+
+    @Test
     void targetOnly_excludesAllTechnicalEvidence() {
         var storyId = UUID.randomUUID();
         var snapshot = snapshotWithStory(storyId, null, SHA_B);

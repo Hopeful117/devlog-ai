@@ -188,6 +188,68 @@ class AnalysisWorkflowServiceTest {
         verify(analysisService, never()).fail(any());
     }
 
+    private UUID stubWorkflowUntilSubmission(UUID analysisId, UUID taskId) {
+        UUID correlationId = UUID.randomUUID();
+        AnalysisContext context = mock(AnalysisContext.class);
+        AiTaskResponse task = aiTaskResponse(taskId, analysisId, correlationId, AiTaskStatus.CREATED);
+        when(analysisService.start(analysisId)).thenReturn(analysisResponse(analysisId, AnalysisStatus.IN_PROGRESS));
+        when(deterministicAnalysisService.analyze(analysisId)).thenReturn(new DeterministicAnalysisResult(1, 1));
+        when(analysisContextService.build(analysisId)).thenReturn(context);
+        when(aiTaskService.create(any(), any())).thenReturn(task);
+        when(aiTaskService.attachSelectedKnowledge(taskId, selectedKnowledge)).thenReturn(task);
+        lenient().when(aiEngineClient.submit(any(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class)))
+                .thenReturn(new AiTaskSubmissionResponse(correlationId, true, "engine-job", Instant.now()));
+        lenient().when(aiTaskService.submit(eq(taskId), any()))
+                .thenReturn(aiTaskResponse(taskId, analysisId, correlationId, AiTaskStatus.SUBMITTED));
+        return correlationId;
+    }
+
+    @Test
+    void userBoundWorkflowIssuesAndRegistersTheBindingBeforeSubmission() {
+        UUID analysisId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        stubWorkflowUntilSubmission(analysisId, taskId);
+        var principal = new com.hopeful117.devlogai.authorization.AuthenticatedPrincipal(
+                "agent", com.hopeful117.devlogai.authorization.PrincipalKind.AI_AGENT, "test");
+        var authorizationService = mock(com.hopeful117.devlogai.aicredentialbinding.service.AiTaskExecutionAuthorizationService.class);
+        var bindingClient = mock(com.hopeful117.devlogai.aicredentialbinding.service.AiEngineBindingClient.class);
+        var taskRepository = mock(com.hopeful117.devlogai.ai.task.repository.AiTaskRepository.class);
+        var taskEntity = new com.hopeful117.devlogai.ai.task.entity.AiTask();
+        var binding = com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBinding.builder()
+                .id(UUID.randomUUID()).build();
+        when(taskRepository.findById(taskId)).thenReturn(java.util.Optional.of(taskEntity));
+        when(authorizationService.authorizeAndIssueBinding(principal, taskEntity)).thenAnswer(invocation -> {
+            taskEntity.setCredentialBindingId(binding.getId());
+            return new com.hopeful117.devlogai.aicredentialbinding.service.AiTaskExecutionAuthorizationService
+                    .AuthorizedExecution(binding, "chatgpt", "gpt-5.6-luna", java.util.Map.of());
+        });
+        workflowService.setUserBoundExecution(authorizationService, bindingClient, taskRepository);
+
+        workflowService.start(analysisId, principal);
+
+        InOrder order = inOrder(authorizationService, bindingClient, aiEngineClient);
+        order.verify(authorizationService).authorizeAndIssueBinding(principal, taskEntity);
+        order.verify(bindingClient).register(binding);
+        order.verify(aiEngineClient).submit(any(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class));
+        assertEquals(binding.getId(), taskEntity.getCredentialBindingId());
+        assertNull(taskEntity.getProvider());
+        assertNull(taskEntity.getModelIdentifier());
+    }
+
+    @Test
+    void userBoundWorkflowFailsClosedWithoutBindingConfiguration() {
+        UUID analysisId = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
+        stubWorkflowUntilSubmission(analysisId, taskId);
+        var principal = new com.hopeful117.devlogai.authorization.AuthenticatedPrincipal(
+                "agent", com.hopeful117.devlogai.authorization.PrincipalKind.AI_AGENT, "test");
+
+        assertThrows(IllegalStateException.class, () -> workflowService.start(analysisId, principal));
+
+        verify(aiEngineClient, never()).submit(any(com.hopeful117.devlogai.ai.engine.dto.PromptRequest.class));
+        verify(analysisService).fail(analysisId);
+    }
+
     @Test
     void shouldSubmitPromptRequestUsingProjectedSelectedKnowledgeContract() {
         UUID analysisId = UUID.randomUUID();

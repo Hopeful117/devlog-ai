@@ -341,6 +341,72 @@ class RepositoryStructureCollectorTest {
     }
 
     @Test
+    void requestedFilesKeepTheirSourceOrTestKind() {
+        Source source = Source.builder().id(sourceId).type(SourceType.GIT_REPOSITORY).active(true).build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+        when(workspaceManager.synchronize(source, null))
+                .thenReturn(new SynchronizedWorkspace(sourceId, tempDir, "abc123"));
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(new RepositoryScan(List.of(
+                new RepositoryFile("backend/src/main/java/com/app/StoryService.java", 100, null),
+                new RepositoryFile("backend/src/test/java/com/app/StoryServiceTest.java", 100, null),
+                new RepositoryFile("docs/decisions/ADR-001.md", 100, null)), 3, 1, List.of()));
+
+        List<RepositoryEvidence> evidence = collector.collect(createRequest(new UserGuidance(
+                "Inspect", null, null, null, null, List.of("backend/src", "docs/decisions"))));
+
+        java.util.Map<String, String> kinds = new java.util.HashMap<>();
+        evidence.stream().filter(value -> value.provenance() != null
+                        && value.provenance().originatingFile() != null)
+                .forEach(value -> kinds.put(value.provenance().originatingFile(), value.kind()));
+        // Story 0243: a requested Java file is SOURCE_FILE, not the generic CONFIG_FILE.
+        assertEquals("SOURCE_FILE", kinds.get("backend/src/main/java/com/app/StoryService.java"));
+        assertEquals("TEST_FILE", kinds.get("backend/src/test/java/com/app/StoryServiceTest.java"));
+        assertEquals("CONFIG_FILE", kinds.get("docs/decisions/ADR-001.md"));
+        assertTrue(evidence.stream().filter(value -> value.provenance() != null
+                        && "backend/src/main/java/com/app/StoryService.java".equals(value.provenance().originatingFile()))
+                .allMatch(value -> value.reference().startsWith("file:")));
+    }
+
+    @Test
+    void requestedFilesAreOrderedByRelevanceToTheObjectiveNotByPath() throws java.io.IOException {
+        Source source = Source.builder().id(sourceId).type(SourceType.GIT_REPOSITORY).active(true).build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId))
+                .thenReturn(List.of(source));
+        when(workspaceManager.synchronize(source, null))
+                .thenReturn(new SynchronizedWorkspace(sourceId, tempDir, "abc123"));
+        String base = "backend/src/main/java/com/app/storycontextanalysis/";
+        java.nio.file.Files.createDirectories(tempDir.resolve(base + "controller"));
+        java.nio.file.Files.createDirectories(tempDir.resolve(base + "usecase"));
+        java.nio.file.Files.writeString(tempDir.resolve(base + "controller/AaaController.java"),
+                "class AaaController { int page; }");
+        java.nio.file.Files.writeString(tempDir.resolve(base + "usecase/StoryContextSubmissionService.java"),
+                "class StoryContextSubmissionService { void authorizePrincipal() {} void persistAnalysis() {} }");
+        when(scanner.scan(any(CollectionContext.class), any())).thenReturn(new RepositoryScan(List.of(
+                new RepositoryFile(base + "controller/AaaController.java", 40, null),
+                new RepositoryFile(base + "usecase/StoryContextSubmissionService.java", 90, null)), 2, 1, List.of()));
+        collector.setContentReader(new com.hopeful117.devlogai.collection.collector.SecureRepositoryContentReader(
+                new com.hopeful117.devlogai.collection.collector.CollectorLimits()));
+        ContextRequest base0 = createRequestWithObjective(
+                "How does a Story Context request move from Core authorization to the final persisted analysis?");
+        ContextRequest request = new ContextRequest(base0.analysisContext(), base0.intent(),
+                new UserGuidance("Inspect", null, null, null, null, List.of("backend/src/main/java/com/app/storycontextanalysis")),
+                List.of(), base0.contextPlan(), base0.budget(), null);
+
+        List<RepositoryEvidence> files = collector.collect(request).stream()
+                .filter(value -> value.provenance() != null && value.provenance().originatingFile() != null
+                        && value.provenance().originatingFile().startsWith(base))
+                .toList();
+
+        // Story 0243 (R5): the relevant use case precedes the alphabetically first controller.
+        assertEquals(base + "usecase/StoryContextSubmissionService.java",
+                files.getFirst().provenance().originatingFile());
+        int relevant = Integer.parseInt(files.getFirst().extractionMetadata().get("requestedScopeRelevance"));
+        int unrelated = Integer.parseInt(files.getLast().extractionMetadata().get("requestedScopeRelevance"));
+        assertTrue(relevant > unrelated);
+    }
+
+    @Test
     void producesDiverseFileCandidatesForMultiModuleRepository() {
         List<RepositoryFile> files = new java.util.ArrayList<>();
         files.add(new RepositoryFile(

@@ -27,6 +27,22 @@ public class AiTaskExecutionAuthorizationService {
 
     @Transactional
     public AuthorizedExecution authorizeAndIssue(AuthenticatedPrincipal principal, AiTask task) {
+        return authorize(principal, task, true);
+    }
+
+    /**
+     * Story 0241: authorize the principal and issue the task binding without
+     * writing the execution identity on the task. Tasks outside Story Context
+     * record provider and model atomically with the prompt identity at
+     * callback time (ck_ai_task_prompt_execution_identity).
+     */
+    @Transactional
+    public AuthorizedExecution authorizeAndIssueBinding(AuthenticatedPrincipal principal, AiTask task) {
+        return authorize(principal, task, false);
+    }
+
+    private AuthorizedExecution authorize(AuthenticatedPrincipal principal, AiTask task,
+                                          boolean recordExecutionIdentity) {
         if (principal == null) {
             throw new IllegalStateException("authenticated principal is required for user-bound AI execution");
         }
@@ -43,8 +59,10 @@ public class AiTaskExecutionAuthorizationService {
             throw rejected("provider is not supported for user-bound Story Agent execution");
         }
         AiCredentialBinding binding = bindingService.issue(principal, task.getId(), provider);
-        task.setProvider(provider);
-        task.setModelIdentifier(configuration.getSelectedModel());
+        if (recordExecutionIdentity) {
+            task.setProvider(provider);
+            task.setModelIdentifier(configuration.getSelectedModel());
+        }
         return new AuthorizedExecution(binding, provider, configuration.getSelectedModel(),
                 configuration.getAllowedParameters());
     }

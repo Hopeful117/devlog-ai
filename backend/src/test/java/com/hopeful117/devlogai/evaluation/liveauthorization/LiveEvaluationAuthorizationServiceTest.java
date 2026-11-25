@@ -3,6 +3,7 @@ package com.hopeful117.devlogai.evaluation.liveauthorization;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
 import com.hopeful117.devlogai.authorization.PrincipalKind;
+import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationContractRegistry;
 import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparation;
 import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparationRepository;
 import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparationStatus;
@@ -38,7 +39,7 @@ class LiveEvaluationAuthorizationServiceTest {
                 .status(LiveEvaluationPreparationStatus.READY)
                 .planSnapshot(Map.of("provider", "openai_chatgpt", "model", "gpt-5.6-luna",
                         "blockers", java.util.List.of(), "providerCalls", 0, "networkCalls", 0,
-                        "campaignId", "devlog-ai-abc-first-test",
+                        "campaignId", "devlog-ai-abc-first-test", "caseId", "Q1",
                         "authorizedConditions", java.util.List.of("A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST"),
                         "pricingStatus", "APPROVED",
                         "costCeiling", Map.of("currency", "NOT_APPLICABLE", "maxAmount", "NOT_MEASURED")))
@@ -57,7 +58,7 @@ class LiveEvaluationAuthorizationServiceTest {
         when(authorizations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(access.isAuthorized(any(), eq(project), anyString())).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
-                preparations, authorizations, access, Clock.fixed(now, ZoneOffset.UTC));
+                preparations, authorizations, access, Clock.fixed(now, ZoneOffset.UTC), LiveEvaluationContractRegistry.approved());
 
         LiveEvaluationAuthorizationResponse result = service.approve(
                 authorizationId, digest, new AuthenticatedPrincipal("human", PrincipalKind.HUMAN, "test"));
@@ -72,6 +73,8 @@ class LiveEvaluationAuthorizationServiceTest {
                 result.artifact().get("authorizedConditions"));
         assertEquals("APPROVED", result.artifact().get("pricingStatus"));
         assertEquals("NOT_MEASURED", ((Map<?, ?>) result.artifact().get("costCeiling")).get("maxAmount"));
+        assertEquals("Q1_ORACLE_ACCEPTED", result.artifact().get("oracleStatus"));
+        assertEquals(Map.of("Q1", "ACCEPTED"), result.artifact().get("caseOracleStatus"));
         verify(authorizations).save(any());
     }
 
@@ -94,7 +97,7 @@ class LiveEvaluationAuthorizationServiceTest {
         when(authorizations.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(access.isAuthorized(any(), eq(project), anyString())).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
-                preparations, authorizations, access, Clock.fixed(now, ZoneOffset.UTC));
+                preparations, authorizations, access, Clock.fixed(now, ZoneOffset.UTC), LiveEvaluationContractRegistry.approved());
         LiveEvaluationAuthorizationRequest request = new LiveEvaluationAuthorizationRequest(planId, digest);
 
         service.request(request, "same-key", new AuthenticatedPrincipal("requester-a", PrincipalKind.AI_AGENT, "test"));
@@ -135,7 +138,7 @@ class LiveEvaluationAuthorizationServiceTest {
         when(access.isAuthorized(any(), eq(project), eq("MCP_LIVE_EVALUATION_EXECUTE"))).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
                 mock(LiveEvaluationPreparationRepository.class), authorizations, access,
-                Clock.fixed(now, ZoneOffset.UTC));
+                Clock.fixed(now, ZoneOffset.UTC), LiveEvaluationContractRegistry.approved());
         AuthenticatedPrincipal runner = new AuthenticatedPrincipal("runner", PrincipalKind.AI_AGENT, "test");
 
         assertEquals(LiveEvaluationAuthorizationStatus.CONSUMED,
@@ -162,7 +165,7 @@ class LiveEvaluationAuthorizationServiceTest {
         when(access.isAuthorized(any(), eq(project), eq("MCP_LIVE_EVALUATION_EXECUTE"))).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
                 mock(LiveEvaluationPreparationRepository.class), authorizations, access,
-                Clock.fixed(Instant.parse("2026-11-23T05:00:00Z"), ZoneOffset.UTC));
+                Clock.fixed(Instant.parse("2026-11-23T05:00:00Z"), ZoneOffset.UTC), LiveEvaluationContractRegistry.approved());
 
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.consume(authorizationId, "a".repeat(64), "execution-2",
@@ -178,7 +181,7 @@ class LiveEvaluationAuthorizationServiceTest {
         Project project = Project.builder().id(UUID.randomUUID()).slug("devlog-ai").build();
         LiveEvaluationPreparation preparation = LiveEvaluationPreparation.builder()
                 .id(planId).project(project).principalId("requester").planDigest(digest)
-                .status(LiveEvaluationPreparationStatus.READY).planSnapshot(Map.of())
+                .status(LiveEvaluationPreparationStatus.READY).planSnapshot(Map.of("caseId", "Q1"))
                 .createdAt(now).expiresAt(now.plusSeconds(3600)).build();
         LiveEvaluationAuthorization pending = LiveEvaluationAuthorization.builder()
                 .id(authorizationId).preparation(preparation).requesterId("requester")
@@ -191,7 +194,7 @@ class LiveEvaluationAuthorizationServiceTest {
         when(access.isAuthorized(any(), eq(project), eq("MCP_LIVE_EVALUATION_AUTHORIZE"))).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
                 mock(LiveEvaluationPreparationRepository.class), authorizations, access,
-                Clock.fixed(now, ZoneOffset.UTC));
+                Clock.fixed(now, ZoneOffset.UTC), LiveEvaluationContractRegistry.approved());
 
         LiveEvaluationAuthorizationResponse result = service.approve(
                 authorizationId, digest, new AuthenticatedPrincipal("approver-agent", PrincipalKind.AI_AGENT, "test"));
@@ -209,7 +212,7 @@ class LiveEvaluationAuthorizationServiceTest {
         Project project = Project.builder().id(UUID.randomUUID()).slug("devlog-ai").build();
         LiveEvaluationPreparation preparation = LiveEvaluationPreparation.builder()
                 .id(planId).project(project).principalId("same-agent").planDigest(digest)
-                .status(LiveEvaluationPreparationStatus.READY).planSnapshot(Map.of())
+                .status(LiveEvaluationPreparationStatus.READY).planSnapshot(Map.of("caseId", "Q1"))
                 .createdAt(now).expiresAt(now.plusSeconds(3600)).build();
         LiveEvaluationAuthorization pending = LiveEvaluationAuthorization.builder()
                 .id(authorizationId).preparation(preparation).requesterId("same-agent")
@@ -222,7 +225,7 @@ class LiveEvaluationAuthorizationServiceTest {
         when(access.isAuthorized(any(), eq(project), eq("MCP_LIVE_EVALUATION_AUTHORIZE"))).thenReturn(true);
         LiveEvaluationAuthorizationService service = new LiveEvaluationAuthorizationService(
                 mock(LiveEvaluationPreparationRepository.class), authorizations, access,
-                Clock.fixed(now, ZoneOffset.UTC));
+                Clock.fixed(now, ZoneOffset.UTC), LiveEvaluationContractRegistry.approved());
 
         LiveEvaluationAuthorizationResponse result = service.approve(authorizationId, digest,
                 new AuthenticatedPrincipal("same-agent", PrincipalKind.AI_AGENT, "test"));

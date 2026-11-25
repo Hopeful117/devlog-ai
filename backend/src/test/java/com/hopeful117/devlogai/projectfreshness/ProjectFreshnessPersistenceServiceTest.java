@@ -164,4 +164,59 @@ class ProjectFreshnessPersistenceServiceTest {
         verify(freshness).save(captor.capture());
         return captor.getValue();
     }
+
+    @Test
+    void aFailedAnalysisIsNeverRecordedAsCurrentBaseline() {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).build();
+        Source source = Source.builder().id(sourceId).name("GitHub").defaultBranch("main")
+                .type(SourceType.GIT_REPOSITORY).active(true).build();
+        when(projects.findById(projectId)).thenReturn(Optional.of(project));
+        when(sources.findByIdAndProject_IdAndActiveTrue(sourceId, projectId)).thenReturn(Optional.of(source));
+        when(profiles.findLatestComparable(eq(projectId), eq(sourceId), any())).thenReturn(List.of());
+        when(freshness.findByProjectIdAndSourceId(projectId, sourceId)).thenReturn(Optional.empty());
+        when(freshness.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var failed = com.hopeful117.devlogai.analysis.entity.Analysis.builder().id(UUID.randomUUID())
+                .status(com.hopeful117.devlogai.analysis.entity.AnalysisStatus.FAILED).build();
+
+        ProjectFreshnessResponse saved = service.recordObservation(projectId, sourceId, failed,
+                "b".repeat(40), Instant.parse("2026-11-25T10:00:00Z"));
+
+        assertEquals(ProjectFreshnessStatus.NO_BASELINE, saved.status());
+        assertNull(saved.baseline());
+    }
+
+    @Test
+    void aBaselineThatFailedLaterIsReportedFromTheComparableBaseline() {
+        UUID projectId = UUID.randomUUID();
+        UUID sourceId = UUID.randomUUID();
+        Project project = Project.builder().id(projectId).build();
+        Source source = Source.builder().id(sourceId).name("GitHub").defaultBranch("main")
+                .type(SourceType.GIT_REPOSITORY).active(true).build();
+        when(projects.existsById(projectId)).thenReturn(true);
+        when(sources.findByIdAndProject_IdAndActiveTrue(sourceId, projectId)).thenReturn(Optional.of(source));
+        var failed = com.hopeful117.devlogai.analysis.entity.Analysis.builder().id(UUID.randomUUID())
+                .status(com.hopeful117.devlogai.analysis.entity.AnalysisStatus.FAILED).build();
+        var older = com.hopeful117.devlogai.analysis.entity.Analysis.builder().id(UUID.randomUUID())
+                .status(com.hopeful117.devlogai.analysis.entity.AnalysisStatus.COMPLETED).build();
+        var snapshot = mock(com.hopeful117.devlogai.profile.entity.ProjectProfileSnapshot.class);
+        when(snapshot.getResolvedRevisions()).thenReturn(java.util.Map.of(sourceId.toString(), "a".repeat(40)));
+        when(snapshot.getAnalysis()).thenReturn(older);
+        when(profiles.findLatestComparable(eq(projectId), eq(sourceId), any())).thenReturn(List.of(snapshot));
+        ProjectSourceFreshness stored = ProjectSourceFreshness.builder().id(UUID.randomUUID())
+                .project(project).source(source).baselineAnalysis(failed)
+                .status(ProjectFreshnessStatus.CURRENT).guidance(ProjectRefreshGuidance.REFRESH_NOT_NEEDED)
+                .requestedRevision("origin/main").currentRevision("b".repeat(40)).baselineRevision("b".repeat(40))
+                .ingestedRevision("b".repeat(40)).checkedAt(Instant.parse("2026-11-25T10:00:00Z")).build();
+        when(freshness.findByProjectIdAndSourceId(projectId, sourceId)).thenReturn(Optional.of(stored));
+
+        ProjectFreshnessResponse latest = service.latest(projectId, sourceId).orElseThrow();
+
+        assertEquals(ProjectFreshnessStatus.PARTIALLY_FRESH, latest.status());
+        assertEquals(ProjectRefreshGuidance.REFRESH_RECOMMENDED, latest.guidance());
+        assertEquals(older.getId(), latest.baseline().analysisId());
+        assertEquals("a".repeat(40), latest.baseline().analyzedRevision());
+        verify(freshness, never()).save(any());
+    }
 }

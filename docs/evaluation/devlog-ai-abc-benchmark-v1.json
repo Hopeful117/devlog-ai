@@ -17,49 +17,116 @@
       "caseId": "Q1",
       "version": "1.0.0",
       "category": "ARCHITECTURE",
-      "question": "How does a Story Context request move from Core authorization to the final persisted analysis, and which side owns each invariant?"
+      "question": "How does a Story Context request move from Core authorization to the final persisted analysis, and which side owns each invariant?",
+      "scopeFiles": [
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis",
+        "ai-engine/app/services",
+        "ai-engine/app/schemas",
+        "ai-engine/app/prompts",
+        "docs/decisions"
+      ],
+      "storyNumber": null,
+      "scopeReviewStatus": "ACCEPTED"
     },
     {
       "caseId": "Q2",
       "version": "1.0.0",
       "category": "CODE_BEHAVIOR",
-      "question": "When an investigation action is repeated, what happens to repository reads and budget usage?"
+      "question": "When an investigation action is repeated, what happens to repository reads and budget usage?",
+      "scopeFiles": [
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis",
+        "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis",
+        "ai-engine/app/services",
+        "ai-engine/app/schemas"
+      ],
+      "storyNumber": null,
+      "scopeReviewStatus": "ACCEPTED"
     },
     {
       "caseId": "Q3",
       "version": "1.0.0",
       "category": "HISTORICAL_DECISION",
-      "question": "Why does the current design keep Core authoritative and Python repository-blind?"
+      "question": "Why does the current design keep Core authoritative and Python repository-blind?",
+      "scopeFiles": [
+        "docs/decisions",
+        "docs/stories",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis",
+        "ai-engine/app/services"
+      ],
+      "storyNumber": null,
+      "scopeReviewStatus": "ACCEPTED"
     },
     {
       "caseId": "Q4",
       "version": "1.0.0",
       "category": "IMPACT_ANALYSIS",
-      "question": "If READ_EVIDENCE_RANGE limits or evidence projection change, which validation, grounding, and tests are affected?"
+      "question": "If READ_EVIDENCE_RANGE limits or evidence projection change, which validation, grounding, and tests are affected?",
+      "scopeFiles": [
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis",
+        "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis",
+        "ai-engine/app/schemas",
+        "ai-engine/app/services",
+        "ai-engine/tests"
+      ],
+      "storyNumber": null,
+      "scopeReviewStatus": "ACCEPTED"
     },
     {
       "caseId": "Q5",
       "version": "1.0.0",
       "category": "CODE_DOCUMENT_INCONSISTENCY",
-      "question": "Which claims in older Story 0184 repository artifacts no longer describe the current branch, and why?"
+      "question": "Which claims in older Story 0184 repository artifacts no longer describe the current branch, and why?",
+      "scopeFiles": [
+        "docs/stories/0184-bounded-story-context-investigation",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis",
+        "ai-engine/app/services",
+        "ai-engine/app/schemas"
+      ],
+      "storyNumber": 184,
+      "scopeReviewStatus": "ACCEPTED"
     },
     {
       "caseId": "Q6",
       "version": "1.0.0",
       "category": "SEQUENTIAL_INVESTIGATION",
-      "question": "What evidence is needed to decide whether a weak answer came from candidate loss, projection loss, or synthesis failure?"
+      "question": "What evidence is needed to decide whether a weak answer came from candidate loss, projection loss, or synthesis failure?",
+      "scopeFiles": [
+        "backend/src/main/java/com/hopeful117/devlogai/repositorycontext",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis",
+        "ai-engine/app/prompts",
+        "ai-engine/evaluations",
+        "docs/decisions"
+      ],
+      "storyNumber": null,
+      "scopeReviewStatus": "ACCEPTED"
     },
     {
       "caseId": "Q7",
       "version": "1.0.0",
       "category": "INSUFFICIENT_EVIDENCE",
-      "question": "Does the current repository prove that the bounded analyst improves real engineering answer quality?"
+      "question": "Does the current repository prove that the bounded analyst improves real engineering answer quality?",
+      "scopeFiles": [
+        "docs/evaluation",
+        "ai-engine/evaluations",
+        "docs/stories/0223-agentic-quality-real-story-pilot",
+        "docs/decisions"
+      ],
+      "storyNumber": null,
+      "scopeReviewStatus": "ACCEPTED"
     },
     {
       "caseId": "Q8",
       "version": "1.0.0",
       "category": "CONTRADICTIONS_AND_HISTORY",
-      "question": "Do the 0177 fixture result and V4 live result justify production hybrid retrieval or direct-agent adoption?"
+      "question": "Do the 0177 fixture result and V4 live result justify production hybrid retrieval or direct-agent adoption?",
+      "scopeFiles": [
+        "docs/stories/0177-evaluate-hybrid-retrieval-for-story-context",
+        "docs/evaluation",
+        "ai-engine/evaluations",
+        "docs/decisions"
+      ],
+      "storyNumber": 177,
+      "scopeReviewStatus": "ACCEPTED"
     }
   ],
   "scoring": {
@@ -75,5 +142,6 @@
     "unevaluatedAnswers": "NOT_EVALUATED_NOT_INCORRECT",
     "repetitions": 3,
     "humanRaters": 2
-  }
+  },
+  "scopePolicy": "Story 0237: scopeFiles are subsystem path prefixes chosen from the question wording, not from oracle evidence. The same scope is the A files, the C allowedPathPrefixes and the B citable paths. storyNumber binds an Engineering Story only when the question is about that Story."
 }
