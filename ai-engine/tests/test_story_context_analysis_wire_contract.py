@@ -592,6 +592,24 @@ async def test_investigation_finalizes_without_sending_action_when_budget_is_spe
 
 
 @pytest.mark.asyncio
+async def test_investigation_finalizes_with_gathered_evidence_after_scope_refusal(monkeypatch):
+    """Story 0245: a non-budget refusal after gathered evidence also leads to FINAL."""
+    request = _investigation_request()
+    traces = _ServiceTraces([_investigation_plan(request.ai_task_id), _second_action(), _final_decision()])
+    callback = _SequencedInvestigationCallback([
+        {"actionId": "action-1", "outcome": "RESULTS", "evidence": _evidence(1)},
+        {"actionId": "action-2", "outcome": "REJECTED", "rejectionCode": "PATH_OUT_OF_SCOPE"},
+    ])
+    service = _service(monkeypatch, traces, callback)
+
+    await service.process(request, UUID("00000000-0000-0000-0000-0000000000c5"))
+
+    assert len(callback.actions) == 2
+    assert "No further action is allowed" in traces.prompts[2]
+    assert callback.results[0].status.value == "COMPLETED"
+
+
+@pytest.mark.asyncio
 async def test_investigation_provider_incomplete_is_terminal(monkeypatch):
     request = _investigation_request()
     traces = _ServiceTraces([ChatGptProviderError("incomplete", status="RESPONSE.INCOMPLETE", reason="length")])

@@ -343,7 +343,7 @@
   "reproducibility": {
     "repositoryRevision": "6f0d2da87cc4dc77427c701c3ec1443bb843216d",
     "promptVersion": "story-context-analysis-prompt-v1",
-    "promptContentDigest": "d88ebc6533c0370a76e9cf6488f6c2dff222514befdbeb04afa5b113fe665d8c",
+    "promptContentDigest": "d78290704f68906926e04ed891376a99f6f6325a90262ce50a095a8ca484f353",
     "schemaDigest": "08d139d65a411e1cf545ded1073188b049fa29047fe9a142d5c516fda8898e06"
   }
 }

@@ -9,6 +9,7 @@ from pydantic import TypeAdapter
 from app.providers.base import GenerationPolicy, Prompt, PromptTraceability
 from app.prompts.structured_context import SHARED_STRUCTURED_CONTEXT_CONTRACT
 from app.schemas.ai_task import PromptRequest
+from app.prompts.reference_aliases import alias_for, citable_references, reference_aliases
 from app.schemas.story_context_agent_projection import StoryContextAgentProjectionV1
 from app.schemas.story_context_analysis import ProviderStoryContextAnalysisResult, StoryAgentFollowUpResult
 from app.schemas.story_context_investigation import InvestigationDecision, InvestigationInitialization
@@ -34,24 +35,13 @@ OUTPUT_CLASSIFICATION_RULE = (
 
 REFERENCE_VERBATIM_RULE = (
     "REFERENCE COPY RULE (AUTHORITATIVE): every evidence reference you emit, in findings, uncertainties, "
-    "implementation items, and causal assessments, must be copied character for character from an "
-    "authorized reference, including any @revision suffix. Never shorten, reformat, or reconstruct a "
-    "reference from a file path.\n"
+    "implementation items, and causal assessments, must be either the short alias of a citable reference "
+    "exactly as listed (for example R3) or the full authorized reference copied character for character, "
+    "including any @revision suffix. Prefer the alias. Never shorten, reformat, or reconstruct a "
+    "reference from a file path, and never invent an alias.\n"
 )
 
 
-def citable_references(grounding_contract: dict[str, object] | None) -> list[str]:
-    """Story 0243: exact citable references, in Core's order, from the typed grounding allow-list."""
-    if not isinstance(grounding_contract, dict):
-        return []
-    allowed = grounding_contract.get("allowedGroundingReferences")
-    if not isinstance(allowed, list):
-        return []
-    references: list[str] = []
-    for entry in allowed:
-        if isinstance(entry, dict) and isinstance(entry.get("ref"), str) and entry["ref"] not in references:
-            references.append(entry["ref"])
-    return references
 
 
 def _unknown_reference_retry_rule(error_message: str) -> str:
@@ -59,7 +49,8 @@ def _unknown_reference_retry_rule(error_message: str) -> str:
     if "unknown evidence" not in error_message.casefold():
         return ""
     rejected = sorted(set(re.findall(r"(?:file|document|config|diff|git|story|insight|decision|event|fact|"
-                                     r"analysis|module|repository)[:/][^\s'\",\]]+", error_message)))
+                                     r"analysis|module|repository)[:/][^\s'\",\]]+", error_message))
+                      | set(re.findall(r"(?<![A-Za-z0-9])R[0-9]+(?![A-Za-z0-9])", error_message)))
     listed = "".join(f"- {value}\n" for value in rejected) if rejected else "- (see error above)\n"
     return (
         "UNKNOWN REFERENCE CORRECTION (AUTHORITATIVE)\n"
@@ -406,7 +397,8 @@ class StoryContextAnalysisPromptBuilder:
               "do not claim an evidence-grounded objective understanding: leave its summary empty and its grounding null, "
               "leave grounded finding arrays empty, and express remaining work only as ungrounded recommendations or "
               "missing information.\n"
-               + ("The action budget is exhausted. Return FINAL now; do not return PLAN or ACTION.\n"
+               + ("No further action is allowed: the action budget is exhausted or Core refused an action. "
+                  "Return FINAL now from the prior capability results; do not return PLAN or ACTION.\n"
                   if final_required else "")
               + "Final findings must cite only evidence references authorized in the Core grounding contract. "
              # Story 0244: the FINAL step gets the same exact citable list as v1 (Story 0243).
@@ -456,13 +448,16 @@ class StoryContextAnalysisPromptBuilder:
 
     def _citable_references_block(self, grounding_contract: dict[str, object] | None) -> str:
         """Story 0243: the exact, exhaustive list of references the answer may cite."""
-        references = citable_references(grounding_contract)
-        if not references:
+        aliases = reference_aliases(grounding_contract)
+        if not aliases:
             return ""
         return (
             "CITABLE REFERENCES (EXACT, EXHAUSTIVE, AUTHORITATIVE)\n"
-            + "\n".join(f"- {reference}" for reference in references)
-            + "\nCite only references from this list, copied character for character. A file, class, "
+            + "\n".join(f"- {alias} = {reference}" for alias, reference in aliases.items())
+            + "\nIn every evidence `reference` field, cite the alias (for example R1) exactly as listed; "
+            "it is resolved to the full reference before validation. The full reference copied character for character is "
+            "also accepted. An alias that is not in this list is rejected. Cite only references from this "
+            "list. A file, class, "
             "module, or document that is merely mentioned inside evidence content (for example in an "
             "import, a comment, or a code reference) is NOT citable unless its exact reference appears "
             "in this list. Never build a reference from a path. If no listed reference supports a "
@@ -479,6 +474,7 @@ class StoryContextAnalysisPromptBuilder:
 
         files = [value for value in requested_files if isinstance(value, str) and value]
         references: dict[str, list[str]] = {file: [] for file in files}
+        aliases = alias_for(grounding_contract)
         allowed = grounding_contract.get("allowedGroundingReferences")
         if isinstance(allowed, list):
             for entry in allowed:
@@ -492,7 +488,8 @@ class StoryContextAnalysisPromptBuilder:
                     if (reference == file or reference.endswith(f":{file}") or originating_file == file
                             or (isinstance(originating_file, str) and originating_file.startswith(f"{file}/"))
                             or f":{file}/" in reference):
-                        references[file].append(reference)
+                        # Story 0245: show the alias the model is asked to cite.
+                        references[file].append(aliases.get(reference, reference))
         return self._canonical({
             "files": files,
             "groundingReferences": references,

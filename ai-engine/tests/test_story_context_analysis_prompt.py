@@ -81,7 +81,8 @@ def test_requested_file_scope_lists_only_file_grounding_references() -> None:
     )
 
     assert '"files":["docker-compose.yml"]' in scope
-    assert '"docker-compose.yml":["docker-compose.yml"]' in scope
+    # Story 0245: the mapping shows the alias the model is asked to cite.
+    assert '"docker-compose.yml":["R1"]' in scope
     assert "docs/architecture.md" not in scope
     assert "Every finding must cite at least one reference" in scope
 
@@ -305,7 +306,8 @@ def test_citable_references_list_exactly_the_typed_allow_list_in_core_order() ->
     assert citable_references(None) == []
     block = StoryContextAnalysisPromptBuilder()._citable_references_block(contract)
     assert block.startswith("CITABLE REFERENCES (EXACT, EXHAUSTIVE, AUTHORITATIVE)")
-    assert "- file:s:backend/A.java@r" in block
+    assert "- R1 = file:s:backend/A.java@r" in block
+    assert "- R2 = document:s:docs/ADR-006.md@r" in block
     assert "merely mentioned" in block
 
 
@@ -321,7 +323,7 @@ def test_requested_directory_scope_maps_the_files_under_it() -> None:
 
     scope = json.loads(StoryContextAnalysisPromptBuilder()._requested_file_scope(projection, contract))
 
-    assert scope["groundingReferences"]["backend/pkg"] == ["file:s:backend/pkg/usecase/A.java@r"]
+    assert scope["groundingReferences"]["backend/pkg"] == ["R1"]
 
 
 def test_corrective_retry_quotes_rejected_references() -> None:
@@ -369,6 +371,15 @@ def test_investigation_prompt_and_retry_carry_citable_references() -> None:
         prompt, ValueError("Finding references unknown evidence: ['file:s:docs/B.md@r']"))
 
     assert "CITABLE REFERENCES (EXACT, EXHAUSTIVE, AUTHORITATIVE)" in prompt.user_message
-    assert "- file:s:docs/A.md@r" in prompt.user_message
+    assert "- R1 = file:s:docs/A.md@r" in prompt.user_message
     assert "UNKNOWN REFERENCE CORRECTION" in retry.user_message
     assert "- file:s:docs/B.md@r" in retry.user_message
+
+
+def test_unknown_alias_is_quoted_in_retry() -> None:
+    """Story 0245: an unknown alias is named in the correction."""
+    from app.prompts.story_context_analysis import _unknown_reference_retry_rule
+
+    rule = _unknown_reference_retry_rule("Finding X references unknown evidence: ['R42']")
+
+    assert "- R42" in rule

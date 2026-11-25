@@ -10,6 +10,7 @@ from app.clients.core_callback_client import CoreCallbackClient
 from app.models.ai_task import AiTaskType
 from app.models.proposal import AiTaskResultStatus
 from app.prompts.story_context_analysis import StoryContextAnalysisPromptBuilder
+from app.prompts.reference_aliases import resolve_reference_aliases
 from app.providers.base import LlmProvider, Prompt
 from app.schemas.ai_task import AiTaskSubmissionRequest
 from app.schemas.ai_task_result import (
@@ -253,7 +254,7 @@ class StoryContextAnalysisGenerationService:
                 if not self._budget_allows_action(budget, results):
                     # Story 0244: no action can fit the remaining budget; finish
                     # with the gathered evidence instead of sending a doomed action.
-                    decision, prompt = await self._finalize_on_budget(submission, results, traces)
+                    decision, prompt = await self._finalize_with_gathered_evidence(submission, results, traces)
                     continue
                 if isinstance(decision, InvestigationPlanDecision):
                     if not pending:
@@ -284,14 +285,12 @@ class StoryContextAnalysisGenerationService:
                 results.append(typed_result.model_dump(mode="json", by_alias=True, exclude_none=True))
                 actions_taken += 1
                 outcome = typed_result.outcome
-                budget_refused = outcome == "REJECTED" and (
-                    typed_result.rejection_code == "BUDGET_EXHAUSTED"
-                    or typed_result.stop_reason == "BUDGET_EXHAUSTED"
-                )
-                if budget_refused and self._has_gathered_evidence(results):
-                    # Story 0244: Core refused an action for budget after evidence
-                    # was gathered. Ask for the FINAL decision over that evidence.
-                    decision, prompt = await self._finalize_on_budget(submission, results, traces)
+                if outcome in {"REJECTED", "UNAVAILABLE"} and self._has_gathered_evidence(results):
+                    # Story 0244 (budget) and Story 0245 (any refusal): Core refused
+                    # or could not serve an action after evidence was gathered.
+                    # Core's refusal stands; ask for the FINAL decision over the
+                    # evidence already authorized instead of failing the task.
+                    decision, prompt = await self._finalize_with_gathered_evidence(submission, results, traces)
                     continue
                 if outcome in {"REJECTED", "UNAVAILABLE"}:
                     raise _InvestigationTerminal(
@@ -357,6 +356,8 @@ class StoryContextAnalysisGenerationService:
         if final_required and not isinstance(decision, InvestigationFinalDecision):
             raise _InvestigationTerminal("BUDGET_EXHAUSTED")
         if isinstance(decision, InvestigationFinalDecision):
+            # Story 0245: aliases resolve to exact references before validation.
+            self._resolved(decision.result, submission.grounding_contract or {})
             self._synchronize_output_classification(decision.result)
             self._validate_output(
                 provider_result_to_internal(decision.result),
@@ -414,6 +415,12 @@ class StoryContextAnalysisGenerationService:
         )
 
     @staticmethod
+    def _resolved(output, grounding_contract):
+        """Story 0245: replace citable aliases (R1..Rn) in place; unknown aliases stay and fail validation."""
+        resolve_reference_aliases(output, grounding_contract)
+        return output
+
+    @staticmethod
     def _synchronize_output_classification(output: StoryContextAnalysisResult) -> None:
         """Fill omitted redundant classifications from the already supplied grounding metadata."""
         findings = [
@@ -458,7 +465,7 @@ class StoryContextAnalysisGenerationService:
         )
         output.output_classification = OutputClassification(entries=entries)
 
-    async def _finalize_on_budget(self, submission, results, traces):
+    async def _finalize_with_gathered_evidence(self, submission, results, traces):
         if not self._has_gathered_evidence(results):
             raise _InvestigationTerminal("BUDGET_EXHAUSTED")
         prompt = self._prompt_builder.build_investigation(submission, results, final_required=True)
@@ -676,7 +683,9 @@ class StoryContextAnalysisGenerationService:
             prompt,
             ProviderStoryContextAnalysisResult,
             lambda output: self._validate_output(
-                provider_result_to_internal(output), context, grounding_contract
+                provider_result_to_internal(
+                    self._resolved(output, grounding_contract)
+                ), context, grounding_contract
             ),
         )
         return provider_result_to_internal(provider_output)
