@@ -279,6 +279,29 @@ def test_core_live_adapter_accepts_c_source_revision_from_nested_result() -> Non
     assert result["integrationStatus"] == "LIVE_CORE_CALLBACK_COMPLETED"
 
 
+def test_core_live_adapter_accepts_c_source_revision_from_top_level_scope() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "C_DEVLOG_ENGINEERING_ANALYST",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223,
+                         story_path=None, files=("docs/story.md",)),
+        {**manifest(), "repositoryRevision": "authorized-revision"},
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {
+            "status": "COMPLETED",
+            "aiTaskId": "task-id",
+            "scope": {"resolvedRevision": "authorized-revision"},
+            "result": {"analysis": {"objectiveUnderstanding": {"summary": "bounded"}}},
+        }),
+    )
+
+    result = adapter.execute(
+        {"observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1"},
+        {**manifest(), "repositoryRevision": "authorized-revision"},
+    )
+
+    assert result["executionStatus"] == "COMPLETED"
+    assert result["integrationStatus"] == "LIVE_CORE_CALLBACK_COMPLETED"
+
+
 def approved_pricing() -> dict:
     value = {
         "status": "APPROVED",

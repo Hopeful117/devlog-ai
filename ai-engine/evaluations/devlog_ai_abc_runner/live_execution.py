@@ -399,7 +399,8 @@ class CoreLiveTreatmentAdapter:
                 "mcpResponse": response_diagnostic,
             }
         if self.condition == "C_DEVLOG_ENGINEERING_ANALYST":
-            scope = result.get("scope")
+            # MCP leaves scope at the top level when the task was already COMPLETED on submission.
+            scope = result.get("scope") if isinstance(result.get("scope"), dict) else execution.get("scope")
             resolved_revision = scope.get("resolvedRevision") if isinstance(scope, dict) else None
             expected_revision = manifest.get("repositoryRevision")
             if not isinstance(expected_revision, str) or not expected_revision:
