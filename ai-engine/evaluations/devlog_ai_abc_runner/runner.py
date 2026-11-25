@@ -17,6 +17,14 @@ from evaluations.devlog_ai_abc_normalization import (
 )
 from evaluations.comparative_baseline.collection_runtime import provider_failure_attribution
 
+from .campaign import (
+    CampaignError,
+    assignment_matrix,
+    batch_observation_ids,
+    case_of,
+    is_campaign,
+    validate_campaign_structure,
+)
 from .fixtures import fixture_for
 from .provenance import (
     Q1_RUNTIME_IDENTITIES,
@@ -112,11 +120,20 @@ def load_manifest(path: Path) -> dict[str, Any]:
     if value.get("experimentType") != "END_TO_END_SYSTEM_COMPARISON":
         raise ManifestValidationError("manifest must use END_TO_END_SYSTEM_COMPARISON")
     observations = value.get("observations")
-    if not isinstance(observations, list) or len(observations) != 3:
-        raise ManifestValidationError("manifest must contain exactly three observations")
-    identities = tuple(item.get("observationId") for item in observations if isinstance(item, dict))
-    if identities != _EXPECTED_OBSERVATIONS:
-        raise ManifestValidationError("manifest observation identities are not the frozen Q1 set")
+    if is_campaign(value):
+        # Story 0237 AC-6: the 8 x 3 x 3 campaign is a deterministic matrix.
+        try:
+            validate_campaign_structure(value)
+        except CampaignError as error:
+            raise ManifestValidationError(str(error)) from error
+    else:
+        if not isinstance(observations, list) or len(observations) != 3:
+            raise ManifestValidationError("manifest must contain exactly three observations")
+        identities = tuple(item.get("observationId") for item in observations if isinstance(item, dict))
+        if identities != _EXPECTED_OBSERVATIONS:
+            raise ManifestValidationError("manifest observation identities are not the frozen Q1 set")
+        if any(item.get("condition") != _CONDITIONS[item["observationId"]] for item in observations):
+            raise ManifestValidationError("manifest observation conditions are not the frozen Q1 set")
     if any(item.get("status") != "PREPARED_NOT_EXECUTED" for item in observations):
         raise ManifestValidationError("observations must be PREPARED_NOT_EXECUTED")
     budgets = value.get("technicalBudgets")
@@ -203,10 +220,17 @@ def replay_run(*, manifest_path: str | Path, run_root: str | Path) -> dict[str, 
 
     manifest = load_manifest(Path(manifest_path))
     root = Path(run_root)
-    integrity = _validate_integrity(root, manifest["observations"])
-    for observation in manifest["observations"]:
+    # A campaign batch run records only its own cells; replay what was recorded.
+    recorded = [
+        item for item in manifest["observations"]
+        if (root / "observations" / item["observationId"]).is_dir()
+    ]
+    if not recorded:
+        raise RuntimeError("run contains no manifest observation")
+    integrity = _validate_integrity(root, recorded)
+    for observation in recorded:
         observation_id = observation["observationId"]
-        condition = _CONDITIONS[observation_id]
+        condition = observation["condition"]
         observation_root = root / "observations" / observation_id
         raw = json.loads((observation_root / "raw" / "answer.json").read_text(encoding="utf-8"))
         stored = json.loads((observation_root / "derived" / "normalized.json").read_text(encoding="utf-8"))
@@ -216,8 +240,16 @@ def replay_run(*, manifest_path: str | Path, run_root: str | Path) -> dict[str, 
     return {"status": "PASS", "integrity": integrity, "providerCalls": 0, "networkCalls": 0}
 
 
-def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, mode: str = DRY_RUN, observation_ids: tuple[str, ...] | None = None) -> RunResult:
+def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, mode: str = DRY_RUN, observation_ids: tuple[str, ...] | None = None, case_id: str | None = None) -> RunResult:
     manifest = load_manifest(Path(manifest_path))
+    if case_id is not None:
+        try:
+            batch = tuple(batch_observation_ids(manifest, case_id))
+        except CampaignError as error:
+            raise ManifestValidationError(str(error)) from error
+        if observation_ids is not None and not set(observation_ids) <= set(batch):
+            raise ManifestValidationError("observation selection is outside the case batch")
+        observation_ids = observation_ids or batch
     repository_root = Path(repository_root).resolve()
     actual_revision = repository_revision(repository_root)
     try:
@@ -243,7 +275,7 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
     results: list[dict[str, Any]] = []
     for observation in observations:
         observation_id = observation["observationId"]
-        condition = _CONDITIONS[observation_id]
+        condition = observation["condition"]
         adapter = selected.get(condition)
         if adapter is None:
             raise ManifestValidationError(f"no adapter selected for {condition}")
@@ -254,7 +286,7 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
             (observation_root / directory).mkdir(parents=True)
         envelope = {
             "observationId": observation_id,
-            "caseId": manifest["caseId"],
+            "caseId": case_of(manifest, observation),
             "treatment": condition,
             "repositoryRevision": manifest["repositoryRevision"],
         }
@@ -314,11 +346,7 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
         "manifestVersion": manifest["version"],
         "manifestFileSha256": manifest_file_hash,
         "mode": mode,
-        "status": (
-            "Q1_INTEGRATION_SIMULATION_PASS"
-            if integration_passed
-            else ("Q1_INTEGRATION_SIMULATION_PARTIAL" if mode == INTEGRATION_SIMULATION else "Q1_RUNNER_DRY_RUN_READY")
-        ),
+        "status": _summary_status(mode, results, integration_passed, campaign=is_campaign(manifest)),
         "repositoryRevision": manifest["repositoryRevision"],
         "provenance": provenance,
         "providerCalls": sum(item["providerCalls"] for item in results),
@@ -336,9 +364,34 @@ def run_dry_run(*, manifest_path: str | Path, output_root: str | Path, repositor
             else ("PARTIAL" if mode == INTEGRATION_SIMULATION else "NOT_APPLICABLE")
         ),
     }
+    if is_campaign(manifest):
+        summary["caseId"] = case_id
+        summary["assignmentMatrix"] = assignment_matrix(manifest, {
+            item["observationId"]: {
+                **item,
+                "semanticEligibility": json.loads((run_root / "observations" / item["observationId"]
+                                                   / "derived" / "normalized.json").read_text(encoding="utf-8"))
+                .get("semanticEligibility"),
+                "runRoot": str(run_root),
+            }
+            for item in results
+        })
     _write_json_exclusive(run_root / "integrity-report.json", integrity)
     _write_json_exclusive(run_root / "execution-summary.json", summary)
     return RunResult(run_root=run_root, summary=summary, integrity=integrity)
+
+
+def _summary_status(mode: str, results: list[dict[str, Any]], integration_passed: bool,
+                    *, campaign: bool = False) -> str:
+    """Name the run after the mode that actually executed (Story 0237 AC-5)."""
+
+    prefix = "CAMPAIGN" if campaign else "Q1"
+    if mode == LIVE:
+        completed = all(item["technicalStatus"] == "COMPLETED" for item in results)
+        return f"{prefix}_LIVE_EXECUTION_COMPLETED" if completed else f"{prefix}_LIVE_EXECUTION_PARTIAL"
+    if mode == INTEGRATION_SIMULATION:
+        return f"{prefix}_INTEGRATION_SIMULATION_PASS" if integration_passed else f"{prefix}_INTEGRATION_SIMULATION_PARTIAL"
+    return f"{prefix}_RUNNER_DRY_RUN_READY"
 
 
 def _acceptability_counts(results: list[dict[str, Any]]) -> dict[str, int]:
@@ -363,7 +416,7 @@ def _result_payload(result: RunResult | dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def run_integration_simulation(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path) -> RunResult:
+def run_integration_simulation(*, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, case_id: str | None = None, observation_ids: tuple[str, ...] | None = None) -> RunResult:
     """Exercise local boundaries with deterministic provider/Core doubles."""
 
     from .integration import integration_simulation_adapters
@@ -375,6 +428,8 @@ def run_integration_simulation(*, manifest_path: str | Path, output_root: str | 
         repository_root=root,
         adapters=integration_simulation_adapters(root, Path(output_root).resolve()),
         mode=INTEGRATION_SIMULATION,
+        case_id=case_id,
+        observation_ids=observation_ids,
     )
 
 
@@ -399,26 +454,57 @@ def run_live_prepare(
     repository_root: str | Path,
     output_root: str | Path,
     pricing_contract: Mapping[str, Any] | None,
+    case_id: str | None = None,
 ) -> dict[str, Any]:
     if oracle_path is None:
         raise ManifestValidationError("LIVE_PREPARE requires the Q1 oracle path")
     if pricing_contract is None:
         raise ManifestValidationError("LIVE_PREPARE requires the approved pricing contract")
-    from .live import load_q1_oracle
     from .live_execution import prepare_live_evaluation
 
     manifest = load_manifest(Path(manifest_path))
-    oracle = load_q1_oracle(oracle_path, expected_revision=manifest["repositoryRevision"])
+    batch_case = _batch_case(manifest, case_id)
+    oracle = load_batch_oracle(oracle_path, manifest, batch_case)
     return prepare_live_evaluation(
         manifest=manifest,
         oracle=oracle,
         repository_root=repository_root,
         output_root=output_root,
         pricing_contract=pricing_contract,
+        case_id=batch_case,
     )
 
 
-def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None, prepared_plan: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, activate_live: bool = False, observation_ids: tuple[str, ...] | None = None) -> RunResult | dict[str, Any]:
+def _batch_case(manifest: Mapping[str, Any], case_id: str | None) -> str:
+    """A campaign executes one case batch at a time; the Q1 manifest is its own batch."""
+
+    if is_campaign(manifest):
+        if case_id is None:
+            raise ManifestValidationError("a campaign live step requires --case-id")
+        if case_id not in manifest["caseIds"]:
+            raise ManifestValidationError(f"case {case_id} is not part of the campaign")
+        return case_id
+    if case_id not in (None, manifest["caseId"]):
+        raise ManifestValidationError("case selection does not match the manifest case")
+    return manifest["caseId"]
+
+
+def load_batch_oracle(oracle_path: str | Path, manifest: Mapping[str, Any], case_id: str) -> dict[str, Any]:
+    from .campaign import load_case_oracle
+    from .live import LiveAuthorizationError, load_q1_oracle
+
+    if not is_campaign(manifest):
+        return load_q1_oracle(oracle_path, expected_revision=manifest["repositoryRevision"])
+    try:
+        oracle = load_case_oracle(oracle_path, case_id, expected_revision=manifest["repositoryRevision"])
+    except CampaignError as error:
+        raise LiveAuthorizationError(str(error)) from error
+    if oracle.get("status") != "ACCEPTED":
+        raise LiveAuthorizationError(f"{case_id} oracle is not explicitly accepted")
+    return oracle
+
+
+def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, repository_root: str | Path, adapters: Mapping[str, TreatmentAdapter] | None = None, oracle_path: str | Path | None = None, authorization: Mapping[str, Any] | None = None, prepared_plan: Mapping[str, Any] | None = None, pricing_contract: Mapping[str, Any] | None = None, activate_live: bool = False, observation_ids: tuple[str, ...] | None = None, case_id: str | None = None) -> RunResult | dict[str, Any]:
     if mode == LIVE_PREPARE:
         if not activate_live:
             raise LiveNotAuthorized("LIVE_PREPARE requires the explicit --activate-live flag")
@@ -428,23 +514,31 @@ def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, reposi
             repository_root=repository_root,
             output_root=output_root,
             pricing_contract=pricing_contract,
+            case_id=case_id,
         )
     if mode == LIVE:
         if authorization is None:
             raise LiveNotAuthorized("LIVE_NOT_AUTHORIZED: Q1 live execution requires a separate explicit authorization")
-        from .live import load_q1_oracle, validate_live_authorization
+        from .live import validate_live_authorization
         from .live_execution import run_live_execution
 
         manifest_value = load_manifest(Path(manifest_path))
         if oracle_path is None:
             raise ManifestValidationError("LIVE requires the Q1 oracle path")
-        oracle = load_q1_oracle(oracle_path, expected_revision=manifest_value["repositoryRevision"])
+        batch_case = _batch_case(manifest_value, case_id)
+        oracle = load_batch_oracle(oracle_path, manifest_value, batch_case)
         validate_live_authorization(
             authorization,
             manifest=manifest_value,
             oracle=oracle,
             pricing_contract=pricing_contract or manifest_value.get("pricingContract"),
+            case_id=batch_case,
         )
+        if is_campaign(manifest_value):
+            batch = tuple(batch_observation_ids(manifest_value, batch_case))
+            if observation_ids is not None and tuple(observation_ids) != batch:
+                raise ManifestValidationError("a campaign live step executes exactly one whole case batch")
+            observation_ids = batch
         return run_live_execution(
             manifest_path=manifest_path,
             output_root=output_root,
@@ -473,6 +567,8 @@ def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, reposi
             manifest_path=manifest_path,
             output_root=output_root,
             repository_root=repository_root,
+            case_id=case_id,
+            observation_ids=observation_ids,
         )
     if mode != DRY_RUN:
         raise ValueError(f"unsupported runner mode: {mode}")
@@ -482,6 +578,7 @@ def run(*, mode: str, manifest_path: str | Path, output_root: str | Path, reposi
         repository_root=repository_root,
         adapters=adapters,
         observation_ids=observation_ids,
+        case_id=case_id,
     )
 
 
@@ -499,6 +596,7 @@ def main() -> None:
     parser.add_argument("--env-file", help="load a dotenv file without overriding explicit environment variables")
     parser.add_argument("--observation-id", action="append", dest="observation_ids",
                         help="limit execution to one or more frozen observation IDs")
+    parser.add_argument("--case-id", help="campaign case batch to execute (Story 0237 AC-6)")
     args = parser.parse_args()
     if args.env_file:
         from .live_execution import LiveConfigurationError, load_environment_file
@@ -535,6 +633,7 @@ def main() -> None:
         pricing_contract=pricing_contract,
         activate_live=args.activate_live,
         observation_ids=tuple(args.observation_ids) if args.observation_ids else None,
+        case_id=args.case_id,
     )
     payload = _result_payload(result)
     print(json.dumps(payload, indent=2, sort_keys=True))

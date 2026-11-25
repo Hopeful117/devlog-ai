@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import socket
+from dataclasses import replace
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -18,14 +19,15 @@ from evaluations.devlog_ai_abc_runner.live import (
     load_q1_oracle,
     validate_live_authorization,
 )
+from evaluations.devlog_ai_abc_runner.benchmark import load_case
 from evaluations.devlog_ai_abc_runner.live_execution import (
     ChatGptOAuthTransport,
-    CoreLiveTreatmentAdapter,
+    CoreLiveTreatmentAdapter as _CoreLiveTreatmentAdapter,
     LiveConfiguration,
     LiveConfigurationError,
     _bounded_mcp_error,
     load_environment_file,
-    live_adapters,
+    live_adapters as _live_adapters,
     missing_live_provider_environment,
     require_live_provider_environment,
     resolve_live_story,
@@ -39,6 +41,17 @@ ROOT = Path(__file__).parents[1].parent
 MANIFEST_PATH = ROOT / "docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json"
 ORACLE_PATH = ROOT / "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json"
 REVISION = "0673d1d32433cdaff054d5f1defd1bedd01c0039"
+Q1_CASE = load_case(ROOT, "Q1")
+
+
+def CoreLiveTreatmentAdapter(*args, **kwargs):
+    kwargs.setdefault("case", Q1_CASE)
+    return _CoreLiveTreatmentAdapter(*args, **kwargs)
+
+
+def live_adapters(**kwargs):
+    kwargs.setdefault("case", Q1_CASE)
+    return _live_adapters(**kwargs)
 
 
 def manifest() -> dict:
@@ -123,6 +136,7 @@ def test_chatgpt_oauth_transport_exposes_bounded_http_diagnostic(monkeypatch: py
     transport = object.__new__(ChatGptOAuthTransport)
     transport._task_id = "task-id"
     transport._model = "gpt-5.6-luna"
+    transport._scope_instruction = "Investigate and cite only repository paths equal to or under these scope prefixes: docs."
     transport._settings = SimpleNamespace(llm_timeout_seconds=1, chatgpt_responses_endpoint="https://provider.example/responses")
     transport._resolver = SimpleNamespace(resolve_for_task=lambda *_args: Credential())
     transport._refresh_service = None
@@ -583,6 +597,8 @@ def test_live_execution_reserves_fresh_b_binding_per_authorization_before_consum
                 return {"planId": "plan-1", "projectSlug": "devlog-ai", "planDigest": "digest-1"}
             if name == "story_context_agent_prepare_task_binding":
                 return {"aiTaskId": "00000000-0000-0000-0000-0000000000b2"}
+            if name == "story_context_agent_get_projection":
+                return {"freshness": {"state": "FRESH", "revisionConsistency": "CONSISTENT"}}
             if name == "consume_bounded_live_evaluation_authorization":
                 return {"status": "CONSUMED"}
             raise AssertionError(name)
@@ -596,7 +612,10 @@ def test_live_execution_reserves_fresh_b_binding_per_authorization_before_consum
     monkeypatch.setattr(live_execution, "assert_reproducible_worktree", lambda root: None)
     monkeypatch.setattr(live_execution, "require_live_provider_environment", lambda env: None)
     monkeypatch.setattr(live_execution, "validate_prepared_plan", lambda *a, **k: None)
-    monkeypatch.setattr(live_execution, "resolve_live_story", lambda config, mcp: config)
+    monkeypatch.setattr(
+        live_execution, "resolve_live_story",
+        lambda config, mcp: replace(config, story_id="00000000-0000-0000-0000-000000000223"))
+    monkeypatch.setattr(live_execution, "load_live_case", lambda root, manifest, case_id=None: Q1_CASE)
     monkeypatch.setattr(
         live_execution, "run_dry_run",
         lambda **kwargs: captured.update(kwargs) or "RAN",

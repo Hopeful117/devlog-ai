@@ -125,7 +125,16 @@ public final class StoryContextAgentProjectionV1 {
         } else if (rawSummary != null) {
             result.putAll(mapper.convertValue(rawSummary, Map.class));
         }
-        Object rawState = result.get("state");
+        // Story 0238: guidance is part of the Core summary, not of the
+        // projection contract, which rejects unknown freshness fields.
+        result.remove("guidance");
+        Object rawState = null;
+        if (rawSummary instanceof ProjectFreshnessSummary summary) {
+            // The Core aggregation is authoritative; never re-derive it here.
+            rawState = summary.status().name();
+            result.put("status", rawState);
+        }
+        if (rawState == null) rawState = result.get("state");
         if (rawState == null) rawState = result.get("status");
         if (rawState == null) rawState = c.freshness().get("status");
         if (rawState == null) {
@@ -133,12 +142,12 @@ public final class StoryContextAgentProjectionV1 {
                 rawState = freshness.status();
             }
         }
-        String state = String.valueOf(rawState == null ? "UNKNOWN" : rawState)
+        String status = String.valueOf(rawState == null ? "UNKNOWN" : rawState)
                 .toUpperCase(Locale.ROOT);
         if (!Set.of("CURRENT", "FRESH", "STALE", "PARTIALLY_FRESH", "NO_BASELINE",
-                "UNKNOWN", "NOT_ESTABLISHED").contains(state)) state = "UNKNOWN";
-        result.put("status", result.getOrDefault("status", state));
-        result.put("state", state);
+                "UNKNOWN", "NOT_ESTABLISHED").contains(status)) status = "UNKNOWN";
+        result.put("status", result.getOrDefault("status", status));
+        result.put("state", contractState(status));
         result.put("sourceRevision", Map.of("kind", "PROJECT_REVISION",
                 "project", project, "revision", revision));
         String freshnessRevision = freshnessRevisionOrUnknown(c);
@@ -153,6 +162,21 @@ public final class StoryContextAgentProjectionV1 {
         Object warnings = c.freshness().get("warnings");
         if (warnings != null) result.put("warnings", warnings);
         return result;
+    }
+
+    /**
+     * Maps a Core freshness status onto the projection contract vocabulary
+     * ({@code FRESH, STALE, UNKNOWN, NOT_ESTABLISHED}); {@code status} keeps the
+     * precise Core value. PARTIALLY_FRESH means the knowledge baseline is behind
+     * the repository, so the knowledge is STALE for an agent.
+     */
+    static String contractState(String status) {
+        return switch (status) {
+            case "CURRENT", "FRESH" -> "FRESH";
+            case "PARTIALLY_FRESH", "STALE" -> "STALE";
+            case "NO_BASELINE", "NOT_ESTABLISHED" -> "NOT_ESTABLISHED";
+            default -> "UNKNOWN";
+        };
     }
 
     private static Map<String, Object> executionScope(CanonicalEngineeringContext c, String project,

@@ -249,7 +249,8 @@
       "expectedUncertainty": [
         "Distinguish action-level idempotency from the separate parent task submission idempotency."
       ],
-      "expectedAnswerClass": "GROUNDED_CODE_BEHAVIOR"
+      "expectedAnswerClass": "GROUNDED_CODE_BEHAVIOR",
+      "canonicalDigest": "90180f17318ac4c8bf3c735de1f408597ea1a81e1b254913d8f100e68591577d"
     },
     {
       "caseId": "Q3",
@@ -309,7 +310,8 @@
       "expectedUncertainty": [
         "Historical rationale is established by ADRs; comparative quality consequences remain an experimental question."
       ],
-      "expectedAnswerClass": "HISTORICAL_ARCHITECTURAL_RATIONALE"
+      "expectedAnswerClass": "HISTORICAL_ARCHITECTURAL_RATIONALE",
+      "canonicalDigest": "474f5ba5d787b5dd48cc9b881e9ef1ea7d170e82342f41184b1a1af8cce7d1b0"
     },
     {
       "caseId": "Q4",
@@ -375,7 +377,8 @@
       "expectedUncertainty": [
         "The exact test set for a future implementation depends on whether the change alters only limits or also evidence semantics."
       ],
-      "expectedAnswerClass": "GROUNDED_IMPACT_ANALYSIS"
+      "expectedAnswerClass": "GROUNDED_IMPACT_ANALYSIS",
+      "canonicalDigest": "67493086a247364f641dda2b85fce825b12e3510a7922416b5852cb9a416f769"
     },
     {
       "caseId": "Q5",
@@ -438,7 +441,8 @@
       "expectedUncertainty": [
         "Only repository-state and implementation claims verified against current code can be reclassified; historical test execution cannot be reproduced from the report alone."
       ],
-      "expectedAnswerClass": "CURRENT_VS_HISTORICAL_RECONCILIATION"
+      "expectedAnswerClass": "CURRENT_VS_HISTORICAL_RECONCILIATION",
+      "canonicalDigest": "e4c8cb4e0f7cc24c4adba9d1f38cccd902a7d6dcde6505f471e52a0caffa3813"
     },
     {
       "caseId": "Q6",
@@ -502,7 +506,8 @@
       "expectedUncertainty": [
         "Provider-visible evidence is UNKNOWN where the runtime contract lacks per-reference attribution."
       ],
-      "expectedAnswerClass": "INVESTIGATION_DIAGNOSTIC_PLAN"
+      "expectedAnswerClass": "INVESTIGATION_DIAGNOSTIC_PLAN",
+      "canonicalDigest": "6a99440c6eb5385ff29d95b3dd2d951c30424001e1885ce03a019d0bb5b65327"
     },
     {
       "caseId": "Q7",
@@ -557,7 +562,8 @@
       "expectedUncertainty": [
         "Real semantic quality, cost and usefulness remain unmeasured for this treatment."
       ],
-      "expectedAnswerClass": "CORRECT_ABSTENTION"
+      "expectedAnswerClass": "CORRECT_ABSTENTION",
+      "canonicalDigest": "41b0acbf7293eab4aa983e7260a601d07222211fb449aeb15024a8c22a7a02cd"
     },
     {
       "caseId": "Q8",
@@ -621,7 +627,8 @@
       "expectedUncertainty": [
         "The relative value of active investigation and DevLog context is the purpose of the proposed A/B/C benchmark."
       ],
-      "expectedAnswerClass": "CONDITIONAL_ARCHITECTURAL_CONCLUSION"
+      "expectedAnswerClass": "CONDITIONAL_ARCHITECTURAL_CONCLUSION",
+      "canonicalDigest": "3e54bba8b7ddfc14f25aa06a0f6fa400c4055f457539815de4ca3e569c89d3ad"
     }
   ]
 }

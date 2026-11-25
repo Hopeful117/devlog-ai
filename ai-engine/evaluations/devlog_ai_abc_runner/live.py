@@ -169,8 +169,17 @@ def validate_live_authorization(
     oracle: Mapping[str, Any],
     pricing_contract: Mapping[str, Any] | None = None,
     now_epoch_seconds: int | None = None,
+    case_id: str | None = None,
 ) -> None:
-    """Validate one future campaign authorization without reading credentials."""
+    """Validate one Core authorization for one case batch without reading credentials."""
+
+    from .campaign import CampaignError, batch_observation_ids
+
+    batch_case = case_id or manifest.get("caseId")
+    try:
+        batch_ids = batch_observation_ids(manifest, str(batch_case))
+    except CampaignError as error:
+        raise LiveAuthorizationError(str(error)) from error
 
     missing = sorted(_REQUIRED_AUTH_KEYS - set(authorization))
     if missing:
@@ -197,13 +206,13 @@ def validate_live_authorization(
         raise LiveAuthorizationError("authorization manifest identity mismatch")
     if authorization["manifestDigest"] != canonical_manifest_digest(manifest):
         raise LiveAuthorizationError("authorization manifest digest mismatch")
-    if authorization["oracleStatus"] != Q1_ORACLE_ACCEPTED or oracle.get("status") != "ACCEPTED":
-        raise LiveAuthorizationError("Q1 oracle is not explicitly accepted")
+    if authorization["oracleStatus"] != f"{batch_case}_ORACLE_ACCEPTED" or oracle.get("status") != "ACCEPTED":
+        raise LiveAuthorizationError(f"{batch_case} oracle is not explicitly accepted")
+    if oracle.get("caseId") not in (None, batch_case):
+        raise LiveAuthorizationError("authorization oracle is not the oracle of the case batch")
     if authorization["oracleDigest"] != oracle.get("canonicalDigest"):
         raise LiveAuthorizationError("authorization oracle digest mismatch")
-    if authorization["authorizedObservationIds"] != [
-        item["observationId"] for item in manifest["observations"]
-    ]:
+    if authorization["authorizedObservationIds"] != batch_ids:
         raise LiveAuthorizationError("authorization observation set mismatch")
     if authorization["authorizedConditions"] != manifest["conditions"]:
         raise LiveAuthorizationError("authorization condition set mismatch")

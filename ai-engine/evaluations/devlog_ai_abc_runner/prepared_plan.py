@@ -58,9 +58,13 @@ def validate_prepared_plan(
         raise PreparedPlanError("preparation source revision mismatch")
     if plan.get("benchmarkId") != manifest.get("benchmarkId") or plan.get("benchmarkVersion") != manifest.get("benchmarkVersion"):
         raise PreparedPlanError("preparation benchmark identity mismatch")
-    if plan.get("caseId") != manifest.get("caseId"):
-        raise PreparedPlanError("preparation case identity mismatch")
-    if plan.get("observationIds") != [item["observationId"] for item in manifest["observations"]]:
+    from .campaign import CampaignError, batch_observation_ids
+
+    try:
+        batch_ids = batch_observation_ids(manifest, str(plan.get("caseId")))
+    except CampaignError as error:
+        raise PreparedPlanError("preparation case identity mismatch") from error
+    if plan.get("observationIds") != batch_ids:
         raise PreparedPlanError("preparation observation set mismatch")
     if plan.get("operationalLimits") != manifest.get("technicalBudgets"):
         raise PreparedPlanError("preparation operational limits mismatch")

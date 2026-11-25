@@ -249,3 +249,16 @@ def test_oracle_material_is_not_present_in_run_artifacts(tmp_path: Path) -> None
     content = "".join(path.read_text() for path in treatment_files)
     assert "requiredClaims" not in content
     assert "requiredEvidenceReferences" not in content
+
+
+def test_summary_status_names_the_executed_mode() -> None:
+    from evaluations.devlog_ai_abc_runner.runner import _summary_status
+
+    completed = [{"technicalStatus": "COMPLETED"}] * 3
+    partial = [{"technicalStatus": "COMPLETED"}, {"technicalStatus": "RUNTIME_FAILURE"}]
+
+    assert _summary_status(LIVE, completed, False) == "Q1_LIVE_EXECUTION_COMPLETED"
+    assert _summary_status(LIVE, partial, False) == "Q1_LIVE_EXECUTION_PARTIAL"
+    assert _summary_status(INTEGRATION_SIMULATION, completed, True) == "Q1_INTEGRATION_SIMULATION_PASS"
+    assert _summary_status(INTEGRATION_SIMULATION, partial, False) == "Q1_INTEGRATION_SIMULATION_PARTIAL"
+    assert _summary_status(DRY_RUN, completed, False) == "Q1_RUNNER_DRY_RUN_READY"
