@@ -276,3 +276,18 @@ def test_corrective_retry_restates_classification_rule_only_for_classification_f
     assert rule_marker in classification_retry.user_message
     assert rule_marker not in other_retry.user_message
     assert rule_marker in investigation_retry.user_message
+
+
+def test_prompts_require_verbatim_references_and_retry_restates_rule() -> None:
+    request = load_scenario(SCENARIO_ID).prompt_request
+    builder = StoryContextAnalysisPromptBuilder()
+    prompt = builder.build(request)
+    marker = "The failure concerns an evidence reference that is not authorized"
+
+    assert "REFERENCE COPY RULE" in prompt.user_message
+    assert "including any @revision suffix" in prompt.user_message
+
+    unknown = "Uncertainty references unknown evidence: document:source:docs/story.md"
+    assert marker in builder.investigation_corrective_retry(prompt, ValueError(unknown)).user_message
+    assert marker in builder.corrective_retry(prompt, ValueError(unknown)).user_message
+    assert marker not in builder.corrective_retry(prompt, ValueError("Invalid confidence level")).user_message

@@ -88,7 +88,7 @@ async def test_stream_records_completed_usage(monkeypatch):
             for line in (
                 'data: {"type":"response.output_text.delta","delta":"{\\"ok\\":true}"}',
                 "",
-                'data: {"type":"response.completed","response":{"usage":{"input_tokens":12,"output_tokens":7,"total_tokens":19}}}',
+                'data: {"type":"response.completed","response":{"usage":{"input_tokens":12,"output_tokens":7,"total_tokens":19,"output_tokens_details":{"reasoning_tokens":5}}}}',
                 "",
             ):
                 yield line
@@ -113,6 +113,7 @@ async def test_stream_records_completed_usage(monkeypatch):
         "input_tokens": 12,
         "output_tokens": 7,
         "total_tokens": 19,
+        "reasoning_tokens": 5,
     }
 
 

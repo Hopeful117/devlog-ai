@@ -31,11 +31,22 @@ OUTPUT_CLASSIFICATION_RULE = (
 )
 
 
+REFERENCE_VERBATIM_RULE = (
+    "REFERENCE COPY RULE (AUTHORITATIVE): every evidence reference you emit, in findings, uncertainties, "
+    "implementation items, and causal assessments, must be copied character for character from an "
+    "authorized reference, including any @revision suffix. Never shorten, reformat, or reconstruct a "
+    "reference from a file path.\n"
+)
+
+
 def _classification_retry_rule(error_message: str) -> str:
     lowered = error_message.casefold()
+    rules = ""
     if "outputclassification" in lowered or "findingreference" in lowered:
-        return "The failure concerns outputClassification. Rebuild it from scratch. " + OUTPUT_CLASSIFICATION_RULE
-    return ""
+        rules += "The failure concerns outputClassification. Rebuild it from scratch. " + OUTPUT_CLASSIFICATION_RULE
+    if "unknown evidence" in lowered or "unknown reference" in lowered:
+        rules += "The failure concerns an evidence reference that is not authorized. " + REFERENCE_VERBATIM_RULE
+    return rules
 
 
 SYSTEM_MESSAGE = """You are the DevLog Engineering Story Context Agent.
@@ -235,7 +246,7 @@ class StoryContextAnalysisPromptBuilder:
              "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
               "objectiveUnderstanding.grounding is required when its summary is non-empty. Ground factual or interpretative summaries with authorized evidenceReferences; use RECOMMENDATION only for explicitly advisory content.\n"
              "Classify every non-empty finding, including objectiveUnderstanding, as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION in outputClassification; objectiveUnderstanding must never be omitted.\n"
-             + OUTPUT_CLASSIFICATION_RULE +
+             + OUTPUT_CLASSIFICATION_RULE + REFERENCE_VERBATIM_RULE +
             "ArchitectureFinding, DecisionFinding, HistoricalContextItem, and ImpactedComponentFinding MUST include relationType (EXPLICIT, TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE, or INFERRED_HYPOTHESIS).\n"
             "For V2 causal analysis, build one causalAssessment for the exact Core-owned causalQuestion. Select only bounded LINE_RANGE or SECTION locators over authorized repository evidence; do not fabricate resolved content or digests.\n"
             "For legacy causal analysis, causal claims are separate from relationType. Build the evidence ledger first: candidate source/target, authorized references, one role per cited reference, permitted level, classification, bounded explanation.\n"
@@ -367,7 +378,7 @@ class StoryContextAnalysisPromptBuilder:
               + "Final findings must cite only evidence references authorized in the Core grounding contract. "
              "In FINAL, outputClassification must include exactly one matching entry for objectiveUnderstanding whenever "
              "the result contains objectiveUnderstanding.grounding, including when all finding arrays are empty.\n"
-              + OUTPUT_CLASSIFICATION_RULE + "\n"
+              + OUTPUT_CLASSIFICATION_RULE + REFERENCE_VERBATIM_RULE + "\n"
             "EXPECTED OUTPUT SCHEMA\n"
             f"{self._canonical(decision_schema)}"
         )
