@@ -1,4 +1,5 @@
 import hashlib
+import re
 import json
 import uuid
 from dataclasses import dataclass
@@ -37,6 +38,37 @@ REFERENCE_VERBATIM_RULE = (
     "authorized reference, including any @revision suffix. Never shorten, reformat, or reconstruct a "
     "reference from a file path.\n"
 )
+
+
+def citable_references(grounding_contract: dict[str, object] | None) -> list[str]:
+    """Story 0243: exact citable references, in Core's order, from the typed grounding allow-list."""
+    if not isinstance(grounding_contract, dict):
+        return []
+    allowed = grounding_contract.get("allowedGroundingReferences")
+    if not isinstance(allowed, list):
+        return []
+    references: list[str] = []
+    for entry in allowed:
+        if isinstance(entry, dict) and isinstance(entry.get("ref"), str) and entry["ref"] not in references:
+            references.append(entry["ref"])
+    return references
+
+
+def _unknown_reference_retry_rule(error_message: str) -> str:
+    """Story 0243: quote rejected references so the retry replaces or drops them."""
+    if "unknown evidence" not in error_message.casefold():
+        return ""
+    rejected = sorted(set(re.findall(r"(?:file|document|config|diff|git|story|insight|decision|event|fact|"
+                                     r"analysis|module|repository)[:/][^\s'\",\]]+", error_message)))
+    listed = "".join(f"- {value}\n" for value in rejected) if rejected else "- (see error above)\n"
+    return (
+        "UNKNOWN REFERENCE CORRECTION (AUTHORITATIVE)\n"
+        "These references were rejected because they are not in CITABLE REFERENCES:\n"
+        + listed
+        + "Do not emit them again in any form. Replace each one with a reference copied verbatim from "
+        "CITABLE REFERENCES that directly supports the same statement; if none does, remove the "
+        "statement or move it to missingInformation as NOT_ESTABLISHED.\n"
+    )
 
 
 def _classification_retry_rule(error_message: str) -> str:
@@ -231,7 +263,8 @@ class StoryContextAnalysisPromptBuilder:
             f"{grounding_json}\n\n"
             "REQUESTED FILE SCOPE (AUTHORITATIVE)\n"
             f"{requested_file_scope}\n\n"
-            "SELECTED KNOWLEDGE\n"
+            + self._citable_references_block(request.grounding_contract)
+            + "SELECTED KNOWLEDGE\n"
             f"{knowledge_json}\n\n"
             "USER GUIDANCE (NON-AUTHORITATIVE)\n"
             f"{guidance_json}\n\n"
@@ -418,6 +451,21 @@ class StoryContextAnalysisPromptBuilder:
     def _canonical(self, value: object) -> str:
         return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
+    def _citable_references_block(self, grounding_contract: dict[str, object] | None) -> str:
+        """Story 0243: the exact, exhaustive list of references the answer may cite."""
+        references = citable_references(grounding_contract)
+        if not references:
+            return ""
+        return (
+            "CITABLE REFERENCES (EXACT, EXHAUSTIVE, AUTHORITATIVE)\n"
+            + "\n".join(f"- {reference}" for reference in references)
+            + "\nCite only references from this list, copied character for character. A file, class, "
+            "module, or document that is merely mentioned inside evidence content (for example in an "
+            "import, a comment, or a code reference) is NOT citable unless its exact reference appears "
+            "in this list. Never build a reference from a path. If no listed reference supports a "
+            "statement, drop the statement or report it as NOT_ESTABLISHED in missingInformation.\n\n"
+        )
+
     def _requested_file_scope(
         self, projection: dict[str, object], grounding_contract: dict[str, object]
     ) -> str:
@@ -437,7 +485,10 @@ class StoryContextAnalysisPromptBuilder:
                 provenance = entry.get("provenance")
                 originating_file = provenance.get("originatingFile") if isinstance(provenance, dict) else None
                 for file in files:
-                    if reference == file or reference.endswith(f":{file}") or originating_file == file:
+                    # Story 0243: a requested directory maps to the files under it.
+                    if (reference == file or reference.endswith(f":{file}") or originating_file == file
+                            or (isinstance(originating_file, str) and originating_file.startswith(f"{file}/"))
+                            or f":{file}/" in reference):
                         references[file].append(reference)
         return self._canonical({
             "files": files,
@@ -473,6 +524,7 @@ class StoryContextAnalysisPromptBuilder:
             "The failure category is explicit. For SEMANTIC_SUPPORT_ERROR, downgrade the claim to NOT_ESTABLISHED when support is insufficient; do not invent evidence or add references outside the authoritative contract.\n"
             "For GROUNDING_ERROR caused by requested file scope, remove every finding that does not cite an authorized reference for one of the requested files; return empty finding arrays, missingInformation, and implementationQuestions instead of using broad analysis references.\n"
             + _classification_retry_rule(error_message)
+            + _unknown_reference_retry_rule(error_message)
             + "Produce a corrected ProviderStoryContextAnalysisResult that satisfies all constraints. "
             "confidence must remain a scalar HIGH, MEDIUM, or LOW value."
         )

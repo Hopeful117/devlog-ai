@@ -266,15 +266,21 @@ public class DocumentBodyCollector implements RepositoryContextCollector {
 
             int effectiveMaxPerDoc = Math.min(budgetPolicy.maxCharactersPerDocument(), remainingAggregateBudget);
 
+            // Story 0243 (human decision, supersedes Story 0119 section 5.2 note 3):
+            // an oversized document is admitted truncated at the limit with an
+            // explicit TRUNCATED status instead of being excluded, so long ADRs
+            // remain available as declared partial evidence.
             SecureRepositoryContentReader.ReadResult result = candidate.isMainStory()
                     ? applyLimit(storyDiscoveryResult, effectiveMaxPerDoc)
-                    : contentReader.readComplete(
+                    : contentReader.read(
                             resolved.workspace, candidate.path(), effectiveMaxPerDoc);
 
-            // Skip oversized documents entirely (SKIPPED / INPUT_TOO_LARGE)
             if (result.status() == SecureRepositoryContentReader.ReadResult.Status.SKIPPED) {
-                log.warn("Document {} exceeds per-document limit, skipping", candidate.path());
+                log.warn("Document {} was skipped by the content reader ({})", candidate.path(), result.reason());
                 continue;
+            }
+            if (result.status() == SecureRepositoryContentReader.ReadResult.Status.TRUNCATED) {
+                log.info("Document {} admitted truncated at {} characters", candidate.path(), effectiveMaxPerDoc);
             }
             if (result.status() == SecureRepositoryContentReader.ReadResult.Status.UNAVAILABLE
                     || result.text() == null) {

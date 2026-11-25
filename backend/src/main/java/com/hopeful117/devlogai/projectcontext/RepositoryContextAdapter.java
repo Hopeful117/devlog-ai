@@ -163,7 +163,8 @@ public class RepositoryContextAdapter {
                         List.of(), revisionScope);
 
         if (storyId != null) {
-            context = filterByStoryScope(context, projectId, snapshot, storyId);
+            context = filterByStoryScope(context, projectId, snapshot, storyId,
+                    files == null ? List.of() : files);
         }
 
         return context;
@@ -568,28 +569,42 @@ public class RepositoryContextAdapter {
             ProjectContextSnapshot snapshot,
             UUID storyId
     ) {
+        return filterByStoryScope(context, projectId, snapshot, storyId, List.of());
+    }
+
+    /**
+     * Story 0243: explicitly requested files survive the Story technical
+     * filter; only Git history (commits, diffs) outside the Story window is removed.
+     */
+    RepositoryContext filterByStoryScope(
+            RepositoryContext context,
+            UUID projectId,
+            ProjectContextSnapshot snapshot,
+            UUID storyId,
+            List<String> requestedFiles
+    ) {
         var story = snapshot.engineeringStories().stream()
                 .filter(s -> storyId.equals(s.id()))
                 .findFirst()
                 .orElse(null);
 
         if (story == null) {
-            return filterToNonTechnical(context);
+            return filterToNonTechnical(context, requestedFiles);
         }
 
         String baseCommit = story.baseCommit();
         String targetCommit = story.targetCommit();
 
         if (baseCommit == null || targetCommit == null) {
-            return filterToNonTechnical(context);
+            return filterToNonTechnical(context, requestedFiles);
         }
 
         Set<String> window = findCommitsInWindow(projectId, baseCommit, targetCommit);
         if (window.isEmpty()) {
-            return filterToNonTechnical(context);
+            return filterToNonTechnical(context, requestedFiles);
         }
 
-        return filterContextByCommitSet(context, window);
+        return filterContextByCommitSet(context, window, requestedFiles);
     }
 
     private RepositoryContext filterBaseOnly(
@@ -626,8 +641,12 @@ public class RepositoryContextAdapter {
     }
 
     private RepositoryContext filterToNonTechnical(RepositoryContext context) {
+        return filterToNonTechnical(context, List.of());
+    }
+
+    private RepositoryContext filterToNonTechnical(RepositoryContext context, List<String> requestedFiles) {
         List<RepositoryEvidence> nonTechnical = context.evidence().stream()
-                .filter(e -> !isTechnicalEvidence(e))
+                .filter(e -> !isTechnicalEvidence(e) || isRequestedFileEvidence(e, requestedFiles))
                 .toList();
         return withFilteredEvidence(context, nonTechnical,
                 candidate -> !isTechnicalCandidate(candidate));
@@ -637,9 +656,17 @@ public class RepositoryContextAdapter {
             RepositoryContext context,
             Set<String> commitHashesInWindow
     ) {
+        return filterContextByCommitSet(context, commitHashesInWindow, List.of());
+    }
+
+    private RepositoryContext filterContextByCommitSet(
+            RepositoryContext context,
+            Set<String> commitHashesInWindow,
+            List<String> requestedFiles
+    ) {
         List<RepositoryEvidence> filtered = context.evidence().stream()
                 .filter(e -> {
-                    if (!isTechnicalEvidence(e)) return true;
+                    if (!isTechnicalEvidence(e) || isRequestedFileEvidence(e, requestedFiles)) return true;
                     return evidenceRefersToCommitsInWindow(e, commitHashesInWindow);
                 })
                 .toList();
@@ -648,6 +675,18 @@ public class RepositoryContextAdapter {
                         || candidate.relatedReferences().stream().map(this::extractCommitSha)
                         .anyMatch(sha -> sha != null && commitHashesInWindow.contains(sha))
                         || commitHashesInWindow.contains(extractCommitSha(candidate.reference())));
+    }
+
+    private static final Set<String> FILE_EVIDENCE_KINDS = Set.of("SOURCE_FILE", "TEST_FILE", "CONFIG_FILE");
+
+    private boolean isRequestedFileEvidence(RepositoryEvidence evidence, List<String> requestedFiles) {
+        if (requestedFiles == null || requestedFiles.isEmpty() || !FILE_EVIDENCE_KINDS.contains(evidence.kind())
+                || evidence.provenance() == null || evidence.provenance().originatingFile() == null) {
+            return false;
+        }
+        String file = evidence.provenance().originatingFile().replace('\\', '/');
+        return requestedFiles.stream().filter(java.util.Objects::nonNull).map(value -> value.replace('\\', '/'))
+                .anyMatch(requested -> file.equals(requested) || file.startsWith(requested + "/"));
     }
 
     private boolean isTechnicalEvidence(RepositoryEvidence evidence) {

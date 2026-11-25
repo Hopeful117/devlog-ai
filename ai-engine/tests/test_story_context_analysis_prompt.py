@@ -291,3 +291,48 @@ def test_prompts_require_verbatim_references_and_retry_restates_rule() -> None:
     assert marker in builder.investigation_corrective_retry(prompt, ValueError(unknown)).user_message
     assert marker in builder.corrective_retry(prompt, ValueError(unknown)).user_message
     assert marker not in builder.corrective_retry(prompt, ValueError("Invalid confidence level")).user_message
+
+
+def test_citable_references_list_exactly_the_typed_allow_list_in_core_order() -> None:
+    """Story 0243: the prompt carries the exact, exhaustive citable reference list."""
+    from app.prompts.story_context_analysis import citable_references
+
+    contract = {"allowedGroundingReferences": [
+        {"ref": "file:s:backend/A.java@r"}, {"ref": "document:s:docs/ADR-006.md@r"},
+        {"ref": "file:s:backend/A.java@r"}, {"other": "x"}, "bad"]}
+
+    assert citable_references(contract) == ["file:s:backend/A.java@r", "document:s:docs/ADR-006.md@r"]
+    assert citable_references(None) == []
+    block = StoryContextAnalysisPromptBuilder()._citable_references_block(contract)
+    assert block.startswith("CITABLE REFERENCES (EXACT, EXHAUSTIVE, AUTHORITATIVE)")
+    assert "- file:s:backend/A.java@r" in block
+    assert "merely mentioned" in block
+
+
+def test_requested_directory_scope_maps_the_files_under_it() -> None:
+    """Story 0243: a requested directory is not an empty mapping."""
+    import json
+
+    projection = {"request": {"files": ["backend/pkg"]}}
+    contract = {"allowedGroundingReferences": [
+        {"ref": "file:s:backend/pkg/usecase/A.java@r",
+         "provenance": {"originatingFile": "backend/pkg/usecase/A.java"}},
+        {"ref": "file:s:frontend/B.ts@r", "provenance": {"originatingFile": "frontend/B.ts"}}]}
+
+    scope = json.loads(StoryContextAnalysisPromptBuilder()._requested_file_scope(projection, contract))
+
+    assert scope["groundingReferences"]["backend/pkg"] == ["file:s:backend/pkg/usecase/A.java@r"]
+
+
+def test_corrective_retry_quotes_rejected_references() -> None:
+    """Story 0243: an unknown-reference retry names what must not be emitted again."""
+    from app.prompts.story_context_analysis import _unknown_reference_retry_rule
+
+    rule = _unknown_reference_retry_rule(
+        "Objective understanding references unknown evidence: "
+        "['file:s/ai-engine/app/schemas/x.py@r', 'file:s:ai-engine/app/schemas/y.py@r']")
+
+    assert "UNKNOWN REFERENCE CORRECTION" in rule
+    assert "- file:s/ai-engine/app/schemas/x.py@r" in rule
+    assert "- file:s:ai-engine/app/schemas/y.py@r" in rule
+    assert _unknown_reference_retry_rule("some other failure") == ""

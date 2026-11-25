@@ -158,12 +158,22 @@ public class AnalyzeStoryContextUseCase {
             return existingSubmission.get();
         }
 
+        // Story 0243 (R5): the caller's question (guidance focus) also drives
+        // evidence retrieval, not only the prompt.
+        String question = retrievalQuestion(guidance, requestedIntent);
         return submitPrepared(
-                normalizedRevision(revision) == null
+                normalizedRevision(revision) == null && question == null
                         ? prepare(projectSlug, storyId, requestedIntent, files)
-                        : preparationService.prepare(projectSlug, storyId, requestedIntent, files, null,
+                        : preparationService.prepare(projectSlug, storyId, requestedIntent, files, question,
                                 normalizedRevision(revision)),
                 guidance, identity, principal, provider);
+    }
+
+    private static String retrievalQuestion(Map<String, Object> guidance, String requestedIntent) {
+        if (guidance == null || !(guidance.get("focus") instanceof String focus)) return null;
+        String value = focus.strip();
+        if (value.isEmpty() || value.length() > 2000 || value.equals(requestedIntent)) return null;
+        return value;
     }
 
     private static String normalizedRevision(String revision) {
