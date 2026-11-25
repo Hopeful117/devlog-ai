@@ -269,7 +269,20 @@ public class AnalyzeStoryContextUseCase {
                 // TIMED_OUT indicates a transient infrastructure failure (e.g. AI engine processed
                 // the task but the callback to Core failed). Allow a retry with the same key so
                 // the caller gets a fresh task rather than the permanently stuck timed-out one.
-                if (existingTask.getStatus() == AiTaskStatus.TIMED_OUT) {
+                // Clear submissionDigest to unblock the unique constraint so the new task can be
+                // inserted with the same digest (the fallback findBySubmissionDigest path also
+                // relies on this being null to avoid re-resolving to the stuck task).
+                if (existingTask.getStatus() == AiTaskStatus.TIMED_OUT
+                        || existingTask.getStatus() == AiTaskStatus.FAILED) {
+                    // TIMED_OUT: transient infrastructure failure (AI engine processed but callback failed).
+                    // FAILED: terminal AI failure (e.g. BUDGET_EXHAUSTED). Allow retry with same key so
+                    // the caller is not permanently stuck on the failed task.
+                    // Clear all unique-constraint fields so a fresh task can be created without hitting
+                    // any uk_ai_task_sca_* constraint on the retired record.
+                    existingTask.setSubmissionDigest(null);
+                    existingTask.setIdempotencyKeyHash(null);
+                    existingTask.setIdempotencyScopeHash(null);
+                    aiTaskRepository.save(existingTask);
                     return Optional.empty();
                 }
                 if (!Objects.equals(existingTask.getSubmissionDigest(), identity.submissionDigest())) {

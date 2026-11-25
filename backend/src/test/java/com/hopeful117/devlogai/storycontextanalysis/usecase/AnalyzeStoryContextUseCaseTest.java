@@ -75,6 +75,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -549,6 +550,7 @@ class AnalyzeStoryContextUseCaseTest {
                 eq("human-1"), eq(projectId), any())).thenReturn(true);
         when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(any(), any()))
                 .thenReturn(Optional.of(timedOut));
+        when(aiTaskRepository.save(timedOut)).thenReturn(timedOut);
         when(engineeringContextFacade.getCanonicalEngineeringContext(any(), any(), any(), any()))
                 .thenReturn(null);
 
@@ -558,6 +560,50 @@ class AnalyzeStoryContextUseCaseTest {
         assertThrows(IllegalStateException.class,
                 () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null,
                         "retry-key", principal, "chatgpt"));
+        // All three unique-constraint fields must be cleared so no uk_ai_task_sca_* constraint
+        // blocks insertion of the replacement task.
+        verify(aiTaskRepository).save(timedOut);
+        assertNull(timedOut.getSubmissionDigest());
+        assertNull(timedOut.getIdempotencyKeyHash());
+        assertNull(timedOut.getIdempotencyScopeHash());
+        verify(engineeringContextFacade).getCanonicalEngineeringContext(
+                PROJECT_SLUG, INTENT_ID, List.of(), storyId);
+        verify(analysisRepository, never()).save(any(Analysis.class));
+    }
+
+    @Test
+    void failedTaskIsNotReturnedByIdempotencyLookupAllowingRetry() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        AiTask failed = AiTask.builder().id(UUID.randomUUID())
+                .submissionDigest("same-request")
+                .status(AiTaskStatus.FAILED)
+                .build();
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                "grant-1", projectId.toString(), "MCP_STORY_AGENT_EXECUTE");
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectId), any())).thenReturn(true);
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(any(), any()))
+                .thenReturn(Optional.of(failed));
+        when(aiTaskRepository.save(failed)).thenReturn(failed);
+        when(engineeringContextFacade.getCanonicalEngineeringContext(any(), any(), any(), any()))
+                .thenReturn(null);
+
+        // A FAILED task (e.g. BUDGET_EXHAUSTED) must not block retries with the same key.
+        assertThrows(IllegalStateException.class,
+                () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null,
+                        "retry-key", principal, "chatgpt"));
+        verify(aiTaskRepository).save(failed);
+        assertNull(failed.getSubmissionDigest());
+        assertNull(failed.getIdempotencyKeyHash());
+        assertNull(failed.getIdempotencyScopeHash());
         verify(engineeringContextFacade).getCanonicalEngineeringContext(
                 PROJECT_SLUG, INTENT_ID, List.of(), storyId);
         verify(analysisRepository, never()).save(any(Analysis.class));

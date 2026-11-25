@@ -465,6 +465,15 @@ public class DevLogStoryAgentTool {
             diagnostics.put("recoveryAction", taskStatus.get("recoveryAction"));
         }
         execution.put("diagnostics", diagnostics);
+        // Propagate scope for non-completed tasks so consumers can find resolvedRevision
+        // even when the task failed (e.g. BUDGET_EXHAUSTED).
+        Map<String, Object> partialResult = new LinkedHashMap<>();
+        if (taskStatus.get("contextSnapshot") instanceof Map<?, ?> contextSnapshot) {
+            putIfPresent(partialResult, contextSnapshot, "scope");
+        }
+        if (!partialResult.isEmpty()) {
+            execution.put("result", partialResult);
+        }
         return execution;
     }
 
