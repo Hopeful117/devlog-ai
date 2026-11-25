@@ -39,7 +39,8 @@ public class DevLogStoryAgentController {
                 effectiveQuestion(payload.intent(), payload.question()),
                 payload.files() == null ? List.of() : payload.files(),
                 payload.guidance(),
-                idempotencyKey
+                idempotencyKey,
+                payload.revision()
         );
 
         DevLogStoryAgentExecution execution = devLogStoryAgentService.execute(request, principal);
@@ -62,6 +63,12 @@ public class DevLogStoryAgentController {
             @NotBlank String intent,
             String question,
             List<@NotBlank String> files,
-            Map<String, Object> guidance) {
+            Map<String, Object> guidance,
+            String revision) {
+        /** Story 0242: a payload without a pinned revision. */
+        public AgentRequest(UUID storyId, String intent, String question, List<String> files,
+                            Map<String, Object> guidance) {
+            this(storyId, intent, question, files, guidance, null);
+        }
     }
 }

@@ -363,6 +363,11 @@ class CoreLiveTreatmentAdapter:
             "guidance": guidance,
             "idempotencyKey": idempotency_key,
         }
+        # Story 0242: pin A and C to the authorized source revision, never the
+        # source's moving current revision.
+        pinned_revision = manifest.get("repositoryRevision")
+        if isinstance(pinned_revision, str) and pinned_revision:
+            request["revision"] = pinned_revision
         if self._case_story_id is not None:
             request["storyId"] = self._case_story_id
         try:
@@ -415,7 +420,9 @@ class CoreLiveTreatmentAdapter:
                 "taskId": task_id,
                 "mcpResponse": response_diagnostic,
             }
-        if self.condition == "C_DEVLOG_ENGINEERING_ANALYST":
+        if self.condition in ("A_DEVLOG_CURRENT", "C_DEVLOG_ENGINEERING_ANALYST") \
+                and execution_status == "COMPLETED":
+            # Story 0242: A and C must both have run at the authorized revision.
             # MCP leaves scope at the top level when the task was already COMPLETED on submission.
             scope = result.get("scope") if isinstance(result.get("scope"), dict) else execution.get("scope")
             resolved_revision = scope.get("resolvedRevision") if isinstance(scope, dict) else None
@@ -1210,11 +1217,12 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
         authorization_id = authorization.get("authorizationId")
         if not isinstance(authorization_id, str) or not authorization_id.strip():
             raise LiveConfigurationError("live authorization requires an authorization identity")
-        if config.b_task_id is None:
-            # Bindings expire after minutes, so B gets a fresh one per authorization,
-            # reserved before consumption so a reservation failure leaves the authorization unused.
-            reservation = _reserve_task_binding(mcp, config, f"q1-live-binding-{authorization_id}")
-            config = replace(config, b_task_id=UUID(reservation["aiTaskId"]))
+        # Bindings expire after minutes, so B always gets a fresh one per authorization,
+        # reserved before consumption so a reservation failure leaves the authorization unused.
+        # Story 0242: a static DEVLOG_LIVE_B_TASK_ID is ignored here; a stale task id made
+        # every B observation of campaign Q1 gate 1 fail on an unknown binding.
+        reservation = _reserve_task_binding(mcp, config, f"q1-live-binding-{authorization_id}")
+        config = replace(config, b_task_id=UUID(reservation["aiTaskId"]))
         adapters = live_adapters(repository_root=root, manifest=manifest, config=config, mcp=mcp,
                                  case=case, case_story_id=case_story_id,
                                  environment=environment, execution_scope=authorization_id)

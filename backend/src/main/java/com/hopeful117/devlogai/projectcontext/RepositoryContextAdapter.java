@@ -122,6 +122,22 @@ public class RepositoryContextAdapter {
             UUID storyId,
             String question
     ) {
+        return buildRepositoryContext(projectId, storyDescription, snapshot, files, storyId, question, null);
+    }
+
+    /**
+     * Story 0242: {@code requestedRevision}, when present, pins the repository
+     * revision of this execution; the workspace must resolve exactly to it.
+     */
+    public RepositoryContext buildRepositoryContext(
+            UUID projectId,
+            String storyDescription,
+            ProjectContextSnapshot snapshot,
+            List<String> files,
+            UUID storyId,
+            String question,
+            String requestedRevision
+    ) {
         var currentStory = resolveStory(snapshot, storyId);
         String selectionText = selectionText(storyDescription, question, currentStory, files);
         BoundedKnowledge boundedKnowledge = boundedKnowledge(
@@ -138,7 +154,7 @@ public class RepositoryContextAdapter {
         UserGuidance guidance = createGuidance(selectionText, files);
 
         RepositoryRevisionScope revisionScope = resolveRevisionScope(
-                projectId, currentStory, snapshot);
+                projectId, currentStory, snapshot, requestedRevision);
         RepositoryContext context = revisionScope == null
                 ? repositoryContextService.build(
                         syntheticContext, intent, guidance, validatedInsights)
@@ -155,8 +171,9 @@ public class RepositoryContextAdapter {
 
     private RepositoryRevisionScope resolveRevisionScope(
             UUID projectId, ProjectContextSnapshot.EngineeringStorySnapshot story,
-            ProjectContextSnapshot snapshot) {
-        if (story == null) return null;
+            ProjectContextSnapshot snapshot, String pinnedRevision) {
+        boolean pinned = pinnedRevision != null && !pinnedRevision.isBlank();
+        if (story == null && !pinned) return null;
 
         List<Source> sources = sourceRepository
                 .findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(projectId);
@@ -172,6 +189,17 @@ public class RepositoryContextAdapter {
         }
 
         Source source = sources.getFirst();
+        if (pinned) {
+            String requested = pinnedRevision.strip();
+            SynchronizedWorkspace workspace = workspaceManager.synchronize(source, requested);
+            String revision = workspace.resolvedRevision();
+            if (revision == null || !revision.equalsIgnoreCase(requested)) {
+                throw new IllegalArgumentException(
+                        "Requested revision is not an exact commit of the active source: " + requested);
+            }
+            return new RepositoryRevisionScope(projectId, source.getId(), revision,
+                    workspace.path(), RepositoryRevisionScope.SOURCE_REQUESTED);
+        }
         String requestedRevision = firstNonBlank(story.targetCommit(), analysisTargetRevision(snapshot));
         SynchronizedWorkspace workspace = workspaceManager.synchronize(source, requestedRevision);
         String revision = workspace.resolvedRevision();

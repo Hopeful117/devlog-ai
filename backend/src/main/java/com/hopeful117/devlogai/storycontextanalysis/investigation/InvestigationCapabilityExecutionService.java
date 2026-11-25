@@ -37,9 +37,9 @@ public class InvestigationCapabilityExecutionService {
             InvestigationBudget budget,
             InvestigationUsage usage,
             Set<String> actionIds) {
-        if (projectId == null || storyId == null) {
+        if (projectId == null) {
             return InvestigationCapabilityResult.rejected(
-                    projectId, storyId, action, "INVALID_INPUT", "Project and Story identifiers are required");
+                    projectId, storyId, action, "INVALID_INPUT", "Project identifier is required");
         }
         var validation = InvestigationCapabilityActionValidator.validate(
                 action, scope, budget, usage, actionIds,
@@ -57,7 +57,9 @@ public class InvestigationCapabilityExecutionService {
                     snapshot,
                     requestedFiles(action),
                     storyId,
-                    searchQuestion(action));
+                    searchQuestion(action),
+                    // Story 0242: every action reads the task's pinned revision.
+                    scope.revision());
             return projectResult(projectId, storyId, action, scope, context);
         } catch (RuntimeException exception) {
             return InvestigationCapabilityResult.rejected(

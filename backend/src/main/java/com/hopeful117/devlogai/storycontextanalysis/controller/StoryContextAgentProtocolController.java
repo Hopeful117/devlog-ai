@@ -161,7 +161,7 @@ public class StoryContextAgentProtocolController {
             List<String> files = request.files() == null ? List.of() : request.files();
             UUID aiTaskId = analyzeStoryContextUseCase.execute(
                     projectSlug, storyId, request.intent(), files, request.guidance(), idempotencyKey,
-                    principal, "chatgpt");
+                    principal, "chatgpt", request.revision());
             AiTaskResponse task = aiTaskService.getById(aiTaskId);
             return ResponseEntity.accepted().body(SubmitResponse.from(task, task.contextSnapshot()));
         });
@@ -301,7 +301,13 @@ public class StoryContextAgentProtocolController {
                 principal, snapshotId, request.question(), request.guidance(), idempotencyKey));
     }
 
-    public record SubmitRequest(@NotBlank String intent, List<String> files, Map<String, Object> guidance) { }
+    /** Story 0242: {@code revision} optionally pins the execution to an exact source commit. */
+    public record SubmitRequest(@NotBlank String intent, List<String> files, Map<String, Object> guidance,
+                                String revision) {
+        public SubmitRequest(String intent, List<String> files, Map<String, Object> guidance) {
+            this(intent, files, guidance, null);
+        }
+    }
 
     public record ReservationResponse(UUID aiTaskId, String provider,
                                       String model, String status) {

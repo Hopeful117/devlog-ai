@@ -19,7 +19,17 @@ public record PreparedStoryContext(
         CanonicalEngineeringContext canonicalContext,
         Map<String, Object> projection,
         String projectionDigest,
-        String question) {
+        String question,
+        String revision) {
+    /** Story 0242: an execution prepared without a pinned revision. */
+    public PreparedStoryContext(String projectSlug, UUID storyId, String intent, List<String> files,
+                                Project project, EngineeringStory story,
+                                CanonicalEngineeringContext canonicalContext, Map<String, Object> projection,
+                                String projectionDigest, String question) {
+        this(projectSlug, storyId, intent, files, project, story, canonicalContext, projection,
+                projectionDigest, question, null);
+    }
+
     public PreparedStoryContext {
         if (projectSlug == null || projectSlug.isBlank()) {
             throw new IllegalArgumentException("projectSlug is required");

@@ -34,6 +34,12 @@ public class StoryContextPreparationService {
 
     public PreparedStoryContext prepare(String projectSlug, UUID storyId, String intent,
                                         List<String> files, String question) {
+        return prepare(projectSlug, storyId, intent, files, question, null);
+    }
+
+    /** Story 0242: a non-blank revision pins the canonical context to that exact commit. */
+    public PreparedStoryContext prepare(String projectSlug, UUID storyId, String intent,
+                                        List<String> files, String question, String revision) {
         Project project = projectRepository.findBySlug(projectSlug)
                 .orElseThrow(() -> new EntityNotFoundException("Project", projectSlug));
         EngineeringStory story = storyId == null ? null : storyRepository.findById(storyId)
@@ -43,7 +49,11 @@ public class StoryContextPreparationService {
         }
 
         List<String> requestedFiles = files == null ? List.of() : List.copyOf(files);
-        CanonicalEngineeringContext canonical = question == null
+        String pinnedRevision = revision == null || revision.isBlank() ? null : revision.strip();
+        CanonicalEngineeringContext canonical = pinnedRevision != null
+                ? engineeringContextFacade.getCanonicalEngineeringContext(
+                        projectSlug, intent, requestedFiles, storyId, question, pinnedRevision)
+                : question == null
                 ? engineeringContextFacade.getCanonicalEngineeringContext(
                         projectSlug, intent, requestedFiles, storyId)
                 : engineeringContextFacade.getCanonicalEngineeringContext(
@@ -63,6 +73,6 @@ public class StoryContextPreparationService {
 
         return new PreparedStoryContext(
                 projectSlug, storyId, intent, requestedFiles, project, story, canonical, projection,
-                (String) projection.get("projectionDigest"), question);
+                (String) projection.get("projectionDigest"), question, pinnedRevision);
     }
 }

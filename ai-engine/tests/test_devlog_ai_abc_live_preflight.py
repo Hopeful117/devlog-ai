@@ -525,6 +525,7 @@ def test_core_live_adapter_uses_authenticated_mcp_without_core_bearer() -> None:
             return {
                 "status": "COMPLETED",
                 "aiTaskId": "task-1",
+                "scope": {"resolvedRevision": "pinned-revision"},
                 "result": {"analysis": "bounded"},
             }
 
@@ -535,12 +536,14 @@ def test_core_live_adapter_uses_authenticated_mcp_without_core_bearer() -> None:
         "DEVLOG_LIVE_FILES": "docs/a.md",
         "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
     }, require_task_id=False)
-    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, {}, mcp)
+    pinned = {"repositoryRevision": "pinned-revision"}
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, pinned, mcp)
 
-    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, {})
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, pinned)
 
     assert result["executionStatus"] == "COMPLETED"
     assert result["submission"]["status"] == "MCP_ACCEPTED"
+    assert mcp.calls[0][1]["revision"] == "pinned-revision"
     assert mcp.calls[0][0] == "devlog_story_agent"
     assert "storyId" not in mcp.calls[0][1]
     assert "Authorization" not in mcp.calls[0][1]
@@ -787,12 +790,14 @@ def test_core_live_adapter_rereads_completed_task_after_mcp_poll_ceiling() -> No
                 return {"status": "TIMED_OUT", "aiTaskId": "task-9", "diagnostics": {
                     "code": "POLL_TIMEOUT", "aiTaskId": "task-9", "deadlineAt": deadline,
                     "lastKnownStatus": "SUBMITTED"}}
-            return {"status": "COMPLETED", "aiTaskId": "task-9", "result": {"analysis": "bounded"}}
+            return {"status": "COMPLETED", "aiTaskId": "task-9", "scope": {"resolvedRevision": "pinned-revision"},
+                    "result": {"analysis": "bounded"}}
 
     mcp = FakeMcp()
-    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", _core_config(), {}, mcp)
+    pinned = {"repositoryRevision": "pinned-revision"}
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", _core_config(), pinned, mcp)
 
-    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, {})
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, pinned)
 
     assert result["executionStatus"] == "COMPLETED"
     assert result["integrationStatus"] == "LIVE_CORE_CALLBACK_COMPLETED"

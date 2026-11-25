@@ -268,3 +268,84 @@ def test_unknown_freshness_never_consumes_the_authorization(monkeypatch: pytest.
 
     assert "consume_bounded_live_evaluation_authorization" not in calls
     assert "story_context_agent_prepare_task_binding" not in calls
+
+
+def test_a_fails_closed_when_core_ran_at_another_revision() -> None:
+    case = load_case(ROOT, "Q1")
+    manifest = {"repositoryRevision": "0673d1d32433cdaff054d5f1defd1bedd01c0039"}
+    mcp = RecordingMcp({"devlog_story_agent": {
+        "status": "COMPLETED", "aiTaskId": "task-1",
+        "scope": {"resolvedRevision": "7ecc16806e3dea3c412f98139952ed0cfabb6f54"},
+        "result": {"analysis": {"objectiveUnderstanding": {"summary": "bounded"}}},
+    }})
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", _config(), manifest, mcp, case=case)
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, manifest)
+
+    assert mcp.calls[0][1]["revision"] == manifest["repositoryRevision"]
+    assert result["executionStatus"] == "RUNTIME_FAILURE"
+    assert result["errorType"] == "Q1_SOURCE_REVISION_MISMATCH"
+
+
+def test_live_run_ignores_a_stale_b_task_id_and_reserves_a_fresh_binding(
+        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    from evaluations.devlog_ai_abc_runner import live_execution
+
+    calls: list[tuple[str, dict]] = []
+    captured: dict = {}
+
+    class FakeMcp:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            calls.append((name, arguments))
+            if name == "get_bounded_live_evaluation_preparation":
+                return {"planId": "plan-1", "projectSlug": "devlog-ai", "planDigest": "digest-1"}
+            if name == "story_context_agent_get_projection":
+                return {"freshness": {"state": "FRESH"}}
+            if name == "story_context_agent_prepare_task_binding":
+                return {"aiTaskId": "00000000-0000-0000-0000-0000000000f2"}
+            if name == "consume_bounded_live_evaluation_authorization":
+                return {"status": "CONSUMED"}
+            raise AssertionError(name)
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(live_execution, "McpClient", FakeMcp)
+    monkeypatch.setattr(live_execution, "current_head", lambda root: "rev-1")
+    monkeypatch.setattr(live_execution, "assert_reproducible_worktree", lambda root: None)
+    monkeypatch.setattr(live_execution, "require_live_provider_environment", lambda env: None)
+    monkeypatch.setattr(live_execution, "validate_prepared_plan", lambda *a, **k: None)
+    monkeypatch.setattr(live_execution, "resolve_live_story",
+                        lambda config, mcp: replace(config, story_id="00000000-0000-0000-0000-000000000223"))
+    monkeypatch.setattr(live_execution, "run_dry_run", lambda **kwargs: captured.update(kwargs) or "RAN")
+
+    live_execution.run_live_execution(
+        manifest_path=tmp_path / "manifest.json",
+        output_root=tmp_path / "out",
+        repository_root=ROOT,
+        manifest={"model": "gpt-5.6-luna", "caseId": "Q1", "caseVersion": "1.0.0", "observations": []},
+        authorization={"planId": "plan-1", "planDigest": "digest-1", "runtimeRevision": "rev-1",
+                       "authorizationId": "auth-9"},
+        prepared_plan={"planId": "plan-1", "planDigest": "digest-1"},
+        oracle={},
+        environment={
+            "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+            "DEVLOG_LIVE_STORY_NUMBER": "223",
+            "DEVLOG_LIVE_FILES": "docs/stories/0223-agentic-quality-real-story-pilot/story.md",
+            "DEVLOG_LIVE_B_TASK_ID": "5fa2a3e7-9918-47cd-9149-0a3be4be815a",
+            "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+            "LLM_PROVIDER": "openai_chatgpt",
+            "CHATGPT_OAUTH_ENABLED": "true",
+            "DEVLOG_LIVE_REMOTE_PROVIDER": "true",
+        },
+    )
+
+    assert "story_context_agent_prepare_task_binding" in [name for name, _ in calls]
+    b_adapter = captured["adapters"]["B_DIRECT_INVESTIGATOR"]
+    assert "00000000-0000-0000-0000-0000000000f2" in repr(vars(b_adapter))
+    assert "5fa2a3e7" not in repr(vars(b_adapter))

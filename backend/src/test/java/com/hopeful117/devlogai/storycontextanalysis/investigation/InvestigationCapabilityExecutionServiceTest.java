@@ -61,7 +61,7 @@ class InvestigationCapabilityExecutionServiceTest {
         var action = search("action-1", 2);
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
         when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
-                eq(snapshot), any(), eq(STORY_ID), eq(action.query())))
+                eq(snapshot), any(), eq(STORY_ID), eq(action.query()), eq(REVISION)))
                 .thenReturn(context(evidence("backend/Main.java", REVISION, "match")));
 
         var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
@@ -82,7 +82,7 @@ class InvestigationCapabilityExecutionServiceTest {
                 "inspect source", "backend/Main.java", 2, 3, 1, 10_000, 2_000);
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
         when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
-                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null)))
+                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null), eq(REVISION)))
                 .thenReturn(context(evidence("backend/Main.java", REVISION, "one\ntwo\nthree\nfour")));
 
         var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
@@ -102,7 +102,7 @@ class InvestigationCapabilityExecutionServiceTest {
         var sourceId = UUID.randomUUID();
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
         when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
-                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null)))
+                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null), eq(REVISION)))
                 .thenReturn(contextWithRevisionScope(sourceId, storyEvidence(action.path())));
         when(evidenceResolutionFacade.resolve(any())).thenReturn(evidenceResolutionResult);
         when(evidenceResolutionResult.payload())
@@ -127,7 +127,7 @@ class InvestigationCapabilityExecutionServiceTest {
         var sourceId = UUID.randomUUID();
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
         when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
-                eq(snapshot), eq(List.of()), eq(STORY_ID), eq(action.query())))
+                eq(snapshot), eq(List.of()), eq(STORY_ID), eq(action.query()), eq(REVISION)))
                 .thenReturn(contextWithRevisionScope(sourceId, storyEvidence("docs/q1.md")));
         when(evidenceResolutionFacade.resolve(any())).thenReturn(evidenceResolutionResult);
         when(evidenceResolutionResult.payload())
@@ -152,7 +152,7 @@ class InvestigationCapabilityExecutionServiceTest {
                 "inspect Story", "docs/stories/0230/story.md", 1, 2, 1, 10_000, 2_000);
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
         when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
-                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null)))
+                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null), eq(REVISION)))
                 .thenReturn(context(storyEvidence(action.path())));
 
         var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
@@ -169,7 +169,7 @@ class InvestigationCapabilityExecutionServiceTest {
                 "inspect source", "backend/Main.java", 1, 2, 1, 10_000, 2_000);
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
         when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
-                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null)))
+                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null), eq(REVISION)))
                 .thenReturn(contextWithRevisionScope(UUID.randomUUID(),
                         evidenceWithoutRevision(action.path())));
 
@@ -187,7 +187,7 @@ class InvestigationCapabilityExecutionServiceTest {
         var sourceId = UUID.randomUUID();
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
         when(repositoryContextAdapter.buildRepositoryContext(eq(PROJECT_ID), eq(action.purpose()),
-                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null)))
+                eq(snapshot), eq(List.of(action.path())), eq(STORY_ID), eq((String) null), eq(REVISION)))
                 .thenReturn(contextWithRevisionScope(sourceId, storyEvidence(action.path())));
         when(evidenceResolutionFacade.resolve(any())).thenThrow(new EvidenceResolutionException(
                 EvidenceResolutionFailureCode.EVIDENCE_NO_LONGER_RESOLVABLE,
@@ -218,7 +218,7 @@ class InvestigationCapabilityExecutionServiceTest {
     void emptyResultsAreExplicitAndDoNotInventEvidence() {
         var action = search("action-4", 1);
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
-        when(repositoryContextAdapter.buildRepositoryContext(any(), any(), any(), any(), any(), any()))
+        when(repositoryContextAdapter.buildRepositoryContext(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(context());
 
         var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
@@ -239,14 +239,14 @@ class InvestigationCapabilityExecutionServiceTest {
         var action = search("action-5", 1);
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
         var item = evidence("backend/Main.java", REVISION, "match");
-        when(repositoryContextAdapter.buildRepositoryContext(any(), any(), any(), any(), any(), any()))
+        when(repositoryContextAdapter.buildRepositoryContext(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(context(item, item, evidence("backend/Other.java", REVISION, "match")));
 
         var result = service.execute(PROJECT_ID, STORY_ID, action, SCOPE, BUDGET,
                 InvestigationUsage.empty(), Set.of());
 
         assertThat(result.evidence()).hasSize(1);
-        verify(repositoryContextAdapter).buildRepositoryContext(any(), any(), any(), any(), any(), any());
+        verify(repositoryContextAdapter).buildRepositoryContext(any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -254,7 +254,7 @@ class InvestigationCapabilityExecutionServiceTest {
         var action = new SearchEvidenceRequest("action-6", "devlog", REVISION,
                 "find source", "match", "backend", 10, 10, 10);
         when(projectContextProvider.build(PROJECT_ID)).thenReturn(snapshot);
-        when(repositoryContextAdapter.buildRepositoryContext(any(), any(), any(), any(), any(), any()))
+        when(repositoryContextAdapter.buildRepositoryContext(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(context(evidence("backend/One.java", REVISION, "match"),
                         evidence("backend/Two.java", REVISION, "match")));
 

@@ -89,6 +89,12 @@ public class AnalyzeStoryContextUseCase {
         return preparationService.prepare(projectSlug, storyId, intent, files, question);
     }
 
+    /** Story 0242: prepare an execution pinned to an exact source revision. */
+    public PreparedStoryContext prepare(String projectSlug, UUID storyId, String intent,
+                                        List<String> files, String question, String revision) {
+        return preparationService.prepare(projectSlug, storyId, intent, files, question, revision);
+    }
+
     public UUID execute(
             String projectSlug,
             UUID storyId,
@@ -119,6 +125,17 @@ public class AnalyzeStoryContextUseCase {
             Map<String, Object> guidance, String idempotencyKey,
             AuthenticatedPrincipal principal, String provider
     ) {
+        return execute(projectSlug, storyId, requestedIntent, files, guidance, idempotencyKey,
+                principal, provider, null);
+    }
+
+    /** Story 0242: submit an execution pinned to an exact source revision (null keeps current resolution). */
+    @Transactional
+    public UUID execute(
+            String projectSlug, UUID storyId, String requestedIntent, List<String> files,
+            Map<String, Object> guidance, String idempotencyKey,
+            AuthenticatedPrincipal principal, String provider, String revision
+    ) {
         Project project = projectRepository.findBySlug(projectSlug)
                 .orElseThrow(() -> new EntityNotFoundException("Project", projectSlug));
         authorizePrincipal(principal, project, "MCP_STORY_AGENT_EXECUTE");
@@ -134,14 +151,23 @@ public class AnalyzeStoryContextUseCase {
 
         List<String> requestedFiles = files == null ? List.of() : List.copyOf(files);
         SubmissionIdentity identity = submissionIdentity(
-                projectSlug, storyId, requestedIntent, requestedFiles, null, guidance, idempotencyKey, principal);
+                projectSlug, storyId, requestedIntent, requestedFiles, null, normalizedRevision(revision),
+                guidance, idempotencyKey, principal);
         Optional<UUID> existingSubmission = existingSubmission(identity);
         if (existingSubmission.isPresent()) {
             return existingSubmission.get();
         }
 
         return submitPrepared(
-                prepare(projectSlug, storyId, requestedIntent, files), guidance, identity, principal, provider);
+                normalizedRevision(revision) == null
+                        ? prepare(projectSlug, storyId, requestedIntent, files)
+                        : preparationService.prepare(projectSlug, storyId, requestedIntent, files, null,
+                                normalizedRevision(revision)),
+                guidance, identity, principal, provider);
+    }
+
+    private static String normalizedRevision(String revision) {
+        return revision == null || revision.isBlank() ? null : revision.strip().toLowerCase(java.util.Locale.ROOT);
     }
 
     /** Submits a previously prepared context without reconstructing or selecting it again. */
@@ -159,7 +185,7 @@ public class AnalyzeStoryContextUseCase {
         authorizePrincipal(principal, project, "MCP_STORY_AGENT_EXECUTE");
         SubmissionIdentity identity = submissionIdentity(
                 prepared.projectSlug(), prepared.storyId(), prepared.intent(), prepared.files(),
-                prepared.question(), guidance, idempotencyKey, principal);
+                prepared.question(), prepared.revision(), guidance, idempotencyKey, principal);
         Optional<UUID> existingSubmission = existingSubmission(identity);
         if (existingSubmission.isPresent()) {
             return existingSubmission.get();
@@ -235,6 +261,14 @@ public class AnalyzeStoryContextUseCase {
             String projectSlug, UUID storyId, String requestedIntent, List<String> files,
             String question, Map<String, Object> guidance, String idempotencyKey,
             AuthenticatedPrincipal principal) {
+        return submissionIdentity(projectSlug, storyId, requestedIntent, files, question, null,
+                guidance, idempotencyKey, principal);
+    }
+
+    private SubmissionIdentity submissionIdentity(
+            String projectSlug, UUID storyId, String requestedIntent, List<String> files,
+            String question, String revision, Map<String, Object> guidance, String idempotencyKey,
+            AuthenticatedPrincipal principal) {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("projectSlug", projectSlug);
         values.put("storyId", storyId == null ? null : storyId.toString());
@@ -242,6 +276,10 @@ public class AnalyzeStoryContextUseCase {
         values.put("question", question);
         values.put("files", files);
         values.put("guidance", guidance == null ? Map.of() : guidance);
+        if (revision != null) {
+            // Story 0242: only pinned executions carry a revision, so existing identities are unchanged.
+            values.put("revision", revision);
+        }
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             return new SubmissionIdentity(digestService.sha256(digestService.canonicalJson(values)), null, null);
         }
