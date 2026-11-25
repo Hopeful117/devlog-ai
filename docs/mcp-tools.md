@@ -46,6 +46,19 @@ sont idempotents sur `(projectId, storyNumber)`.
 après l'import de l'historique. `sync_project_stories` permet de demander le
 catalogue seul lorsque l'import historique n'est pas nécessaire.
 
+## `refresh_project_baseline` / `get_project_baseline_status`
+
+Story 0240. `refresh_project_baseline(projectSlug, targetRevision?)` starts or
+reuses a Core Project Understanding execution for the project's single active
+repository source (`POST /api/v1/projects/{projectId}/understanding-executions`),
+with the caller's bearer token. It returns the analysis id, status and outcome.
+
+`get_project_baseline_status(projectSlug, analysisId)` returns a bounded
+projection of that analysis (id, type, intent, status, timestamps) and the Core
+project freshness summary. An analysis that belongs to another project is
+rejected as not found. Both tools refuse unauthenticated calls. Proposals
+produced by the analysis still require human review through the proposal tools.
+
 ## Story Context Agent v1 (canonical)
 
 The canonical runtime route is the versioned asynchronous protocol:

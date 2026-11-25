@@ -1,7 +1,9 @@
 package com.hopeful117.devlogai.projectunderstanding;
 
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipalResolver;
 import com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingRequest;
 import com.hopeful117.devlogai.projectunderstanding.dto.ProjectUnderstandingResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -18,12 +20,16 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ProjectUnderstandingController {
     private final ProjectUnderstandingService service;
+    private final AuthenticatedPrincipalResolver principalResolver;
 
     @PostMapping
     public ResponseEntity<ProjectUnderstandingResponse> execute(
             @PathVariable UUID projectId,
-            @Valid @RequestBody ProjectUnderstandingRequest request
+            @Valid @RequestBody ProjectUnderstandingRequest request,
+            HttpServletRequest servletRequest
     ) {
-        return ResponseEntity.ok(service.execute(projectId, request));
+        // Story 0241: the caller's identity selects its provider credential binding.
+        return ResponseEntity.ok(service.execute(projectId, request,
+                principalResolver.resolve(servletRequest).orElse(null)));
     }
 }

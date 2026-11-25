@@ -55,6 +55,26 @@ class AiTaskExecutionAuthorizationServiceTest {
     }
 
     @Test
+    void bindingOnlyAuthorizationLeavesTheExecutionIdentityUnset() {
+        AiUserConfiguration configuration = configuration("openai_chatgpt", "gpt-5.6-luna");
+        AiTask task = mock(AiTask.class);
+        UUID taskId = UUID.randomUUID();
+        when(task.getId()).thenReturn(taskId);
+        when(configurations.findByPrincipalId("principal-1")).thenReturn(Optional.of(configuration));
+        when(associations.findByPrincipalIdAndProvider("principal-1", "chatgpt"))
+                .thenReturn(Optional.of(new AiCredentialAssociation()));
+        when(configurationService.state(any(), any())).thenReturn(AiUserConfigurationState.READY);
+        when(bindings.issue(any(), eq(taskId), eq("chatgpt")))
+                .thenReturn(AiCredentialBinding.builder().id(UUID.randomUUID()).build());
+
+        var result = service().authorizeAndIssueBinding(principal(), task);
+
+        assertEquals("chatgpt", result.provider());
+        verify(task, never()).setProvider(any());
+        verify(task, never()).setModelIdentifier(any());
+    }
+
+    @Test
     void readyAnthropicConfigurationUsesAnthropicBinding() {
         AiUserConfiguration configuration = mock(AiUserConfiguration.class);
         when(configuration.getProvider()).thenReturn("anthropic");
