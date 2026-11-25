@@ -52,3 +52,16 @@ def test_json_formatter_includes_bounded_output_allowance_metadata() -> None:
     assert event["outputParameterSource"] == "CORE_AUTHORIZED"
     assert "prompt" not in event
     assert "credential" not in event
+
+
+def test_json_formatter_includes_provider_usage_tokens() -> None:
+    record = logging.LogRecord("test", logging.INFO, __file__, 1, "usage measured", (), None)
+    record.inputTokens = 1200
+    record.outputTokens = 4800
+    record.reasoningTokens = 3100
+
+    event = json.loads(JsonFormatter().format(record))
+
+    assert event["inputTokens"] == 1200
+    assert event["outputTokens"] == 4800
+    assert event["reasoningTokens"] == 3100

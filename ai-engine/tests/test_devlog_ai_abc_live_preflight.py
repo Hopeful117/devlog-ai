@@ -38,7 +38,7 @@ from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
 ROOT = Path(__file__).parents[1].parent
 MANIFEST_PATH = ROOT / "docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json"
 ORACLE_PATH = ROOT / "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json"
-REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
+REVISION = "0673d1d32433cdaff054d5f1defd1bedd01c0039"
 
 
 def manifest() -> dict:
@@ -267,6 +267,29 @@ def test_core_live_adapter_accepts_c_source_revision_from_nested_result() -> Non
                 "scope": {"resolvedRevision": "authorized-revision"},
                 "analysis": {},
             },
+        }),
+    )
+
+    result = adapter.execute(
+        {"observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1"},
+        {**manifest(), "repositoryRevision": "authorized-revision"},
+    )
+
+    assert result["executionStatus"] == "COMPLETED"
+    assert result["integrationStatus"] == "LIVE_CORE_CALLBACK_COMPLETED"
+
+
+def test_core_live_adapter_accepts_c_source_revision_from_top_level_scope() -> None:
+    adapter = CoreLiveTreatmentAdapter(
+        "C_DEVLOG_ENGINEERING_ANALYST",
+        SimpleNamespace(project_slug="devlog-ai", story_id=None, story_number=223,
+                         story_path=None, files=("docs/story.md",)),
+        {**manifest(), "repositoryRevision": "authorized-revision"},
+        SimpleNamespace(tool=lambda *_args, **_kwargs: {
+            "status": "COMPLETED",
+            "aiTaskId": "task-id",
+            "scope": {"resolvedRevision": "authorized-revision"},
+            "result": {"analysis": {"objectiveUnderstanding": {"summary": "bounded"}}},
         }),
     )
 
@@ -543,6 +566,94 @@ def test_live_adapters_require_chatgpt_oauth_before_provider_execution() -> None
     assert set(adapters) == {"A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST"}
 
 
+def test_live_execution_reserves_fresh_b_binding_per_authorization_before_consumption(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    from evaluations.devlog_ai_abc_runner import live_execution
+
+    calls: list[tuple[str, dict]] = []
+
+    class FakeMcp:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            calls.append((name, arguments))
+            if name == "get_bounded_live_evaluation_preparation":
+                return {"planId": "plan-1", "projectSlug": "devlog-ai", "planDigest": "digest-1"}
+            if name == "story_context_agent_prepare_task_binding":
+                return {"aiTaskId": "00000000-0000-0000-0000-0000000000b2"}
+            if name == "consume_bounded_live_evaluation_authorization":
+                return {"status": "CONSUMED"}
+            raise AssertionError(name)
+
+        def close(self) -> None:
+            pass
+
+    captured: dict = {}
+    monkeypatch.setattr(live_execution, "McpClient", FakeMcp)
+    monkeypatch.setattr(live_execution, "current_head", lambda root: "rev-1")
+    monkeypatch.setattr(live_execution, "assert_reproducible_worktree", lambda root: None)
+    monkeypatch.setattr(live_execution, "require_live_provider_environment", lambda env: None)
+    monkeypatch.setattr(live_execution, "validate_prepared_plan", lambda *a, **k: None)
+    monkeypatch.setattr(live_execution, "resolve_live_story", lambda config, mcp: config)
+    monkeypatch.setattr(
+        live_execution, "run_dry_run",
+        lambda **kwargs: captured.update(kwargs) or "RAN",
+    )
+
+    result = live_execution.run_live_execution(
+        manifest_path=tmp_path / "manifest.json",
+        output_root=tmp_path / "out",
+        repository_root=tmp_path,
+        manifest={"model": "gpt-5.6-luna", "manifestDigest": "m", "observations": []},
+        authorization={"planId": "plan-1", "planDigest": "digest-1", "runtimeRevision": "rev-1",
+                       "authorizationId": "auth-42"},
+        prepared_plan={"planId": "plan-1", "planDigest": "digest-1"},
+        oracle={},
+        environment={
+            "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+            "DEVLOG_LIVE_STORY_NUMBER": "223",
+            "DEVLOG_LIVE_FILES": "docs/a.md",
+            "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+            "LLM_PROVIDER": "openai_chatgpt",
+            "CHATGPT_OAUTH_ENABLED": "true",
+            "DEVLOG_LIVE_REMOTE_PROVIDER": "true",
+        },
+    )
+
+    assert result == "RAN"
+    names = [name for name, _ in calls]
+    assert names.index("story_context_agent_prepare_task_binding") < names.index(
+        "consume_bounded_live_evaluation_authorization")
+    reservation = dict(calls)["story_context_agent_prepare_task_binding"]
+    assert reservation["idempotencyKey"] == "q1-live-binding-auth-42"
+    b_adapter = captured["adapters"]["B_DIRECT_INVESTIGATOR"]
+    assert "00000000-0000-0000-0000-0000000000b2" in repr(vars(b_adapter))
+
+
+def test_live_adapters_refuse_b_without_reserved_binding() -> None:
+    configuration = LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+    }, require_task_id=False)
+
+    with pytest.raises(LiveConfigurationError, match="reserved credential-binding task"):
+        live_adapters(
+            repository_root=ROOT,
+            manifest={"model": "gpt-5.6-luna"},
+            config=configuration,
+            mcp=object(),
+            environment={
+                "LLM_PROVIDER": "openai_chatgpt",
+                "CHATGPT_OAUTH_ENABLED": "true",
+                "DEVLOG_LIVE_REMOTE_PROVIDER": "true",
+            },
+        )
+
+
 def test_mcp_error_diagnostic_is_bounded_and_redacts_credentials() -> None:
     error = RuntimeError(json.dumps({
         "code": -32001,
@@ -611,3 +722,83 @@ def test_live_mode_remains_disabled_even_when_a_future_contract_is_valid(tmp_pat
             repository_root=ROOT,
             authorization=valid_authorization(),
         )
+
+
+def _core_config() -> LiveConfiguration:
+    return LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+        "DEVLOG_LIVE_POLL_INTERVAL_SECONDS": "0.01",
+    }, require_task_id=False)
+
+
+def test_core_live_adapter_scopes_execution_identity_to_the_authorization() -> None:
+    class FakeMcp:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            self.calls.append((name, arguments))
+            return {"status": "COMPLETED", "aiTaskId": "task-1", "result": {"analysis": "bounded"}}
+
+    mcp = FakeMcp()
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", _core_config(), {}, mcp, execution_scope="auth-7")
+
+    adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, {})
+
+    request = mcp.calls[0][1]
+    assert request["idempotencyKey"].endswith("-auth-7")
+    assert request["guidance"]["evaluation"]["executionIdentity"] == request["idempotencyKey"]
+
+
+def test_core_live_adapter_rereads_completed_task_after_mcp_poll_ceiling() -> None:
+    deadline = "2999-01-01T00:00:00Z"
+
+    class FakeMcp:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            self.calls.append(name)
+            if name == "story_context_agent_get_snapshot_authenticated":
+                return {"id": "task-9", "status": "COMPLETED"}
+            if self.calls.count("devlog_story_agent") == 1:
+                return {"status": "TIMED_OUT", "aiTaskId": "task-9", "diagnostics": {
+                    "code": "POLL_TIMEOUT", "aiTaskId": "task-9", "deadlineAt": deadline,
+                    "lastKnownStatus": "SUBMITTED"}}
+            return {"status": "COMPLETED", "aiTaskId": "task-9", "result": {"analysis": "bounded"}}
+
+    mcp = FakeMcp()
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", _core_config(), {}, mcp)
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, {})
+
+    assert result["executionStatus"] == "COMPLETED"
+    assert result["integrationStatus"] == "LIVE_CORE_CALLBACK_COMPLETED"
+    assert mcp.calls == ["devlog_story_agent", "story_context_agent_get_snapshot_authenticated", "devlog_story_agent"]
+
+
+def test_core_live_adapter_reports_core_failure_after_poll_ceiling_without_resubmitting() -> None:
+    class FakeMcp:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            self.calls.append(name)
+            if name == "story_context_agent_get_snapshot_authenticated":
+                return {"id": "task-9", "status": "FAILED", "failureCode": "ConflictException",
+                        "failureMessage": "Investigation final provider generation exceeds the remaining budget"}
+            return {"status": "TIMED_OUT", "aiTaskId": "task-9", "diagnostics": {
+                "code": "POLL_TIMEOUT", "aiTaskId": "task-9", "deadlineAt": "2999-01-01T00:00:00Z"}}
+
+    mcp = FakeMcp()
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", _core_config(), {}, mcp)
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, {})
+
+    assert mcp.calls.count("devlog_story_agent") == 1
+    assert result["executionStatus"] == "FAILED"
+    assert result["mcpExecution"]["diagnostics"]["failureCode"] == "ConflictException"
+    assert result["mcpExecution"]["diagnostics"]["resolvedAfter"] == "POLL_TIMEOUT"

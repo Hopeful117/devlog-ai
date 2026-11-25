@@ -3,11 +3,15 @@
   "version": "1.0.0",
   "status": "PROPOSED_HUMAN_REVIEW",
   "repositoryId": "git:github.com/Hopeful117/devlog-ai",
-  "repositoryRevision": "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b",
+  "repositoryRevision": "0673d1d32433cdaff054d5f1defd1bedd01c0039",
   "sourceRevisionBasis": "local checkout HEAD equals origin/main",
   "oracleFile": "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json",
   "questionPolicy": "The question wording is preserved from the strategic benchmark specification.",
-  "conditions": ["A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST"],
+  "conditions": [
+    "A_DEVLOG_CURRENT",
+    "B_DIRECT_INVESTIGATOR",
+    "C_DEVLOG_ENGINEERING_ANALYST"
+  ],
   "questions": [
     {
       "caseId": "Q1",

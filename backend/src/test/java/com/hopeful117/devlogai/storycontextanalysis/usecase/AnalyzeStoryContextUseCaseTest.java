@@ -14,6 +14,8 @@ import com.hopeful117.devlogai.ai.reference.AiReferenceRegistry;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
 import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBinding;
+import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBindingStatus;
+import com.hopeful117.devlogai.aicredentialbinding.repository.AiCredentialBindingRepository;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiEngineBindingClient;
 import com.hopeful117.devlogai.aicredentialbinding.service.AiTaskExecutionAuthorizationService;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
@@ -75,6 +77,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -116,6 +119,7 @@ class AnalyzeStoryContextUseCaseTest {
     @Mock private AiTaskRepository aiTaskRepository;
     @Mock private StoryContextAnalysisRepository storyContextAnalysisRepository;
     @Mock private AnalysisRepository analysisRepository;
+    @Mock private AiCredentialBindingRepository credentialBindingRepository;
 
     private AnalyzeStoryContextUseCase useCase;
 
@@ -155,7 +159,8 @@ class AnalyzeStoryContextUseCaseTest {
                          null,
                          aiEngineBindingClient,
                           taskAuthorizationService, StoryContextTestPolicy.resolver()),
-                analysisRepository
+                analysisRepository,
+                credentialBindingRepository
         );
     }
 
@@ -499,6 +504,88 @@ class AnalyzeStoryContextUseCaseTest {
     }
 
     @Test
+    void equivalentFailedTaskIsRetiredInsteadOfReusedUnderNewKey() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        AiTask failed = AiTask.builder().id(UUID.randomUUID())
+                .submissionDigest("same-request")
+                .idempotencyKeyHash("old-key")
+                .idempotencyScopeHash("old-scope")
+                .status(AiTaskStatus.FAILED)
+                .build();
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                "grant-1", projectId.toString(), "MCP_STORY_AGENT_EXECUTE");
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectId), any())).thenReturn(true);
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(any(), any()))
+                .thenReturn(Optional.empty());
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHashIsNull(any()))
+                .thenReturn(Optional.empty());
+        when(aiTaskRepository.findBySubmissionDigest(any())).thenReturn(Optional.of(failed));
+        when(engineeringContextFacade.getCanonicalEngineeringContext(any(), any(), any(), any()))
+                .thenReturn(null);
+
+        // Reaching context construction proves the dead task was not served as an idempotent hit.
+        assertThrows(IllegalStateException.class,
+                () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null,
+                        "new-runtime-key", principal, "chatgpt"));
+        verify(aiTaskRepository).save(failed);
+        assertNull(failed.getSubmissionDigest());
+        assertNull(failed.getIdempotencyKeyHash());
+        assertNull(failed.getIdempotencyScopeHash());
+        verify(engineeringContextFacade).getCanonicalEngineeringContext(
+                PROJECT_SLUG, INTENT_ID, List.of(), storyId);
+    }
+
+    @Test
+    void equivalentReservationWithExpiredBindingIsRetired() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        UUID bindingId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        AiTask reservation = AiTask.builder().id(UUID.randomUUID())
+                .submissionDigest("same-request")
+                .status(AiTaskStatus.CREATED)
+                .credentialBindingId(bindingId)
+                .build();
+        AiCredentialBinding expired = AiCredentialBinding.builder().id(bindingId)
+                .status(AiCredentialBindingStatus.ACTIVE)
+                .expiresAt(Instant.now().minusSeconds(60))
+                .build();
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                "grant-1", projectId.toString(), "MCP_STORY_AGENT_EXECUTE");
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectId), any())).thenReturn(true);
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(any(), any()))
+                .thenReturn(Optional.empty());
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHashIsNull(any()))
+                .thenReturn(Optional.empty());
+        when(aiTaskRepository.findBySubmissionDigest(any())).thenReturn(Optional.of(reservation));
+        when(credentialBindingRepository.findById(bindingId)).thenReturn(Optional.of(expired));
+        when(engineeringContextFacade.getCanonicalEngineeringContext(any(), any(), any(), any()))
+                .thenReturn(null);
+
+        assertThrows(IllegalStateException.class,
+                () -> useCase.reserveCredentialBinding(PROJECT_SLUG, storyId, INTENT_ID, List.of(),
+                        Map.of(), "new-binding-key", principal, "chatgpt"));
+        verify(aiTaskRepository).save(reservation);
+        assertNull(reservation.getSubmissionDigest());
+    }
+
+    @Test
     void legacyUnscopedKeyCannotBeReusedAcrossTheScopedContract() {
         UUID projectId = UUID.randomUUID();
         UUID storyId = UUID.randomUUID();
@@ -526,6 +613,86 @@ class AnalyzeStoryContextUseCaseTest {
         verify(engineeringContextFacade, never()).getCanonicalEngineeringContext(
                 any(), any(), any(), any());
         verify(aiTaskRepository, never()).findBySubmissionDigest(any());
+    }
+
+    @Test
+    void timedOutTaskIsNotReturnedByIdempotencyLookupAllowingRetry() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        AiTask timedOut = AiTask.builder().id(UUID.randomUUID())
+                .submissionDigest("same-request")
+                .status(AiTaskStatus.TIMED_OUT)
+                .build();
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                "grant-1", projectId.toString(), "MCP_STORY_AGENT_EXECUTE");
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectId), any())).thenReturn(true);
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(any(), any()))
+                .thenReturn(Optional.of(timedOut));
+        when(aiTaskRepository.save(timedOut)).thenReturn(timedOut);
+        when(engineeringContextFacade.getCanonicalEngineeringContext(any(), any(), any(), any()))
+                .thenReturn(null);
+
+        // A TIMED_OUT task must not be returned as an idempotent hit; Core must attempt to
+        // build a new context (which may fail here due to null canonical context, but the key
+        // assertion is that the idempotency guard does NOT short-circuit).
+        assertThrows(IllegalStateException.class,
+                () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null,
+                        "retry-key", principal, "chatgpt"));
+        // All three unique-constraint fields must be cleared so no uk_ai_task_sca_* constraint
+        // blocks insertion of the replacement task.
+        verify(aiTaskRepository).save(timedOut);
+        assertNull(timedOut.getSubmissionDigest());
+        assertNull(timedOut.getIdempotencyKeyHash());
+        assertNull(timedOut.getIdempotencyScopeHash());
+        verify(engineeringContextFacade).getCanonicalEngineeringContext(
+                PROJECT_SLUG, INTENT_ID, List.of(), storyId);
+        verify(analysisRepository, never()).save(any(Analysis.class));
+    }
+
+    @Test
+    void failedTaskIsNotReturnedByIdempotencyLookupAllowingRetry() {
+        UUID projectId = UUID.randomUUID();
+        UUID storyId = UUID.randomUUID();
+        Project project = project(projectId);
+        EngineeringStory story = story(storyId, project);
+        AiTask failed = AiTask.builder().id(UUID.randomUUID())
+                .submissionDigest("same-request")
+                .status(AiTaskStatus.FAILED)
+                .build();
+        AuthenticatedPrincipal principal = new AuthenticatedPrincipal(
+                "human-1", PrincipalKind.HUMAN, "test", "mcp-actor",
+                "grant-1", projectId.toString(), "MCP_STORY_AGENT_EXECUTE");
+
+        when(projectRepository.findBySlug(PROJECT_SLUG)).thenReturn(Optional.of(project));
+        when(storyRepository.findById(storyId)).thenReturn(Optional.of(story));
+        when(intentCatalog.resolve(INTENT_ID, "v1")).thenReturn(intent());
+        when(membershipRepository.existsByPrincipalIdAndProjectIdAndRoleIn(
+                eq("human-1"), eq(projectId), any())).thenReturn(true);
+        when(aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(any(), any()))
+                .thenReturn(Optional.of(failed));
+        when(aiTaskRepository.save(failed)).thenReturn(failed);
+        when(engineeringContextFacade.getCanonicalEngineeringContext(any(), any(), any(), any()))
+                .thenReturn(null);
+
+        // A FAILED task (e.g. BUDGET_EXHAUSTED) must not block retries with the same key.
+        assertThrows(IllegalStateException.class,
+                () -> useCase.execute(PROJECT_SLUG, storyId, INTENT_ID, List.of(), null,
+                        "retry-key", principal, "chatgpt"));
+        verify(aiTaskRepository).save(failed);
+        assertNull(failed.getSubmissionDigest());
+        assertNull(failed.getIdempotencyKeyHash());
+        assertNull(failed.getIdempotencyScopeHash());
+        verify(engineeringContextFacade).getCanonicalEngineeringContext(
+                PROJECT_SLUG, INTENT_ID, List.of(), storyId);
+        verify(analysisRepository, never()).save(any(Analysis.class));
     }
 
     @Test

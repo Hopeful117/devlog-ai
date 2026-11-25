@@ -21,6 +21,34 @@ class UnsupportedPromptTemplateError(PromptConstructionError):
     code = "UNSUPPORTED_PROMPT_TEMPLATE"
 
 
+OUTPUT_CLASSIFICATION_RULE = (
+    "OUTPUT CLASSIFICATION RULE (AUTHORITATIVE): outputClassification.entries must contain exactly one "
+    "entry per item that has grounding, and no other entries. findingReference is the item's positional "
+    "path, never a title or slug: objectiveUnderstanding, or the array name with its zero-based index "
+    "(architectureFindings[0], decisionFindings[1], evidenceFindings[0], historicalContext[0], "
+    "constraintFindings[0], impactedComponentFindings[2]). Copy classification and grounded verbatim "
+    "from that item's grounding; never reclassify an item inside outputClassification.\n"
+)
+
+
+REFERENCE_VERBATIM_RULE = (
+    "REFERENCE COPY RULE (AUTHORITATIVE): every evidence reference you emit, in findings, uncertainties, "
+    "implementation items, and causal assessments, must be copied character for character from an "
+    "authorized reference, including any @revision suffix. Never shorten, reformat, or reconstruct a "
+    "reference from a file path.\n"
+)
+
+
+def _classification_retry_rule(error_message: str) -> str:
+    lowered = error_message.casefold()
+    rules = ""
+    if "outputclassification" in lowered or "findingreference" in lowered:
+        rules += "The failure concerns outputClassification. Rebuild it from scratch. " + OUTPUT_CLASSIFICATION_RULE
+    if "unknown evidence" in lowered or "unknown reference" in lowered:
+        rules += "The failure concerns an evidence reference that is not authorized. " + REFERENCE_VERBATIM_RULE
+    return rules
+
+
 SYSTEM_MESSAGE = """You are the DevLog Engineering Story Context Agent.
 Your task is to produce a structured, grounded analysis of an Engineering Story's context for Discuss/Plan preparation.
 The Intent is the exclusive business objective.
@@ -218,6 +246,7 @@ class StoryContextAnalysisPromptBuilder:
              "Every finding must include evidenceReferences using the canonical reference from the Grounding Contract.\n"
               "objectiveUnderstanding.grounding is required when its summary is non-empty. Ground factual or interpretative summaries with authorized evidenceReferences; use RECOMMENDATION only for explicitly advisory content.\n"
              "Classify every non-empty finding, including objectiveUnderstanding, as FACTUAL_EXTRACTION, AI_INTERPRETATION, or RECOMMENDATION in outputClassification; objectiveUnderstanding must never be omitted.\n"
+             + OUTPUT_CLASSIFICATION_RULE + REFERENCE_VERBATIM_RULE +
             "ArchitectureFinding, DecisionFinding, HistoricalContextItem, and ImpactedComponentFinding MUST include relationType (EXPLICIT, TEMPORAL_PROXIMITY, POSSIBLE_RELEVANCE, or INFERRED_HYPOTHESIS).\n"
             "For V2 causal analysis, build one causalAssessment for the exact Core-owned causalQuestion. Select only bounded LINE_RANGE or SECTION locators over authorized repository evidence; do not fabricate resolved content or digests.\n"
             "For legacy causal analysis, causal claims are separate from relationType. Build the evidence ledger first: candidate source/target, authorized references, one role per cited reference, permitted level, classification, bounded explanation.\n"
@@ -348,7 +377,8 @@ class StoryContextAnalysisPromptBuilder:
                   if final_required else "")
               + "Final findings must cite only evidence references authorized in the Core grounding contract. "
              "In FINAL, outputClassification must include exactly one matching entry for objectiveUnderstanding whenever "
-             "the result contains objectiveUnderstanding.grounding, including when all finding arrays are empty.\n\n"
+             "the result contains objectiveUnderstanding.grounding, including when all finding arrays are empty.\n"
+              + OUTPUT_CLASSIFICATION_RULE + REFERENCE_VERBATIM_RULE + "\n"
             "EXPECTED OUTPUT SCHEMA\n"
             f"{self._canonical(decision_schema)}"
         )
@@ -442,7 +472,8 @@ class StoryContextAnalysisPromptBuilder:
             f"{error_message}\n\n"
             "The failure category is explicit. For SEMANTIC_SUPPORT_ERROR, downgrade the claim to NOT_ESTABLISHED when support is insufficient; do not invent evidence or add references outside the authoritative contract.\n"
             "For GROUNDING_ERROR caused by requested file scope, remove every finding that does not cite an authorized reference for one of the requested files; return empty finding arrays, missingInformation, and implementationQuestions instead of using broad analysis references.\n"
-            "Produce a corrected ProviderStoryContextAnalysisResult that satisfies all constraints. "
+            + _classification_retry_rule(error_message)
+            + "Produce a corrected ProviderStoryContextAnalysisResult that satisfies all constraints. "
             "confidence must remain a scalar HIGH, MEDIUM, or LOW value."
         )
         content = f"{SYSTEM_MESSAGE}\n\n{corrective_user_message}"
@@ -473,7 +504,8 @@ class StoryContextAnalysisPromptBuilder:
             "Return the same decision envelope protocol. Preserve valid evidence and findings, "
             "but make every outputClassification.findingReference match an item that is actually "
             "present in the corresponding output array. Remove stale classification entries instead "
-            "of inventing identifiers. Do not add evidence or references outside the authorized contract."
+            "of inventing identifiers. Do not add evidence or references outside the authorized contract.\n"
+            + _classification_retry_rule(error_message)
         )
         content = f"{SYSTEM_MESSAGE}\n\n{corrective_user_message}"
         content_digest = hashlib.sha256(content.encode()).hexdigest()

@@ -787,7 +787,7 @@ class StoryContextAnalysisGenerationService:
             unknown = finding_refs - allowed_refs
             if unknown:
                 raise StoryContextAnalysisUnknownReferenceError(
-                    f"Finding {finding.title} references unknown evidence: {sorted(unknown)}"
+                    f"Finding {self._finding_label(finding)} references unknown evidence: {sorted(unknown)}"
                 )
             if finding.grounding.classification not in {"FACTUAL_EXTRACTION", "AI_INTERPRETATION", "RECOMMENDATION"}:
                 raise StoryContextAnalysisOutputValidationError(
@@ -802,18 +802,18 @@ class StoryContextAnalysisGenerationService:
                 and not finding.grounding.evidence_references
             ):
                 raise StoryContextAnalysisMissingEvidenceError(
-                    f"Finding {finding.title} requires at least one evidence reference"
+                    f"Finding {self._finding_label(finding)} requires at least one evidence reference"
                 )
             # Validate relationType for relationship-bearing findings
             finding_type = type(finding).__name__.lower().replace("finding", "_findings").replace("historicalcontextitem", "historical_context")
             if finding_type in RELATIONSHIP_BEARING_FINDING_TYPES:
                 if finding.grounding.relation_type is None:
                     raise StoryContextAnalysisRelationTypeError(
-                        f"Finding {finding.title} must have relationType"
+                        f"Finding {self._finding_label(finding)} must have relationType"
                     )
                 if finding.grounding.relation_type.value not in VALID_RELATION_TYPES:
                     raise StoryContextAnalysisRelationTypeError(
-                        f"Finding {finding.title} has invalid relationType: {finding.grounding.relation_type.value}"
+                        f"Finding {self._finding_label(finding)} has invalid relationType: {finding.grounding.relation_type.value}"
                     )
 
         valid_classification_references: set[str] = set()
@@ -898,6 +898,11 @@ class StoryContextAnalysisGenerationService:
                     f"Invalid output classification: {cls.classification}"
                 )
 
+    @staticmethod
+    def _finding_label(finding: object) -> str:
+        # ImpactedComponentFinding has componentName instead of title.
+        return str(getattr(finding, "title", None) or getattr(finding, "component_name", None) or "<unnamed>")
+
     def _validate_requested_file_grounding(
         self,
         output: StoryContextAnalysisResult,
@@ -942,7 +947,7 @@ class StoryContextAnalysisGenerationService:
             }
             if references and not references & file_grounded_refs:
                 raise StoryContextAnalysisRequestedFileScopeError(
-                    f"Finding {finding.title} does not cite evidence from requested file scope"
+                    f"Finding {self._finding_label(finding)} does not cite evidence from requested file scope"
                 )
 
     def _validate_v2_assessment(

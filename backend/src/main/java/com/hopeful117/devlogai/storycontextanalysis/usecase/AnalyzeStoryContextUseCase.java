@@ -8,6 +8,8 @@ import com.hopeful117.devlogai.ai.task.entity.AiTaskType;
 import com.hopeful117.devlogai.ai.reference.AiReferenceRegistryFactory;
 import com.hopeful117.devlogai.ai.task.repository.AiTaskRepository;
 import com.hopeful117.devlogai.ai.task.service.AiTaskService;
+import com.hopeful117.devlogai.aicredentialbinding.entity.AiCredentialBindingStatus;
+import com.hopeful117.devlogai.aicredentialbinding.repository.AiCredentialBindingRepository;
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
 import com.hopeful117.devlogai.analysis.entity.Analysis;
@@ -57,6 +59,7 @@ public class AnalyzeStoryContextUseCase {
     private final StoryContextCallbackService callbackService;
     private final StoryContextSubmissionService submissionService;
     private final AnalysisRepository analysisRepository;
+    private final AiCredentialBindingRepository credentialBindingRepository;
     private static final TaskSnapshotEvidenceResolver evidenceResolver = new TaskSnapshotEvidenceResolver();
 
     /** Read-only projection path; it performs no task creation or second selection. */
@@ -265,11 +268,16 @@ public class AnalyzeStoryContextUseCase {
             Optional<AiTask> existing = aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHash(
                     identity.idempotencyKeyHash(), identity.idempotencyScopeHash());
             if (existing.isPresent()) {
-                if (!Objects.equals(existing.get().getSubmissionDigest(), identity.submissionDigest())) {
+                AiTask existingTask = existing.get();
+                if (isRetired(existingTask)) {
+                    retire(existingTask);
+                    return Optional.empty();
+                }
+                if (!Objects.equals(existingTask.getSubmissionDigest(), identity.submissionDigest())) {
                     throw new com.hopeful117.devlogai.shared.exception.ConflictException(
                             "Idempotency-Key was already used for a different request");
                 }
-                return Optional.of(existing.get().getId());
+                return Optional.of(existingTask.getId());
             }
             if (aiTaskRepository.findByIdempotencyKeyHashAndIdempotencyScopeHashIsNull(
                     identity.idempotencyKeyHash()).isPresent()) {
@@ -279,11 +287,44 @@ public class AnalyzeStoryContextUseCase {
             // The submission digest is also unique. A retried equivalent request
             // with a new runtime idempotency key must reuse that task instead of
             // reaching the database unique constraint.
-            Optional<AiTask> equivalent = aiTaskRepository.findBySubmissionDigest(identity.submissionDigest());
-            return equivalent == null ? Optional.empty() : equivalent.map(AiTask::getId);
+            return reusableEquivalent(identity.submissionDigest());
         }
-        Optional<AiTask> equivalent = aiTaskRepository.findBySubmissionDigest(identity.submissionDigest());
-        return equivalent == null ? Optional.empty() : equivalent.map(AiTask::getId);
+        return reusableEquivalent(identity.submissionDigest());
+    }
+
+    private Optional<UUID> reusableEquivalent(String submissionDigest) {
+        Optional<AiTask> equivalent = aiTaskRepository.findBySubmissionDigest(submissionDigest);
+        if (equivalent == null || equivalent.isEmpty()) {
+            return Optional.empty();
+        }
+        if (isRetired(equivalent.get())) {
+            retire(equivalent.get());
+            return Optional.empty();
+        }
+        return equivalent.map(AiTask::getId);
+    }
+
+    // A failed, timed-out, or credential-expired reservation must never be served as an
+    // idempotent hit: callers would be permanently stuck on a dead task.
+    private boolean isRetired(AiTask task) {
+        if (task.getStatus() == AiTaskStatus.FAILED || task.getStatus() == AiTaskStatus.TIMED_OUT) {
+            return true;
+        }
+        if (task.getStatus() != AiTaskStatus.CREATED || task.getCredentialBindingId() == null) {
+            return false;
+        }
+        return credentialBindingRepository.findById(task.getCredentialBindingId())
+                .map(binding -> binding.getStatus() != AiCredentialBindingStatus.ACTIVE
+                        || !binding.getExpiresAt().isAfter(Instant.now()))
+                .orElse(true);
+    }
+
+    // Clears every unique-constraint field so a replacement task can reuse the same identity.
+    private void retire(AiTask task) {
+        task.setSubmissionDigest(null);
+        task.setIdempotencyKeyHash(null);
+        task.setIdempotencyScopeHash(null);
+        aiTaskRepository.save(task);
     }
 
     private record SubmissionIdentity(

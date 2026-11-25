@@ -7,10 +7,10 @@
   "caseId": "Q1",
   "caseVersion": "1.0.0",
   "repositoryId": "git:github.com/Hopeful117/devlog-ai",
-  "repositoryRevision": "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b",
+  "repositoryRevision": "0673d1d32433cdaff054d5f1defd1bedd01c0039",
   "sourceSnapshot": {
     "repositoryId": "git:github.com/Hopeful117/devlog-ai",
-    "revision": "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b",
+    "revision": "0673d1d32433cdaff054d5f1defd1bedd01c0039",
     "readMode": "pinned_git_object"
   },
   "runtimeIdentities": {
@@ -49,12 +49,31 @@
   },
   "experimentType": "END_TO_END_SYSTEM_COMPARISON",
   "controlledContextValueComparison": "DEFERRED",
-  "conditions": ["A_DEVLOG_CURRENT", "B_DIRECT_INVESTIGATOR", "C_DEVLOG_ENGINEERING_ANALYST"],
+  "conditions": [
+    "A_DEVLOG_CURRENT",
+    "B_DIRECT_INVESTIGATOR",
+    "C_DEVLOG_ENGINEERING_ANALYST"
+  ],
   "repetitions": 1,
   "observations": [
-    {"observationId": "Q1-A-DEVLOG-CURRENT-r1", "condition": "A_DEVLOG_CURRENT", "repetition": 1, "status": "PREPARED_NOT_EXECUTED"},
-    {"observationId": "Q1-B-DIRECT-INVESTIGATOR-r1", "condition": "B_DIRECT_INVESTIGATOR", "repetition": 1, "status": "PREPARED_NOT_EXECUTED"},
-    {"observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1", "condition": "C_DEVLOG_ENGINEERING_ANALYST", "repetition": 1, "status": "PREPARED_NOT_EXECUTED"}
+    {
+      "observationId": "Q1-A-DEVLOG-CURRENT-r1",
+      "condition": "A_DEVLOG_CURRENT",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q1-B-DIRECT-INVESTIGATOR-r1",
+      "condition": "B_DIRECT_INVESTIGATOR",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    },
+    {
+      "observationId": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1",
+      "condition": "C_DEVLOG_ENGINEERING_ANALYST",
+      "repetition": 1,
+      "status": "PREPARED_NOT_EXECUTED"
+    }
   ],
   "provider": "openai_chatgpt",
   "model": "gpt-5.6-luna",
@@ -72,7 +91,13 @@
     "status": "READY_PROVIDER_FREE",
     "contract": "devlog-abc-claim-evidence-normalization-v1",
     "scope": "evaluation_only",
-    "mustPreserve": ["claim text", "evidence references", "uncertainty", "technical status", "raw answer identity"]
+    "mustPreserve": [
+      "claim text",
+      "evidence references",
+      "uncertainty",
+      "technical status",
+      "raw answer identity"
+    ]
   },
   "q1Readiness": {
     "capabilityStatus": "Q1_CAPABILITIES_BLOCKED_ASYMMETRY_ACCEPTED",
@@ -85,8 +110,22 @@
   },
   "toolEnvelope": {
     "parityMode": "END_TO_END_SYSTEM_COMPARISON",
-    "BAllowedOperations": ["read_file", "search_repository", "git_log", "git_show", "git_diff", "inspect_commit"],
-    "CAllowedActions": ["SEARCH_EVIDENCE", "READ_EVIDENCE_RANGE", "GET_HISTORY", "GET_DECISIONS", "GET_INSIGHTS", "GET_EVENTS"],
+    "BAllowedOperations": [
+      "read_file",
+      "search_repository",
+      "git_log",
+      "git_show",
+      "git_diff",
+      "inspect_commit"
+    ],
+    "CAllowedActions": [
+      "SEARCH_EVIDENCE",
+      "READ_EVIDENCE_RANGE",
+      "GET_HISTORY",
+      "GET_DECISIONS",
+      "GET_INSIGHTS",
+      "GET_EVENTS"
+    ],
     "capabilityDifferencePolicy": "record_actual_capabilities_do_not_equalize",
     "commonSubsetNormalization": "evaluation_only_not_execution_constraint"
   },
@@ -99,15 +138,48 @@
     "maxWallClockSeconds": 120,
     "maxOutputTokensPerResponse": 32768
   },
-  "stopConditions": ["FINAL_ANSWER", "BUDGET_EXHAUSTED", "PROVIDER_INCOMPLETE", "PROVIDER_TIMEOUT", "TOOL_OR_ACTION_FAILURE", "REVISION_MISMATCH", "GROUNDING_FAILURE"],
-  "metrics": ["technicalStatus", "semanticEligibility", "weightedQuality", "requiredClaimRecall", "unsupportedClaimRate", "evidenceSupportRate", "toolOrActionCount", "inputOutputTokens", "latencyMs", "cost"],
-  "technicalSuccess": ["all identities match", "repository revision is pinned", "a valid terminal answer or explicit technical failure is classified", "RAW and derived artifacts replay without provider calls", "no oracle material enters treatment input", "the evaluation-only output normalization adapter passes deterministic contract tests", "the actual capability envelope and technical completion status are recorded per observation"],
+  "stopConditions": [
+    "FINAL_ANSWER",
+    "BUDGET_EXHAUSTED",
+    "PROVIDER_INCOMPLETE",
+    "PROVIDER_TIMEOUT",
+    "TOOL_OR_ACTION_FAILURE",
+    "REVISION_MISMATCH",
+    "GROUNDING_FAILURE"
+  ],
+  "metrics": [
+    "technicalStatus",
+    "semanticEligibility",
+    "weightedQuality",
+    "requiredClaimRecall",
+    "unsupportedClaimRate",
+    "evidenceSupportRate",
+    "toolOrActionCount",
+    "inputOutputTokens",
+    "latencyMs",
+    "cost"
+  ],
+  "technicalSuccess": [
+    "all identities match",
+    "repository revision is pinned",
+    "a valid terminal answer or explicit technical failure is classified",
+    "RAW and derived artifacts replay without provider calls",
+    "no oracle material enters treatment input",
+    "the evaluation-only output normalization adapter passes deterministic contract tests",
+    "the actual capability envelope and technical completion status are recorded per observation"
+  ],
   "humanEvaluation": {
     "blind": true,
     "evaluateNativeAndNormalizedArtifacts": true,
     "displayProjectionForAAndC": "evaluation-only exact structured text projection",
     "narrativeQualityComparable": false
   },
-  "humanAuthorizationRequired": ["oracle approval", "provider call authorization", "confirmation that Q1 is appropriate as first case", "approval of asymmetric end-to-end comparison", "approval of the execution runner and artifact destinations"],
+  "humanAuthorizationRequired": [
+    "oracle approval",
+    "provider call authorization",
+    "confirmation that Q1 is appropriate as first case",
+    "approval of asymmetric end-to-end comparison",
+    "approval of the execution runner and artifact destinations"
+  ],
   "cost": "NOT_CALCULATED_UNTIL_PROVIDER_AND_PRICING_ARE_AUTHORIZED"
 }

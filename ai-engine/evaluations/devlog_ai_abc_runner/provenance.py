@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-Q1_SOURCE_REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
+Q1_SOURCE_REVISION = "0673d1d32433cdaff054d5f1defd1bedd01c0039"
 Q1_REPOSITORY_ID = "git:github.com/Hopeful117/devlog-ai"
 
 Q1_RUNTIME_IDENTITIES = {

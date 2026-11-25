@@ -52,8 +52,9 @@ public record ContextLossLedger(
     private static final Set<String> CANDIDATE_REASONS = Set.of(
             "CATEGORY_CONCENTRATION_LIMIT", "EVIDENCE_ITEM_BUDGET_EXCEEDED",
             "TOKEN_BUDGET_EXCEEDED", "INSUFFICIENT_RELEVANCE", "SELECTED_BY_CATEGORY_FLOOR",
-            "SELECTED_BY_DIVERSITY", "SELECTED_BY_RANK", "SELECTED_BY_STRONG_RELEVANCE",
-            "SELECTED_BY_REQUESTED_FILE", "DUPLICATE_REFERENCE", "NOT_RECORDED", "NOT_SELECTED");
+            "SELECTED_BY_CORE_KNOWLEDGE_FLOOR", "SELECTED_BY_DIVERSITY", "SELECTED_BY_RANK",
+            "SELECTED_BY_STRONG_RELEVANCE", "SELECTED_BY_REQUESTED_FILE", "DUPLICATE_REFERENCE",
+            "NOT_RECORDED", "NOT_SELECTED");
 
     public ContextLossLedger {
         if (!VERSION.equals(version)) throw new IllegalArgumentException("Unsupported ledger version");

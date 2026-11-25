@@ -204,3 +204,90 @@ def test_corrective_retry_preserves_bounded_grounding_failure_code() -> None:
 
     assert "Failure category: GROUNDING_ERROR" in retry.user_message
     assert "Failure code: GROUNDING_REQUESTED_FILE_SCOPE" in retry.user_message
+
+
+def test_finding_reference_schema_requires_positional_path() -> None:
+    from pydantic import ValidationError
+    from app.schemas.story_context_analysis import ClassificationEntry, ProviderClassificationEntry
+
+    for reference in ("objectiveUnderstanding", "architectureFindings[0]", "impactedComponentFindings[12]"):
+        ProviderClassificationEntry.model_validate(
+            {"findingReference": reference, "classification": "FACTUAL_EXTRACTION", "grounded": True}
+        )
+    for reference in ("architecture:three-treatments", "architectureFindings", "missingInformation[0]"):
+        with pytest.raises(ValidationError):
+            ProviderClassificationEntry.model_validate(
+                {"findingReference": reference, "classification": "FACTUAL_EXTRACTION", "grounded": True}
+            )
+    # Stored and adapted results (e.g. causalAssessment) keep the permissive internal entry.
+    ClassificationEntry.model_validate(
+        {"findingReference": "causalAssessment", "classification": "AI_INTERPRETATION", "grounded": True}
+    )
+    schema = ProviderStoryContextAnalysisResult.model_json_schema()
+    assert "pattern" in schema["$defs"]["ProviderClassificationEntry"]["properties"]["findingReference"]
+
+
+def test_one_shot_and_investigation_prompts_state_output_classification_rule() -> None:
+    base_request = load_scenario(SCENARIO_ID).prompt_request
+    one_shot = StoryContextAnalysisPromptBuilder().build(base_request)
+    investigation_request = base_request.model_copy(update={
+        "metadata": {
+            **base_request.metadata,
+            "investigation": {
+                "initialized": True,
+                "protocolVersion": "story-context-agent-protocol/v2",
+                "executionId": str(base_request.ai_task_id),
+                "parentTaskId": str(base_request.ai_task_id),
+                "scope": {"projectSlug": "devlog-ai", "revision": "revision-1", "allowedPathPrefixes": ["docs"]},
+                "budget": {
+                    "maximumSteps": 2, "maximumRetrievalCalls": 2, "maximumEvidenceItems": 10,
+                    "maximumBytes": 10000, "maximumTokens": 2000, "maximumElapsedMillis": 60000,
+                    "maximumProviderOutputTokens": 4000,
+                },
+                "usage": {
+                    "steps": 0, "retrievalCalls": 0, "evidenceItems": 0,
+                    "bytes": 0, "tokens": 0, "elapsedMillis": 0, "providerOutputTokens": 0,
+                },
+            },
+        },
+    })
+    investigation = StoryContextAnalysisPromptBuilder().build_investigation(investigation_request)
+
+    for prompt in (one_shot, investigation):
+        assert "OUTPUT CLASSIFICATION RULE" in prompt.user_message
+        assert "architectureFindings[0]" in prompt.user_message
+        assert "Copy classification and grounded verbatim" in prompt.user_message
+
+
+def test_corrective_retry_restates_classification_rule_only_for_classification_failures() -> None:
+    request = load_scenario(SCENARIO_ID).prompt_request
+    builder = StoryContextAnalysisPromptBuilder()
+    prompt = builder.build(request)
+    rule_marker = "The failure concerns outputClassification"
+
+    classification_retry = builder.corrective_retry(
+        prompt, ValueError("outputClassification references unknown item: architecture:three-treatments")
+    )
+    other_retry = builder.corrective_retry(prompt, ValueError("Invalid confidence level: VERY_HIGH"))
+    investigation_retry = builder.investigation_corrective_retry(
+        prompt, ValueError("outputClassification disagrees with grounding: objectiveUnderstanding")
+    )
+
+    assert rule_marker in classification_retry.user_message
+    assert rule_marker not in other_retry.user_message
+    assert rule_marker in investigation_retry.user_message
+
+
+def test_prompts_require_verbatim_references_and_retry_restates_rule() -> None:
+    request = load_scenario(SCENARIO_ID).prompt_request
+    builder = StoryContextAnalysisPromptBuilder()
+    prompt = builder.build(request)
+    marker = "The failure concerns an evidence reference that is not authorized"
+
+    assert "REFERENCE COPY RULE" in prompt.user_message
+    assert "including any @revision suffix" in prompt.user_message
+
+    unknown = "Uncertainty references unknown evidence: document:source:docs/story.md"
+    assert marker in builder.investigation_corrective_retry(prompt, ValueError(unknown)).user_message
+    assert marker in builder.corrective_retry(prompt, ValueError(unknown)).user_message
+    assert marker not in builder.corrective_retry(prompt, ValueError("Invalid confidence level")).user_message

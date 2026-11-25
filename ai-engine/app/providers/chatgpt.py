@@ -104,6 +104,18 @@ class OpenAiChatGptProvider:
             }
             output_text = await self._stream(credential.access_token, body)
             completed_at = datetime.now(timezone.utc)
+            logger.info(
+                "ChatGPT provider usage measured",
+                extra={
+                    "event": "provider_usage_measured",
+                    "taskId": request.traceability.ai_task_id,
+                    "intent": request.intent_id,
+                    "durationMs": int((completed_at - started_at).total_seconds() * 1000),
+                    "inputTokens": self._last_usage.get("input_tokens"),
+                    "outputTokens": self._last_usage.get("output_tokens"),
+                    "reasoningTokens": self._last_usage.get("reasoning_tokens"),
+                },
+            )
             payload = json.loads(output_text)
             if wrapped_root:
                 payload = payload["root"]
@@ -202,10 +214,14 @@ class OpenAiChatGptProvider:
                             response = data.get("response") if isinstance(data.get("response"), dict) else data
                             usage = response.get("usage") if isinstance(response, dict) else None
                             if isinstance(usage, dict):
+                                details = usage.get("output_tokens_details")
                                 self._last_usage = {
                                     "input_tokens": self._non_negative_int(usage.get("input_tokens")),
                                     "output_tokens": self._non_negative_int(usage.get("output_tokens")),
                                     "total_tokens": self._non_negative_int(usage.get("total_tokens")),
+                                    "reasoning_tokens": self._non_negative_int(
+                                        details.get("reasoning_tokens") if isinstance(details, dict) else None
+                                    ),
                                 }
                         event_type, data_lines = None, []
         if not completed:

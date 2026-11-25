@@ -338,6 +338,38 @@ class OutputClassification(StoryContextAnalysisContractModel):
     entries: list[ClassificationEntry] = Field(default_factory=list)
 
 
+FINDING_REFERENCE_PATTERN = (
+    r"^(objectiveUnderstanding|(architectureFindings|decisionFindings|evidenceFindings"
+    r"|historicalContext|constraintFindings|impactedComponentFindings)\[[0-9]+\])$"
+)
+
+
+class ProviderClassificationEntry(ClassificationEntry):
+    """Provider-facing entry; stored and adapted results keep the permissive base entry."""
+
+    finding_reference: str = Field(
+        alias="findingReference",
+        min_length=1,
+        max_length=500,
+        pattern=FINDING_REFERENCE_PATTERN,
+        description=(
+            "Positional path of the classified item: objectiveUnderstanding, or an output array name "
+            "with its zero-based index, e.g. architectureFindings[0] or impactedComponentFindings[2]."
+        ),
+    )
+    classification: str = Field(
+        min_length=1,
+        max_length=50,
+        pattern="^(FACTUAL_EXTRACTION|AI_INTERPRETATION|RECOMMENDATION)$",
+        description="Must equal grounding.classification of the referenced item.",
+    )
+    grounded: bool = Field(default=False, description="Must equal grounding.grounded of the referenced item.")
+
+
+class ProviderOutputClassification(OutputClassification):
+    entries: list[ProviderClassificationEntry] = Field(default_factory=list)
+
+
 class StoryContextAnalysisResult(StoryContextAnalysisContractModel):
     objective_understanding: ObjectiveUnderstanding = Field(alias="objectiveUnderstanding")
     architecture_findings: list[ArchitectureFinding] = Field(default_factory=list, alias="architectureFindings")
@@ -375,6 +407,9 @@ class ProviderStoryContextAnalysisResult(StoryContextAnalysisResult):
     """Strict provider wire result, separate from the richer internal model."""
 
     confidence: ProviderConfidence
+    output_classification: ProviderOutputClassification = Field(
+        default_factory=ProviderOutputClassification, alias="outputClassification"
+    )
 
 
 def provider_result_to_internal(

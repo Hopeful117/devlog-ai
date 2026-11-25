@@ -17,7 +17,7 @@ from evaluations.devlog_ai_abc_normalization.normalizer import (
 )
 
 
-REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
+REVISION = "0673d1d32433cdaff054d5f1defd1bedd01c0039"
 
 
 def raw(payload: dict, *, treatment: str, raw_hash: bool = True) -> dict:

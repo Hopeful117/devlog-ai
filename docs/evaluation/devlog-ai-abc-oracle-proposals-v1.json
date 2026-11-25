@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "status": "ACCEPTED",
   "repositoryId": "git:github.com/Hopeful117/devlog-ai",
-  "repositoryRevision": "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b",
+  "repositoryRevision": "0673d1d32433cdaff054d5f1defd1bedd01c0039",
   "oracles": [
     {
       "caseId": "Q1",
@@ -15,53 +15,166 @@
           "id": "Q1-C1",
           "statement": "Java Core resolves the project, invokes authorization for MCP Story Agent execution, verifies the Story/project relationship and required intent, then prepares the context before calling the submission path.",
           "status": "VERIFIED",
-          "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java#L119-L141", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java#L168-L173"],
-          "requiredInvariants": ["project resolution is Core-owned", "the required authorization scope is checked before submission", "a supplied Story must belong to the resolved project", "intent is present and resolved", "preparation precedes submitPrepared"],
-          "optionalDetails": ["the authorization service's complete policy rules", "the exact idempotency implementation"],
-          "expectedQualifications": ["the cited use case proves invocation and boundary, not every internal authorization policy rule"],
-          "forbiddenClaims": ["the use case itself contains the complete authorization policy", "Python authorizes the repository operation"]
+          "evidence": [
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java#L119-L141",
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java#L168-L173"
+          ],
+          "requiredInvariants": [
+            "project resolution is Core-owned",
+            "the required authorization scope is checked before submission",
+            "a supplied Story must belong to the resolved project",
+            "intent is present and resolved",
+            "preparation precedes submitPrepared"
+          ],
+          "optionalDetails": [
+            "the authorization service's complete policy rules",
+            "the exact idempotency implementation"
+          ],
+          "expectedQualifications": [
+            "the cited use case proves invocation and boundary, not every internal authorization policy rule"
+          ],
+          "forbiddenClaims": [
+            "the use case itself contains the complete authorization policy",
+            "Python authorizes the repository operation"
+          ]
         },
         {
           "id": "Q1-C2",
           "statement": "StoryContextSubmissionService creates the Analysis and AiTask execution records, binds the context/projection/grounding identities, records budget and loss accounting, and submits the accepted task to the AI Engine; submission is not proof that provider processing succeeded.",
           "status": "VERIFIED",
-          "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java#L147-L169", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java#L221-L239"],
-          "requiredInvariants": ["canonical context digest is required", "Analysis/AiTask records and execution snapshot are persisted", "grounding, projection, submission and context identities are retained", "budget rejection fails before submission", "successful submission delegates to Core's AI Engine client"],
-          "optionalDetails": ["individual snapshot map keys", "provider binding fields", "the exact loss-ledger representation"],
-          "expectedQualifications": ["distinguish task submission/transport from provider completion and final callback acceptance"],
-          "forbiddenClaims": ["aiEngineClient.submit proves a completed analysis", "every internal snapshot field is required for a correct answer"]
+          "evidence": [
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java#L147-L169",
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java#L221-L239"
+          ],
+          "requiredInvariants": [
+            "canonical context digest is required",
+            "Analysis/AiTask records and execution snapshot are persisted",
+            "grounding, projection, submission and context identities are retained",
+            "budget rejection fails before submission",
+            "successful submission delegates to Core's AI Engine client"
+          ],
+          "optionalDetails": [
+            "individual snapshot map keys",
+            "provider binding fields",
+            "the exact loss-ledger representation"
+          ],
+          "expectedQualifications": [
+            "distinguish task submission/transport from provider completion and final callback acceptance"
+          ],
+          "forbiddenClaims": [
+            "aiEngineClient.submit proves a completed analysis",
+            "every internal snapshot field is required for a correct answer"
+          ]
         },
         {
           "id": "Q1-C3",
           "statement": "Python performs provider-backed structured generation and validates the generated result. Only the investigation-enabled path enters the PLAN/ACTION/FINAL loop: Python proposes bounded actions and validates typed Core results, while Core remains authoritative for action scope, revision, authorization and limits.",
           "status": "VERIFIED",
-          "evidence": ["ai-engine/app/services/story_context_analysis_generation_service.py#L128-L169", "ai-engine/app/services/story_context_analysis_generation_service.py#L224-L285", "ai-engine/app/services/story_context_analysis_generation_service.py#L306-L329", "ai-engine/app/schemas/story_context_investigation.py#L122-L156", "ai-engine/app/schemas/story_context_investigation.py#L204-L220", "docs/decisions/ADR-067.md#L33-L62"],
-          "requiredInvariants": ["ordinary Story Context generation can complete without the investigation loop", "investigation begins with a validated PLAN", "actions are sent to Core through the callback client", "typed action results and identities are validated before reuse", "Python does not receive repository or database authority"],
-          "optionalDetails": ["the exact number of corrective retries", "interaction-trace accounting fields", "the concrete callback transport"],
-          "expectedQualifications": ["PLAN/ACTION/FINAL describes the investigation-enabled path, not every Story Context request", "provider generation and Core action execution are separate responsibilities"],
-          "forbiddenClaims": ["all requests must pass through PLAN/ACTION/FINAL", "Python directly reads the repository or database", "a provider-generated action is self-authorizing"]
+          "evidence": [
+            "ai-engine/app/services/story_context_analysis_generation_service.py#L128-L169",
+            "ai-engine/app/services/story_context_analysis_generation_service.py#L224-L285",
+            "ai-engine/app/services/story_context_analysis_generation_service.py#L306-L329",
+            "ai-engine/app/schemas/story_context_investigation.py#L122-L156",
+            "ai-engine/app/schemas/story_context_investigation.py#L204-L220",
+            "docs/decisions/ADR-067.md#L33-L62"
+          ],
+          "requiredInvariants": [
+            "ordinary Story Context generation can complete without the investigation loop",
+            "investigation begins with a validated PLAN",
+            "actions are sent to Core through the callback client",
+            "typed action results and identities are validated before reuse",
+            "Python does not receive repository or database authority"
+          ],
+          "optionalDetails": [
+            "the exact number of corrective retries",
+            "interaction-trace accounting fields",
+            "the concrete callback transport"
+          ],
+          "expectedQualifications": [
+            "PLAN/ACTION/FINAL describes the investigation-enabled path, not every Story Context request",
+            "provider generation and Core action execution are separate responsibilities"
+          ],
+          "forbiddenClaims": [
+            "all requests must pass through PLAN/ACTION/FINAL",
+            "Python directly reads the repository or database",
+            "a provider-generated action is self-authorizing"
+          ]
         },
         {
           "id": "Q1-C4",
           "statement": "Java Core validates the callback result against task identity, digest, grounding, references, classifications and related invariants, then persists the result as an immutable non-trusted StoryContextAnalysis snapshot; persistence does not promote the analysis to trusted knowledge.",
           "status": "VERIFIED",
-          "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextCallbackService.java#L71-L100", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextResultValidator.java#L15-L61", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/entity/StoryContextAnalysis.java#L38-L51", "docs/decisions/ADR-067.md#L124-L146", "docs/decisions/ADR-067.md#L183-L193"],
-          "requiredInvariants": ["a callback must contain an analysis result", "Core validation checks the authorized grounding set and context digest", "invalid grounding, references or classifications are rejected", "the persisted snapshot is immutable and associated with the task", "the persisted analysis remains non-trusted"],
-          "optionalDetails": ["the exact durable field name story_context_analyses.analysis_snapshot", "prompt execution metadata and context freshness columns", "the individual validator checks"],
-          "expectedQualifications": ["the field name is a precise optional detail, not a required phrase for a good answer", "persisted is not equivalent to promoted trusted knowledge"],
-          "forbiddenClaims": ["successful persistence makes the result trusted knowledge", "the model can bypass Core callback validation", "ADR-067 mandates this exact database column name"]
+          "evidence": [
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextCallbackService.java#L71-L100",
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextResultValidator.java#L15-L61",
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/entity/StoryContextAnalysis.java#L38-L51",
+            "docs/decisions/ADR-067.md#L124-L146",
+            "docs/decisions/ADR-067.md#L183-L193"
+          ],
+          "requiredInvariants": [
+            "a callback must contain an analysis result",
+            "Core validation checks the authorized grounding set and context digest",
+            "invalid grounding, references or classifications are rejected",
+            "the persisted snapshot is immutable and associated with the task",
+            "the persisted analysis remains non-trusted"
+          ],
+          "optionalDetails": [
+            "the exact durable field name story_context_analyses.analysis_snapshot",
+            "prompt execution metadata and context freshness columns",
+            "the individual validator checks"
+          ],
+          "expectedQualifications": [
+            "the field name is a precise optional detail, not a required phrase for a good answer",
+            "persisted is not equivalent to promoted trusted knowledge"
+          ],
+          "forbiddenClaims": [
+            "successful persistence makes the result trusted knowledge",
+            "the model can bypass Core callback validation",
+            "ADR-067 mandates this exact database column name"
+          ]
         }
       ],
       "acceptableQualifiedClaims": [
-        {"statement": "The provider may propose actions, but Core executes only validated actions within the initialized scope, revision and budgets.", "status": "VERIFIED"},
-        {"statement": "The current implementation persists an existing StoryContextAnalysis snapshot, while ADR-067 defines snapshot semantics without mandating a new table or exact field name.", "status": "VERIFIED"}
+        {
+          "statement": "The provider may propose actions, but Core executes only validated actions within the initialized scope, revision and budgets.",
+          "status": "VERIFIED"
+        },
+        {
+          "statement": "The current implementation persists an existing StoryContextAnalysis snapshot, while ADR-067 defines snapshot semantics without mandating a new table or exact field name.",
+          "status": "VERIFIED"
+        }
       ],
-      "requiredEvidenceReferences": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java#L119-L141", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java#L147-L169", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java#L221-L239", "ai-engine/app/services/story_context_analysis_generation_service.py#L128-L169", "ai-engine/app/services/story_context_analysis_generation_service.py#L224-L329", "ai-engine/app/schemas/story_context_investigation.py#L122-L156", "docs/decisions/ADR-067.md#L33-L62", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextCallbackService.java#L71-L100", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextResultValidator.java#L15-L61", "docs/decisions/ADR-067.md#L124-L146"],
-      "forbiddenClaims": ["Python directly reads the repository or database.", "A successful AI result is automatically trusted knowledge.", "PLAN/ACTION/FINAL is mandatory for every request.", "The current implementation proves improved answer quality."],
-      "expectedUncertainty": ["The cited code establishes ownership and flow, but not comparative semantic quality.", "The authorization service's complete policy and provider semantic success are outside the cited boundaries."],
+      "requiredEvidenceReferences": [
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java#L119-L141",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java#L147-L169",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java#L221-L239",
+        "ai-engine/app/services/story_context_analysis_generation_service.py#L128-L169",
+        "ai-engine/app/services/story_context_analysis_generation_service.py#L224-L329",
+        "ai-engine/app/schemas/story_context_investigation.py#L122-L156",
+        "docs/decisions/ADR-067.md#L33-L62",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextCallbackService.java#L71-L100",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextResultValidator.java#L15-L61",
+        "docs/decisions/ADR-067.md#L124-L146"
+      ],
+      "forbiddenClaims": [
+        "Python directly reads the repository or database.",
+        "A successful AI result is automatically trusted knowledge.",
+        "PLAN/ACTION/FINAL is mandatory for every request.",
+        "The current implementation proves improved answer quality."
+      ],
+      "expectedUncertainty": [
+        "The cited code establishes ownership and flow, but not comparative semantic quality.",
+        "The authorization service's complete policy and provider semantic success are outside the cited boundaries."
+      ],
       "expectedAnswerClass": "GROUNDED_ARCHITECTURAL_EXPLANATION",
       "scoring": {
-        "weights": {"technicalAccuracy": 30, "evidenceAndTraceability": 25, "depth": 20, "engineerUsefulness": 20, "uncertaintyHandling": 5},
+        "weights": {
+          "technicalAccuracy": 30,
+          "evidenceAndTraceability": 25,
+          "depth": 20,
+          "engineerUsefulness": 20,
+          "uncertaintyHandling": 5
+        },
         "rules": {
           "correct": "States the Core/Python boundary and the execution flow with no material contradiction, with relevant evidence or clearly qualified repository-grounded reasoning.",
           "partiallyCorrect": "Gets the main boundary or flow right but omits one non-central invariant, collapses two stages, or uses incomplete evidence without reversing the conclusion.",
@@ -69,7 +182,11 @@
           "contradiction": "Assigns authorization, repository execution, grounding acceptance, or trust promotion to the wrong side, or claims provider submission is completed analysis.",
           "unsupported": "Adds a material implementation or architectural claim not established by the cited repository evidence and does not mark it as uncertain."
         },
-        "formatNeutrality": ["Do not reward length, narrative prose, structured output shape, citation count, or any treatment-specific field by itself.", "Score explicit claims and evidence after normalization; treat absence of a native answerText as a format difference, not an automatic penalty.", "A technical failure is not a semantic failure and is excluded from semantic scoring."]
+        "formatNeutrality": [
+          "Do not reward length, narrative prose, structured output shape, citation count, or any treatment-specific field by itself.",
+          "Score explicit claims and evidence after normalization; treat absence of a native answerText as a format difference, not an automatic penalty.",
+          "A technical failure is not a semantic failure and is excluded from semantic scoring."
+        ]
       },
       "canonicalDigestRule": "SHA-256 of canonical JSON for this Q1 oracle object with canonicalDigest omitted, using UTF-8, sorted keys, and compact separators.",
       "canonicalDigest": "2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e"
@@ -80,15 +197,58 @@
       "status": "ACCEPTED",
       "question": "When an investigation action is repeated, what happens to repository reads and budget usage?",
       "requiredClaims": [
-        {"id": "Q2-C1", "statement": "The Core action service identifies an existing action by actionId and compares the request digest.", "status": "VERIFIED", "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L131-L141"]},
-        {"id": "Q2-C2", "statement": "A repeated action with the same request digest returns the stored canonical result and does not execute the repository capability again.", "status": "VERIFIED", "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L132-L141", "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionServiceTest.java"]},
-        {"id": "Q2-C3", "statement": "Reusing an actionId with a different request is rejected as a conflict.", "status": "VERIFIED", "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L135-L138"]},
-        {"id": "Q2-C4", "statement": "The action ledger and usage accounting are updated only for a new action execution or a bounded rejection path, not for the same-result duplicate replay.", "status": "INFERRED", "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L131-L193"]}
+        {
+          "id": "Q2-C1",
+          "statement": "The Core action service identifies an existing action by actionId and compares the request digest.",
+          "status": "VERIFIED",
+          "evidence": [
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L131-L141"
+          ]
+        },
+        {
+          "id": "Q2-C2",
+          "statement": "A repeated action with the same request digest returns the stored canonical result and does not execute the repository capability again.",
+          "status": "VERIFIED",
+          "evidence": [
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L132-L141",
+            "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionServiceTest.java"
+          ]
+        },
+        {
+          "id": "Q2-C3",
+          "statement": "Reusing an actionId with a different request is rejected as a conflict.",
+          "status": "VERIFIED",
+          "evidence": [
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L135-L138"
+          ]
+        },
+        {
+          "id": "Q2-C4",
+          "statement": "The action ledger and usage accounting are updated only for a new action execution or a bounded rejection path, not for the same-result duplicate replay.",
+          "status": "INFERRED",
+          "evidence": [
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L131-L193"
+          ]
+        }
       ],
-      "acceptableQualifiedClaims": [{"statement": "The exact number of low-level repository calls is not independently observable from this service alone; the contract guarantees no second capability execution on an identical duplicate.", "status": "VERIFIED"}],
-      "requiredEvidenceReferences": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L103-L193", "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionServiceTest.java"],
-      "forbiddenClaims": ["Every duplicate is silently accepted even with different parameters.", "Duplicate replay consumes a fresh retrieval budget by design.", "The model controls duplicate handling outside Core."],
-      "expectedUncertainty": ["Distinguish action-level idempotency from the separate parent task submission idempotency."],
+      "acceptableQualifiedClaims": [
+        {
+          "statement": "The exact number of low-level repository calls is not independently observable from this service alone; the contract guarantees no second capability execution on an identical duplicate.",
+          "status": "VERIFIED"
+        }
+      ],
+      "requiredEvidenceReferences": [
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L103-L193",
+        "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionServiceTest.java"
+      ],
+      "forbiddenClaims": [
+        "Every duplicate is silently accepted even with different parameters.",
+        "Duplicate replay consumes a fresh retrieval budget by design.",
+        "The model controls duplicate handling outside Core."
+      ],
+      "expectedUncertainty": [
+        "Distinguish action-level idempotency from the separate parent task submission idempotency."
+      ],
       "expectedAnswerClass": "GROUNDED_CODE_BEHAVIOR"
     },
     {
@@ -97,15 +257,58 @@
       "status": "ACCEPTED",
       "question": "Why does the current design keep Core authoritative and Python repository-blind?",
       "requiredClaims": [
-        {"id": "Q3-C1", "statement": "The design separates deterministic domain authority from probabilistic AI interpretation because AI output may be incorrect, incomplete, or assumption-based.", "status": "VERIFIED", "evidence": ["docs/decisions/ADR-006.md#L11-L37"]},
-        {"id": "Q3-C2", "statement": "ADR-067 assigns authorization, scope, context construction, trust boundaries, deterministic invariants and result acceptance to Java/Core, while Python owns execution and probabilistic reasoning.", "status": "VERIFIED", "evidence": ["docs/decisions/ADR-067.md#L33-L62"]},
-        {"id": "Q3-C3", "statement": "Python must not independently reconstruct project context through direct database/repository access or a parallel retrieval model.", "status": "VERIFIED", "evidence": ["docs/decisions/ADR-067.md#L81-L96"]},
-        {"id": "Q3-C4", "statement": "The boundary preserves human validation before any AI interpretation can become trusted project knowledge.", "status": "VERIFIED", "evidence": ["docs/decisions/ADR-006.md#L39-L73", "docs/decisions/ADR-067.md#L160-L179"]}
+        {
+          "id": "Q3-C1",
+          "statement": "The design separates deterministic domain authority from probabilistic AI interpretation because AI output may be incorrect, incomplete, or assumption-based.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/decisions/ADR-006.md#L11-L37"
+          ]
+        },
+        {
+          "id": "Q3-C2",
+          "statement": "ADR-067 assigns authorization, scope, context construction, trust boundaries, deterministic invariants and result acceptance to Java/Core, while Python owns execution and probabilistic reasoning.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/decisions/ADR-067.md#L33-L62"
+          ]
+        },
+        {
+          "id": "Q3-C3",
+          "statement": "Python must not independently reconstruct project context through direct database/repository access or a parallel retrieval model.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/decisions/ADR-067.md#L81-L96"
+          ]
+        },
+        {
+          "id": "Q3-C4",
+          "statement": "The boundary preserves human validation before any AI interpretation can become trusted project knowledge.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/decisions/ADR-006.md#L39-L73",
+            "docs/decisions/ADR-067.md#L160-L179"
+          ]
+        }
       ],
-      "acceptableQualifiedClaims": [{"statement": "Future expansion is allowed only through authorized Core capabilities, not by giving Python an implicit repository handle.", "status": "VERIFIED"}],
-      "requiredEvidenceReferences": ["docs/decisions/ADR-006.md#L39-L73", "docs/decisions/ADR-067.md#L33-L96"],
-      "forbiddenClaims": ["The boundary exists only to reduce token cost.", "Python is trusted to assign evidence truth.", "The architecture forbids all future authorized retrieval expansion."],
-      "expectedUncertainty": ["Historical rationale is established by ADRs; comparative quality consequences remain an experimental question."],
+      "acceptableQualifiedClaims": [
+        {
+          "statement": "Future expansion is allowed only through authorized Core capabilities, not by giving Python an implicit repository handle.",
+          "status": "VERIFIED"
+        }
+      ],
+      "requiredEvidenceReferences": [
+        "docs/decisions/ADR-006.md#L39-L73",
+        "docs/decisions/ADR-067.md#L33-L96"
+      ],
+      "forbiddenClaims": [
+        "The boundary exists only to reduce token cost.",
+        "Python is trusted to assign evidence truth.",
+        "The architecture forbids all future authorized retrieval expansion."
+      ],
+      "expectedUncertainty": [
+        "Historical rationale is established by ADRs; comparative quality consequences remain an experimental question."
+      ],
       "expectedAnswerClass": "HISTORICAL_ARCHITECTURAL_RATIONALE"
     },
     {
@@ -114,15 +317,64 @@
       "status": "ACCEPTED",
       "question": "If READ_EVIDENCE_RANGE limits or evidence projection change, which validation, grounding, and tests are affected?",
       "requiredClaims": [
-        {"id": "Q4-C1", "statement": "The action contract and Python schema constrain range paths and line bounds, including a maximum 500-line range in Core validation.", "status": "VERIFIED", "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityActionValidator.java#L73-L79", "ai-engine/app/schemas/story_context_investigation.py#L98-L113"]},
-        {"id": "Q4-C2", "statement": "Core execution resolves returned evidence to canonical references, revision, provenance, trust tier and bounded content before returning it.", "status": "VERIFIED", "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityExecutionService.java#L73-L131"]},
-        {"id": "Q4-C3", "statement": "Grounding changes affect action result projection, grounding-contract updates, and final Core result validation.", "status": "VERIFIED", "evidence": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L174-L193", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextResultValidator.java#L15-L43"]},
-        {"id": "Q4-C4", "statement": "The affected test surface includes capability validation/execution, action-service idempotency/grounding, submission initialization, Python investigation contracts/loop, and bounded behavioral baseline tests.", "status": "VERIFIED", "evidence": ["backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityActionValidatorTest.java", "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityExecutionServiceTest.java", "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionServiceTest.java", "ai-engine/tests/test_story_context_investigation.py", "ai-engine/tests/test_story0184_bounded_behavioral_baseline.py"]}
+        {
+          "id": "Q4-C1",
+          "statement": "The action contract and Python schema constrain range paths and line bounds, including a maximum 500-line range in Core validation.",
+          "status": "VERIFIED",
+          "evidence": [
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityActionValidator.java#L73-L79",
+            "ai-engine/app/schemas/story_context_investigation.py#L98-L113"
+          ]
+        },
+        {
+          "id": "Q4-C2",
+          "statement": "Core execution resolves returned evidence to canonical references, revision, provenance, trust tier and bounded content before returning it.",
+          "status": "VERIFIED",
+          "evidence": [
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityExecutionService.java#L73-L131"
+          ]
+        },
+        {
+          "id": "Q4-C3",
+          "statement": "Grounding changes affect action result projection, grounding-contract updates, and final Core result validation.",
+          "status": "VERIFIED",
+          "evidence": [
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionService.java#L174-L193",
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextResultValidator.java#L15-L43"
+          ]
+        },
+        {
+          "id": "Q4-C4",
+          "statement": "The affected test surface includes capability validation/execution, action-service idempotency/grounding, submission initialization, Python investigation contracts/loop, and bounded behavioral baseline tests.",
+          "status": "VERIFIED",
+          "evidence": [
+            "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityActionValidatorTest.java",
+            "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityExecutionServiceTest.java",
+            "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextInvestigationActionServiceTest.java",
+            "ai-engine/tests/test_story_context_investigation.py",
+            "ai-engine/tests/test_story0184_bounded_behavioral_baseline.py"
+          ]
+        }
       ],
-      "acceptableQualifiedClaims": [{"statement": "A limit-only change may not require a schema version change if the contract semantics remain compatible, but the evaluation identity and tests must still change when behavior changes.", "status": "INFERRED"}],
-      "requiredEvidenceReferences": ["backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityActionValidator.java#L46-L79", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityExecutionService.java#L73-L131", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextResultValidator.java#L15-L43"],
-      "forbiddenClaims": ["Only the Python schema is affected.", "Changing the range limit cannot affect grounding.", "The change can be made without updating evaluation identities or tests."],
-      "expectedUncertainty": ["The exact test set for a future implementation depends on whether the change alters only limits or also evidence semantics."],
+      "acceptableQualifiedClaims": [
+        {
+          "statement": "A limit-only change may not require a schema version change if the contract semantics remain compatible, but the evaluation identity and tests must still change when behavior changes.",
+          "status": "INFERRED"
+        }
+      ],
+      "requiredEvidenceReferences": [
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityActionValidator.java#L46-L79",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityExecutionService.java#L73-L131",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextResultValidator.java#L15-L43"
+      ],
+      "forbiddenClaims": [
+        "Only the Python schema is affected.",
+        "Changing the range limit cannot affect grounding.",
+        "The change can be made without updating evaluation identities or tests."
+      ],
+      "expectedUncertainty": [
+        "The exact test set for a future implementation depends on whether the change alters only limits or also evidence semantics."
+      ],
       "expectedAnswerClass": "GROUNDED_IMPACT_ANALYSIS"
     },
     {
@@ -131,15 +383,61 @@
       "status": "ACCEPTED",
       "question": "Which claims in older Story 0184 repository artifacts no longer describe the current branch, and why?",
       "requiredClaims": [
-        {"id": "Q5-C1", "statement": "The Story 0184 implementation report identifies branch main at d83600a and a modified worktree, which is not the current physical checkout under evaluation.", "status": "VERIFIED", "evidence": ["docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L3-L19", "docs/evaluation/devlog-ai-abc-benchmark-v1.json"]},
-        {"id": "Q5-C2", "statement": "The current checkout is story/0184-bounded-story-context-investigation at 60fae3e0 and matches its remote branch; the report's repository-state claims are historical.", "status": "VERIFIED", "evidence": ["docs/investigations/current-state-quality-bottleneck-investigation.md#L11-L27"]},
-        {"id": "Q5-C3", "statement": "The older report's implementation summary remains materially consistent with the current branch for the existence of Core-owned typed retrieval and opt-in v2 behavior, subject to verification in current code.", "status": "VERIFIED", "evidence": ["docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L21-L33", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityRegistry.java#L5-L14"]},
-        {"id": "Q5-C4", "statement": "The report's test results and live-provider limitations are historical claims tied to its execution context, not proof of current semantic quality.", "status": "VERIFIED", "evidence": ["docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L101-L128", "docs/investigations/current-state-quality-bottleneck-investigation.md#L74-L80"]}
+        {
+          "id": "Q5-C1",
+          "statement": "The Story 0184 implementation report identifies branch main at d83600a and a modified worktree, which is not the current physical checkout under evaluation.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L3-L19",
+            "docs/evaluation/devlog-ai-abc-benchmark-v1.json"
+          ]
+        },
+        {
+          "id": "Q5-C2",
+          "statement": "The current checkout is story/0184-bounded-story-context-investigation at 60fae3e0 and matches its remote branch; the report's repository-state claims are historical.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/investigations/current-state-quality-bottleneck-investigation.md#L11-L27"
+          ]
+        },
+        {
+          "id": "Q5-C3",
+          "statement": "The older report's implementation summary remains materially consistent with the current branch for the existence of Core-owned typed retrieval and opt-in v2 behavior, subject to verification in current code.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L21-L33",
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityRegistry.java#L5-L14"
+          ]
+        },
+        {
+          "id": "Q5-C4",
+          "statement": "The report's test results and live-provider limitations are historical claims tied to its execution context, not proof of current semantic quality.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L101-L128",
+            "docs/investigations/current-state-quality-bottleneck-investigation.md#L74-L80"
+          ]
+        }
       ],
-      "acceptableQualifiedClaims": [{"statement": "A historical document can remain valid as provenance while being stale as a current repository-state record.", "status": "INFERRED"}],
-      "requiredEvidenceReferences": ["docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L3-L19", "docs/investigations/current-state-quality-bottleneck-investigation.md#L11-L27", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityRegistry.java#L8-L14"],
-      "forbiddenClaims": ["The entire implementation report is false.", "The current branch is main at d83600a.", "Passing Story 0184 tests proves answer-quality improvement."],
-      "expectedUncertainty": ["Only repository-state and implementation claims verified against current code can be reclassified; historical test execution cannot be reproduced from the report alone."],
+      "acceptableQualifiedClaims": [
+        {
+          "statement": "A historical document can remain valid as provenance while being stale as a current repository-state record.",
+          "status": "INFERRED"
+        }
+      ],
+      "requiredEvidenceReferences": [
+        "docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L3-L19",
+        "docs/investigations/current-state-quality-bottleneck-investigation.md#L11-L27",
+        "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/investigation/InvestigationCapabilityRegistry.java#L8-L14"
+      ],
+      "forbiddenClaims": [
+        "The entire implementation report is false.",
+        "The current branch is main at d83600a.",
+        "Passing Story 0184 tests proves answer-quality improvement."
+      ],
+      "expectedUncertainty": [
+        "Only repository-state and implementation claims verified against current code can be reclassified; historical test execution cannot be reproduced from the report alone."
+      ],
       "expectedAnswerClass": "CURRENT_VS_HISTORICAL_RECONCILIATION"
     },
     {
@@ -148,15 +446,62 @@
       "status": "ACCEPTED",
       "question": "What evidence is needed to decide whether a weak answer came from candidate loss, projection loss, or synthesis failure?",
       "requiredClaims": [
-        {"id": "Q6-C1", "statement": "Candidate loss requires candidate, ranking, selection and discard-reason accounting at the fixed question and revision.", "status": "VERIFIED", "evidence": ["docs/investigations/current-state-quality-bottleneck-investigation.md#L109-L124", "docs/stories/0179-story-context-runtime-loss-evaluation/evaluation-report.md#L42-L65"]},
-        {"id": "Q6-C2", "statement": "Projection loss requires comparing selected evidence with the actual model-facing projection and grounding allow-list, not merely the pre-selection candidate set.", "status": "VERIFIED", "evidence": ["docs/stories/0184-bounded-story-context-investigation/repository-analysis.md#L64-L109", "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java#L136-L169"]},
-        {"id": "Q6-C3", "statement": "Synthesis failure requires evidence to be available and eligible to the provider, followed by claim-level comparison showing that the answer did not use or incorrectly interpreted it.", "status": "INFERRED", "evidence": ["docs/investigations/current-state-quality-bottleneck-investigation.md#L114-L124", "docs/decisions/ADR-066.md#L389-L480"]},
-        {"id": "Q6-C4", "statement": "Provider/runtime failures must be separated from all three semantic causes and excluded from the semantic denominator.", "status": "VERIFIED", "evidence": ["docs/evaluation/comparative-experiment-protocol.md#L40-L52", "docs/evaluation/answer-quality-benchmark-specification.md#L82-L90"]}
+        {
+          "id": "Q6-C1",
+          "statement": "Candidate loss requires candidate, ranking, selection and discard-reason accounting at the fixed question and revision.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/investigations/current-state-quality-bottleneck-investigation.md#L109-L124",
+            "docs/stories/0179-story-context-runtime-loss-evaluation/evaluation-report.md#L42-L65"
+          ]
+        },
+        {
+          "id": "Q6-C2",
+          "statement": "Projection loss requires comparing selected evidence with the actual model-facing projection and grounding allow-list, not merely the pre-selection candidate set.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/stories/0184-bounded-story-context-investigation/repository-analysis.md#L64-L109",
+            "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/StoryContextSubmissionService.java#L136-L169"
+          ]
+        },
+        {
+          "id": "Q6-C3",
+          "statement": "Synthesis failure requires evidence to be available and eligible to the provider, followed by claim-level comparison showing that the answer did not use or incorrectly interpreted it.",
+          "status": "INFERRED",
+          "evidence": [
+            "docs/investigations/current-state-quality-bottleneck-investigation.md#L114-L124",
+            "docs/decisions/ADR-066.md#L389-L480"
+          ]
+        },
+        {
+          "id": "Q6-C4",
+          "statement": "Provider/runtime failures must be separated from all three semantic causes and excluded from the semantic denominator.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/evaluation/comparative-experiment-protocol.md#L40-L52",
+            "docs/evaluation/answer-quality-benchmark-specification.md#L82-L90"
+          ]
+        }
       ],
-      "acceptableQualifiedClaims": [{"statement": "Per-reference provider visibility must be reported as UNKNOWN when the callback contract does not expose it; it must not be inferred.", "status": "VERIFIED"}],
-      "requiredEvidenceReferences": ["docs/stories/0179-story-context-runtime-loss-evaluation/evaluation-report.md#L42-L65", "docs/stories/0180-runtime-evaluation-readiness-and-isolation/evaluation-report.md#L49-L69", "docs/evaluation/comparative-experiment-protocol.md#L82-L97"],
-      "forbiddenClaims": ["A large candidate count proves the model saw the evidence.", "A grounded answer proves all selected evidence was used.", "A provider timeout is a semantically incorrect answer."],
-      "expectedUncertainty": ["Provider-visible evidence is UNKNOWN where the runtime contract lacks per-reference attribution."],
+      "acceptableQualifiedClaims": [
+        {
+          "statement": "Per-reference provider visibility must be reported as UNKNOWN when the callback contract does not expose it; it must not be inferred.",
+          "status": "VERIFIED"
+        }
+      ],
+      "requiredEvidenceReferences": [
+        "docs/stories/0179-story-context-runtime-loss-evaluation/evaluation-report.md#L42-L65",
+        "docs/stories/0180-runtime-evaluation-readiness-and-isolation/evaluation-report.md#L49-L69",
+        "docs/evaluation/comparative-experiment-protocol.md#L82-L97"
+      ],
+      "forbiddenClaims": [
+        "A large candidate count proves the model saw the evidence.",
+        "A grounded answer proves all selected evidence was used.",
+        "A provider timeout is a semantically incorrect answer."
+      ],
+      "expectedUncertainty": [
+        "Provider-visible evidence is UNKNOWN where the runtime contract lacks per-reference attribution."
+      ],
       "expectedAnswerClass": "INVESTIGATION_DIAGNOSTIC_PLAN"
     },
     {
@@ -165,14 +510,53 @@
       "status": "ACCEPTED",
       "question": "Does the current repository prove that the bounded analyst improves real engineering answer quality?",
       "requiredClaims": [
-        {"id": "Q7-C1", "statement": "No: current Story 0184 tests are credential-free behavioral/contract tests and do not establish live semantic answer quality.", "status": "VERIFIED", "evidence": ["ai-engine/tests/test_story0184_bounded_behavioral_baseline.py#L1-L6", "docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L117-L128"]},
-        {"id": "Q7-C2", "statement": "The repository contains evidence of the bounded capability and its safety properties, but not a completed A/B/C comparison with human-scored answers.", "status": "VERIFIED", "evidence": ["docs/investigations/current-state-quality-bottleneck-investigation.md#L74-L80", "docs/investigations/current-state-quality-bottleneck-investigation.md#L104-L107"]},
-        {"id": "Q7-C3", "statement": "The correct conclusion is NOT_ESTABLISHED, not that the analyst is ineffective.", "status": "VERIFIED", "evidence": ["docs/evaluation/answer-quality-benchmark-specification.md#L7-L20", "docs/decisions/ADR-066.md#L417-L451"]}
+        {
+          "id": "Q7-C1",
+          "statement": "No: current Story 0184 tests are credential-free behavioral/contract tests and do not establish live semantic answer quality.",
+          "status": "VERIFIED",
+          "evidence": [
+            "ai-engine/tests/test_story0184_bounded_behavioral_baseline.py#L1-L6",
+            "docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L117-L128"
+          ]
+        },
+        {
+          "id": "Q7-C2",
+          "statement": "The repository contains evidence of the bounded capability and its safety properties, but not a completed A/B/C comparison with human-scored answers.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/investigations/current-state-quality-bottleneck-investigation.md#L74-L80",
+            "docs/investigations/current-state-quality-bottleneck-investigation.md#L104-L107"
+          ]
+        },
+        {
+          "id": "Q7-C3",
+          "statement": "The correct conclusion is NOT_ESTABLISHED, not that the analyst is ineffective.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/evaluation/answer-quality-benchmark-specification.md#L7-L20",
+            "docs/decisions/ADR-066.md#L417-L451"
+          ]
+        }
       ],
-      "acceptableQualifiedClaims": [{"statement": "The analyst is technically prepared for a controlled evaluation, subject to the B/C capability comparability blocker.", "status": "INFERRED"}],
-      "requiredEvidenceReferences": ["docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L101-L128", "ai-engine/tests/test_story0184_bounded_behavioral_baseline.py#L182-L236", "docs/evaluation/comparative-baseline-v4-official-collection-report.md#L40-L68"],
-      "forbiddenClaims": ["The bounded analyst is proven superior.", "The bounded analyst is proven useless.", "The V4 technical validity label is an answer-quality result."],
-      "expectedUncertainty": ["Real semantic quality, cost and usefulness remain unmeasured for this treatment."],
+      "acceptableQualifiedClaims": [
+        {
+          "statement": "The analyst is technically prepared for a controlled evaluation, subject to the B/C capability comparability blocker.",
+          "status": "INFERRED"
+        }
+      ],
+      "requiredEvidenceReferences": [
+        "docs/stories/0184-bounded-story-context-investigation/implementation-report.md#L101-L128",
+        "ai-engine/tests/test_story0184_bounded_behavioral_baseline.py#L182-L236",
+        "docs/evaluation/comparative-baseline-v4-official-collection-report.md#L40-L68"
+      ],
+      "forbiddenClaims": [
+        "The bounded analyst is proven superior.",
+        "The bounded analyst is proven useless.",
+        "The V4 technical validity label is an answer-quality result."
+      ],
+      "expectedUncertainty": [
+        "Real semantic quality, cost and usefulness remain unmeasured for this treatment."
+      ],
       "expectedAnswerClass": "CORRECT_ABSTENTION"
     },
     {
@@ -181,15 +565,62 @@
       "status": "ACCEPTED",
       "question": "Do the 0177 fixture result and V4 live result justify production hybrid retrieval or direct-agent adoption?",
       "requiredClaims": [
-        {"id": "Q8-C1", "statement": "Story 0177's semantic/hybrid recall result is fixture-scoped, model-free, and explicitly does not justify production RAG by itself.", "status": "VERIFIED", "evidence": ["docs/stories/0177-evaluate-hybrid-retrieval-for-story-context/evaluation-report.md#L3-L17", "docs/stories/0177-evaluate-hybrid-retrieval-for-story-context/evaluation-report.md#L34-L56"]},
-        {"id": "Q8-C2", "statement": "The V4 official collection is technically valid as an artifact collection but has many provider failures/censored or non-evaluated observations and therefore is not a superiority result.", "status": "VERIFIED", "evidence": ["docs/evaluation/comparative-baseline-v4-official-collection-report.md#L40-L68", "docs/evaluation/comparative-baseline-v4-official-collection-report.md#L203-L215"]},
-        {"id": "Q8-C3", "statement": "ADR-063 requires stable retrieval/reference semantics and defers vector/RAG infrastructure until a measured recall gap survives Core filtering and composition.", "status": "VERIFIED", "evidence": ["docs/decisions/ADR-063.md#L267-L297", "docs/decisions/ADR-063.md#L416-L434"]},
-        {"id": "Q8-C4", "statement": "The evidence supports further controlled A/B/C preparation, not production adoption of hybrid retrieval or direct-agent behavior.", "status": "INFERRED", "evidence": ["docs/investigations/current-state-quality-bottleneck-investigation.md#L126-L163", "docs/evaluation/comparative-experiment-protocol.md#L136-L147"]}
+        {
+          "id": "Q8-C1",
+          "statement": "Story 0177's semantic/hybrid recall result is fixture-scoped, model-free, and explicitly does not justify production RAG by itself.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/stories/0177-evaluate-hybrid-retrieval-for-story-context/evaluation-report.md#L3-L17",
+            "docs/stories/0177-evaluate-hybrid-retrieval-for-story-context/evaluation-report.md#L34-L56"
+          ]
+        },
+        {
+          "id": "Q8-C2",
+          "statement": "The V4 official collection is technically valid as an artifact collection but has many provider failures/censored or non-evaluated observations and therefore is not a superiority result.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/evaluation/comparative-baseline-v4-official-collection-report.md#L40-L68",
+            "docs/evaluation/comparative-baseline-v4-official-collection-report.md#L203-L215"
+          ]
+        },
+        {
+          "id": "Q8-C3",
+          "statement": "ADR-063 requires stable retrieval/reference semantics and defers vector/RAG infrastructure until a measured recall gap survives Core filtering and composition.",
+          "status": "VERIFIED",
+          "evidence": [
+            "docs/decisions/ADR-063.md#L267-L297",
+            "docs/decisions/ADR-063.md#L416-L434"
+          ]
+        },
+        {
+          "id": "Q8-C4",
+          "statement": "The evidence supports further controlled A/B/C preparation, not production adoption of hybrid retrieval or direct-agent behavior.",
+          "status": "INFERRED",
+          "evidence": [
+            "docs/investigations/current-state-quality-bottleneck-investigation.md#L126-L163",
+            "docs/evaluation/comparative-experiment-protocol.md#L136-L147"
+          ]
+        }
       ],
-      "acceptableQualifiedClaims": [{"statement": "A direct investigation capability is technically worth testing, but technical validity does not establish semantic superiority.", "status": "VERIFIED"}],
-      "requiredEvidenceReferences": ["docs/stories/0177-evaluate-hybrid-retrieval-for-story-context/evaluation-report.md#L34-L56", "docs/evaluation/comparative-baseline-v4-official-collection-report.md#L40-L68", "docs/decisions/ADR-063.md#L267-L297"],
-      "forbiddenClaims": ["0177 proves production RAG is required.", "V4 proves B or C is superior.", "A fixture recall increase is equivalent to answer-quality improvement."],
-      "expectedUncertainty": ["The relative value of active investigation and DevLog context is the purpose of the proposed A/B/C benchmark."],
+      "acceptableQualifiedClaims": [
+        {
+          "statement": "A direct investigation capability is technically worth testing, but technical validity does not establish semantic superiority.",
+          "status": "VERIFIED"
+        }
+      ],
+      "requiredEvidenceReferences": [
+        "docs/stories/0177-evaluate-hybrid-retrieval-for-story-context/evaluation-report.md#L34-L56",
+        "docs/evaluation/comparative-baseline-v4-official-collection-report.md#L40-L68",
+        "docs/decisions/ADR-063.md#L267-L297"
+      ],
+      "forbiddenClaims": [
+        "0177 proves production RAG is required.",
+        "V4 proves B or C is superior.",
+        "A fixture recall increase is equivalent to answer-quality improvement."
+      ],
+      "expectedUncertainty": [
+        "The relative value of active investigation and DevLog context is the purpose of the proposed A/B/C benchmark."
+      ],
       "expectedAnswerClass": "CONDITIONAL_ARCHITECTURAL_CONCLUSION"
     }
   ]
