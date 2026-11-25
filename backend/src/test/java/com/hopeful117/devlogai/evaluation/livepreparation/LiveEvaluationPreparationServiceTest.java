@@ -105,9 +105,9 @@ class LiveEvaluationPreparationServiceTest {
                 "devlog-ai", "key", new AuthenticatedPrincipal("principal", PrincipalKind.HUMAN, "test"),
                 new LiveEvaluationPreparationRequest(
                         "devlog-ai-abc", "1.0.0", "Q1", "devlog-ai-abc-first-test", "1.1.0",
-                        "bcd538cc5a40c6d270098145181bdc421caee9cc1f215d4692d1168726482465",
+                        "eaca1774647e4d9e15f0f6b77a98aa733a787895f0cde1f282933de3405dc598",
                         "ACCEPTED", "2127d4ce224b1f39f5d8f113bb0b24b3dab7e9443fcb101600a774341c8d6d4e",
-                        "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b", runtimeRevision,
+                        "0673d1d32433cdaff054d5f1defd1bedd01c0039", runtimeRevision,
                         Map.of("runtimeRevision", runtimeRevision, "coreVerified", false),
                         Map.of("A", Map.of("runtime", "java-core-story-context-one-shot", "entrypoint",
                                         "backend/src/main/java/com/hopeful117/devlogai/storycontextanalysis/usecase/AnalyzeStoryContextUseCase.java",
