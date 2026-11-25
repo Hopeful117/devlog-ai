@@ -699,3 +699,83 @@ def test_live_mode_remains_disabled_even_when_a_future_contract_is_valid(tmp_pat
             repository_root=ROOT,
             authorization=valid_authorization(),
         )
+
+
+def _core_config() -> LiveConfiguration:
+    return LiveConfiguration.from_environment({
+        "DEVLOG_LIVE_PROJECT_SLUG": "devlog-ai",
+        "DEVLOG_LIVE_STORY_NUMBER": "223",
+        "DEVLOG_LIVE_FILES": "docs/a.md",
+        "DEVLOG_MCP_LAUNCHER": "/tmp/devlog-mcp-start.sh",
+        "DEVLOG_LIVE_POLL_INTERVAL_SECONDS": "0.01",
+    }, require_task_id=False)
+
+
+def test_core_live_adapter_scopes_execution_identity_to_the_authorization() -> None:
+    class FakeMcp:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            self.calls.append((name, arguments))
+            return {"status": "COMPLETED", "aiTaskId": "task-1", "result": {"analysis": "bounded"}}
+
+    mcp = FakeMcp()
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", _core_config(), {}, mcp, execution_scope="auth-7")
+
+    adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, {})
+
+    request = mcp.calls[0][1]
+    assert request["idempotencyKey"].endswith("-auth-7")
+    assert request["guidance"]["evaluation"]["executionIdentity"] == request["idempotencyKey"]
+
+
+def test_core_live_adapter_rereads_completed_task_after_mcp_poll_ceiling() -> None:
+    deadline = "2999-01-01T00:00:00Z"
+
+    class FakeMcp:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            self.calls.append(name)
+            if name == "story_context_agent_get_snapshot_authenticated":
+                return {"id": "task-9", "status": "COMPLETED"}
+            if self.calls.count("devlog_story_agent") == 1:
+                return {"status": "TIMED_OUT", "aiTaskId": "task-9", "diagnostics": {
+                    "code": "POLL_TIMEOUT", "aiTaskId": "task-9", "deadlineAt": deadline,
+                    "lastKnownStatus": "SUBMITTED"}}
+            return {"status": "COMPLETED", "aiTaskId": "task-9", "result": {"analysis": "bounded"}}
+
+    mcp = FakeMcp()
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", _core_config(), {}, mcp)
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, {})
+
+    assert result["executionStatus"] == "COMPLETED"
+    assert result["integrationStatus"] == "LIVE_CORE_CALLBACK_COMPLETED"
+    assert mcp.calls == ["devlog_story_agent", "story_context_agent_get_snapshot_authenticated", "devlog_story_agent"]
+
+
+def test_core_live_adapter_reports_core_failure_after_poll_ceiling_without_resubmitting() -> None:
+    class FakeMcp:
+        def __init__(self) -> None:
+            self.calls = []
+
+        def tool(self, name: str, arguments: dict) -> dict:
+            self.calls.append(name)
+            if name == "story_context_agent_get_snapshot_authenticated":
+                return {"id": "task-9", "status": "FAILED", "failureCode": "ConflictException",
+                        "failureMessage": "Investigation final provider generation exceeds the remaining budget"}
+            return {"status": "TIMED_OUT", "aiTaskId": "task-9", "diagnostics": {
+                "code": "POLL_TIMEOUT", "aiTaskId": "task-9", "deadlineAt": "2999-01-01T00:00:00Z"}}
+
+    mcp = FakeMcp()
+    adapter = CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", _core_config(), {}, mcp)
+
+    result = adapter.execute({"observationId": "Q1-A-DEVLOG-CURRENT-r1"}, {})
+
+    assert mcp.calls.count("devlog_story_agent") == 1
+    assert result["executionStatus"] == "FAILED"
+    assert result["mcpExecution"]["diagnostics"]["failureCode"] == "ConflictException"
+    assert result["mcpExecution"]["diagnostics"]["resolvedAfter"] == "POLL_TIMEOUT"

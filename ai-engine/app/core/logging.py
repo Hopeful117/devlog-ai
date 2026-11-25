@@ -33,6 +33,7 @@ class JsonFormatter(logging.Formatter):
             "attempt", "proposalCount", "exceptionType", "event", "taskId",
             "intent", "provider", "model", "authorizedOutputTokens",
             "effectiveOutputTokens", "configuredOutputTokens", "outputParameterSource",
+            "inputTokens", "outputTokens", "reasoningTokens",
             "providerStatus", "incompleteReason",
             "externalJobId", "phase", "outcome",
         ):

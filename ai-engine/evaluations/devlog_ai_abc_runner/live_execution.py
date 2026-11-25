@@ -18,7 +18,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
 from uuid import UUID
@@ -251,12 +251,63 @@ class LiveConfiguration:
 class CoreLiveTreatmentAdapter:
     """Execute one Core-authorized Story Context treatment through MCP."""
 
-    def __init__(self, condition: str, config: LiveConfiguration, manifest: Mapping[str, Any], mcp: McpClient):
+    def __init__(self, condition: str, config: LiveConfiguration, manifest: Mapping[str, Any], mcp: McpClient,
+                 *, execution_scope: str | None = None, snapshot_grace_seconds: float = 30.0):
         self.condition = condition
         self.live_status = "LIVE_CORE_MCP_BOUNDARY"
         self._config = config
         self._manifest = manifest
         self._mcp = mcp
+        self._execution_scope = execution_scope
+        self._snapshot_grace_seconds = snapshot_grace_seconds
+
+    def _resolve_poll_timeout(self, request: dict[str, Any], execution: dict[str, Any]) -> dict[str, Any]:
+        """Wait past the MCP poll ceiling for the Core-owned terminal status, reading only snapshots."""
+        diagnostics = execution.get("diagnostics")
+        if not isinstance(diagnostics, dict) or diagnostics.get("code") != "POLL_TIMEOUT":
+            return execution
+        task_id = diagnostics.get("aiTaskId") or execution.get("aiTaskId")
+        try:
+            deadline = datetime.fromisoformat(str(diagnostics.get("deadlineAt")).replace("Z", "+00:00"))
+        except ValueError:
+            return execution
+        if not isinstance(task_id, str) or not task_id:
+            return execution
+        stop_at = deadline + timedelta(seconds=self._snapshot_grace_seconds)
+        while datetime.now(timezone.utc) < stop_at:
+            time.sleep(self._config.poll_interval_seconds)
+            try:
+                snapshot = self._mcp.tool("story_context_agent_get_snapshot_authenticated", {"aiTaskId": task_id})
+            except (OSError, RuntimeError, TimeoutError):
+                continue
+            status = snapshot.get("status") if isinstance(snapshot, dict) else None
+            if status == "COMPLETED":
+                # A COMPLETED task is reused for the identical request, so this re-read
+                # fetches its result without starting a new provider execution.
+                completed = self._mcp.tool("devlog_story_agent", request)
+                if isinstance(completed, dict) and (
+                    completed.get("aiTaskId") or completed.get("snapshotId")
+                ) == task_id:
+                    return completed
+                resolved = dict(execution)
+                resolved["diagnostics"] = {**diagnostics, "code": "COMPLETED_REREAD_IDENTITY_MISMATCH"}
+                return resolved
+            if status in {"FAILED", "TIMED_OUT", "NOT_ESTABLISHED"}:
+                resolved = dict(execution)
+                resolved["status"] = status
+                resolved["diagnostics"] = {
+                    key: value for key, value in {
+                        "status": status,
+                        "aiTaskId": task_id,
+                        "failureCode": snapshot.get("failureCode"),
+                        "failureMessage": snapshot.get("failureMessage"),
+                        "terminalReason": snapshot.get("terminalReason"),
+                        "deadlineAt": snapshot.get("deadlineAt"),
+                        "resolvedAfter": "POLL_TIMEOUT",
+                    }.items() if value is not None
+                }
+                return resolved
+        return execution
 
     def execute(self, observation: Mapping[str, Any], manifest: Mapping[str, Any]) -> dict[str, Any]:
         guidance: dict[str, Any] = {}
@@ -282,11 +333,14 @@ class CoreLiveTreatmentAdapter:
         idempotency_key = (
             f"q1-live-{observation['observationId']}-{current_head(Path.cwd())[:12]}"
         )
-        if self.condition == "C_DEVLOG_ENGINEERING_ANALYST":
-            guidance = {
-                **guidance,
-                "evaluation": {"executionIdentity": idempotency_key},
-            }
+        if self._execution_scope:
+            idempotency_key = f"{idempotency_key}-{self._execution_scope}"
+        # Core keeps evaluation out of the prompt but includes it in the submission digest,
+        # so each authorization yields its own execution instead of reusing an earlier one.
+        guidance = {
+            **guidance,
+            "evaluation": {"executionIdentity": idempotency_key},
+        }
         started = time.perf_counter()
         request = {
             "projectSlug": self._config.project_slug,
@@ -307,6 +361,7 @@ class CoreLiveTreatmentAdapter:
             ) from error
         if not isinstance(execution, dict):
             raise LiveConfigurationError("MCP Story Agent response must be an object")
+        execution = self._resolve_poll_timeout(request, execution)
         response_diagnostic = _mcp_response_diagnostic(execution)
         task_id = execution.get("aiTaskId") or execution.get("snapshotId")
         if not isinstance(task_id, str) or not task_id:
@@ -965,16 +1020,19 @@ def require_b_live_environment(environment: Mapping[str, str] | None = None) -> 
 
 
 def live_adapters(*, repository_root: Path, manifest: Mapping[str, Any], config: LiveConfiguration,
-                  mcp: McpClient, environment: Mapping[str, str] | None = None) -> dict[str, TreatmentAdapter]:
+                  mcp: McpClient, environment: Mapping[str, str] | None = None,
+                  execution_scope: str | None = None) -> dict[str, TreatmentAdapter]:
     require_b_live_environment(environment)
     if config.b_task_id is None:
         raise LiveConfigurationError("B live execution requires a reserved credential-binding task")
     values = os.environ if environment is None else environment
     model = values.get("LLM_MODEL", manifest["model"]).strip()
     return {
-        "A_DEVLOG_CURRENT": CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, manifest, mcp),
+        "A_DEVLOG_CURRENT": CoreLiveTreatmentAdapter("A_DEVLOG_CURRENT", config, manifest, mcp,
+                                                     execution_scope=execution_scope),
         "B_DIRECT_INVESTIGATOR": DirectLiveTreatmentAdapter(repository_root, config.b_task_id, model),
-        "C_DEVLOG_ENGINEERING_ANALYST": CoreLiveTreatmentAdapter("C_DEVLOG_ENGINEERING_ANALYST", config, manifest, mcp),
+        "C_DEVLOG_ENGINEERING_ANALYST": CoreLiveTreatmentAdapter("C_DEVLOG_ENGINEERING_ANALYST", config, manifest, mcp,
+                                                                 execution_scope=execution_scope),
     }
 
 
@@ -1032,7 +1090,7 @@ def run_live_execution(*, manifest_path: str | Path, output_root: str | Path, re
             reservation = _reserve_task_binding(mcp, config, f"q1-live-binding-{authorization_id}")
             config = replace(config, b_task_id=UUID(reservation["aiTaskId"]))
         adapters = live_adapters(repository_root=root, manifest=manifest, config=config, mcp=mcp,
-                                 environment=environment)
+                                 environment=environment, execution_scope=authorization_id)
         execution_key = (environment or os.environ).get("DEVLOG_LIVE_EXECUTION_IDEMPOTENCY_KEY", "").strip()
         if not execution_key:
             execution_key = hashlib.sha256(json.dumps({
