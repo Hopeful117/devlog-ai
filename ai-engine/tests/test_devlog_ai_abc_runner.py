@@ -29,7 +29,7 @@ OBSERVATIONS = (
     "Q1-B-DIRECT-INVESTIGATOR-r1",
     "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1",
 )
-FROZEN_REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
+FROZEN_REVISION = "0673d1d32433cdaff054d5f1defd1bedd01c0039"
 
 
 def _require_frozen_revision() -> None:
@@ -157,9 +157,9 @@ def test_integration_simulation_exercises_all_three_boundaries_without_external_
     assert statuses["C_DEVLOG_ENGINEERING_ANALYST"]["integrationStatus"] == "PASS"
     b_raw = json.loads((result.run_root / "observations" / "Q1-B-DIRECT-INVESTIGATOR-r1" / "raw" / "answer.json").read_text())["rawOutput"]
     assert b_raw["bindingStatus"] == "Q1_B_RUNTIME_INTEGRATION_PASS"
-    assert b_raw["sourceSnapshot"]["revision"] == "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
+    assert b_raw["sourceSnapshot"]["revision"] == "0673d1d32433cdaff054d5f1defd1bedd01c0039"
     assert b_raw["toolTrace"][0]["executionStatus"] == "EXECUTED_SUCCESS"
-    assert b_raw["toolTrace"][0]["repositoryRevision"] == "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
+    assert b_raw["toolTrace"][0]["repositoryRevision"] == "0673d1d32433cdaff054d5f1defd1bedd01c0039"
     assert b_raw["externalProviderCalls"] == 0
     assert b_raw["externalNetworkCalls"] == 0
     assert (result.run_root / "observations" / "Q1-B-DIRECT-INVESTIGATOR-r1" / "trace" / "events.json").read_text() != "[]"

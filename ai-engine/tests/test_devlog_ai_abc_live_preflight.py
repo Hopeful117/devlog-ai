@@ -38,7 +38,7 @@ from evaluations.devlog_ai_abc_runner.pricing import canonical_pricing_digest
 ROOT = Path(__file__).parents[1].parent
 MANIFEST_PATH = ROOT / "docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json"
 ORACLE_PATH = ROOT / "docs/evaluation/devlog-ai-abc-oracle-proposals-v1.json"
-REVISION = "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b"
+REVISION = "0673d1d32433cdaff054d5f1defd1bedd01c0039"
 
 
 def manifest() -> dict:

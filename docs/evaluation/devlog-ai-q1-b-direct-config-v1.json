@@ -7,7 +7,7 @@
   "question": "How does a Story Context request move from Core authorization to the final persisted analysis, and which side owns each invariant?",
   "repository": {
     "repositoryId": "git:github.com/Hopeful117/devlog-ai",
-    "revision": "fa33f03d9af42e3ac6e64112ecebe38d86de7b9b",
+    "revision": "0673d1d32433cdaff054d5f1defd1bedd01c0039",
     "readMode": "pinned_git_object",
     "toolContract": "direct-read-only-git-tools"
   },
