@@ -65,7 +65,7 @@ class DocumentBodyCollectorIntegrationTest {
     private static final UUID SOURCE_ID = UUID.randomUUID();
     private static final String REVISION = "abc123";
     private static final String STORY_PATH = "docs/stories/0118/story.md";
-    private static final String ADR_PATH = "docs/decisions/ADR-0067.md";
+    private static final String ADR_PATH = "docs/decisions/ADR-067.md";
 
     @BeforeEach
     void setUp() {
