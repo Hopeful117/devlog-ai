@@ -4,11 +4,14 @@
 import json
 import base64
 import binascii
+import io
 import math
 import os
 import re
+import select
 import secrets
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -20,7 +23,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 SECRET_PATTERNS = (
@@ -580,14 +583,30 @@ class RuntimeSession:
         self.lease = lease
         self.child: subprocess.Popen[bytes] | None = None
         self.ready = threading.Event()
+        self.initialize_received = threading.Event()
+        self.handshake_deadline = 0.0
         self.stop_requested = threading.Event()
+        self.explicit_stop = threading.Event()
         self.lock = threading.RLock()
+        # Lifecycle decisions never wait on protocol I/O. When both locks
+        # are needed, acquire the session lock before the lifecycle lock.
+        self.lifecycle_lock = threading.Lock()
+        self.spawn_done = threading.Event()
+        self.spawn_done.set()
+        self.unpublished_child: subprocess.Popen[bytes] | None = None
+        self.child_stop_lock = threading.Lock()
+        self.stdout_lock = threading.Lock()
+        self.stdout_done = threading.Event()
+        self.stdout_done.set()
+        self.terminalize_lock = threading.Lock()
         self.tool_event_lock = threading.Lock()
         self.stdin_write_lock = threading.Lock()
         self.renewal_condition = threading.Condition(self.lock)
         self.renewal_in_progress = False
+        self.replacement_failed = threading.Event()
         self.outstanding: dict[str, ToolOperation | int] = {}
         self.operations: dict[str, ToolOperation] = {}
+        self.pending_operation_events: list[tuple[ToolOperation, str, str, int, str | None]] = []
         self.last_renewal_failure = 0.0
         self.initialize_raw: bytes | None = None
         self.initialized_raw: bytes | None = None
@@ -662,26 +681,13 @@ class RuntimeSession:
         if self.outstanding.get(operation.request_id) is operation:
             self.outstanding.pop(operation.request_id, None)
         self.operations.pop(operation.operation_id, None)
+        event_type = {
+            TOOL_RESPONDED: "MCP_TOOL_RESPONDED",
+            TOOL_FAILED: "MCP_TOOL_FAILED",
+            TOOL_INTERRUPTED: "MCP_TOOL_INTERRUPTED",
+        }[state]
+        self.pending_operation_events.append((operation, event_type, state, generation, reason_code))
         return True
-
-    def _emit_terminal_event(
-        self,
-        operation: ToolOperation,
-        state: str,
-        generation: int,
-        reason_code: str | None = None,
-    ) -> None:
-        self._emit_tool_event(
-            operation,
-            {
-                TOOL_RESPONDED: "MCP_TOOL_RESPONDED",
-                TOOL_FAILED: "MCP_TOOL_FAILED",
-                TOOL_INTERRUPTED: "MCP_TOOL_INTERRUPTED",
-            }[state],
-            state,
-            generation,
-            reason_code=reason_code,
-        )
 
     def _finish_operation(
         self,
@@ -693,8 +699,17 @@ class RuntimeSession:
         with self.lock:
             finished = self._finish_operation_locked(operation, state, generation, reason_code)
         if finished:
-            self._emit_terminal_event(operation, state, generation, reason_code)
+            self.flush_terminal_events()
         return finished
+
+    def flush_terminal_events(self) -> None:
+        # Reservation and retirement queue their events under the session
+        # lock. Finalization flushes them even if a relay thread is paused.
+        with self.terminalize_lock:
+            with self.lock:
+                pending, self.pending_operation_events = self.pending_operation_events, []
+            for operation, event_type, status, generation, reason in pending:
+                self._emit_tool_event(operation, event_type, status, generation, reason_code=reason)
 
     @property
     def renewal_margin(self) -> float:
@@ -761,70 +776,123 @@ class RuntimeSession:
 
     def start_child(self, replay_initialize: bool = False) -> None:
         with self.lock:
-            if self.stop_requested.is_set():
-                raise RuntimeError("MCP_INSTANCE_STOPPING")
-            self.generation += 1
-            generation = self.generation
-            child_env = os.environ.copy()
-            child_env["DEVLOG_MCP_BEARER_TOKEN"] = self.lease.token
-            child_env["KEYCLOAK_ISSUER_URI"] = self.configuration["issuer_uri"]
-            child_env.setdefault("KEYCLOAK_AUDIENCE", "devlog-core")
-            child_env["KEYCLOAK_JWKS_URI"] = self.configuration["jwks_uri"]
-            child_env["KEYCLOAK_MCP_ACTOR_CLIENT_ID"] = self.configuration["actor_client_id"]
+            with self.lifecycle_lock:
+                if self.stop_requested.is_set():
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
+                self.spawn_done.clear()
             try:
-                child = subprocess.Popen(
-                    ["java", "-jar", self.configuration["jar"]],
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    env=child_env,
-                )
-            except OSError as exception:
-                raise RuntimeError("MCP_PROCESS_FAILED") from exception
-            self.child = child
-            self.ready = threading.Event()
-            self.suppress_initialize_response = replay_initialize and self.initialize_raw is not None
-            update_manifest(self.directory, state="RUNNING", mcpPid=child.pid, mcpStartTime=process_start_time(child.pid))
-            self.writer.write("MCP_PROCESS_STARTED", mcpPid=child.pid)
-            threading.Thread(target=self.relay_stdout, args=(child, generation), daemon=True).start()
-            threading.Thread(target=self.relay_stderr, args=(child,), daemon=True).start()
-            if replay_initialize and self.initialize_raw is not None and child.stdin is not None:
-                child.stdin.write(self.initialize_raw)
-                child.stdin.flush()
+                child, initialize = self._spawn_child(replay_initialize)
+            finally:
+                self.spawn_done.set()
+        if initialize is not None:
+            self.write_child_handshake(child.stdin, initialize)
+
+    def _spawn_child(self, replay_initialize: bool) -> tuple[subprocess.Popen[bytes], bytes | None]:
+        # Called with the session lock. Do not include handshake I/O in the
+        # spawn reservation: shutdown may need to kill the child to unblock it.
+        self.generation += 1
+        generation = self.generation
+        child_env = os.environ.copy()
+        child_env["DEVLOG_MCP_BEARER_TOKEN"] = self.lease.token
+        child_env["KEYCLOAK_ISSUER_URI"] = self.configuration["issuer_uri"]
+        child_env.setdefault("KEYCLOAK_AUDIENCE", "devlog-core")
+        child_env["KEYCLOAK_JWKS_URI"] = self.configuration["jwks_uri"]
+        child_env["KEYCLOAK_MCP_ACTOR_CLIENT_ID"] = self.configuration["actor_client_id"]
+        try:
+            child = subprocess.Popen(
+                ["java", "-jar", self.configuration["jar"]],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=child_env,
+            )
+        except OSError as exception:
+            raise RuntimeError("MCP_PROCESS_FAILED") from exception
+        with self.lifecycle_lock:
+            publish = not self.stop_requested.is_set()
+            if publish:
+                self.child = child
+                self.ready = threading.Event()
+                self.initialize_received = threading.Event()
+                self.stdout_done = threading.Event()
+            else:
+                self.unpublished_child = child
+        if not publish:
+            self.terminate_owned_child(child, "MCP_INSTANCE_STOPPING")
+            self.unpublished_child = None
+            raise RuntimeError("MCP_INSTANCE_STOPPING")
+        initialize = self.initialize_raw if replay_initialize else None
+        self.suppress_initialize_response = initialize is not None
+        update_manifest(self.directory, state="RUNNING", mcpPid=child.pid, mcpStartTime=process_start_time(child.pid))
+        self.writer.write("MCP_PROCESS_STARTED", mcpPid=child.pid)
+        threading.Thread(target=self.run_stdout_relay, args=(child, generation, self.stdout_done), daemon=True).start()
+        threading.Thread(target=self.relay_stderr, args=(child,), daemon=True).start()
+        return child, initialize
+
+    def request_stop(self) -> None:
+        with self.lifecycle_lock:
+            self.explicit_stop.set()
+            self.stop_requested.set()
 
     def stop_child(self, code: str) -> None:
-        terminal_events: list[tuple[ToolOperation, int]] = []
-        with self.lock:
+        if code != "TOKEN_RENEWAL":
+            self.request_stop()
+            self.spawn_done.wait()
+        with self.lifecycle_lock:
             child = self.child
-            if code != "TOKEN_RENEWAL":
-                self.stop_requested.set()
-                self.generation += 1
-                for operation in list(self.operations.values()):
-                    if self._finish_operation_locked(operation, TOOL_INTERRUPTED, self.generation):
-                        terminal_events.append((operation, self.generation))
-            child_running = child is not None and child.poll() is None
-        for terminal_operation, terminal_generation in terminal_events:
-            self._emit_terminal_event(
-                terminal_operation,
-                TOOL_INTERRUPTED,
-                terminal_generation,
-                reason_code="MCP_INSTANCE_STOPPING",
-            )
-        if not child_running:
+        if child is not None:
+            self.terminate_owned_child(child, code)
+        if code == "TOKEN_RENEWAL":
             return
-        self.writer.write("MCP_INSTANCE_STOPPED", code=code)
-        if child.stdin:
-            try:
-                child.stdin.close()
-            except OSError:
-                pass
-        child.terminate()
+        self.interrupt_pending_operations()
+
+    def interrupt_pending_operations(self) -> None:
+        with self.lock:
+            for operation in list(self.operations.values()):
+                self._finish_operation_locked(operation, TOOL_INTERRUPTED, self.generation, "MCP_INSTANCE_STOPPING")
+        self.flush_terminal_events()
+
+    def terminate_owned_child(self, child: subprocess.Popen[bytes], code: str) -> None:
+        # Never close a buffered stdin before signalling: close can wait on
+        # a writer whose pipe is full. Signal/reap without the protocol locks.
+        with self.child_stop_lock:
+            terminate_child(child, self.writer, code)
+
+    def write_stdout(self, payload: bytes, generation: int, message: Any = None) -> bool:
+        with self.stdout_lock:
+            with self.lock:
+                if generation != self.generation or self.explicit_stop.is_set():
+                    return False
+                operation = self.response_operation_locked(message, generation)
+                if operation is not None:
+                    # The server answered. Release the wire request before the
+                    # client can read the response, but log delivery only after
+                    # the write. The operation remains visible to shutdown.
+                    self.outstanding.pop(operation.request_id)
+            # An admitted frame may finish, but cannot be overtaken by a
+            # newer generation. No lifecycle lock is held during the write.
+            output = sys.stdout.buffer
+            # The stdio launcher owns stdout. Do not pin Python's buffered
+            # stdout lock in a daemon thread during interpreter shutdown.
+            if isinstance(output, io.BufferedWriter) and isinstance(output.raw, io.FileIO):
+                remaining = memoryview(payload)
+                while remaining:
+                    written = os.write(output.fileno(), remaining)
+                    if not written:
+                        raise BrokenPipeError("MCP stdout write made no progress")
+                    remaining = remaining[written:]
+            else:
+                output.write(payload)
+                output.flush()
+            if operation is not None:
+                self.finish_response(operation, message, generation)
+            return True
+
+    def run_stdout_relay(self, child: subprocess.Popen[bytes], generation: int, done: threading.Event) -> None:
         try:
-            child.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            self.writer.write("MCP_INSTANCE_STOPPED", severity="WARN", code="CHILD_KILL_REQUIRED")
-            child.kill()
-            child.wait(timeout=5)
+            self.relay_stdout(child, generation)
+        finally:
+            done.set()
 
     def relay_stdout(self, child: subprocess.Popen[bytes], generation: int) -> None:
         assert child.stdout is not None
@@ -841,24 +909,21 @@ class RuntimeSession:
                     if generation != self.generation:
                         continue
                 auth_failure = self.is_transport_auth_failure(message)
-                if auth_failure and self.retry_authentication(message):
+                if not self.stop_requested.is_set() and auth_failure and self.retry_authentication(message):
                     continue
-                if self.is_rate_limited(message) and self.retry_rate_limited(message):
+                if not self.stop_requested.is_set() and self.is_rate_limited(message) and self.retry_rate_limited(message):
                     continue
                 with self.lock:
                     if generation != self.generation:
                         continue
-                    internal = self.consume_initialize_response(message, generation)
+                # Publication de disponibilité hors du verrou de session :
+                # l'arrêt peut détenir child_stop_lock pendant un réap.
+                internal = self.consume_initialize_response(message, generation)
                 if internal:
                     continue
-                with self.lock:
-                    if generation == self.generation:
-                        sys.stdout.buffer.write(line + b"\n")
-                        sys.stdout.buffer.flush()
-        with self.lock:
-            if buffer and generation == self.generation:
-                sys.stdout.buffer.write(buffer)
-                sys.stdout.buffer.flush()
+                self.write_stdout(line + b"\n", generation, message)
+        if buffer:
+            self.write_stdout(buffer, generation)
 
     def relay_stderr(self, child: subprocess.Popen[bytes]) -> None:
         assert child.stderr is not None
@@ -870,37 +935,36 @@ class RuntimeSession:
                 sys.stderr.flush()
 
     def observe_response(self, message: Any, generation: int | None = None) -> None:
-        if not isinstance(message, dict) or "id" not in message:
-            return
-        identifier = message["id"]
-        if isinstance(identifier, (str, int, float)) and not isinstance(identifier, bool):
-            terminal_event: tuple[ToolOperation, str, int, str | None] | None = None
-            with self.lock:
-                key = json.dumps(identifier, sort_keys=True)
-                operation = self.outstanding.get(key)
-                if not isinstance(operation, ToolOperation):
-                    return
-                if generation is not None and generation != operation.current_generation:
-                    return
-                if isinstance(message.get("error"), dict):
-                    terminal_generation = generation if generation is not None else operation.current_generation
-                    if self._finish_operation_locked(operation, TOOL_FAILED, terminal_generation):
-                        terminal_event = (
-                            operation,
-                            TOOL_FAILED,
-                            terminal_generation,
-                            self.jsonrpc_diagnostic(message)["code"],
-                        )
-                else:
-                    terminal_generation = generation if generation is not None else operation.current_generation
-                    if operation.tool_name in DEVLOG_CORRELATION_TOOLS:
-                        correlation_id = _extract_devlog_correlation_id(message)
-                        if correlation_id:
-                            operation.response_correlation_id = correlation_id
-                    if self._finish_operation_locked(operation, TOOL_RESPONDED, terminal_generation):
-                        terminal_event = (operation, TOOL_RESPONDED, terminal_generation, None)
-            if terminal_event is not None:
-                self._emit_terminal_event(*terminal_event)
+        with self.lock:
+            operation = self.response_operation_locked(message, generation)
+        if operation is not None:
+            self.finish_response(operation, message, generation)
+
+    def response_operation_locked(self, message: Any, generation: int | None) -> ToolOperation | None:
+        identifier = self.request_id(message)
+        if identifier is None:
+            return None
+        operation = self.outstanding.get(identifier)
+        if not isinstance(operation, ToolOperation):
+            return None
+        if generation is not None and generation != operation.current_generation:
+            return None
+        return operation
+
+    def finish_response(self, operation: ToolOperation, message: dict, generation: int | None) -> None:
+        with self.lock:
+            if operation.state != TOOL_ACTIVE or (
+                generation is not None and generation != operation.current_generation
+            ):
+                return
+            terminal_generation = operation.current_generation
+            if isinstance(message.get("error"), dict):
+                self._finish_operation_locked(operation, TOOL_FAILED, terminal_generation, self.jsonrpc_diagnostic(message)["code"])
+            else:
+                if operation.tool_name in DEVLOG_CORRELATION_TOOLS:
+                    operation.response_correlation_id = _extract_devlog_correlation_id(message)
+                self._finish_operation_locked(operation, TOOL_RESPONDED, terminal_generation)
+        self.flush_terminal_events()
 
     @staticmethod
     def jsonrpc_error_reason(message: Any) -> str:
@@ -951,7 +1015,7 @@ class RuntimeSession:
         identifier = self.request_id(message)
         if identifier is None:
             return False
-        terminal_event: tuple[ToolOperation, str, int, str | None] | None = None
+        terminal_event = False
         raw: bytes | None = None
         operation_id: str | None = None
         with self.lock:
@@ -959,24 +1023,21 @@ class RuntimeSession:
             if not isinstance(operation, ToolOperation):
                 return False
             if not operation.retry_safe:
-                if self._finish_operation_locked(operation, TOOL_FAILED, operation.current_generation):
-                    terminal_event = (
-                        operation,
-                        TOOL_FAILED,
-                        operation.current_generation,
-                        "MCP_RETRY_NOT_IDEMPOTENT",
-                    )
+                terminal_event = self._finish_operation_locked(
+                    operation, TOOL_FAILED, operation.current_generation, "MCP_RETRY_NOT_IDEMPOTENT"
+                )
                 raw = None
                 operation_id = None
             elif operation.retry_count >= 1:
-                if self._finish_operation_locked(operation, TOOL_FAILED, operation.current_generation):
-                    terminal_event = (operation, TOOL_FAILED, operation.current_generation, "MCP_REAUTH_REQUIRED")
+                terminal_event = self._finish_operation_locked(
+                    operation, TOOL_FAILED, operation.current_generation, "MCP_REAUTH_REQUIRED"
+                )
             else:
                 operation.retry_count += 1
                 raw = operation.raw_payload
                 operation_id = operation.operation_id
-        if terminal_event is not None:
-            self._emit_terminal_event(*terminal_event)
+        if terminal_event:
+            self.flush_terminal_events()
             return False
         if raw is None or operation_id is None:
             return False
@@ -986,7 +1047,7 @@ class RuntimeSession:
             self.writer.write("TOKEN_RENEWAL_SUCCEEDED", code="AUTHENTICATION_RETRY")
             return True
         except (OSError, RuntimeError, ValueError, urllib.error.URLError, TimeoutError):
-            terminal_event = None
+            terminal_event = False
             with self.lock:
                 current = self.operations.get(operation_id)
                 if current is not None:
@@ -996,10 +1057,9 @@ class RuntimeSession:
                     else:
                         state = TOOL_FAILED
                         reason_code = "MCP_REAUTH_REQUIRED"
-                    if self._finish_operation_locked(current, state, current.current_generation):
-                        terminal_event = (current, state, current.current_generation, reason_code)
-            if terminal_event is not None:
-                self._emit_terminal_event(*terminal_event)
+                    terminal_event = self._finish_operation_locked(current, state, current.current_generation, reason_code)
+            if terminal_event:
+                self.flush_terminal_events()
             self.stop_child("MCP_REAUTH_REQUIRED")
             return False
 
@@ -1024,7 +1084,7 @@ class RuntimeSession:
         identifier = self.request_id(message)
         if identifier is None:
             return False
-        terminal_event: tuple[ToolOperation, str, int, str | None] | None = None
+        terminal_event = False
         raw: bytes | None = None
         operation_id: str | None = None
         delay = self.rate_limit_retry_delay(message)
@@ -1035,8 +1095,7 @@ class RuntimeSession:
             if operation.rate_limit_retry_in_progress:
                 if not operation.rate_limit_retry_sent:
                     return True
-                if self._finish_operation_locked(operation, TOOL_FAILED, operation.current_generation):
-                    terminal_event = (operation, TOOL_FAILED, operation.current_generation, "RATE_LIMITED")
+                terminal_event = self._finish_operation_locked(operation, TOOL_FAILED, operation.current_generation, "RATE_LIMITED")
                 raw = None
                 operation_id = None
             elif (
@@ -1044,21 +1103,18 @@ class RuntimeSession:
                 or operation.tool_name is None
                 or operation.rate_limit_retry_count >= 1
             ):
-                if self._finish_operation_locked(operation, TOOL_FAILED, operation.current_generation):
-                    terminal_event = (
-                        operation,
-                        TOOL_FAILED,
-                        operation.current_generation,
-                        "MCP_RETRY_NOT_IDEMPOTENT" if not operation.retry_safe else "RATE_LIMITED",
-                    )
+                terminal_event = self._finish_operation_locked(
+                    operation, TOOL_FAILED, operation.current_generation,
+                    "MCP_RETRY_NOT_IDEMPOTENT" if not operation.retry_safe else "RATE_LIMITED",
+                )
             else:
                 operation.rate_limit_retry_count += 1
                 operation.rate_limit_retry_in_progress = True
                 operation.rate_limit_retry_sent = False
                 raw = operation.raw_payload
                 operation_id = operation.operation_id
-        if terminal_event is not None:
-            self._emit_terminal_event(*terminal_event)
+        if terminal_event:
+            self.flush_terminal_events()
             return False
         if raw is None or operation_id is None:
             return False
@@ -1080,12 +1136,11 @@ class RuntimeSession:
                 if current.current_generation != self.generation or self.stop_requested.is_set():
                     state = TOOL_INTERRUPTED if self.stop_requested.is_set() else TOOL_FAILED
                     reason_code = "MCP_INSTANCE_STOPPING" if state == TOOL_INTERRUPTED else "RATE_LIMITED"
-                    if self._finish_operation_locked(current, state, current.current_generation):
-                        terminal_event = (current, state, current.current_generation, reason_code)
+                    terminal_event = self._finish_operation_locked(current, state, current.current_generation, reason_code)
                     raw = None
                     operation_id = None
-            if terminal_event is not None:
-                self._emit_terminal_event(*terminal_event)
+            if terminal_event:
+                self.flush_terminal_events()
                 return False
             if raw is None or operation_id is None:
                 return False
@@ -1101,38 +1156,32 @@ class RuntimeSession:
                     current.rate_limit_retry_in_progress = False
             return True
         except (OSError, RuntimeError, ValueError, urllib.error.URLError, TimeoutError):
-            terminal_event = None
+            terminal_event = False
             with self.lock:
                 current = self.operations.get(operation_id)
                 if current is not None:
                     state = TOOL_INTERRUPTED if self.stop_requested.is_set() else TOOL_FAILED
                     reason_code = "MCP_INSTANCE_STOPPING" if state == TOOL_INTERRUPTED else "RATE_LIMITED"
-                    if self._finish_operation_locked(current, state, current.current_generation):
-                        terminal_event = (current, state, current.current_generation, reason_code)
-            if terminal_event is not None:
-                self._emit_terminal_event(*terminal_event)
+                    terminal_event = self._finish_operation_locked(current, state, current.current_generation, reason_code)
+            if terminal_event:
+                self.flush_terminal_events()
             return False
 
     def consume_initialize_response(self, message: Any, generation: int | None = None) -> bool:
         if generation is not None and generation != self.generation:
             return True
         if not isinstance(message, dict):
-            self.observe_response(message, generation)
             return False
         identifier = self.request_id(message)
         is_initialize_response = identifier == self.initialize_id and isinstance(message.get("result"), dict)
         if not self.suppress_initialize_response:
-            self.observe_response(message, generation)
             if is_initialize_response and message["result"].get("protocolVersion"):
-                self.ready.set()
-                self.writer.write("MCP_INSTANCE_READY", code="INITIALIZE_RESPONSE")
+                self.publish_ready("INITIALIZE_RESPONSE", generation)
             return False
         if identifier != self.initialize_id:
-            self.observe_response(message, generation)
             return False
         if is_initialize_response and message["result"].get("protocolVersion"):
-            self.ready.set()
-            self.writer.write("MCP_INSTANCE_READY", code="RENEWAL_INITIALIZE_RESPONSE")
+            self.initialize_received.set()
         return True
 
     def request_id(self, message: Any) -> str | None:
@@ -1144,18 +1193,87 @@ class RuntimeSession:
         return None
 
     def ensure_ready(self) -> None:
-        if self.ready.wait(timeout=10):
+        if self.initialize_received.wait(timeout=max(0, self.handshake_deadline - time.monotonic())):
             return
         raise RuntimeError("MCP_HANDSHAKE_FAILED")
 
+    def publish_ready(self, code: str, generation: int | None = None) -> bool:
+        # Decide under the session lock, but never keep it while acquiring
+        # child_stop_lock: child termination can wait on a process reap.
+        with self.lock:
+            if generation is not None and generation != self.generation:
+                return False
+            if self.stop_requested.is_set():
+                return False
+        # Order readiness ahead of the STOPPED diagnostic without holding a
+        # lifecycle lock during event I/O or any handshake write.
+        with self.child_stop_lock:
+            with self.lifecycle_lock:
+                if self.stop_requested.is_set():
+                    return False
+                if generation is not None and generation != self.generation:
+                    return False
+                self.ready.set()
+            self.writer.write("MCP_INSTANCE_READY", code=code)
+            return True
+
+    def write_child_handshake(self, stream: Any, payload: bytes) -> None:
+        if self.stop_requested.is_set():
+            raise RuntimeError("MCP_INSTANCE_STOPPING")
+        if stream is None or time.monotonic() >= self.handshake_deadline:
+            raise RuntimeError("MCP_HANDSHAKE_FAILED")
+        # Popen owns a blocking buffered pipe; bypass buffering for the
+        # replay and bound both writes with the same deadline as the reply.
+        # Share stdin_write_lock with the ordinary relay so a handshake can
+        # never interleave a frame with a concurrent request.
+        with self.stdin_write_lock:
+            if isinstance(stream, io.BufferedWriter) and isinstance(stream.raw, io.FileIO):
+                fd = stream.fileno()
+                blocking = os.get_blocking(fd)
+                os.set_blocking(fd, False)
+                remaining = memoryview(payload)
+                poller = select.poll()
+                poller.register(fd, select.POLLOUT)
+                try:
+                    while remaining:
+                        if self.stop_requested.is_set():
+                            raise RuntimeError("MCP_INSTANCE_STOPPING")
+                        deadline_left = self.handshake_deadline - time.monotonic()
+                        if deadline_left <= 0:
+                            raise RuntimeError("MCP_HANDSHAKE_FAILED")
+                        if not poller.poll(math.ceil(min(deadline_left, 0.25) * 1000)):
+                            continue
+                        try:
+                            written = os.write(fd, remaining)
+                        except BlockingIOError:
+                            continue
+                        if not written:
+                            raise RuntimeError("MCP_HANDSHAKE_FAILED")
+                        remaining = remaining[written:]
+                finally:
+                    os.set_blocking(fd, blocking)
+            else:
+                stream.write(payload)
+                stream.flush()
+
     def renew_if_needed(self, force: bool = False, retry_operation_id: str | None = None) -> None:
+        if self.stop_requested.is_set():
+            raise RuntimeError("MCP_INSTANCE_STOPPING")
         with self.lock:
             while self.renewal_in_progress:
+                if self.stop_requested.is_set():
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
                 self.renewal_condition.wait()
+                if self.stop_requested.is_set():
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
+                if self.replacement_failed.is_set():
+                    raise RuntimeError("MCP_REAUTH_REQUIRED")
                 if time.time() + self.renewal_margin < self.lease.expires_at:
                     return
                 if time.time() - self.last_renewal_failure < self.renewal_cooldown:
                     raise RuntimeError("MCP_REAUTH_REQUIRED")
+            if self.replacement_failed.is_set():
+                raise RuntimeError("MCP_REAUTH_REQUIRED")
             if not force and time.time() + self.renewal_margin < self.lease.expires_at:
                 return
             if self.outstanding:
@@ -1166,41 +1284,67 @@ class RuntimeSession:
                     raise RuntimeError("MCP_REAUTH_REQUIRED")
             if time.time() - self.last_renewal_failure < self.renewal_cooldown:
                 raise RuntimeError("MCP_REAUTH_REQUIRED")
-            self.renewal_in_progress = True
+            with self.lifecycle_lock:
+                if self.stop_requested.is_set():
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
+                self.renewal_in_progress = True
         try:
             self._renew(force)
         finally:
             with self.lock:
-                self.renewal_in_progress = False
+                with self.lifecycle_lock:
+                    self.renewal_in_progress = False
                 self.renewal_condition.notify_all()
 
     def _renew(self, force: bool) -> None:
-        with self.lock:
+        replacing = False
+        try:
+            if self.stop_requested.is_set():
+                raise RuntimeError("MCP_INSTANCE_STOPPING")
             self.writer.write("TOKEN_EXPIRED", severity="INFO", code="TOKEN_RENEWAL_REQUIRED")
             self.writer.write("TOKEN_RENEWAL_STARTED")
-        try:
+            if self.stop_requested.is_set():
+                raise RuntimeError("MCP_INSTANCE_STOPPING")
             lease = self.acquire_token_with_retry()
             if lease.expires_at - time.time() < self.minimum_lease:
                 raise RuntimeError("TOKEN_RESPONSE_INVALID")
+            if self.stop_requested.is_set():
+                raise RuntimeError("MCP_INSTANCE_STOPPING")
+            replacing = True
+            self.stop_child("TOKEN_RENEWAL")
             with self.lock:
-                if self.stop_requested.is_set():
-                    raise RuntimeError("MCP_INSTANCE_STOPPING")
-                self.stop_child("TOKEN_RENEWAL")
                 if self.stop_requested.is_set():
                     raise RuntimeError("MCP_INSTANCE_STOPPING")
                 self.lease = lease
-                self.start_child(replay_initialize=self.initialize_raw is not None)
                 has_initialize = self.initialize_raw is not None
+                self.handshake_deadline = time.monotonic() + 10
+            self.start_child(replay_initialize=has_initialize)
             if has_initialize:
                 self.ensure_ready()
                 with self.lock:
-                    if self.initialized_raw is not None and self.child and self.child.stdin:
-                        self.child.stdin.write(self.initialized_raw)
-                        self.child.stdin.flush()
-                    self.suppress_initialize_response = False
+                    if self.stop_requested.is_set():
+                        raise RuntimeError("MCP_INSTANCE_STOPPING")
+                    child, initialized = self.child, self.initialized_raw
+                if initialized is not None:
+                    self.write_child_handshake(child.stdin if child is not None else None, initialized)
+                with self.lock:
+                    if self.stop_requested.is_set():
+                        raise RuntimeError("MCP_INSTANCE_STOPPING")
+                    if time.monotonic() >= self.handshake_deadline:
+                        raise RuntimeError("MCP_HANDSHAKE_FAILED")
+                    current_generation = self.generation
+                if not self.publish_ready("RENEWAL_INITIALIZE_RESPONSE", current_generation):
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
+                self.suppress_initialize_response = False
+            if self.stop_requested.is_set():
+                raise RuntimeError("MCP_INSTANCE_STOPPING")
             self.writer.write("TOKEN_RENEWAL_SUCCEEDED")
         except (OSError, RuntimeError, urllib.error.URLError, TimeoutError) as exception:
             with self.lock:
+                if replacing:
+                    # The new lease alone cannot make a failed generation
+                    # usable. Publish the failure before releasing waiters.
+                    self.replacement_failed.set()
                 self.last_renewal_failure = time.time()
             code = str(exception).split(":", 1)[0]
             if isinstance(exception, urllib.error.HTTPError):
@@ -1219,6 +1363,8 @@ class RuntimeSession:
     ) -> None:
         if not skip_renewal:
             self.renew_if_needed(retry_operation_id=retry_operation_id)
+        if self.replacement_failed.is_set():
+            raise RuntimeError("MCP_REAUTH_REQUIRED")
         child = self.child
         if child is None or child.stdin is None:
             raise RuntimeError("MCP_PROCESS_FAILED")
@@ -1267,21 +1413,16 @@ class RuntimeSession:
                     )
                     self.outstanding[identifier] = operation
                     self.operations[operation.operation_id] = operation
+                    self.pending_operation_events.append((operation, "MCP_TOOL_STARTED", TOOL_ACTIVE, self.generation, None))
                     started_operation = operation
             if started_operation is not None:
-                self._emit_tool_event(
-                    started_operation,
-                    "MCP_TOOL_STARTED",
-                    TOOL_ACTIVE,
-                    started_operation.current_generation,
-                )
+                self.flush_terminal_events()
         with self.stdin_write_lock:
-            if identifier is not None:
-                with self.lock:
-                    if operation.state != TOOL_ACTIVE:
-                        raise RuntimeError("MCP_INSTANCE_STOPPING")
-                    if self.stop_requested.is_set():
-                        raise RuntimeError("MCP_INSTANCE_STOPPING")
+            with self.lock:
+                if self.replacement_failed.is_set():
+                    raise RuntimeError("MCP_REAUTH_REQUIRED")
+                if self.stop_requested.is_set() or (identifier is not None and operation.state != TOOL_ACTIVE):
+                    raise RuntimeError("MCP_INSTANCE_STOPPING")
             try:
                 child.stdin.write(raw)
                 child.stdin.flush()
@@ -1355,6 +1496,87 @@ def prune_completed_instances(root: Path) -> None:
         shutil.rmtree(directory, ignore_errors=True)
 
 
+def supervise_child(
+    session: RuntimeSession, parent_pid: int, parent_start: str | None,
+    interrupted: Callable[[], bool] = lambda: False,
+) -> subprocess.Popen[bytes] | None:
+    try:
+        while True:
+            if interrupted() and not session.stop_requested.is_set():
+                session.stop_child("SIGNAL_RECEIVED")
+            if not session.stop_requested.is_set() and (
+                os.getppid() != parent_pid or process_start_time(parent_pid) != parent_start
+            ):
+                session.request_stop()
+                session.writer.write("MCP_PARENT_DISAPPEARED", severity="WARN", code="PARENT_PROCESS_GONE")
+                session.stop_child("PARENT_PROCESS_GONE")
+            with session.lifecycle_lock:
+                child = session.child
+                if session.stop_requested.is_set():
+                    return child
+                if (child is None or child.poll() is not None) and not session.renewal_in_progress:
+                    # Seal the terminal decision before another thread can start a replacement.
+                    session.stop_requested.set()
+                    return child
+            time.sleep(0.25)
+    except KeyboardInterrupt:
+        session.stop_child("SIGNAL_RECEIVED")
+        return session.child
+
+
+def run_owned_session(session: RuntimeSession, parent_pid: int, parent_start: str | None) -> int:
+    interrupted = False
+
+    def record_interrupt(_signal, _frame):
+        # Python can invoke this while the main thread owns any of our
+        # locks. Record intent only; do not raise out of ownership cleanup.
+        nonlocal interrupted
+        interrupted = True
+
+    previous = None
+    if threading.current_thread() is threading.main_thread():
+        previous = signal.signal(signal.SIGINT, record_interrupt)
+    try:
+        try:
+            session.start_child()
+        except RuntimeError as exception:
+            session.writer.write("MCP_PROCESS_EXITED", severity="ERROR", code=str(exception))
+            update_manifest(session.directory, state="FAILED", failureCode="MCP_PROCESS_FAILED")
+            return 1
+        threading.Thread(target=session.relay_stdin, daemon=True).start()
+        child = supervise_child(session, parent_pid, parent_start, lambda: interrupted)
+        return finalize_owned_session(session, child, lambda: interrupted)
+    finally:
+        if previous is not None:
+            signal.signal(signal.SIGINT, previous)
+
+
+def finalize_owned_session(
+    session: RuntimeSession, child: subprocess.Popen[bytes] | None, interrupted: Callable[[], bool],
+) -> int:
+    # No new spawn may be reserved after the terminal decision. An already
+    # reserved Popen must hand off or reap its exact child before finalization.
+    session.spawn_done.wait()
+    if session.unpublished_child is not None:
+        session.terminate_owned_child(session.unpublished_child, "MCP_INSTANCE_STOPPING")
+    if child is None:
+        update_manifest(session.directory, state="FAILED", failureCode="MCP_PROCESS_FAILED")
+        return 1
+    session.terminate_owned_child(child, "MCP_INSTANCE_STOPPING")
+    exit_code = child.wait(timeout=5)
+    if not session.explicit_stop.is_set() and not interrupted():
+        # Drain already-produced frames on natural exit, but never wait
+        # indefinitely for a backpressured or disconnected client.
+        session.stdout_done.wait(timeout=1)
+    session.request_stop()
+    session.interrupt_pending_operations()
+    if not session.ready.is_set():
+        session.writer.write("MCP_HANDSHAKE_FAILED", severity="WARN", code="MCP_HANDSHAKE_FAILED")
+    session.writer.write("MCP_PROCESS_EXITED", code="MCP_PROCESS_FAILED" if exit_code else "NORMAL_EXIT", exitCode=exit_code)
+    update_manifest(session.directory, state="STOPPED", exitCode=exit_code, stoppedAt=datetime.now(timezone.utc).isoformat())
+    return exit_code
+
+
 def main() -> int:
     instance_id = secrets.token_hex(12)
     root = state_root()
@@ -1411,35 +1633,7 @@ def main() -> int:
         return 1
 
     session = RuntimeSession(configuration, directory, writer, lease)
-    try:
-        session.start_child()
-    except RuntimeError as exception:
-        writer.write("MCP_PROCESS_EXITED", severity="ERROR", code=str(exception))
-        update_manifest(directory, state="FAILED", failureCode="MCP_PROCESS_FAILED")
-        return 1
-
-    threading.Thread(target=session.relay_stdin, daemon=True).start()
-
-    try:
-        while session.child is not None and session.child.poll() is None and not session.stop_requested.is_set():
-            if os.getppid() != parent_pid or process_start_time(parent_pid) != parent_start:
-                writer.write("MCP_PARENT_DISAPPEARED", severity="WARN", code="PARENT_PROCESS_GONE")
-                session.stop_child("PARENT_PROCESS_GONE")
-                break
-            time.sleep(0.25)
-    except KeyboardInterrupt:
-        session.stop_child("SIGNAL_RECEIVED")
-
-    child = session.child
-    if child is None:
-        update_manifest(directory, state="FAILED", failureCode="MCP_PROCESS_FAILED")
-        return 1
-    exit_code = child.wait()
-    if not session.ready.is_set():
-        writer.write("MCP_HANDSHAKE_FAILED", severity="WARN", code="MCP_HANDSHAKE_FAILED")
-    writer.write("MCP_PROCESS_EXITED", code="MCP_PROCESS_FAILED" if exit_code else "NORMAL_EXIT", exitCode=exit_code)
-    update_manifest(directory, state="STOPPED", exitCode=exit_code, stoppedAt=datetime.now(timezone.utc).isoformat())
-    return exit_code
+    return run_owned_session(session, parent_pid, parent_start)
 
 
 if __name__ == "__main__":

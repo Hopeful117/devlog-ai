@@ -5,11 +5,13 @@ import importlib.util
 import io
 import json
 import os
+import signal
 import tempfile
 import threading
 import time
 import unittest
-from unittest.mock import patch
+from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import Mock, patch
 from pathlib import Path
 
 
@@ -20,7 +22,874 @@ runtime = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runtime)
 
 
+class _SignalingLock:
+    """Lock wrapper that signals the acquisition attempt before blocking."""
+
+    def __init__(self, lock: threading.Lock, attempted: threading.Event) -> None:
+        self._lock = lock
+        self._attempted = attempted
+
+    def __enter__(self):
+        self._attempted.set()
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, *exception) -> bool:
+        self._lock.release()
+        return False
+
+
 class RuntimeTests(unittest.TestCase):
+    def test_delivered_response_releases_request_before_stdout_thread_resumes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=1) as pool:
+            session = runtime.RuntimeSession(
+                {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "0"},
+                Path(directory), Mock(), runtime.TokenLease("old", 0),
+            )
+            session.pusher = Mock()
+            session.child = Mock()
+            request = b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n'
+            response = {"jsonrpc": "2.0", "id": 1, "result": {}}
+            session.forward(request, json.loads(request), skip_renewal=True)
+            original = session.outstanding["1"]
+            on_wire, release = threading.Event(), threading.Event()
+
+            def flush():
+                on_wire.set()
+                self.assertTrue(release.wait(3))
+
+            output = Mock()
+            output.buffer.flush.side_effect = flush
+            with patch.object(runtime.sys, "stdout", output), patch.object(session, "_renew") as renew:
+                relay = pool.submit(session.write_stdout, b"{}\n", session.generation, response)
+                try:
+                    self.assertTrue(on_wire.wait(3))
+                    self.assertNotIn("1", session.outstanding)
+                    self.assertIn(original.operation_id, session.operations)
+                    session.forward(request, json.loads(request))
+                    renew.assert_called_once()
+                    subsequent = session.outstanding["1"]
+                    self.assertIsNot(original, subsequent)
+                finally:
+                    release.set()
+                self.assertTrue(relay.result(timeout=3))
+                self.assertIs(session.outstanding["1"], subsequent)
+            self.assertEqual(original.state, runtime.TOOL_RESPONDED)
+
+    def test_waiting_forward_cannot_use_replacement_after_handshake_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=2) as pool:
+            session = runtime.RuntimeSession(
+                {"minimum_lease_seconds": "5", "renewal_cooldown_seconds": "0", "renewal_margin_seconds": "30"},
+                Path(directory), Mock(), runtime.TokenLease("old", 0),
+            )
+            session.initialize_raw = b"initialize\n"
+            child = Mock()
+            request = b'{"jsonrpc":"2.0","id":2,"method":"tools/list"}\n'
+            handshaking, waiter, release = (threading.Event() for _ in range(3))
+            original_wait = session.renewal_condition.wait
+
+            def handshake():
+                handshaking.set()
+                self.assertTrue(release.wait(3))
+                raise RuntimeError("MCP_HANDSHAKE_FAILED")
+
+            def wait_for_renewal():
+                waiter.set()
+                return original_wait(3)
+
+            def start_child(replay_initialize=False):
+                session.child = child
+
+            with (
+                patch.object(session, "start_child", side_effect=start_child),
+                patch.object(session, "ensure_ready", side_effect=handshake),
+                patch.object(session.renewal_condition, "wait", side_effect=wait_for_renewal),
+                patch.object(session, "acquire_token_with_retry", return_value=runtime.TokenLease("new", time.time() + 60)),
+            ):
+                renewal = pool.submit(session.renew_if_needed, True)
+                try:
+                    self.assertTrue(handshaking.wait(3))
+                    forward = pool.submit(session.forward, request, json.loads(request))
+                    self.assertTrue(waiter.wait(3))
+                finally:
+                    release.set()
+                for result in (renewal, forward):
+                    with self.assertRaisesRegex(RuntimeError, "MCP_REAUTH_REQUIRED"):
+                        result.result(timeout=3)
+            child.stdin.write.assert_not_called()
+            self.assertFalse(session.ready.is_set())
+
+    def test_finalization_flushes_queued_stdin_failure_before_process_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=1) as pool:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.pusher = Mock()
+            session.child = child = Mock()
+            child.poll.return_value = child.wait.return_value = 143
+            child.stdin.write.side_effect = BrokenPipeError()
+            request = b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n'
+            queued, release = threading.Event(), threading.Event()
+            actual_flush = session.flush_terminal_events
+
+            def flush():
+                if threading.current_thread() is not threading.main_thread() and not session.operations:
+                    queued.set()
+                    self.assertTrue(release.wait(3))
+                actual_flush()
+
+            with patch.object(session, "flush_terminal_events", side_effect=flush), patch.object(runtime, "update_manifest"):
+                forward = pool.submit(session.forward, request, json.loads(request), skip_renewal=True)
+                try:
+                    self.assertTrue(queued.wait(3))
+                    session.request_stop()
+                    self.assertEqual(runtime.finalize_owned_session(session, child, lambda: False), 143)
+                finally:
+                    release.set()
+                with self.assertRaisesRegex(RuntimeError, "MCP_PROCESS_FAILED"):
+                    forward.result(timeout=3)
+            order = [call.args[0] for call in session.writer.write.call_args_list]
+            self.assertEqual(order.count("MCP_TOOL_FAILED"), 1)
+            self.assertLess(order.index("MCP_TOOL_FAILED"), order.index("MCP_PROCESS_EXITED"))
+
+    def test_readiness_event_cannot_be_overtaken_by_child_stop_event(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=2) as pool:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.child = child = Mock()
+            child.poll.return_value = None
+            child.terminate.side_effect = lambda: setattr(child.poll, "return_value", 143)
+            recording, release = threading.Event(), threading.Event()
+            order = []
+
+            def write(event, **fields):
+                if event == "MCP_INSTANCE_READY":
+                    recording.set()
+                    self.assertTrue(release.wait(3))
+                order.append(event)
+
+            session.writer.write.side_effect = write
+            readiness = pool.submit(session.publish_ready, "RENEWAL_INITIALIZE_RESPONSE")
+            try:
+                self.assertTrue(recording.wait(3))
+                shutdown = pool.submit(session.stop_child, "STDIN_CLOSED")
+                self.assertTrue(session.stop_requested.wait(3))
+                child.terminate.assert_not_called()
+            finally:
+                release.set()
+            self.assertTrue(readiness.result(timeout=3))
+            shutdown.result(timeout=3)
+            self.assertFalse(session.publish_ready("RENEWAL_INITIALIZE_RESPONSE"))
+            self.assertEqual(order, ["MCP_INSTANCE_READY", "MCP_INSTANCE_STOPPED"])
+
+    def test_readiness_publication_releases_session_lock_while_child_stop_is_held(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=1) as pool:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.child = Mock()
+            stop_held, attempted = threading.Lock(), threading.Event()
+            stop_held.acquire()
+            session.child_stop_lock = _SignalingLock(stop_held, attempted)
+            publication = pool.submit(session.publish_ready, "INITIALIZE_RESPONSE")
+            try:
+                self.assertTrue(attempted.wait(3))
+                # A concurrent child reap may hold child_stop_lock. The session
+                # lock must stay free so protocol I/O is not suspended.
+                self.assertTrue(session.lock.acquire(timeout=1))
+                session.lock.release()
+                self.assertFalse(publication.done())
+            finally:
+                stop_held.release()
+            self.assertTrue(publication.result(timeout=3))
+            self.assertTrue(session.ready.is_set())
+
+    def test_handshake_write_shares_stdin_lock_with_forward(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=1) as pool:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.handshake_deadline = time.monotonic() + 10
+            held, attempted = threading.Lock(), threading.Event()
+            held.acquire()
+            session.stdin_write_lock = _SignalingLock(held, attempted)
+            stream = Mock()
+            write = pool.submit(session.write_child_handshake, stream, b"{}\n")
+            try:
+                self.assertTrue(attempted.wait(3))
+                stream.write.assert_not_called()
+            finally:
+                held.release()
+            write.result(timeout=3)
+            stream.write.assert_called_once_with(b"{}\n")
+            stream.flush.assert_called_once_with()
+
+    def test_sigint_during_finalization_does_not_abandon_pending_popen(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=1) as pool:
+            session = runtime.RuntimeSession(
+                {"issuer_uri": "test", "jwks_uri": "test", "actor_client_id": "test", "jar": "test"},
+                Path(directory), Mock(), runtime.TokenLease("old", 0),
+            )
+            old, replacement = Mock(), Mock()
+            old.poll.return_value = old.wait.return_value = 143
+            replacement.poll.return_value = None
+            spawning, release = threading.Event(), threading.Event()
+            actual_start, actual_wait = session.start_child, session.spawn_done.wait
+            order = []
+            session.writer.write.side_effect = lambda event, **fields: order.append(event)
+            replacement.wait.side_effect = lambda timeout: order.append("reaped") or 143
+            startup = None
+
+            def spawn(*args, **kwargs):
+                spawning.set()
+                self.assertTrue(release.wait(3))
+                return replacement
+
+            def start():
+                nonlocal startup
+                session.child = old
+                startup = pool.submit(actual_start)
+                self.assertTrue(spawning.wait(3))
+
+            def supervise(*args):
+                session.request_stop()
+                return old
+
+            def interrupt_before_wait():
+                try:
+                    signal.raise_signal(signal.SIGINT)
+                finally:
+                    release.set()
+                self.assertTrue(actual_wait(3))
+
+            previous = signal.getsignal(signal.SIGINT)
+            with (
+                patch.object(runtime.subprocess, "Popen", side_effect=spawn),
+                patch.object(runtime, "supervise_child", side_effect=supervise),
+                patch.object(runtime, "update_manifest"),
+                patch.object(session, "start_child", side_effect=start),
+                patch.object(session, "relay_stdin"),
+                patch.object(session.spawn_done, "wait", side_effect=interrupt_before_wait),
+            ):
+                self.assertEqual(runtime.run_owned_session(session, 42, "start"), 143)
+            self.assertIs(signal.getsignal(signal.SIGINT), previous)
+            with self.assertRaisesRegex(RuntimeError, "MCP_INSTANCE_STOPPING"):
+                startup.result(timeout=3)
+            self.assertLess(order.index("reaped"), order.index("MCP_PROCESS_EXITED"))
+
+    def test_renewal_fails_closed_when_either_handshake_write_hits_a_full_pipe(self) -> None:
+        for phase in ("initialize", "initialized"):
+            with self.subTest(phase=phase), tempfile.TemporaryDirectory() as directory:
+                session = runtime.RuntimeSession(
+                    {"minimum_lease_seconds": "5", "renewal_cooldown_seconds": "0"},
+                    Path(directory), Mock(), runtime.TokenLease("old", 0),
+                )
+                session.initialize_raw = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}\n'
+                session.initialized_raw = b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n'
+                child = Mock()
+                reader, writer = os.pipe()
+                try:
+                    with os.fdopen(writer, "wb") as stdin:
+                        child.stdin = stdin
+                        os.set_blocking(writer, False)
+                        while True:
+                            try:
+                                os.write(writer, b"x" * 4096)
+                            except BlockingIOError:
+                                break
+                        os.set_blocking(writer, True)
+
+                        def start_child(replay_initialize=False):
+                            self.assertTrue(replay_initialize)
+                            session.child = child
+                            session.handshake_deadline = time.monotonic() + 0.03
+                            if phase == "initialize":
+                                session.write_child_handshake(stdin, session.initialize_raw)
+                            else:
+                                session.initialize_received.set()
+
+                        with (
+                            patch.object(session, "start_child", side_effect=start_child),
+                            patch.object(session, "acquire_token_with_retry", return_value=runtime.TokenLease("new", time.time() + 60)),
+                            self.assertRaisesRegex(RuntimeError, "MCP_REAUTH_REQUIRED") as failure,
+                        ):
+                            session.renew_if_needed(force=True)
+                        self.assertEqual(str(failure.exception.__cause__), "MCP_HANDSHAKE_FAILED")
+                        self.assertTrue(os.get_blocking(writer))
+                finally:
+                    os.close(reader)
+                self.assertFalse(session.ready.is_set())
+                self.assertFalse(session.renewal_in_progress)
+                session.writer.write.assert_any_call("TOKEN_RENEWAL_FAILED", severity="ERROR", code="MCP_HANDSHAKE_FAILED")
+
+    def test_natural_exit_drains_last_response_before_terminal_log(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=1) as pool:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.pusher = Mock()
+            session.child = child = Mock()
+            child.poll.return_value = child.wait.return_value = 0
+            response = b'{"jsonrpc":"2.0","id":1,"result":{}}\n'
+            child.stdout.read1.side_effect = [response, b""]
+            session.forward(b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n',
+                            {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, skip_renewal=True)
+            admitted, release = threading.Event(), threading.Event()
+            order = []
+            session.writer.write.side_effect = lambda event, **fields: order.append(event)
+            actual_write = session.write_stdout
+
+            def write_after_exit(payload, generation, message=None):
+                admitted.set()
+                self.assertTrue(release.wait(3))
+                return actual_write(payload, generation, message)
+
+            output = Mock()
+            output.buffer = io.BytesIO()
+            session.stdout_done.clear()
+            with (
+                patch.object(runtime, "update_manifest"),
+                patch.object(runtime.sys, "stdout", output),
+                patch.object(runtime.os, "getppid", return_value=42),
+                patch.object(runtime, "process_start_time", return_value="start"),
+                patch.object(session, "write_stdout", side_effect=write_after_exit),
+            ):
+                relay = pool.submit(session.run_stdout_relay, child, session.generation, session.stdout_done)
+                try:
+                    self.assertTrue(admitted.wait(3))
+                    self.assertIs(runtime.supervise_child(session, 42, "start"), child)
+                    self.assertTrue(session.stop_requested.is_set())
+                    self.assertNotIn("MCP_TOOL_RESPONDED", order)
+                finally:
+                    release.set()
+                self.assertEqual(runtime.finalize_owned_session(session, child, lambda: False), 0)
+                relay.result(timeout=3)
+            self.assertEqual(output.buffer.getvalue(), response)
+            self.assertLess(order.index("MCP_TOOL_RESPONDED"), order.index("MCP_PROCESS_EXITED"))
+
+    def test_finalization_records_interrupted_operation_before_exit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.pusher = Mock()
+            session.child = child = Mock()
+            child.poll.return_value = child.wait.return_value = 143
+            session.forward(b'{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n',
+                            {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, skip_renewal=True)
+            session.request_stop()  # The stdin relay has not yet recorded interrupted operations.
+            with patch.object(runtime, "update_manifest"):
+                self.assertEqual(runtime.finalize_owned_session(session, child, lambda: False), 143)
+            order = [call.args[0] for call in session.writer.write.call_args_list]
+            self.assertEqual(order.count("MCP_TOOL_INTERRUPTED"), 1)
+            self.assertLess(order.index("MCP_TOOL_INTERRUPTED"), order.index("MCP_PROCESS_EXITED"))
+
+    def test_stop_does_not_emit_child_stop_before_start_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=2) as pool:
+            session = runtime.RuntimeSession(
+                {"issuer_uri": "test", "jwks_uri": "test", "actor_client_id": "test", "jar": "test"},
+                Path(directory), Mock(), runtime.TokenLease("test", 0),
+            )
+            child = Mock()
+            child.stdout.read1.return_value = b""
+            child.stderr = []
+            child.poll.return_value = None
+            child.terminate.side_effect = lambda: setattr(child.poll, "return_value", 143)
+            manifest, release = threading.Event(), threading.Event()
+
+            def record_manifest(*args, **kwargs):
+                manifest.set()
+                self.assertTrue(release.wait(3))
+
+            with (
+                patch.object(runtime.subprocess, "Popen", return_value=child),
+                patch.object(runtime, "process_start_time", return_value="start"),
+                patch.object(runtime, "update_manifest", side_effect=record_manifest),
+            ):
+                startup = pool.submit(session.start_child)
+                try:
+                    self.assertTrue(manifest.wait(3))
+                    shutdown = pool.submit(session.stop_child, "STDIN_CLOSED")
+                    self.assertTrue(session.stop_requested.wait(3))
+                    child.terminate.assert_not_called()
+                finally:
+                    release.set()
+                startup.result(timeout=3)
+                shutdown.result(timeout=3)
+            order = [call.args[0] for call in session.writer.write.call_args_list]
+            self.assertLess(order.index("MCP_PROCESS_STARTED"), order.index("MCP_INSTANCE_STOPPED"))
+
+    def test_stdout_descriptor_retries_short_writes_without_using_python_buffer(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            descriptor, output = os.pipe()
+            with os.fdopen(descriptor, "rb") as reader:
+                payload = b'{"jsonrpc":"2.0","id":1,"result":{}}\n'
+                actual_write = os.write
+
+                def short_write(fd, data):
+                    return actual_write(fd, data[:8])
+
+                with os.fdopen(output, "w") as stdout:
+                    with patch.object(runtime.sys, "stdout", stdout), patch.object(runtime.os, "write", side_effect=short_write):
+                        session.write_stdout(payload, session.generation)
+                self.assertEqual(reader.read(), payload)
+
+    def test_main_waits_for_unpublished_replacement_cleanup_after_stdin_eof(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=2) as pool:
+            root = Path(directory)
+            writer = Mock()
+            session = runtime.RuntimeSession(
+                {
+                    "minimum_lease_seconds": "5", "renewal_cooldown_seconds": "0",
+                    "issuer_uri": "test", "jwks_uri": "test", "actor_client_id": "test", "jar": "test",
+                },
+                root, writer, runtime.TokenLease("old", 0),
+            )
+            session.pusher = Mock()
+            session.pusher.push_session_lifecycle_event.return_value = None
+            old, replacement = Mock(), Mock()
+            for child in (old, replacement):
+                child.poll.return_value = None
+                child.wait.return_value = 143
+                child.terminate.side_effect = lambda child=child: setattr(child.poll, "return_value", 143)
+            initial, spawning, finalizing, release = (threading.Event() for _ in range(4))
+            actual_start, actual_wait = session.start_child, session.spawn_done.wait
+
+            def start(replay_initialize=False):
+                if session.child is None:
+                    session.child = old
+                    initial.set()
+                    return
+                actual_start(replay_initialize)
+
+            def spawn(*args, **kwargs):
+                spawning.set()
+                self.assertTrue(release.wait(3))
+                return replacement
+
+            def read_eof(_size):
+                self.assertTrue(spawning.wait(3))
+                return b""
+
+            def await_spawn():
+                finalizing.set()
+                self.assertTrue(actual_wait(3))
+
+            stdin = Mock()
+            stdin.buffer.read1.side_effect = read_eof
+            order = []
+            writer.write.side_effect = lambda event, **kwargs: order.append(event)
+
+            def reap_replacement(timeout=None):
+                order.append("replacement_reaped")
+                return 143
+
+            replacement.wait.side_effect = reap_replacement
+            actual_relay, relay_done = session.relay_stdin, threading.Event()
+
+            def relay_stdin():
+                try:
+                    actual_relay()
+                finally:
+                    relay_done.set()
+
+            with (
+                patch.object(runtime, "state_root", return_value=root),
+                patch.object(runtime, "EventWriter", return_value=writer),
+                patch.object(runtime, "required_configuration", return_value={}),
+                patch.object(runtime, "validate_configuration"),
+                patch.object(runtime, "write_manifest"),
+                patch.object(runtime, "update_manifest"),
+                patch.object(runtime, "acquire_token", return_value=session.lease),
+                patch.object(runtime, "RuntimeSession", return_value=session),
+                patch.object(runtime, "process_start_time", return_value="start"),
+                patch.object(runtime.sys, "stdin", stdin),
+                patch.object(runtime.subprocess, "Popen", side_effect=spawn),
+                patch.object(session, "start_child", side_effect=start),
+                patch.object(session, "relay_stdin", side_effect=relay_stdin),
+                patch.object(session.spawn_done, "wait", side_effect=await_spawn),
+                patch.object(session, "acquire_token_with_retry", return_value=runtime.TokenLease("new", time.time() + 60)),
+            ):
+                launcher = pool.submit(runtime.main)
+                try:
+                    self.assertTrue(initial.wait(3))
+                    renewal = pool.submit(session.renew_if_needed, True)
+                    self.assertTrue(finalizing.wait(3))
+                    self.assertFalse(launcher.done())
+                    replacement.terminate.assert_not_called()
+                finally:
+                    release.set()
+                with self.assertRaisesRegex(RuntimeError, "MCP_REAUTH_REQUIRED"):
+                    renewal.result(timeout=3)
+                self.assertEqual(launcher.result(timeout=3), 143)
+                self.assertTrue(relay_done.wait(3))
+
+            replacement.terminate.assert_called_once()
+            replacement.wait.assert_called_once_with(timeout=5)
+            self.assertLess(order.index("replacement_reaped"), order.index("MCP_PROCESS_EXITED"))
+            self.assertIs(session.child, old)
+
+    def test_parent_loss_stops_live_child_while_stdout_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=2) as pool:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.child = child = Mock()
+            child.poll.return_value = None
+            child.terminate.side_effect = lambda: setattr(child.poll, "return_value", 143)
+            child.wait.return_value = 143
+            child.stdout.read1.side_effect = [b'{"jsonrpc":"2.0","id":2,"result":{}}\n', b""]
+            writing, release = threading.Event(), threading.Event()
+            stdout = Mock()
+
+            def blocked_write(_data):
+                writing.set()
+                self.assertTrue(release.wait(3))
+
+            stdout.buffer.write.side_effect = blocked_write
+            with (
+                patch.object(runtime.sys, "stdout", stdout),
+                patch.object(runtime.os, "getppid", return_value=43),
+            ):
+                relay = pool.submit(session.relay_stdout, child, session.generation)
+                try:
+                    self.assertTrue(writing.wait(3))
+                    supervisor = pool.submit(runtime.supervise_child, session, 42, "start")
+                    self.assertIs(supervisor.result(timeout=1), child)
+                    child.terminate.assert_called_once()
+                    child.wait.assert_called_once_with(timeout=5)
+                    child.stdin.close.assert_not_called()
+                    self.assertFalse(relay.done())
+                finally:
+                    release.set()
+                    relay.result(timeout=3)
+
+    def test_supervisor_detects_exit_while_stdout_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=2) as pool:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.child = child = Mock()
+            child.poll.return_value = 7
+            child.stdout.read1.side_effect = [b'{"jsonrpc":"2.0","id":2,"result":{}}\n', b""]
+            writing, release = threading.Event(), threading.Event()
+            stdout = Mock()
+
+            def blocked_write(_data):
+                writing.set()
+                self.assertTrue(release.wait(3))
+
+            stdout.buffer.write.side_effect = blocked_write
+            with (
+                patch.object(runtime.sys, "stdout", stdout),
+                patch.object(runtime.os, "getppid", return_value=42),
+                patch.object(runtime, "process_start_time", return_value="start"),
+            ):
+                relay = pool.submit(session.relay_stdout, child, session.generation)
+                try:
+                    self.assertTrue(writing.wait(3))
+                    supervisor = pool.submit(runtime.supervise_child, session, 42, "start")
+                    self.assertIs(supervisor.result(timeout=1), child)
+                    self.assertTrue(session.stop_requested.is_set())
+                finally:
+                    release.set()
+                    relay.result(timeout=3)
+
+    def test_parent_loss_prevents_replacement_during_real_renewal(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=2) as pool:
+            session = runtime.RuntimeSession(
+                {"minimum_lease_seconds": "5", "renewal_cooldown_seconds": "0"},
+                Path(directory), Mock(), runtime.TokenLease("old", 0),
+            )
+            session.child = child = Mock()
+            child.poll.return_value = None
+            terminated, release = threading.Event(), threading.Event()
+
+            def terminate():
+                child.poll.return_value = 143
+                terminated.set()
+
+            def wait_child(timeout=None):
+                self.assertTrue(release.wait(3))
+                return 143
+
+            child.terminate.side_effect = terminate
+            child.wait.side_effect = wait_child
+            with (
+                patch.object(session, "acquire_token_with_retry", return_value=runtime.TokenLease("new", time.time() + 60)),
+                patch.object(session, "start_child") as start,
+                patch.object(runtime.os, "getppid", return_value=43),
+            ):
+                renewal = pool.submit(session.renew_if_needed, True)
+                try:
+                    self.assertTrue(terminated.wait(3))
+                    supervisor = pool.submit(runtime.supervise_child, session, 42, "start")
+                    self.assertTrue(session.stop_requested.wait(1), "stop must be recorded before child cleanup")
+                finally:
+                    release.set()
+                with self.assertRaisesRegex(RuntimeError, "MCP_REAUTH_REQUIRED"):
+                    renewal.result(timeout=3)
+                self.assertIs(supervisor.result(timeout=3), child)
+                start.assert_not_called()
+                child.terminate.assert_called_once()
+
+    def test_renewal_is_not_started_after_terminal_decision(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("old", 0))
+            session.request_stop()
+            with patch.object(session, "acquire_token_with_retry") as acquire:
+                with self.assertRaisesRegex(RuntimeError, "MCP_INSTANCE_STOPPING"):
+                    session.renew_if_needed(force=True)
+            acquire.assert_not_called()
+            session.writer.write.assert_not_called()
+
+    def test_stop_prevents_publication_of_child_spawned_concurrently(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=1) as pool:
+            session = runtime.RuntimeSession(
+                {"issuer_uri": "test", "jwks_uri": "test", "actor_client_id": "test", "jar": "test"},
+                Path(directory), Mock(), runtime.TokenLease("old", 0),
+            )
+            session.child = old = Mock()
+            unpublished = Mock()
+            unpublished.poll.return_value = None
+            spawning, release = threading.Event(), threading.Event()
+
+            def spawn(*args, **kwargs):
+                spawning.set()
+                self.assertTrue(release.wait(3))
+                return unpublished
+
+            with patch.object(runtime.subprocess, "Popen", side_effect=spawn):
+                startup = pool.submit(session.start_child)
+                try:
+                    self.assertTrue(spawning.wait(3))
+                    session.request_stop()
+                finally:
+                    release.set()
+                with self.assertRaisesRegex(RuntimeError, "MCP_INSTANCE_STOPPING"):
+                    startup.result(timeout=3)
+
+            self.assertIs(session.child, old)
+            unpublished.terminate.assert_called_once()
+            unpublished.wait.assert_called_once_with(timeout=5)
+            old.terminate.assert_not_called()
+            unpublished.stdin.write.assert_not_called()
+
+    def test_supervisor_waits_for_real_renewal_and_handshake(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=1) as pool:
+            session = runtime.RuntimeSession(
+                {
+                    "minimum_lease_seconds": "5", "renewal_cooldown_seconds": "0",
+                    "issuer_uri": "test", "jwks_uri": "test", "actor_client_id": "test", "jar": "test",
+                },
+                Path(directory), Mock(), runtime.TokenLease("old", 0),
+            )
+            session.initialize_raw = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}\n'
+            session.initialize_id = "1"
+            session.initialized_raw = b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n'
+            session.child = old = Mock()
+            old.poll.return_value = None
+            terminated, release, initialized = threading.Event(), threading.Event(), threading.Event()
+            replacement = Mock()
+            replacement.poll.return_value = None
+            replacement.stderr = []
+            replacement.stdin = Mock(wraps=io.BytesIO())
+            replacement.stdin.flush.side_effect = initialized.set
+            def read_initialize(_size):
+                self.assertTrue(initialized.wait(3))
+                replacement.stdout.read1.side_effect = None
+                replacement.stdout.read1.return_value = b""
+                return b'{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-11-25"}}\n'
+
+            def terminate():
+                old.poll.return_value = 143
+                terminated.set()
+
+            def wait_child(timeout=None):
+                self.assertTrue(release.wait(3))
+                return 143
+
+            replacement.stdout.read1.side_effect = read_initialize
+            old.terminate.side_effect = terminate
+            old.wait.side_effect = wait_child
+            with (
+                patch.object(session, "acquire_token_with_retry", return_value=runtime.TokenLease("new", time.time() + 60)),
+                patch.object(runtime.subprocess, "Popen", return_value=replacement),
+                patch.object(runtime, "update_manifest"),
+                patch.object(runtime.os, "getppid", return_value=42),
+                patch.object(runtime, "process_start_time", return_value="start"),
+            ):
+                renewal = pool.submit(session.renew_if_needed, True)
+
+                def complete_after_supervisor_observes_gap(_seconds):
+                    self.assertIs(session.child, old)
+                    self.assertFalse(session.stop_requested.is_set())
+                    release.set()
+                    renewal.result(timeout=3)
+                    replacement.poll.return_value = 0
+
+                try:
+                    self.assertTrue(terminated.wait(3))
+                    with patch.object(runtime.time, "sleep", side_effect=complete_after_supervisor_observes_gap):
+                        self.assertIs(runtime.supervise_child(session, 42, "start"), replacement)
+                finally:
+                    release.set()
+
+            self.assertTrue(session.ready.is_set())
+            self.assertEqual(replacement.stdin.getvalue(), session.initialize_raw + session.initialized_raw)
+            session.writer.write.assert_any_call("TOKEN_RENEWAL_SUCCEEDED")
+
+    def test_supervisor_observes_replacement_after_old_child_exit_during_renewal(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            old = Mock()
+            old.poll.return_value = 143
+            replacement = Mock()
+            replacement.poll.return_value = 0
+            session.child = old
+            session.renewal_in_progress = True
+
+            # Publish the replacement only after the supervisor has had a chance
+            # to decide whether the exited old child is the launcher's final child.
+            def complete_renewal(_seconds):
+                self.assertIs(session.child, old)
+                self.assertFalse(session.stop_requested.is_set())
+                with session.lock:
+                    session.child = replacement
+                    session.renewal_in_progress = False
+
+            with (
+                patch.object(runtime.os, "getppid", return_value=42),
+                patch.object(runtime, "process_start_time", return_value="start"),
+                patch.object(runtime.time, "sleep", side_effect=complete_renewal) as next_iteration,
+            ):
+                child = runtime.supervise_child(session, 42, "start")
+
+        self.assertIs(child, replacement)
+        next_iteration.assert_called_once()
+
+    def test_supervisor_stops_when_parent_identity_changes_during_renewal(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.child = old = Mock()
+            old.poll.return_value = 143
+            session.renewal_in_progress = True
+
+            with (
+                patch.object(runtime.os, "getppid", return_value=42),
+                patch.object(runtime, "process_start_time", side_effect=["start", "other-start"]),
+                patch.object(runtime.time, "sleep") as next_iteration,
+            ):
+                self.assertIs(runtime.supervise_child(session, 42, "start"), old)
+
+            self.assertTrue(session.stop_requested.is_set())
+            next_iteration.assert_called_once()
+            session.writer.write.assert_called_once_with(
+                "MCP_PARENT_DISAPPEARED", severity="WARN", code="PARENT_PROCESS_GONE"
+            )
+            with self.assertRaisesRegex(RuntimeError, "MCP_INSTANCE_STOPPING"):
+                session.start_child()
+
+    def test_supervisor_honors_requested_stop_while_renewal_is_in_progress(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.child = old = Mock()
+            old.poll.return_value = 143
+            session.renewal_in_progress = True
+
+            def request_stop(_seconds):
+                self.assertFalse(session.stop_requested.is_set())
+                session.stop_child("STDIN_CLOSED")
+
+            with (
+                patch.object(runtime.os, "getppid", return_value=42),
+                patch.object(runtime, "process_start_time", return_value="start"),
+                patch.object(runtime.time, "sleep", side_effect=request_stop),
+            ):
+                self.assertIs(runtime.supervise_child(session, 42, "start"), old)
+
+            self.assertTrue(session.stop_requested.is_set())
+            with self.assertRaisesRegex(RuntimeError, "MCP_INSTANCE_STOPPING"):
+                session.start_child()
+
+    def test_supervisor_exits_when_failed_replacement_clears_renewal(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.child = old = Mock()
+            old.poll.return_value = 143
+            session.renewal_in_progress = True
+
+            def fail_replacement(_seconds):
+                self.assertTrue(session.renewal_in_progress)
+                with session.lock:
+                    session.renewal_in_progress = False
+
+            with (
+                patch.object(runtime.os, "getppid", return_value=42),
+                patch.object(runtime, "process_start_time", return_value="start"),
+                patch.object(runtime.time, "sleep", side_effect=fail_replacement) as next_iteration,
+            ):
+                self.assertIs(runtime.supervise_child(session, 42, "start"), old)
+
+            self.assertTrue(session.stop_requested.is_set())
+            next_iteration.assert_called_once()
+            self.assertFalse(session.ready.is_set())
+
+    def test_supervisor_returns_exited_child_without_renewal(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            session = runtime.RuntimeSession({}, Path(directory), Mock(), runtime.TokenLease("test", 0))
+            session.child = child = Mock()
+            child.poll.return_value = 7
+            with (
+                patch.object(runtime.os, "getppid", return_value=42),
+                patch.object(runtime, "process_start_time", return_value="start"),
+                patch.object(runtime.time, "sleep", side_effect=AssertionError("unexpected wait")),
+            ):
+                self.assertIs(runtime.supervise_child(session, 42, "start"), child)
+
+            self.assertTrue(session.stop_requested.is_set())
+            session.writer.write.assert_not_called()
+
+    def test_supervisor_exits_after_stdin_renewal_failure(self) -> None:
+        for failure_stage in ("acquire", "start", "handshake"):
+            with self.subTest(stage=failure_stage), tempfile.TemporaryDirectory() as directory:
+                session = runtime.RuntimeSession(
+                    {"renewal_margin_seconds": "30", "renewal_cooldown_seconds": "10", "minimum_lease_seconds": "5"},
+                    Path(directory),
+                    Mock(),
+                    runtime.TokenLease("old", time.time() - 1),
+                )
+                session.initialize_raw = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}\n'
+
+                old, replacement = Mock(), Mock()
+                for child in (old, replacement):
+                    child.poll.return_value = None
+                    child.terminate.side_effect = lambda child=child: setattr(child.poll, "return_value", 143)
+                session.child = old
+
+                def start_child(replay_initialize=False):
+                    if failure_stage == "start":
+                        raise RuntimeError("MCP_PROCESS_FAILED")
+                    session.child = replacement
+                    session.ready.clear()
+
+                def relay_once(_seconds):
+                    self.assertFalse(session.stop_requested.is_set())
+                    session.relay_stdin()
+
+                stdin = Mock()
+                stdin.buffer.read1.return_value = b'{"jsonrpc":"2.0","id":2,"method":"tools/list"}\n'
+                with (
+                    patch.object(runtime.os, "getppid", return_value=42),
+                    patch.object(runtime, "process_start_time", return_value="start"),
+                    patch.object(runtime.time, "sleep", side_effect=relay_once) as next_iteration,
+                    patch.object(runtime.sys, "stdin", stdin),
+                    patch.object(
+                        session, "acquire_token_with_retry",
+                        return_value=runtime.TokenLease("new", time.time() + 60),
+                        side_effect=RuntimeError("TOKEN_ENDPOINT_REJECTED") if failure_stage == "acquire" else None,
+                    ),
+                    patch.object(session, "start_child", side_effect=start_child),
+                    patch.object(session, "ensure_ready", side_effect=RuntimeError("MCP_HANDSHAKE_FAILED")),
+                ):
+                    final_child = runtime.supervise_child(session, 42, "start")
+
+                self.assertIs(final_child, replacement if failure_stage == "handshake" else old)
+                next_iteration.assert_called_once()
+                self.assertTrue(session.stop_requested.is_set())
+                self.assertFalse(session.renewal_in_progress)
+                self.assertFalse(session.ready.is_set())
+                final_child.terminate.assert_called_once()
+                final_child.stdin.write.assert_not_called()
+                session.writer.write.assert_any_call("TOKEN_RENEWAL_STARTED")
+                self.assertNotIn("TOKEN_RENEWAL_SUCCEEDED", [call.args[0] for call in session.writer.write.call_args_list])
+
     def test_required_configuration_uses_local_keycloak_issuer_defaults(self) -> None:
         with patch.dict(
             os.environ,
@@ -291,7 +1160,8 @@ class RuntimeTests(unittest.TestCase):
             )
 
         self.assertTrue(consumed)
-        self.assertTrue(session.ready.is_set())
+        self.assertTrue(session.initialize_received.is_set())
+        self.assertFalse(session.ready.is_set())
 
     def test_initial_initialize_response_is_forwarded_and_marks_ready(self) -> None:
         class Writer:
@@ -1418,14 +2288,14 @@ class RuntimeTests(unittest.TestCase):
             child = Child()
             session.child = child
             raw = b'{"jsonrpc":"2.0","id":1,"method":"tools/call"}\n'
-            emit_event = session._emit_tool_event
+            flush_events = session.flush_terminal_events
 
-            def emit_then_stop(operation, event_type, status, generation, **fields):
-                emit_event(operation, event_type, status, generation, **fields)
-                if event_type == "MCP_TOOL_STARTED":
+            def emit_then_stop():
+                flush_events()
+                with patch.object(session, "flush_terminal_events", side_effect=flush_events):
                     session.stop_child("STDIN_CLOSED")
 
-            with patch.object(session, "_emit_tool_event", side_effect=emit_then_stop):
+            with patch.object(session, "flush_terminal_events", side_effect=emit_then_stop):
                 with self.assertRaisesRegex(RuntimeError, "MCP_INSTANCE_STOPPING"):
                     session.forward(raw, json.loads(raw))
 
@@ -1600,13 +2470,14 @@ class RuntimeTests(unittest.TestCase):
             def start_child(replay_initialize=False):
                 session.child = replacement
                 session.ready = threading.Event()
-                session.ready.set()
+                session.initialize_received.set()
 
             with patch.object(runtime, "acquire_token", return_value=runtime.TokenLease("new", time.time() + 60)):
                 with patch.object(session, "start_child", side_effect=start_child):
                     session.renew_if_needed()
 
         self.assertEqual(replacement.stdin.getvalue(), session.initialized_raw)
+        self.assertTrue(session.ready.is_set())
 
     def test_transport_authentication_failure_has_one_bounded_retry(self) -> None:
         class Child:
