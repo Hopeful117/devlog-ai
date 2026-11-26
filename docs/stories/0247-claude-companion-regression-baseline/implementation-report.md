@@ -141,8 +141,14 @@ seconde revue indépendante n’a été effectuée.
 - Changements antérieurs non liés : `tools/devlog_mcp/runtime.py`,
   `tools/devlog_mcp/tests/test_runtime.py`, ADR-084 locale et Story 0246,
   préservés.
-- Commit créé : non.
-- Push / PR / merge : non.
+- Branche de livraison : `story/0247-claude-companion-regression-baseline`.
+- Commit d’implémentation : `f38ca0b6`
+  (`feat(story-0247): document Claude Companion regression baseline`).
+- Push effectué : oui ; branche publiée sur `origin`.
+- PR : [#248](https://github.com/Hopeful117/devlog-ai/pull/248), ouverte vers
+  `main`, en attente de validation humaine.
+- Merge : non effectué ; les checks GitHub étaient encore en cours à la
+  dernière vérification et la validation humaine de la PR reste requise.
 
 ## État
 
