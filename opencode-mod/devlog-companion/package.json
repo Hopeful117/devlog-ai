@@ -1,0 +1,32 @@
+{
+  "name": "@devlog-ai/opencode-companion",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated OpenCode V2 DevLog Companion compatibility spike",
+  "exports": {
+    ".": "./src/server.js",
+    "./rpc": "./src/rpc.js",
+    "./gui-experimental": "./dist/gui-experimental.cjs"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "tsc --noEmit",
+    "build:gui": "vite build",
+    "build": "npm run test && npm run typecheck && npm run build:gui",
+    "pack:dry-run": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "@opencode/plugin": "2.4.0"
+  },
+  "devDependencies": {
+    "solid-js": "1.9.17",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "vite": "7.3.7",
+    "vite-plugin-solid": "2.11.10"
+  }
+}
