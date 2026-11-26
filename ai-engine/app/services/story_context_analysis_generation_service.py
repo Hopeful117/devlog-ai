@@ -10,6 +10,7 @@ from app.clients.core_callback_client import CoreCallbackClient
 from app.models.ai_task import AiTaskType
 from app.models.proposal import AiTaskResultStatus
 from app.prompts.story_context_analysis import StoryContextAnalysisPromptBuilder
+from app.prompts.reference_aliases import resolve_reference_aliases
 from app.providers.base import LlmProvider, Prompt
 from app.schemas.ai_task import AiTaskSubmissionRequest
 from app.schemas.ai_task_result import (
@@ -250,6 +251,11 @@ class StoryContextAnalysisGenerationService:
                     return
                 if actions_taken >= maximum_steps:
                     raise _InvestigationTerminal("BUDGET_EXHAUSTED")
+                if not self._budget_allows_action(budget, results):
+                    # Story 0244: no action can fit the remaining budget; finish
+                    # with the gathered evidence instead of sending a doomed action.
+                    decision, prompt = await self._finalize_with_gathered_evidence(submission, results, traces)
+                    continue
                 if isinstance(decision, InvestigationPlanDecision):
                     if not pending:
                         raise ValueError("Investigation plan did not contain a usable action")
@@ -258,6 +264,7 @@ class StoryContextAnalysisGenerationService:
                     action = decision.action
 
                 action_accounting = self._action_payload(action, submission, traces)
+                self._clamp_action_limits(action_accounting, budget, results)
                 response = await self._callback_client.execute_investigation_action(
                     submission.ai_task_id, submission.correlation_id,
                     action_accounting
@@ -278,6 +285,13 @@ class StoryContextAnalysisGenerationService:
                 results.append(typed_result.model_dump(mode="json", by_alias=True, exclude_none=True))
                 actions_taken += 1
                 outcome = typed_result.outcome
+                if outcome in {"REJECTED", "UNAVAILABLE"} and self._has_gathered_evidence(results):
+                    # Story 0244 (budget) and Story 0245 (any refusal): Core refused
+                    # or could not serve an action after evidence was gathered.
+                    # Core's refusal stands; ask for the FINAL decision over the
+                    # evidence already authorized instead of failing the task.
+                    decision, prompt = await self._finalize_with_gathered_evidence(submission, results, traces)
+                    continue
                 if outcome in {"REJECTED", "UNAVAILABLE"}:
                     raise _InvestigationTerminal(
                         "BUDGET_EXHAUSTED" if typed_result.rejection_code == "BUDGET_EXHAUSTED"
@@ -342,6 +356,8 @@ class StoryContextAnalysisGenerationService:
         if final_required and not isinstance(decision, InvestigationFinalDecision):
             raise _InvestigationTerminal("BUDGET_EXHAUSTED")
         if isinstance(decision, InvestigationFinalDecision):
+            # Story 0245: aliases resolve to exact references before validation.
+            self._resolved(decision.result, submission.grounding_contract or {})
             self._synchronize_output_classification(decision.result)
             self._validate_output(
                 provider_result_to_internal(decision.result),
@@ -399,6 +415,12 @@ class StoryContextAnalysisGenerationService:
         )
 
     @staticmethod
+    def _resolved(output, grounding_contract):
+        """Story 0245: replace citable aliases (R1..Rn) in place; unknown aliases stay and fail validation."""
+        resolve_reference_aliases(output, grounding_contract)
+        return output
+
+    @staticmethod
     def _synchronize_output_classification(output: StoryContextAnalysisResult) -> None:
         """Fill omitted redundant classifications from the already supplied grounding metadata."""
         findings = [
@@ -442,6 +464,79 @@ class StoryContextAnalysisGenerationService:
             ]
         )
         output.output_classification = OutputClassification(entries=entries)
+
+    async def _finalize_with_gathered_evidence(self, submission, results, traces):
+        if not self._has_gathered_evidence(results):
+            raise _InvestigationTerminal("BUDGET_EXHAUSTED")
+        prompt = self._prompt_builder.build_investigation(submission, results, final_required=True)
+        return await self._investigation_decision_with_retry(
+            submission, prompt, traces, final_required=True
+        )
+
+    @staticmethod
+    def _has_gathered_evidence(results: list[dict[str, object]]) -> bool:
+        return any(
+            result.get("outcome") == "RESULTS" and result.get("evidence") for result in results
+        )
+
+    @staticmethod
+    def _consumed(results: list[dict[str, object]]) -> tuple[int, int, int, int]:
+        """Mirrors Core's usage accounting for retrieval actions (Story 0244).
+
+        Core counts one retrieval call per executed action, the returned
+        evidence items, the UTF-8 bytes of their summary and content, and
+        tokens as bytes // 4. Rejected actions consume no retrieval call.
+        """
+        calls = items = size = tokens = 0
+        for result in results:
+            if result.get("outcome") == "REJECTED":
+                continue
+            calls += 1
+            evidence = result.get("evidence") or []
+            items += len(evidence)
+            action_bytes = 0
+            for value in evidence:
+                if not isinstance(value, dict):
+                    continue
+                for key in ("summary", "content"):
+                    text = value.get(key)
+                    if isinstance(text, str):
+                        action_bytes += len(text.encode("utf-8"))
+            size += action_bytes
+            tokens += action_bytes // 4
+        return calls, items, size, tokens
+
+    @classmethod
+    def _remaining(cls, budget: dict, results: list[dict[str, object]]) -> dict[str, int]:
+        calls, items, size, tokens = cls._consumed(results)
+        return {
+            "retrievalCalls": int(budget.get("maximumRetrievalCalls", 0)) - calls,
+            "resultLimit": int(budget.get("maximumEvidenceItems", 0)) - items,
+            "maximumBytes": int(budget.get("maximumBytes", 0)) - size,
+            "maximumTokens": int(budget.get("maximumTokens", 0)) - tokens,
+        }
+
+    @classmethod
+    def _budget_allows_action(cls, budget: dict, results: list[dict[str, object]]) -> bool:
+        return all(value >= 1 for value in cls._remaining(budget, results).values())
+
+    @classmethod
+    def _clamp_action_limits(
+        cls, payload: dict[str, object], budget: dict, results: list[dict[str, object]]
+    ) -> None:
+        """Story 0244: never request more than the remaining investigation budget.
+
+        Only lowers the model's limits; Core still validates every action
+        authoritatively against its own usage record.
+        """
+        limits = payload.get("limits")
+        if not isinstance(limits, dict):
+            return
+        remaining = cls._remaining(budget, results)
+        for key in ("resultLimit", "maximumBytes", "maximumTokens"):
+            value = limits.get(key)
+            if isinstance(value, int) and remaining[key] >= 1:
+                limits[key] = min(value, remaining[key])
 
     @staticmethod
     def _action_payload(action: object, submission, traces) -> dict[str, object]:
@@ -588,7 +683,9 @@ class StoryContextAnalysisGenerationService:
             prompt,
             ProviderStoryContextAnalysisResult,
             lambda output: self._validate_output(
-                provider_result_to_internal(output), context, grounding_contract
+                provider_result_to_internal(
+                    self._resolved(output, grounding_contract)
+                ), context, grounding_contract
             ),
         )
         return provider_result_to_internal(provider_output)

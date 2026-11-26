@@ -1,6 +1,7 @@
 package com.hopeful117.devlogai.projectfreshness;
 
 import com.hopeful117.devlogai.analysis.entity.Analysis;
+import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
 import com.hopeful117.devlogai.profile.entity.ProjectProfileSnapshot;
 import com.hopeful117.devlogai.profile.repository.ProjectProfileSnapshotRepository;
 import com.hopeful117.devlogai.project.repository.ProjectRepository;
@@ -106,6 +107,11 @@ class ProjectFreshnessPersistenceService {
                         "Observed revision is not a valid commit identity"));
         ProjectSourceFreshness entity = freshness.findByProjectIdAndSourceId(projectId, sourceId)
                 .orElseGet(() -> ProjectSourceFreshness.builder().id(UUID.randomUUID()).build());
+        if (isFailed(baselineAnalysis)) {
+            // Story 0241: a failed analysis represents no knowledge; classify
+            // from the latest comparable (non-failed) baseline instead.
+            return save(projectId, sourceId, requestedRevisionLabel(source), normalizedCurrent, checkedAt);
+        }
         entity.setProject(project);
         entity.setSource(source);
         entity.setBaselineAnalysis(baselineAnalysis);
@@ -131,7 +137,45 @@ class ProjectFreshnessPersistenceService {
             throw new EntityNotFoundException("Project", projectId);
         }
         activeSource(projectId, sourceId);
-        return freshness.findByProjectIdAndSourceId(projectId, sourceId).map(this::response);
+        return freshness.findByProjectIdAndSourceId(projectId, sourceId).map(this::reconciled);
+    }
+
+    /**
+     * Story 0241: a checkpoint whose baseline analysis failed after it was
+     * recorded is reported from the latest comparable (non-failed) baseline,
+     * never as the failed analysis. Read-only: the stored row is corrected by
+     * the next freshness check.
+     */
+    private ProjectFreshnessResponse reconciled(ProjectSourceFreshness value) {
+        if (!isFailed(value.getBaselineAnalysis())) {
+            return response(value);
+        }
+        UUID projectId = value.getProject().getId();
+        UUID sourceId = value.getSource().getId();
+        Optional<ProjectProfileSnapshot> baseline = profiles.findLatestComparable(
+                projectId, sourceId, PageRequest.of(0, 1)).stream().findFirst();
+        String rawBaseline = baseline.map(snapshot -> snapshot.getResolvedRevisions()
+                .get(sourceId.toString())).map(String::valueOf).orElse(null);
+        var classification = classifier.classify(baseline.isPresent(),
+                value.getCurrentRevision(), rawBaseline, value.getIngestedRevision());
+        ProjectSourceFreshness corrected = ProjectSourceFreshness.builder()
+                .id(value.getId())
+                .project(value.getProject())
+                .source(value.getSource())
+                .baselineAnalysis(baseline.map(ProjectProfileSnapshot::getAnalysis).orElse(null))
+                .status(classification.status())
+                .guidance(classification.guidance())
+                .requestedRevision(value.getRequestedRevision())
+                .currentRevision(value.getCurrentRevision())
+                .baselineRevision(GitCommitIdentity.normalize(rawBaseline).orElse(null))
+                .ingestedRevision(value.getIngestedRevision())
+                .checkedAt(value.getCheckedAt())
+                .build();
+        return response(corrected);
+    }
+
+    private static boolean isFailed(Analysis analysis) {
+        return analysis != null && analysis.getStatus() == AnalysisStatus.FAILED;
     }
 
     private Source activeSource(UUID projectId, UUID sourceId) {

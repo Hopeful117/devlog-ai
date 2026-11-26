@@ -133,6 +133,8 @@ public class DevLogStoryAgentTool {
             @McpArg(description = "Optional repository file paths", required = false) @Nullable List<String> files,
             @McpArg(description = "Optional human guidance", required = false) @Nullable Map<String, Object> guidance,
             @McpArg(description = "Caller-provided idempotency key required for safe resumption", required = true) String idempotencyKey,
+            @McpArg(description = "Optional full commit SHA pinning the repository revision of this execution", required = false)
+            @Nullable String revision,
             McpSyncRequestContext requestContext) {
         requireIdempotencyKey(idempotencyKey);
         var principal = principalProvider.currentPrincipal(requestContext)
@@ -140,7 +142,8 @@ public class DevLogStoryAgentTool {
         String operationId = observability != null ? observability.newOperationId() : null;
         Instant startedAt = Instant.now();
         try {
-            String result = execute(projectSlug, storyId, intent, question, files, guidance, idempotencyKey, principal);
+            String result = execute(projectSlug, storyId, intent, question, files, guidance, idempotencyKey,
+                    revision, principal);
             if (observability != null && operationId != null) {
                 observability.recordCompletion(projectSlug, operationId, "devlog_story_agent", startedAt,
                         result, principal);
@@ -164,6 +167,19 @@ public class DevLogStoryAgentTool {
             @Nullable Map<String, Object> guidance,
             @Nullable String idempotencyKey,
             McpAuthenticatedPrincipalProvider.McpPrincipal principal) {
+        return execute(projectSlug, storyId, intent, question, files, guidance, idempotencyKey, null, principal);
+    }
+
+    private String execute(
+            String projectSlug,
+            @Nullable UUID storyId,
+            String intent,
+            @Nullable String question,
+            @Nullable List<String> files,
+            @Nullable Map<String, Object> guidance,
+            @Nullable String idempotencyKey,
+            @Nullable String revision,
+            McpAuthenticatedPrincipalProvider.McpPrincipal principal) {
         String bearerToken = principal.bearerToken();
         if (bearerToken == null || bearerToken.isBlank()) {
             throw ResourceSupport.unauthenticated("Authenticated bearer token is required");
@@ -182,7 +198,8 @@ public class DevLogStoryAgentTool {
             }
             DevlogProjectContextClient.SubmitRequest request =
                     new DevlogProjectContextClient.SubmitRequest(
-                            STORY_CONTEXT_ANALYSIS_INTENT, files, effectiveGuidance);
+                            STORY_CONTEXT_ANALYSIS_INTENT, files, effectiveGuidance,
+                            revision == null || revision.isBlank() ? null : revision.strip());
             execution = submitWithBoundedResume(
                     projectSlug, storyId, bearerToken, principal.delegationToken(), idempotencyKey, request,
                     operationDeadline);

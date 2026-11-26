@@ -1,6 +1,8 @@
 package com.hopeful117.devlogai.projectunderstanding;
 
 import com.hopeful117.devlogai.analysis.entity.Analysis;
+import com.hopeful117.devlogai.analysis.entity.AnalysisStatus;
+import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.analysis.repository.AnalysisRepository;
 import com.hopeful117.devlogai.analysis.workflow.AnalysisWorkflowService;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessService;
@@ -26,6 +28,15 @@ public class ProjectUnderstandingService {
     private final ProjectFreshnessService freshnessService;
 
     public ProjectUnderstandingResponse execute(UUID projectId, ProjectUnderstandingRequest request) {
+        return execute(projectId, request, null);
+    }
+
+    /**
+     * Story 0241: an authenticated caller (UI user or MCP agent) runs the
+     * workflow with its own provider credential binding.
+     */
+    public ProjectUnderstandingResponse execute(UUID projectId, ProjectUnderstandingRequest request,
+                                                AuthenticatedPrincipal principal) {
         PreparedProjectUnderstanding prepared = preparationService.prepare(projectId, request);
         ProjectUnderstandingClaim claim;
         try {
@@ -37,15 +48,20 @@ public class ProjectUnderstandingService {
             return response(claim.analysis(), claim.outcome());
         }
         try {
-            workflowService.start(claim.analysis().getId());
+            workflowService.start(claim.analysis().getId(), principal);
         } catch (RuntimeException failure) {
             claimService.failPending(claim.analysis().getId());
             throw failure;
         }
-        recordFreshnessCheckpoint(prepared, claim.analysis());
         UUID analysisId = claim.analysis().getId();
         Analysis current = analysisRepository.findById(analysisId)
                 .orElseThrow(() -> new EntityNotFoundException("Analysis", analysisId));
+        // Story 0241: a failed analysis must never become the freshness baseline.
+        if (current.getStatus() != AnalysisStatus.FAILED) {
+            recordFreshnessCheckpoint(prepared, current);
+        } else {
+            log.warn("Project understanding analysis {} failed; freshness checkpoint not advanced", analysisId);
+        }
         return response(current, claim.outcome());
     }
 

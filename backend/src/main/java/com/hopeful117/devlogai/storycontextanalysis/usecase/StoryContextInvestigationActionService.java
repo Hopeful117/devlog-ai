@@ -121,7 +121,8 @@ public class StoryContextInvestigationActionService {
         String revision = revision(snapshot, investigation);
         List<String> allowedPaths = strings(scopeMap.get("allowedPathPrefixes"));
         if (allowedPaths.isEmpty()) allowedPaths = strings(authorizedScopeMap.get("files"));
-        if (projectSlug == null || storyId == null || revision == null) {
+        // Story 0242: a Story is optional; project and pinned revision are not.
+        if (projectSlug == null || revision == null) {
             throw new ConflictException("Investigation scope is not initialized in the task snapshot");
         }
         if (request == null) throw new ConflictException("Investigation action is required");

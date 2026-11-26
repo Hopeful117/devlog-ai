@@ -280,3 +280,18 @@ def test_named_story_0152_fixtures_are_present_and_validate():
             # root digest; its dedicated test above builds that identity.
             continue
         StoryContextAgentProjectionV1.model_validate(projection(**payload))
+
+
+def test_freshness_accepts_core_revision_mismatch_for_pinned_executions() -> None:
+    """Story 0242: a pinned execution whose evidence revision differs from freshness."""
+    from app.schemas.story_context_agent_projection import StoryAgentFreshness
+
+    freshness = StoryAgentFreshness.model_validate({
+        "sourceRevision": {"kind": "PROJECT_REVISION", "project": "devlog-ai", "revision": "a" * 40},
+        "state": "FRESH",
+        "status": "CURRENT",
+        "revisionConsistency": "MISMATCH",
+        "revisionMismatch": {"evidenceRevision": "a" * 40, "freshnessRevision": "b" * 40},
+    })
+
+    assert freshness.revision_mismatch == {"evidenceRevision": "a" * 40, "freshnessRevision": "b" * 40}

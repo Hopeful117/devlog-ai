@@ -26,4 +26,16 @@ public interface EngineeringContextFacade {
             String projectSlug, String intent, List<String> files, UUID storyId, String question) {
         throw new UnsupportedOperationException("question-aware engineering context is not supported");
     }
+
+    /** Story 0242: revision-pinned canonical context; a null revision keeps the existing resolution. */
+    default CanonicalEngineeringContext getCanonicalEngineeringContext(
+            String projectSlug, String intent, List<String> files, UUID storyId, String question,
+            String revision) {
+        if (revision != null && !revision.isBlank()) {
+            throw new UnsupportedOperationException("revision-pinned engineering context is not supported");
+        }
+        return question == null
+                ? getCanonicalEngineeringContext(projectSlug, intent, files, storyId)
+                : getCanonicalEngineeringContext(projectSlug, intent, files, storyId, question);
+    }
 }

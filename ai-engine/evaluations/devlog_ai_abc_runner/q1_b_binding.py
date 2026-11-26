@@ -122,15 +122,18 @@ def _final_response(request: Any) -> ProviderResponse:
 
 
 @contextmanager
-def _q1_runtime_input(config: Mapping[str, Any]) -> Iterator[None]:
+def _case_runtime_input(question_id: str, question_version: str, question: str,
+                        repository_revision: str) -> Iterator[None]:
+    """Inject one frozen benchmark case into the unchanged V4 runtime (Story 0237 AC-6)."""
+
     original = v4_runtime.condition_input
 
-    def condition_input(condition: str, question_id: str, repetition: int) -> dict[str, Any]:
+    def condition_input(condition: str, _question_id: str, repetition: int) -> dict[str, Any]:
         value = dict(original(condition, "CASE-03", repetition))
-        value["questionId"] = "Q1"
-        value["questionVersion"] = "1.0.0"
-        value["question"] = config["question"]
-        value["repositoryRevision"] = config["repository"]["revision"]
+        value["questionId"] = question_id
+        value["questionVersion"] = question_version
+        value["question"] = question
+        value["repositoryRevision"] = repository_revision
         return value
 
     v4_runtime.condition_input = condition_input
@@ -138,6 +141,12 @@ def _q1_runtime_input(config: Mapping[str, Any]) -> Iterator[None]:
         yield
     finally:
         v4_runtime.condition_input = original
+
+
+@contextmanager
+def _q1_runtime_input(config: Mapping[str, Any]) -> Iterator[None]:
+    with _case_runtime_input("Q1", "1.0.0", config["question"], config["repository"]["revision"]):
+        yield
 
 
 def run_q1_b_binding(repository_root: Path, config_path: Path = Q1_B_CONFIG) -> dict[str, Any]:

@@ -29,16 +29,25 @@ class IntegrationSimulationAdapter:
         self.core_boundary = core_boundary
         self.repository_root = repository_root
         self.output_root = output_root
+        self._scenario_artifact: dict[str, Any] | None = None
 
     def execute(self, observation: Mapping[str, Any], manifest: Mapping[str, Any]) -> dict[str, Any]:
         observation_id = str(observation["observationId"])
-        core_artifact = run_core_harness(
-            observation_id=observation_id,
-            repository_root=self.repository_root,
-            output_path=self.output_root / "observations" / observation_id / "core" / "core.json",
-            repository_revision=current_head(self.repository_root),
-        )
+        # The Java Core boundary scenario is per condition, not per case: it
+        # exercises submission, callback and persistence with fixture content.
+        # A campaign therefore runs the condition scenario once per run and
+        # records which scenario backs every cell (Story 0237 AC-6).
+        scenario_id = _CORE_SCENARIOS[self.condition]
+        if self._scenario_artifact is None:
+            self._scenario_artifact = run_core_harness(
+                observation_id=scenario_id,
+                repository_root=self.repository_root,
+                output_path=self.output_root / "observations" / observation_id / "core" / "core.json",
+                repository_revision=current_head(self.repository_root),
+            )
+        core_artifact = deepcopy(self._scenario_artifact)
         payload = deepcopy(fixture_for(self.condition))
+        payload["coreBoundaryScenario"] = scenario_id
         payload["executionMode"] = "INTEGRATION_SIMULATION"
         payload["integrationStatus"] = "PASS"
         payload["boundaryDouble"] = self.core_boundary
@@ -50,6 +59,12 @@ class IntegrationSimulationAdapter:
         payload["providerCalls"] = 0
         payload["networkCalls"] = 0
         return payload
+
+
+_CORE_SCENARIOS = {
+    "A_DEVLOG_CURRENT": "Q1-A-DEVLOG-CURRENT-r1",
+    "C_DEVLOG_ENGINEERING_ANALYST": "Q1-C-DEVLOG-ENGINEERING-ANALYST-r1",
+}
 
 
 class BDirectRuntimeSimulationAdapter:

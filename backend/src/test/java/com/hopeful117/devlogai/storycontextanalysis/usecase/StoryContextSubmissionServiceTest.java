@@ -288,4 +288,50 @@ class StoryContextSubmissionServiceTest {
                     new AuthenticatedPrincipal("human-1", PrincipalKind.HUMAN, "test"), "anthropic");
         }
     }
+
+    @Test
+    void investigationDeadlineCoversAuthorizedElapsedBudgetPlusMargin() {
+        StoryContextSubmissionService service = deadlineService();
+        AiTask task = new AiTask();
+        java.time.Instant before = java.time.Instant.now();
+
+        service.applyInvestigationDeadline(task, Map.of(
+                "initialized", true, "budget", Map.of("maximumElapsedMillis", 300_000)));
+
+        long seconds = java.time.Duration.between(before, task.getDeadlineAt()).toSeconds();
+        assertTrue(seconds >= 300 + StoryContextSubmissionService.INVESTIGATION_DEADLINE_MARGIN_SECONDS - 1
+                && seconds <= 300 + StoryContextSubmissionService.INVESTIGATION_DEADLINE_MARGIN_SECONDS + 1);
+    }
+
+    @Test
+    void shortInvestigationBudgetKeepsAtLeastTheDefaultTimeout() {
+        StoryContextSubmissionService service = deadlineService();
+        AiTask task = new AiTask();
+        java.time.Instant before = java.time.Instant.now();
+
+        service.applyInvestigationDeadline(task, Map.of(
+                "initialized", true, "budget", Map.of("maximumElapsedMillis", 10_000)));
+
+        long seconds = java.time.Duration.between(before, task.getDeadlineAt()).toSeconds();
+        assertTrue(seconds >= 299 && seconds <= 301);
+    }
+
+    @Test
+    void oneShotTaskDeadlineIsLeftToSubmission() {
+        StoryContextSubmissionService service = deadlineService();
+        AiTask task = new AiTask();
+
+        service.applyInvestigationDeadline(task, null);
+        service.applyInvestigationDeadline(task, Map.of("initialized", false));
+
+        org.junit.jupiter.api.Assertions.assertNull(task.getDeadlineAt());
+    }
+
+    private StoryContextSubmissionService deadlineService() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        return new StoryContextSubmissionService(
+                intentCatalog, aiTaskService, aiEngineClient, aiTaskRepository, analysisRepository,
+                objectMapper, new StoryContextDigestService(objectMapper), null, aiEngineBindingClient,
+                authorizationService, StoryContextTestPolicy.resolver());
+    }
 }

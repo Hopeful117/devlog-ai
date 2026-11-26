@@ -200,7 +200,12 @@ public interface DevlogProjectContextClient {
 
     record AnalyzeContextRequest(List<String> files, Map<String, Object> guidance) {}
 
-    record SubmitRequest(String intent, List<String> files, Map<String, Object> guidance) {}
+    /** Story 0242: {@code revision} optionally pins the execution to an exact source commit. */
+    record SubmitRequest(String intent, List<String> files, Map<String, Object> guidance, String revision) {
+        public SubmitRequest(String intent, List<String> files, Map<String, Object> guidance) {
+            this(intent, files, guidance, null);
+        }
+    }
 
     record FollowUpRequest(String question, Map<String, Object> guidance) {}
 

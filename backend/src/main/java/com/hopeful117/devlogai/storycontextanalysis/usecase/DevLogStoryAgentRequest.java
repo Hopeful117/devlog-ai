@@ -29,8 +29,19 @@ public record DevLogStoryAgentRequest(
     Map<String,Object>guidance,
 
     @Nullable
-    String idempotencyKey
+    String idempotencyKey,
+
+    @Nullable
+    String revision
 ) {
+    private static final java.util.regex.Pattern COMMIT = java.util.regex.Pattern.compile("[0-9a-fA-F]{40}|[0-9a-fA-F]{64}");
+
+    /** Story 0242: a request without a pinned revision. */
+    public DevLogStoryAgentRequest(String projectSlug, UUID storyId, String intent, String question,
+                                   List<String> files, Map<String, Object> guidance, String idempotencyKey) {
+        this(projectSlug, storyId, intent, question, files, guidance, idempotencyKey, null);
+    }
+
     public DevLogStoryAgentRequest {
         requireNonBlank(projectSlug, "projectSlug");
         requireNonBlank(intent, "intent");
@@ -47,6 +58,17 @@ public record DevLogStoryAgentRequest(
         idempotencyKey = idempotencyKey == null || idempotencyKey.isBlank()
                 ? null
                 : idempotencyKey;
+        if (revision != null && revision.isBlank()) {
+            revision = null;
+        }
+        if (revision != null) {
+            revision = revision.strip();
+            // Story 0242: only an exact commit identity can pin an execution.
+            if (!COMMIT.matcher(revision).matches()) {
+                throw new IllegalArgumentException("revision must be a full commit identity");
+            }
+            revision = revision.toLowerCase(java.util.Locale.ROOT);
+        }
     }
 
     private static void requireNonBlank(String value, String field) {

@@ -2,6 +2,8 @@ package com.hopeful117.devlogai.evaluation.liveauthorization;
 
 import com.hopeful117.devlogai.authorization.AuthenticatedPrincipal;
 import com.hopeful117.devlogai.authorization.CoreProjectAuthorizationService;
+import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationContract;
+import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationContractRegistry;
 import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparation;
 import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparationRepository;
 import com.hopeful117.devlogai.evaluation.livepreparation.LiveEvaluationPreparationStatus;
@@ -31,6 +33,7 @@ public class LiveEvaluationAuthorizationService {
     private final LiveEvaluationAuthorizationRepository authorizationRepository;
     private final CoreProjectAuthorizationService authorizationService;
     private final Clock clock;
+    private final LiveEvaluationContractRegistry contracts;
 
     @Transactional
     public LiveEvaluationAuthorizationResponse request(
@@ -107,7 +110,15 @@ public class LiveEvaluationAuthorizationService {
         artifact.put("planId", preparation.getId().toString());
         artifact.put("planDigest", preparation.getPlanDigest());
         artifact.put("repositoryRevision", artifact.get("sourceRevision"));
-        artifact.put("oracleStatus", "Q1_ORACLE_ACCEPTED");
+        Object caseId = artifact.get("caseId");
+        if (caseId instanceof String value && !value.isBlank()) {
+            // Story 0239: the accepted oracle is recorded per case; for Q1 the
+            // label remains Q1_ORACLE_ACCEPTED.
+            artifact.put("oracleStatus", LiveEvaluationContract.oracleAcceptedLabel(value));
+            artifact.put("caseOracleStatus", Map.of(value, "ACCEPTED"));
+        } else {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "preparation plan has no case identity");
+        }
         artifact.put("approverId", principal.principalId());
         artifact.put("approvedAt", now.toString());
         artifact.put("expiresAtEpochSeconds", expiresAt.getEpochSecond());
@@ -142,6 +153,7 @@ public class LiveEvaluationAuthorizationService {
         Instant now = clock.instant();
         if (authorization.getStatus() == LiveEvaluationAuthorizationStatus.APPROVED
                 && authorization.getExpiresAt().isAfter(now)) {
+            enforceCampaignRules(authorization);
             LiveEvaluationAuthorization consumed = LiveEvaluationAuthorization.builder()
                     .id(authorization.getId()).preparation(authorization.getPreparation())
                     .requesterId(authorization.getRequesterId()).approverId(authorization.getApproverId())
@@ -157,6 +169,47 @@ public class LiveEvaluationAuthorizationService {
             markExpired(authorization);
         }
         throw new ResponseStatusException(HttpStatus.GONE, "authorization is not available for consumption");
+    }
+
+    /**
+     * Story 0239 D2/D3: for a contract with campaign rules, a case batch is
+     * consumed at most once and the consumed batches stay within the campaign
+     * observation and planned wall-clock ceilings. Checked under a campaign lock.
+     */
+    private void enforceCampaignRules(LiveEvaluationAuthorization authorization) {
+        Map<String, Object> artifact = authorization.getArtifactSnapshot();
+        if (artifact == null || !(artifact.get("manifestDigest") instanceof String manifestDigest)) return;
+        Optional<LiveEvaluationContract> match = contracts.findByManifestDigest(manifestDigest);
+        if (match.isEmpty() || !match.get().hasCampaignCeiling()) return;
+        LiveEvaluationContract contract = match.get();
+        UUID projectId = authorization.getPreparation().getProject().getId();
+        authorizationRepository.acquireAuthorizationLock("campaign:" + projectId + ":" + manifestDigest);
+        String caseId = String.valueOf(artifact.get("caseId"));
+        List<Map<String, Object>> consumed = authorizationRepository
+                .findByStatusAndPreparation_Project_Id(LiveEvaluationAuthorizationStatus.CONSUMED, projectId)
+                .stream()
+                .filter(other -> !other.getId().equals(authorization.getId()))
+                .map(LiveEvaluationAuthorization::getArtifactSnapshot)
+                .filter(other -> other != null && manifestDigest.equals(other.get("manifestDigest")))
+                .toList();
+        if (contract.oneConsumptionPerCase()
+                && consumed.stream().anyMatch(other -> caseId.equals(other.get("caseId")))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "case batch has already been consumed for this campaign");
+        }
+        int observations = observationCount(artifact) + consumed.stream()
+                .mapToInt(LiveEvaluationAuthorizationService::observationCount).sum();
+        if (contract.maxCampaignObservations() != null && observations > contract.maxCampaignObservations()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "campaign observation ceiling would be exceeded");
+        }
+        long seconds = (long) observations * (Integer) contract.operationalLimits().get("maxWallClockSeconds");
+        if (contract.maxCampaignWallClock() != null && seconds > contract.maxCampaignWallClock().toSeconds()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "campaign wall-clock ceiling would be exceeded");
+        }
+    }
+
+    private static int observationCount(Map<String, Object> artifact) {
+        return artifact.get("observationIds") instanceof List<?> ids ? ids.size() : 0;
     }
 
     @Transactional(readOnly = true)

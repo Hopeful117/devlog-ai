@@ -99,6 +99,30 @@ async def test_callback_client_authenticates_investigation_action() -> None:
     assert result["result"]["outcome"] == "EMPTY"
 
 
+@pytest.mark.asyncio
+async def test_investigation_action_uses_its_own_timeout() -> None:
+    seen: dict[str, object] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen["timeout"] = request.extensions.get("timeout")
+        return httpx.Response(200, json={"result": {}})
+
+    client = CoreCallbackClient(
+        "http://core.test", callback_secret="test-secret",
+        transport=httpx.MockTransport(handler), timeout=5.0, investigation_action_timeout=30.0,
+    )
+
+    with pytest.raises(CoreCallbackError):
+        await client.execute_investigation_action(uuid4(), uuid4(), {"kind": "SEARCH_EVIDENCE"})
+
+    assert seen["timeout"]["read"] == 30.0
+
+
+def test_investigation_action_timeout_must_be_positive() -> None:
+    with pytest.raises(ValueError):
+        CoreCallbackClient("http://core.test", callback_secret="s", investigation_action_timeout=0)
+
+
 def callback_result(correlation_id: UUID) -> AiTaskResultRequest:
     return AiTaskResultRequest(
         correlation_id=correlation_id,

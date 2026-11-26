@@ -89,7 +89,7 @@ class DevLogStoryAgentToolTest {
 
         String result = tool.execute(
                 "devlog-ai", null, "Investigate Story Agent", "Which evidence explains polling?",
-                List.of("README.md"), Map.of("focus", "polling"), "request-1", null);
+                List.of("README.md"), Map.of("focus", "polling"), "request-1", null, null);
 
         assertThat(objectMapper.readTree(result).path("status").asString()).isEqualTo("FAILED");
         verify(client).submitStoryContextAgentTask(
@@ -432,7 +432,7 @@ class DevLogStoryAgentToolTest {
                 .thenThrow(new RuntimeException("backend unreachable"));
 
         org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () ->
-                tool.execute("devlog-ai", null, "intent", null, null, null, "request-1", (org.springframework.ai.mcp.annotation.context.McpSyncRequestContext) null));
+                tool.execute("devlog-ai", null, "intent", null, null, null, "request-1", null, (org.springframework.ai.mcp.annotation.context.McpSyncRequestContext) null));
 
         verify(observability).recordFailure(
                 eq("devlog-ai"),
@@ -476,7 +476,7 @@ class DevLogStoryAgentToolTest {
         org.springframework.ai.mcp.annotation.context.McpSyncRequestContext requestContext =
                 mock(org.springframework.ai.mcp.annotation.context.McpSyncRequestContext.class);
         org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () ->
-                tool.execute("devlog-ai", null, "intent", null, null, null, "request-1", requestContext));
+                tool.execute("devlog-ai", null, "intent", null, null, null, "request-1", null, requestContext));
 
         verify(client).submitStoryContextAgentTask(
                 eq("devlog-ai"), eq((UUID) null), eq("Bearer request"), eq("request-1"),
@@ -502,5 +502,24 @@ class DevLogStoryAgentToolTest {
         return () -> java.util.Optional.of(new McpAuthenticatedPrincipalProvider.McpPrincipal(
                 "test-principal", McpAuthenticatedPrincipalProvider.PrincipalKind.HUMAN,
                 "test", "Bearer test", ""));
+    }
+
+    @Test
+    void forwardsAPinnedRevisionToCore() {
+        DevlogProjectContextClient client = mock(DevlogProjectContextClient.class);
+        when(client.submitStoryContextAgentTask(any(), any(), any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("stop after submission"));
+        ObjectMapper objectMapper = new ObjectMapper();
+        DevLogStoryAgentTool tool = new DevLogStoryAgentTool(client, objectMapper, 100, 0, principalProvider());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> tool.execute(
+                "devlog-ai", null, "intent", "question?", List.of("README.md"), null, "request-rev",
+                " " + "a".repeat(40) + " ", null)).isInstanceOf(RuntimeException.class);
+
+        org.mockito.ArgumentCaptor<DevlogProjectContextClient.SubmitRequest> captor =
+                org.mockito.ArgumentCaptor.forClass(DevlogProjectContextClient.SubmitRequest.class);
+        verify(client, org.mockito.Mockito.atLeastOnce()).submitStoryContextAgentTask(
+                eq("devlog-ai"), eq((UUID) null), any(), eq("request-rev"), any(), captor.capture());
+        assertThat(captor.getValue().revision()).isEqualTo("a".repeat(40));
     }
 }

@@ -45,6 +45,8 @@ import com.hopeful117.devlogai.repositorycontext.RepositoryEvidence;
 import com.hopeful117.devlogai.repositorycontext.RepositoryRevisionScope;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessResponse;
 import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessSummary;
+import com.hopeful117.devlogai.projectfreshness.ProjectFreshnessStatus;
+import com.hopeful117.devlogai.projectfreshness.ProjectRefreshGuidance;
 import com.hopeful117.devlogai.repositorycontext.RepositoryEvidenceContent;
 import com.hopeful117.devlogai.repositorycontext.intelligence.EvidenceScore;
 import com.hopeful117.devlogai.intent.model.IntentDefinition;
@@ -1057,6 +1059,61 @@ class AnalyzeStoryContextUseCaseTest {
         assertEquals("MISMATCH", freshness.get("revisionConsistency"));
         assertEquals(Map.of("evidenceRevision", PROJECT_REVISION,
                         "freshnessRevision", "freshness-revision"), freshness.get("revisionMismatch"));
+    }
+
+    @Test
+    void projectionExposesCoreAggregatedFreshnessInsteadOfUnknown() {
+        ProjectFreshnessSummary summary = new ProjectFreshnessSummary(
+                ProjectFreshnessSummary.PROJECTION_VERSION, UUID.randomUUID(), List.of(
+                        new ProjectFreshnessResponse("v1", UUID.randomUUID(), UUID.randomUUID(),
+                                new ProjectFreshnessResponse.Source(UUID.randomUUID(), "GitHub", "main",
+                                        "origin/main", PROJECT_REVISION, PROJECT_REVISION),
+                                null, ProjectFreshnessStatus.PARTIALLY_FRESH,
+                                ProjectRefreshGuidance.REFRESH_RECOMMENDED, null, null)), 0, false);
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                engineeringContext(), repositoryContext(), CONTEXT_DIGEST, "engineering-context-v2",
+                new ContextRequestEcho(PROJECT_SLUG, INTENT_ID, List.of(CANONICAL_REFERENCE), null),
+                Map.of("summary", summary),
+                Map.of("candidateCount", 1, "selectedCount", 1, "discardedCount", 0,
+                        "usedTokens", 1, "budget", 10), Map.of(), List.of());
+
+        Map<String, Object> projection = StoryContextAgentProjectionV1.build(
+                canonical, PROJECT_SLUG, null, INTENT_ID, List.of(CANONICAL_REFERENCE), null,
+                new ObjectMapper());
+
+        Map<?, ?> freshness = (Map<?, ?>) projection.get("freshness");
+        assertEquals("PARTIALLY_FRESH", freshness.get("status"));
+        assertEquals("STALE", freshness.get("state"));
+        assertFalse(freshness.containsKey("guidance"));
+        assertEquals("CONSISTENT", freshness.get("revisionConsistency"));
+    }
+
+    @Test
+    void projectionKeepsUnknownWhenCoreCannotClassifyFreshness() {
+        CanonicalEngineeringContext canonical = new CanonicalEngineeringContext(
+                engineeringContext(), repositoryContext(), CONTEXT_DIGEST, "engineering-context-v2",
+                new ContextRequestEcho(PROJECT_SLUG, INTENT_ID, List.of(CANONICAL_REFERENCE), null),
+                Map.of("summary", new ProjectFreshnessSummary(
+                        ProjectFreshnessSummary.PROJECTION_VERSION, UUID.randomUUID(), List.of(), 1, false)),
+                Map.of("candidateCount", 1, "selectedCount", 1, "discardedCount", 0,
+                        "usedTokens", 1, "budget", 10), Map.of(), List.of());
+
+        Map<String, Object> projection = StoryContextAgentProjectionV1.build(
+                canonical, PROJECT_SLUG, null, INTENT_ID, List.of(CANONICAL_REFERENCE), null,
+                new ObjectMapper());
+
+        Map<?, ?> freshness = (Map<?, ?>) projection.get("freshness");
+        assertEquals("UNKNOWN", freshness.get("status"));
+        assertEquals("UNKNOWN", freshness.get("state"));
+    }
+
+    @Test
+    void projectionStateUsesTheContractVocabulary() {
+        assertEquals("FRESH", StoryContextAgentProjectionV1.contractState("CURRENT"));
+        assertEquals("STALE", StoryContextAgentProjectionV1.contractState("PARTIALLY_FRESH"));
+        assertEquals("STALE", StoryContextAgentProjectionV1.contractState("STALE"));
+        assertEquals("NOT_ESTABLISHED", StoryContextAgentProjectionV1.contractState("NO_BASELINE"));
+        assertEquals("UNKNOWN", StoryContextAgentProjectionV1.contractState("UNKNOWN"));
     }
 
     @Test

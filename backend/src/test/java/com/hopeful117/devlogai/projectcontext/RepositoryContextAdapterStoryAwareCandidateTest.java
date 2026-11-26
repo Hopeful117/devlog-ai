@@ -153,6 +153,68 @@ class RepositoryContextAdapterStoryAwareCandidateTest {
                 captor.getValue().revisionSource());
     }
 
+    private ProjectContextSnapshot storylessSnapshot() {
+        return new ProjectContextSnapshot(
+                new AnalysisContext.ProjectSnapshot(PROJECT_ID, "Project", "project", null,
+                        ProjectStatus.ACTIVE), null, List.of(), List.of(), List.of(), List.of(),
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of());
+    }
+
+    @Test
+    void requestedRevisionPinsTheScopeEvenWithoutAStory() {
+        UUID sourceId = UUID.fromString("50000000-0000-0000-0000-000000000242");
+        String pinned = "d".repeat(40);
+        var source = Source.builder().id(sourceId).build();
+        when(sourceRepository.findByProjectIdAndActiveTrueOrderByCreatedAtAscIdAsc(PROJECT_ID))
+                .thenReturn(List.of(source));
+        when(workspaceManager.synchronize(source, pinned)).thenReturn(
+                new SynchronizedWorkspace(sourceId, java.nio.file.Path.of("/tmp/workspace"), pinned));
+        when(repositoryContextService.build(any(), any(), any(), anyList(), anyList(), any()))
+                .thenReturn(emptyRepositoryContext());
+
+        adapter.buildRepositoryContext(PROJECT_ID, "Question", storylessSnapshot(),
+                List.of(), null, "question?", " " + pinned + " ");
+
+        ArgumentCaptor<RepositoryRevisionScope> captor =
+                ArgumentCaptor.forClass(RepositoryRevisionScope.class);
+        verify(repositoryContextService).build(any(), any(), any(), anyList(), anyList(), captor.capture());
+        assertEquals(pinned, captor.getValue().resolvedRevision());
+        assertEquals(RepositoryRevisionScope.SOURCE_REQUESTED, captor.getValue().revisionSource());
+        verify(analysisRepository, org.mockito.Mockito.never()).findById(any());
+    }
+
+    @Test
+    void requestedRevisionTakesPriorityOverTheStoryAndBaselineRevisions() {
+        String pinned = "e".repeat(40);
+        when(workspaceManager.synchronize(any(), eq(pinned))).thenReturn(
+                new SynchronizedWorkspace(DEFAULT_SOURCE_ID, java.nio.file.Path.of("/tmp/workspace"), pinned));
+
+        adapter.buildRepositoryContext(PROJECT_ID, "Prepare Story", snapshot(),
+                List.of(), STORY_ID, null, pinned);
+
+        verify(workspaceManager).synchronize(any(), eq(pinned));
+        verify(workspaceManager, org.mockito.Mockito.never()).synchronize(any(), org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test
+    void aRequestedRevisionThatDoesNotResolveExactlyFailsClosed() {
+        String pinned = "f".repeat(40);
+        when(workspaceManager.synchronize(any(), eq(pinned))).thenReturn(
+                new SynchronizedWorkspace(DEFAULT_SOURCE_ID, java.nio.file.Path.of("/tmp/workspace"), "c".repeat(40)));
+
+        assertThrows(IllegalArgumentException.class, () -> adapter.buildRepositoryContext(
+                PROJECT_ID, "Question", storylessSnapshot(), List.of(), null, null, pinned));
+        verify(repositoryContextService, org.mockito.Mockito.never())
+                .build(any(), any(), any(), anyList(), anyList(), any());
+    }
+
+    @Test
+    void noRequestedRevisionAndNoStoryKeepsTheUnscopedBehaviour() {
+        adapter.buildRepositoryContext(PROJECT_ID, "Question", storylessSnapshot(), List.of(), null, null, null);
+
+        verify(workspaceManager, org.mockito.Mockito.never()).synchronize(any(), any());
+    }
+
     @Test
     void storyContextUsesBaselineAnalysisRevisionBeforeCurrentRevision() {
         UUID sourceId = UUID.fromString("50000000-0000-0000-0000-000000000116");

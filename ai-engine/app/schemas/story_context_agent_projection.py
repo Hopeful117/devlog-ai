@@ -96,6 +96,9 @@ class StoryAgentFreshness(ContractModel):
     truncated: bool | None = None
     status: str | None = None
     revision_consistency: str | None = Field(default=None, alias="revisionConsistency")
+    # Story 0242: Core reports evidence/freshness revision divergence explicitly;
+    # a revision-pinned execution makes this a normal, honest state.
+    revision_mismatch: dict[str, str] | None = Field(default=None, alias="revisionMismatch")
     warnings: list[str] | None = None
 
 class StoryAgentAccounting(ContractModel):

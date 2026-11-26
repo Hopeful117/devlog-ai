@@ -48,6 +48,8 @@ Q1_HARNESS_PATHS = (
     "ai-engine/tests/test_devlog_ai_abc_live_preflight.py",
     "docs/evaluation/devlog-ai-abc-first-test-manifest-v1.json",
     "docs/evaluation/devlog-ai-q1-b-direct-config-v1.json",
+    "docs/evaluation/devlog-ai-abc-benchmark-v1.json",
+    "docs/evaluation/devlog-ai-abc-campaign-manifest-v1.json",
     "backend/src/test/java/com/hopeful117/devlogai/storycontextanalysis/StoryContextCoreIntegrationTest.java",
 )
 

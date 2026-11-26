@@ -32,6 +32,7 @@ public record RepositoryRevisionScope(
         }
     }
 
+    public static final String SOURCE_REQUESTED = "REQUESTED_REVISION";
     public static final String SOURCE_STORY_TARGET = "STORY_TARGET_COMMIT";
     public static final String SOURCE_ANALYSIS_TARGET = "ANALYSIS_TARGET_REVISION";
     public static final String SOURCE_CURRENT_REVISION = "SOURCE_CURRENT_REVISION";

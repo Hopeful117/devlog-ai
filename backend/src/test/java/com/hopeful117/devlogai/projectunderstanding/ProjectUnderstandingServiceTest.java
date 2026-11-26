@@ -90,7 +90,35 @@ class ProjectUnderstandingServiceTest {
 
         assertThat(response.outcome()).isEqualTo(ProjectUnderstandingOutcome.CREATED);
         assertThat(response.analysisId()).isEqualTo(analysis.getId());
-        verify(workflow).start(analysis.getId());
+        verify(workflow).start(analysis.getId(), null);
+    }
+
+    @Test
+    void aFailedAnalysisNeverBecomesTheFreshnessBaseline() {
+        when(claims.claim(prepared)).thenReturn(
+                new ProjectUnderstandingClaim(analysis, ProjectUnderstandingOutcome.CREATED));
+        analysis.setStatus(AnalysisStatus.FAILED);
+        when(analyses.findById(analysis.getId())).thenReturn(Optional.of(analysis));
+
+        var response = service.execute(projectId,
+                new ProjectUnderstandingRequest(prepared.sourceId(), null, null));
+
+        assertThat(response.status()).isEqualTo(AnalysisStatus.FAILED);
+        verify(freshnessService, never()).recordObservedBaseline(any(), any(), any(), any());
+    }
+
+    @Test
+    void anAuthenticatedCallerRunsTheWorkflowWithItsPrincipal() {
+        var principal = new com.hopeful117.devlogai.authorization.AuthenticatedPrincipal(
+                "agent", com.hopeful117.devlogai.authorization.PrincipalKind.AI_AGENT, "test");
+        when(claims.claim(prepared)).thenReturn(
+                new ProjectUnderstandingClaim(analysis, ProjectUnderstandingOutcome.CREATED));
+        analysis.setStatus(AnalysisStatus.IN_PROGRESS);
+        when(analyses.findById(analysis.getId())).thenReturn(Optional.of(analysis));
+
+        service.execute(projectId, new ProjectUnderstandingRequest(prepared.sourceId(), null, null), principal);
+
+        verify(workflow).start(analysis.getId(), principal);
     }
 
     @Test
@@ -146,7 +174,7 @@ class ProjectUnderstandingServiceTest {
     void doesNotAdvanceTheCheckpointWhenTheWorkflowFails() {
         when(claims.claim(prepared)).thenReturn(
                 new ProjectUnderstandingClaim(analysis, ProjectUnderstandingOutcome.CREATED));
-        doThrow(new IllegalStateException("start failed")).when(workflow).start(analysis.getId());
+        doThrow(new IllegalStateException("start failed")).when(workflow).start(analysis.getId(), null);
 
         assertThatThrownBy(() -> service.execute(projectId,
                 new ProjectUnderstandingRequest(prepared.sourceId(), null, null)))
@@ -174,7 +202,7 @@ class ProjectUnderstandingServiceTest {
     void marksANewPendingClaimFailedWhenWorkflowCannotStart() {
         when(claims.claim(prepared)).thenReturn(
                 new ProjectUnderstandingClaim(analysis, ProjectUnderstandingOutcome.CREATED));
-        doThrow(new IllegalStateException("start failed")).when(workflow).start(analysis.getId());
+        doThrow(new IllegalStateException("start failed")).when(workflow).start(analysis.getId(), null);
         ProjectUnderstandingRequest request = new ProjectUnderstandingRequest(
                 prepared.sourceId(), null, null);
 

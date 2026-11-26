@@ -53,6 +53,25 @@ class DeterministicEvidenceRankerTest {
     }
 
     @Test
+    void requestedScopeRelevanceIsAFloorForSemanticRelevance() {
+        RepositoryEvidence relevant = evidence("u", "SOURCE_FILE", "pkg/usecase/Zeta.java", "pkg/usecase/Zeta.java")
+                .withExtractionMetadata(Map.of("requestedScopeRelevance", "90"));
+        RepositoryEvidence plain = evidence("c", "SOURCE_FILE", "pkg/controller/Alpha.java", "pkg/controller/Alpha.java")
+                .withExtractionMetadata(Map.of("requestedScopeRelevance", "0"));
+        RepositoryEvidence malformed = evidence("m", "SOURCE_FILE", "pkg/m/Mid.java", "pkg/m/Mid.java")
+                .withExtractionMetadata(Map.of("requestedScopeRelevance", "not-a-number"));
+
+        List<RepositoryEvidence> ranked = ranker.rank(List.of(plain, malformed, relevant),
+                request("Explain the request flow", precision()));
+
+        RepositoryEvidence first = ranked.getFirst();
+        assertEquals("u", first.reference());
+        assertEquals(90, first.score().criteria().get(EvidenceCriterion.SEMANTIC_RELEVANCE));
+        assertTrue(ranked.stream().filter(value -> value.reference().equals("m")).findFirst().orElseThrow()
+                .score().criteria().get(EvidenceCriterion.SEMANTIC_RELEVANCE) < 90);
+    }
+
+    @Test
     void keepsSingleCandidateTermsUsefulAndStable() {
         RepositoryEvidence candidate = evidence(
                 "single", "SOURCE_FILE", "payment gateway", "src/PaymentGateway.java");

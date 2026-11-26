@@ -72,9 +72,20 @@ verification ou insuffisante.
 2. [Story 0219 - Freshness, Scope and Provenance Explicitness](../../stories/0219-explicit-freshness-scope-provenance/story.md)
 3. [Story 0220 - Revision-Pinned Runtime Loss and Provider Outcome Evaluation](../../stories/0220-revision-pinned-runtime-loss-evaluation/story.md)
 4. [Story 0221 - Bounded Live Provider Captures and Attribution](../../stories/0221-bounded-live-provider-captures/story.md)
-5. Story a definir - Specificite, abstention et confiance calibree
-6. Story a definir - Evaluation agentique et pilote sur Stories reelles
+5. [Story 0222 - Abstention and Confidence Calibration](../../stories/0222-abstention-confidence-calibration/story.md)
+6. [Story 0223 - Agentic Quality Evaluation and Real Engineering Story Pilot](../../stories/0223-agentic-quality-real-story-pilot/story.md)
 7. [Story 0228 - MCP Live Evaluation Preparation](../../stories/0228-mcp-live-evaluation-preparation/story.md)
+8. [Story 0229 - MCP Live Evaluation Authorization](../../stories/0229-mcp-live-evaluation-authorization/story.md)
+9. [Story 0230 - Core Citable Evidence Resolution for Investigation](../../stories/0230-core-citable-evidence-resolution-for-investigation/story.md)
+10. [Story 0231 - Core Search Evidence Resolution for Investigation](../../stories/0231-core-search-evidence-resolution-for-investigation/story.md)
+11. [Story 0232 - Q1 Live Result and Revision Integrity](../../stories/0232-live-q1-result-and-revision-integrity/story.md)
+12. [Story 0233 - Detect Empty Result under Constrained Budget](../../stories/0233-detect-empty-result-constrained-budget/story.md)
+13. [Story 0234 - Core Knowledge Floor with File Scope](../../stories/0234-core-knowledge-floor-with-file-scope/story.md)
+14. [Story 0235 - Bound get_engineering_context Response](../../stories/0235-bound-get-engineering-context-response/story.md)
+15. [Story 0236 - MCP Agent Approval for Live Evaluation](../../stories/0236-mcp-agent-approval-live-evaluation/story.md)
+16. [Story 0237 - ABC Harness Validity and Multi-Case Campaign](../../stories/0237-abc-harness-validity-multi-case/story.md)
+17. [Story 0238 - Core Project Freshness Aggregation](../../stories/0238-core-project-freshness-aggregation/story.md)
+18. [Story 0239 - Core Multi-Case Live Evaluation Campaign Contract](../../stories/0239-core-multi-case-live-evaluation-campaign/story.md)
 
 Les Stories 0158, 0173, 0176, 0178 et 0209 sont des dependances ou travaux a
 reconcilier. Elles ne sont pas dupliquees par cette epic.
@@ -86,6 +97,30 @@ reconcilier. Elles ne sont pas dupliquees par cette epic.
 3. Mesurer puis corriger les pertes par etape.
 4. Ameliorer specificite, abstention et calibration.
 5. Executer l'evaluation qualitative et le pilote reel.
+
+## Criteres de cloture (PROPOSES - validation humaine requise)
+
+Niveau de preuve retenu : campagne 8 questions x 3 conditions x 3 repetitions
+(72 observations, Story 0223), notee par revue humaine contre les oracles
+acceptes.
+
+- **Completude** : au moins 90 % des cellules A et C `COMPLETED` ; chaque
+  echec est classe (provider, budget, revision, outil, grounding).
+- **Exactitude** : la meilleure condition DevLog couvre au moins 70 % des
+  `requiredClaims` et ne fait pas moins de B - 10 points.
+- **Honnetete** : aucune `forbiddenClaim` assertee en confiance `HIGH` ;
+  abstention correcte sur Q7 pour au moins 2 repetitions sur 3 par condition
+  DevLog.
+- **Calibration** : aucune reponse jugee hors sujet ou incorrecte en confiance
+  `HIGH`.
+- **Fraicheur** : fraicheur differente de `UNKNOWN` dans toutes les
+  observations DevLog.
+- **Gouvernance** : Stories de l'epic acceptees ou explicitement classees
+  comme prerequis.
+
+Etat au 2026-11-25 : non atteint. Le run live Q1 28 est techniquement complet
+mais invalide comme mesure (voir
+[l'evaluation du run 28](../../evaluation/devlog-ai-q1-live-run28-assessment-v1.md)).
 
 ## Gouvernance
 
