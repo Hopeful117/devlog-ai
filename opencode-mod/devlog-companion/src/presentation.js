@@ -91,6 +91,27 @@ export function presentationDescriptor(value, reducedMotion = false) {
 }
 
 /**
+ * Describe live evidence without collapsing UNKNOWN into the simulated IDLE
+ * fallback. Preview inputs continue to use presentationDescriptor.
+ *
+ * @param {unknown} value
+ * @param {boolean} [reducedMotion]
+ */
+export function livePresentationDescriptor(value, reducedMotion = false) {
+  if (value !== "UNKNOWN") return presentationDescriptor(value, reducedMotion);
+  return {
+    label: "UNKNOWN",
+    color: "#8b949e",
+    ringOpacity: 0.2,
+    satelliteOpacity: 0.25,
+    disconnected: false,
+    connectors: false,
+    state: "UNKNOWN",
+    motion: "none",
+  };
+}
+
+/**
  * Apply a preview-only state selection or reset. A stale READY timer cannot
  * reset a state that has since changed.
  *
