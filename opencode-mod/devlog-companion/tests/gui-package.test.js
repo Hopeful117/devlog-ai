@@ -14,6 +14,7 @@ test("GUI package exposes only the experimental GUI plugin part", async () => {
   assert.deepEqual(manifest.files, [
     "src/gui.tsx",
     "src/gui-presence.js",
+    "src/context-inspector.js",
     "src/presentation.js",
     "src/devlog-mark.svg",
     "dist",

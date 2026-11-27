@@ -20,10 +20,37 @@ import {
   deriveGuiHistory,
   subscribeGuiSessionEvents,
 } from "./gui-presence.js";
+import {
+  contextSelectionForScope,
+  deriveLocalContextInspection,
+  deriveSelectableContextOperations,
+  isContextHistoryRowSelectable,
+  localContextProjectionKey,
+} from "./context-inspector.js";
 
 const PREVIEW_BUILD = import.meta.env.MODE === "preview";
-const HISTORY_VIEWS = ["now", "history"] as const;
-type CompanionView = (typeof HISTORY_VIEWS)[number];
+const COMPANION_VIEWS = ["now", "context", "history"] as const;
+type CompanionView = (typeof COMPANION_VIEWS)[number];
+
+const CONTEXT_REASON_MESSAGES: Record<string, string> = {
+  NO_OPERATION_SELECTED: "Choose a direct result below to inspect it.",
+  TRANSCRIPT_UNAVAILABLE: "The current session transcript is unavailable.",
+  SOURCE_NO_LONGER_AVAILABLE: "The selected result is no longer in the loaded transcript.",
+  DUPLICATE_NATIVE_CALL_ID: "The selected native call ID is ambiguous in this transcript.",
+  CODE_MODE_UNSUPPORTED: "Code Mode does not expose an individually associated context result.",
+  UNSUPPORTED_DIRECT_TOOL: "Only direct get_engineering_context results are supported.",
+  NATIVE_CALL_ID_UNAVAILABLE: "This result has no stable native call ID for selection.",
+  TOOL_RESULT_NOT_COMPLETED: "The selected tool result has not completed.",
+  AMBIGUOUS_RESULT_BLOCKS: "The result contains ambiguous or unsupported content blocks.",
+  UNSUPPORTED_RESULT_BLOCK: "The result block is not a supported plain-text JSON result.",
+  RESULT_SIZE_UNSUPPORTED: "The result exceeds the local inspection size limit.",
+  RESULT_JSON_MALFORMED: "The observed result is not valid JSON.",
+  ENGINEERING_CONTEXT_SHAPE_UNSUPPORTED: "The result does not match the supported EngineeringContext shape.",
+  ENGINEERING_CONTEXT_METADATA_UNSUPPORTED: "The context metadata is missing or malformed.",
+  ENGINEERING_CONTEXT_SECTION_UNSUPPORTED: "A context section has an unsupported shape.",
+  NOT_A_NATIVE_TOOL_RESULT: "The selected item is not a native tool result.",
+  SELECTED_RESULT_CHANGED: "The selected result changed; select it again from Context or History.",
+};
 
 function formatDuration(durationMs: number) {
   if (durationMs < 1000) return `${Math.round(durationMs)} ms`;
@@ -165,8 +192,22 @@ export default Plugin.define({
       const [activeView, setActiveView] = createSignal<CompanionView>("now");
       const [eventVersion, setEventVersion] = createSignal(0);
       const [interrupted, setInterrupted] = createSignal(false);
+      const [selectedContext, setSelectedContext] = createSignal<
+        { scope: string; hostCallId: string; projectionKey: string } | undefined
+      >();
       const reducedMotion = useReducedMotion();
       let readyTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const routeScope = createMemo(() => {
+        const session = props.session;
+        return JSON.stringify([
+          session.server.id,
+          session.key,
+          session.id,
+          session.directory,
+          session.visit,
+        ]);
+      });
 
       const clearReadyTimer = () => {
         if (readyTimer !== undefined) clearTimeout(readyTimer);
@@ -193,12 +234,14 @@ export default Plugin.define({
       createEffect(() => {
         if (PREVIEW_BUILD) return;
         const session = props.session;
+        const scope = routeScope();
         const sessionID = session.id;
         const data = session.server.data;
         // Read route identity here so a new visit/location replaces subscriptions.
         session.key;
         session.visit;
         session.directory;
+        setSelectedContext((current) => current?.scope === scope ? current : undefined);
         setInterrupted(false);
         setEventVersion((current) => current + 1);
 
@@ -249,9 +292,109 @@ export default Plugin.define({
           rows,
         };
       });
+      const contextView = createMemo(() => {
+        eventVersion();
+        if (PREVIEW_BUILD) {
+          return deriveLocalContextInspection(undefined, undefined, routeScope());
+        }
+        const session = props.session;
+        const scope = routeScope();
+        const selection = contextSelectionForScope(selectedContext(), scope);
+        const data = session.server.data;
+        if (session.pending || data.session.message.loading(session.id)) {
+          return deriveLocalContextInspection(undefined, undefined, scope);
+        }
+        const inspection = deriveLocalContextInspection(
+          data.session.message.list(session.id),
+          selection?.hostCallId,
+          scope,
+        );
+        if (
+          selection?.projectionKey &&
+          (inspection.state === "AVAILABLE" || inspection.state === "PARTIAL") &&
+          localContextProjectionKey(inspection) !== selection.projectionKey
+        ) {
+          return {
+            state: "UNAVAILABLE",
+            reason: "SELECTED_RESULT_CHANGED",
+            provenance: "OBSERVED_TOOL_RESULT",
+            scope,
+          } as ReturnType<typeof deriveLocalContextInspection>;
+        }
+        return inspection;
+      });
+      const contextOperationsView = createMemo(() => {
+        eventVersion();
+        if (PREVIEW_BUILD) {
+          return {
+            kind: "unavailable" as const,
+            operations: [],
+            hasCodeModeContext: false,
+          };
+        }
+        const session = props.session;
+        const data = session.server.data;
+        if (session.pending || data.session.message.loading(session.id)) {
+          return {
+            kind: "unavailable" as const,
+            operations: [],
+            hasCodeModeContext: false,
+          };
+        }
+        const history = historyView();
+        if (history.kind === "unavailable") {
+          return {
+            kind: "unavailable" as const,
+            operations: [],
+            hasCodeModeContext: false,
+          };
+        }
+        const messages = data.session.message.list(session.id);
+        const operations = deriveSelectableContextOperations(history.rows, messages);
+        return {
+          kind: operations.length === 0 ? "empty" as const : "available" as const,
+          operations,
+          hasCodeModeContext: history.rows.some(
+            (row) =>
+              row.source === "code-mode" &&
+              row.toolNames?.includes("get_engineering_context"),
+          ),
+        };
+      });
+      const selectContextOperation = (hostCallId: string | undefined) => {
+        const scope = routeScope();
+        const session = props.session;
+        if (!scope || !hostCallId || PREVIEW_BUILD) return;
+        const messages = session.server.data.session.message.list(session.id);
+        const inspection = deriveLocalContextInspection(messages, hostCallId, scope);
+        setSelectedContext(
+          inspection.state === "AVAILABLE" || inspection.state === "PARTIAL"
+            ? {
+                scope,
+                hostCallId,
+                projectionKey: localContextProjectionKey(inspection),
+              }
+            : undefined,
+        );
+      };
+      createEffect(() => {
+        const inspection = contextView();
+        const session = props.session;
+        const transcriptLoading =
+          session.pending || session.server.data.session.message.loading(session.id);
+        if (
+          !transcriptLoading &&
+          selectedContext()?.scope === routeScope() &&
+          inspection.state !== "AVAILABLE" &&
+          inspection.state !== "PARTIAL"
+        ) {
+          setSelectedContext(undefined);
+        }
+      });
       const state = () => PREVIEW_BUILD ? previewState() : liveState();
 
       onCleanup(clearReadyTimer);
+      onCleanup(() => setSelectedContext(undefined));
 
       return (
         <section
@@ -280,7 +423,7 @@ export default Plugin.define({
             role="group"
             style={{ display: "flex", gap: "8px", "border-bottom": "1px solid var(--border-base, currentColor)" }}
           >
-            <For each={HISTORY_VIEWS}>
+            <For each={COMPANION_VIEWS}>
               {(view) => (
                 <button
                   type="button"
@@ -299,7 +442,7 @@ export default Plugin.define({
                     opacity: activeView() === view ? "1" : "0.7",
                   }}
                 >
-                  {view === "now" ? "Now" : "History"}
+                  {view === "now" ? "Now" : view === "context" ? "Context" : "History"}
                 </button>
               )}
             </For>
@@ -336,6 +479,158 @@ export default Plugin.define({
                           ? "A DevLog tool or task failure was observed."
                           : "Current-session evidence is unavailable or inconclusive."}
               </p>
+            </div>
+          </Show>
+          <Show when={activeView() === "context"}>
+            <div
+              id="devlog-companion-panel-context"
+              class="devlog-companion__context"
+              aria-live="polite"
+              style={{ display: "flex", "flex-direction": "column", gap: "10px" }}
+            >
+              <h3 style={{ margin: "4px 0", "font-size": "0.95rem" }}>
+                Local Context Inspector
+              </h3>
+              <p style={{ margin: "0", "font-size": "0.85em", opacity: "0.78" }}>
+                Local inspection of the observed tool result; no backend Context Trace was retrieved.
+              </p>
+              <section
+                aria-label="Choose an observed EngineeringContext result"
+                style={{ display: "flex", "flex-direction": "column", gap: "6px" }}
+              >
+                <h4 style={{ margin: "4px 0 0" }}>Choose an observed result</h4>
+                <p style={{ margin: "0", "font-size": "0.82em", opacity: "0.72" }}>
+                  Direct results from the loaded session, newest first. No backend request is made.
+                </p>
+                <Show
+                  when={contextOperationsView().kind !== "unavailable"}
+                  fallback={
+                    <p role="status" style={{ margin: "0", opacity: "0.78" }}>
+                      Current session history is loading or unavailable.
+                    </p>
+                  }
+                >
+                  <Show
+                    when={contextOperationsView().kind === "available"}
+                    fallback={
+                      <p role="status" style={{ margin: "0", opacity: "0.78" }}>
+                        No eligible direct get_engineering_context result is available in the loaded session history.
+                      </p>
+                    }
+                  >
+                    <div
+                      role="group"
+                      aria-label="Available direct EngineeringContext results"
+                      style={{ display: "flex", "flex-direction": "column", gap: "6px" }}
+                    >
+                      <For each={contextOperationsView().operations}>
+                        {(operation, index) => (
+                          <button
+                            type="button"
+                            aria-pressed={
+                              selectedContext()?.scope === routeScope() &&
+                              selectedContext()?.hostCallId === operation.hostCallId
+                            }
+                            onClick={() => selectContextOperation(operation.hostCallId)}
+                            style={{
+                              "align-self": "flex-start",
+                              color: "inherit",
+                              background: "transparent",
+                              border: "1px solid var(--border-base, currentColor)",
+                              "border-radius": "4px",
+                              padding: "5px 8px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            {operation.toolName} · Result {index() + 1}
+                            {operation.observedAt !== undefined
+                              ? ` · ${formatObservedTime(operation.observedAt)}`
+                              : ""}
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </Show>
+                <Show when={contextOperationsView().hasCodeModeContext}>
+                  <p role="note" style={{ margin: "0", "font-size": "0.82em", opacity: "0.72" }}>
+                    Code Mode exposes only the outer execution here; its nested result cannot be selected individually.
+                  </p>
+                </Show>
+              </section>
+              <Show
+                when={contextView().state === "AVAILABLE" || contextView().state === "PARTIAL"}
+                fallback={
+                  <p role="status" style={{ margin: "0", opacity: "0.78" }}>
+                    {contextView().state === "UNVERIFIED"
+                      ? "Unverified: "
+                      : "Unavailable: "}
+                    {CONTEXT_REASON_MESSAGES[contextView().reason ?? ""] ??
+                      "Choose a supported direct EngineeringContext result in Context or History."}
+                  </p>
+                }
+              >
+                <div
+                  class="devlog-companion__context-overview"
+                  style={{ display: "flex", "flex-direction": "column", gap: "6px" }}
+                >
+                  <p style={{ margin: "0", "font-weight": "600" }}>
+                    Observed {contextView().toolName ?? "tool result"}
+                    {contextView().state === "PARTIAL" ? " · Partial" : " · Available"}
+                  </p>
+                  <Show when={contextView().state === "PARTIAL"}>
+                    <p role="status" style={{ margin: "0", opacity: "0.78" }}>
+                      Some fields are missing, conflicting, capped, or truncated; displayed counts may be incomplete.
+                    </p>
+                  </Show>
+                  <h4 style={{ margin: "6px 0 0" }}>Overview</h4>
+                  <span>Declared freshness: {contextView().freshness}</span>
+                  <span>
+                    Repository revision: {contextView().repositoryRevision?.slice(0, 12) ?? "Unavailable"}
+                  </span>
+                  <span>
+                    Context revision: {contextView().contextRevision?.slice(0, 12) ?? "Unavailable"}
+                  </span>
+                  <span>
+                    Truncated: {contextView().truncated
+                      ? "Yes"
+                      : contextView().truncationUnknown
+                        ? "Unknown (warning list capped)"
+                        : "No"}
+                  </span>
+                  <span>Count consistency: {contextView().countConsistency}</span>
+                  <Show when={contextView().reportedCounts}>
+                    <span>
+                      Reported counts — candidates: {contextView().reportedCounts?.candidate},
+                      selected: {contextView().reportedCounts?.selected},
+                      rejected: {contextView().reportedCounts?.rejected}
+                    </span>
+                  </Show>
+                  <h4 style={{ margin: "6px 0 0" }}>Evidence by trust tier</h4>
+                  <For each={Object.entries(contextView().evidenceCountsByTrustTier ?? {}) as [string, number][]}>
+                    {([tier, count]) => (
+                      <span>{tier.replaceAll("_", " ")}: {count}</span>
+                    )}
+                  </For>
+                  <h4 style={{ margin: "6px 0 0" }}>Context sections</h4>
+                  <For each={Object.entries(contextView().sectionCountsByTrustTier ?? {}) as [string, number][]}>
+                    {([tier, count]) => (
+                      <span>{tier.replaceAll("_", " ")}: {count}</span>
+                    )}
+                  </For>
+                  <Show when={contextView().empty}>
+                    <p style={{ margin: "0", opacity: "0.78" }}>
+                      This verified, non-truncated result contains no selected evidence.
+                    </p>
+                  </Show>
+                  <Show when={(contextView().diagnostics?.length ?? 0) > 0}>
+                    <h4 style={{ margin: "6px 0 0" }}>Diagnostics</h4>
+                    <For each={contextView().diagnostics ?? []}>
+                      {(code) => <span>{code.replaceAll("_", " ")}</span>}
+                    </For>
+                  </Show>
+                </div>
+              </Show>
             </div>
           </Show>
           <Show when={activeView() === "history"}>
@@ -425,6 +720,63 @@ export default Plugin.define({
                                   {row.durationMs !== undefined
                                     ? `Duration ${formatDuration(row.durationMs)}`
                                     : ""}
+                                </span>
+                              </Show>
+                              <Show
+                                when={isContextHistoryRowSelectable(
+                                  row,
+                                  props.session.server.data.session.message.list(
+                                    props.session.id,
+                                  ),
+                                )}
+                              >
+                                <button
+                                  type="button"
+                                  aria-current={
+                                    selectedContext()?.scope === routeScope() &&
+                                    selectedContext()?.hostCallId === row.hostCallId
+                                      ? "true"
+                                      : undefined
+                                  }
+                                  onClick={() => {
+                                    selectContextOperation(row.hostCallId);
+                                    setActiveView("context");
+                                  }}
+                                  style={{
+                                    "align-self": "flex-start",
+                                    color: "inherit",
+                                    background: "transparent",
+                                    border: "1px solid var(--border-base, currentColor)",
+                                    "border-radius": "4px",
+                                    padding: "4px 7px",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  Inspect observed result
+                                </button>
+                              </Show>
+                              <Show
+                                when={
+                                  row.source === "code-mode" &&
+                                  row.toolNames?.includes("get_engineering_context")
+                                }
+                              >
+                                <span
+                                  role="note"
+                                  style={{ "font-size": "0.8em", opacity: "0.7" }}
+                                >
+                                  Context unavailable: Code Mode does not expose an individual nested result identity.
+                                </span>
+                              </Show>
+                              <Show
+                                when={
+                                  row.source === "direct-tool" &&
+                                  row.toolName === "get_engineering_context" &&
+                                  row.hostCallId === undefined
+                                }
+                              >
+                                <span style={{ "font-size": "0.8em", opacity: "0.7" }}>
+                                  Context inspection unavailable: no native call ID.
                                 </span>
                               </Show>
                             </li>
