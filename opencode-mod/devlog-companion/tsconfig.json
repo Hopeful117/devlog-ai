@@ -7,9 +7,10 @@
     "jsxImportSource": "solid-js",
     "allowJs": true,
     "checkJs": true,
+    "types": ["vite/client"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["src/gui.tsx", "src/rpc.js"]
+  "include": ["src/gui.tsx"]
 }
