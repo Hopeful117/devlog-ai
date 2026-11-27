@@ -18,32 +18,38 @@ to complete this checklist. If suitable activity is not already present, record
 
 ## OpenCode Desktop
 
-- [ ] Companion opens and closes normally.
-- [ ] Now, Context, and History remain accessible.
-- [ ] Presence changes only when existing, observed DevLog activity supplies
-      evidence; absent or ambiguous evidence remains `UNKNOWN`.
-- [ ] Code Mode nested Context remains explicitly unavailable/unknown.
-- [ ] Session switching does not display stale activity or Context selection.
-- [ ] If no suitable existing activity/result is available, record the relevant
-      observation as `NOT EVALUATED`; do not invoke a tool for the test.
+- [ ] Confirm the Companion panel is available and opens/closes normally.
+- [ ] Open Now, Context, and History; confirm each view remains accessible.
+- [ ] Confirm normal avatar and presence rendering. Presence changes only when
+      existing observed DevLog activity provides evidence; absent or ambiguous
+      evidence remains `UNKNOWN`.
+- [ ] During naturally occurring work, observe an existing DevLog Code Mode
+      operation. Confirm History records the observed execution and does not
+      invent nested outcomes. Do not call a tool just to create test activity.
+- [ ] Switch sessions and confirm no stale activity or Context selection is
+      displayed.
+- [ ] If no suitable existing activity/result occurs, record the observation as
+      `NOT EVALUATED`; do not fabricate activity or invoke a tool for validation.
 
 ## OpenCode TUI
 
-- [ ] Status contribution appears without replacing the built-in footer.
-- [ ] Namespaced Companion command opens the panel in a valid session.
-- [ ] Existing History is readable and bounded.
-- [ ] Presence reflects only available evidence; missing/ambiguous outcomes stay
-      unknown.
-- [ ] Session switching clears the previous session's display.
-- [ ] Closing the panel and exiting the TUI leave no stale panel/listener state.
-- [ ] If no suitable existing activity is available, do not manufacture one.
+- [ ] Confirm the DevLog status contribution appears without replacing the
+      built-in footer.
+- [ ] Open the panel with the `devlog-companion` command in a valid session.
+- [ ] Confirm History is accessible, readable, and bounded.
+- [ ] During ordinary engineering work, observe activity naturally and confirm
+      displayed state reflects only available evidence; missing/ambiguous
+      outcomes remain unknown. Do not manufacture activity.
+- [ ] Switch sessions and confirm the prior session's activity is not stale.
+- [ ] Close the panel and exit normally; confirm no stale panel/listener state.
+- [ ] If no suitable existing activity occurs, record `NOT EVALUATED`.
 
 ## Claude Companion
 
-- [ ] Confirm the existing installation source/version without changing it.
+- [ ] Confirm no Claude installation or configuration change was introduced.
 - [ ] Observe normal existing behavior only; record an owner-observed regression
       if one occurs.
-- [ ] Do not reinstall Claude or claim parity from an OpenCode check.
+- [ ] Do not reinstall/update Claude or claim parity from an OpenCode check.
 
 ## Remote TUI, only when an appropriate environment already exists
 

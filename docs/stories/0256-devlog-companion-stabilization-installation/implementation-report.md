@@ -11,7 +11,6 @@
 - A documentation-only follow-up records the final artifact/install evidence;
   it does not change package source contents.
 - Push: not authorized or performed.
-- Push: not authorized or performed.
 
 ## Governance and scope
 
@@ -20,10 +19,11 @@
 - Governing constraint: accepted ADR-084 and the approved Story 0256 plan.
 - DevLog context: skipped under the task's explicit no-DevLog-operation
   constraint. No DevLog operation or model request was made.
-- Active configuration, Claude files and settings, remote hosts, and existing
-  development worktrees were not changed. Stable installation was separately
-  authorized and is recorded below.
-- OpenCode was not launched or reloaded. No cleanup or push occurred.
+- The authorized active configuration migration is complete and verified below.
+  Claude files/settings, remote hosts, and existing development worktrees were
+  not changed.
+- This assessment did not launch or restart OpenCode, modify active
+  configuration, or change the stable installed package/dependency tree.
 
 ## Implementation summary
 
@@ -127,64 +127,98 @@ and package dry-run pass verifies that the lock is present in the archive.
   extracted-archive installation and module resolution; the temporary install
   and checks above add that evidence. The compatibility matrix was clarified
   to distinguish the prior source/plugin smoke test from package installation.
-  Host loading remains unverified.
 - Security review: initial package review **PASS**, no actionable findings.
-  Follow-up assessment of the stable install audit: no confirmed exploitable
-  issue established from the summary, but runtime dependency risk is
-  insufficiently characterized and requires owner review before activation.
+  This follow-up assessment classifies the installed audit findings below;
+  residual-risk acceptance is still the owner's decision.
 
-## Not validated / remaining gates
+## Stable migration and provenance verification
 
-- Actual OpenCode host loading, especially the GUI CJS bundle's externalized
-  SDK import, remains **NOT EVALUATED**; OpenCode was not launched.
-- The stable package is staged but not activated. Owner review of the moderate
-  dependency audit findings is recommended before activation.
-- OpenCode host peer/runtime loading, especially the GUI CJS bundle's
-  externalized SDK import, remains **NOT EVALUATED**; OpenCode was not launched.
-- Active Desktop/TUI configuration was inventoried read-only below; no entry was
-  migrated. No OpenCode runtime was started.
-- Same-host duplicate-registration behavior was not runtime-tested. Remote
-  server and SSH topologies remain unqualified.
-- Desktop visual/runtime behavior and the owner-led everyday checklist remain
-  pending.
-- The Claude installed record `0.1.0` versus source manifest `0.2.0` remains a
-  documented discrepancy; actual loaded version remains unknown.
-- The Story is not declared accepted or fully closed. Active installation and
-  owner validation need separate authorization and evidence.
+- The stable version `0.1.1` remains installed at
+  `/home/ludo/.local/share/opencode/plugins/devlog-companion/0.1.1-30ca3577302bfa0c41ec663a812dad5ed03b8d40`.
+- Read-only verification confirmed exactly one stable path in each of
+  `/home/ludo/.config/opencode/opencode.jsonc` and
+  `/home/ludo/.config/opencode/cli.json`; neither old worktree path remains in
+  those Companion entries. The explicit TUI entry is retained.
+- The migration backup remains at
+  `/home/ludo/.local/share/opencode/backups/story-0256-plugin-migration-20261127-233925`
+  (directory mode `0700`; both config backups mode `0600`). Each backup still
+  contains its corresponding pre-migration Companion path.
+- The package manifest remains `devlog-companion@0.1.1`; its release archive
+  SHA-256 remains
+  `257b55a142c647f70f142e71a3c8610c3490f2f841a3e9d9ee9724e5c6caf974`.
+  The pinned installation directory still matches the reviewed source commit;
+  shrinkwrap contains no Story worktree paths. No dependency or package content
+  was changed during this assessment.
+- Prior Desktop logs show plugin discovery/watch setup and two `loading plugin`
+  attempts at the stable GUI CJS entrypoint. No matching error was observed in
+  the examined log window. This establishes **discovery and attempted loading**,
+  not successful module initialization, visible panels, or functional behavior.
+- The available TUI logs only show the earlier Story-worktree entrypoint.
+  No stable TUI load is evidenced. TUI runtime loading remains **NOT
+  EVALUATED**.
+- Desktop visual behavior and the owner checklist below remain pending. Claude
+  files/settings/installation were not changed; the previously documented
+  installed/source version discrepancy remains unresolved and is not addressed
+  by this Story.
+- Remote-server and SSH topologies remain optional and **NOT EVALUATED**.
 
-## Configuration migration preparation
+## Dependency security assessment
 
-Read-only inspection of only the Companion plugin entries found:
+Evidence source: the existing `/tmp/opencode/story-0256-stable-audit.json`,
+created by `npm audit --omit=dev` against the stable installation after its
+locked install; the report records 378 production, 64 optional, and 8 peer
+dependency entries. Read-only `npm explain` and installed package/shrinkwrap
+inspection confirmed the paths and versions below. No audit fix or dependency
+mutation was performed.
 
-| Config | Current Companion path | Proposed value |
+The report's **26 moderate package findings are not 26 independent advisories**.
+They are transitive affected-package records that collapse to two distinct
+GitHub advisories:
+
+| Advisory and affected installed versions | Dependency path and usage assessment | Prerequisites, fixes, and classification |
 |---|---|---|
-| `/home/ludo/.config/opencode/opencode.jsonc` (`plugins[0]`) | `/tmp/opencode/devlog-ai-story-0251/opencode-mod/devlog-companion` | `/home/ludo/.local/share/opencode/plugins/devlog-companion/0.1.1-30ca3577302bfa0c41ec663a812dad5ed03b8d40` |
-| `/home/ludo/.config/opencode/cli.json` (`plugins[0]`) | `/home/ludo/.local/share/opencode/worktree/25d67b/story-0255-tui-preparation/opencode-mod/devlog-companion` | Same stable path. Preserve the explicit entry; do not deduplicate unless owner-authorized evidence establishes actual duplicate loading in the active topology. |
+| [GHSA-3g3m-2fjr-6pw4 / CVE-2026-118773](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4), `glob` AbortSignal cancellation bypass. Installed: `glob@9.3.5` under `babel-plugin-module-resolver@5.0.2`; `glob@13.0.5` under `@opencode/util@2.4.0` / npm tooling; `glob@10.5.0` under `rimraf@5.0.10` → `gaxios@7.1.3` → `gcp-metadata@8.1.4`. | `@opentui/solid@0.9.4` → Babel module resolver is present for TUI TSX transformation. `@opencode/util` exports a glob scanner, but Companion source does not directly call it. No Companion-supplied attacker-controlled glob pattern or AbortSignal was found. Host/SDK behavior for all installed transitive modules is not fully established. | The advisory describes continued filesystem traversal after an aborted async glob; practical impact requires an aborted glob walk and a sufficiently large tree, causing availability/CPU/I/O cost. Advisory's patched version is `glob@14.0.2`; current locked consumers constrain older major ranges and `npm audit` reported no compatible fix for these copies. **Residual risk accepted by the owner for the current local 0.1.1 installation only; practical reachability remains partly uncharacterized.** |
+| [GHSA-g3hv-75wg-m249 / CVE-2026-118764](https://github.com/advisories/GHSA-g3hv-75wg-m249), `minimatch` globparts amplification. Installed: `minimatch@8.0.7` under `glob@9.3.5`; `minimatch@10.2.5` under `glob@13.0.5` and `@opencode/util`; `minimatch@9.0.9` under `glob@10.5.0`. | `babel-plugin-module-resolver` imports `glob`; `@opencode/util/dist/glob.js` imports both glob and minimatch. Companion code uses static module paths and does not directly invoke these APIs. The module resolver can use glob patterns for configured roots; no attacker-controlled pattern source was identified in the Companion. Whether other host/SDK callers pass untrusted patterns was not established. | Exploitation requires an attacker-controlled glob pattern that triggers amplification and excessive CPU/memory. Patched version is `minimatch@11.0.1`; current consumers constrain `^8`, `^9`, and `^10`, and audit reported no compatible fix for those copies. **Residual risk accepted by the owner for the current local 0.1.1 installation only; practical reachability remains insufficiently evidenced.** |
+| Audit-propagated packages, not additional root advisories: `@npmcli/arborist@9.4.0`, `@npmcli/config@10.8.1`, `@npmcli/map-workspaces@5.0.3`, `@npmcli/metavuln-calculator@9.0.3`, `@npmcli/package-json@7.0.5`, `@npmcli/run-script@10.0.4`, `@sigstore/sign@4.1.1`, `@sigstore/tuf@4.0.2`, `@tufjs/models@4.1.0`, `babel-plugin-module-resolver@5.0.2`, `cacache@20.0.4`, `gaxios@7.1.3`, `gcp-metadata@8.1.4`, `ignore-walk@8.0.0`, `make-fetch-happen@15.0.6`, `npm-packlist@10.0.4`, `npm-registry-fetch@19.1.1`, `pacote@21.5.1`, `rimraf@5.0.10`, `sigstore@4.1.1`, and `tuf-js@4.1.0`. | These are transitive under the SDK's `@opencode/util` npm/package-management graph and/or the OpenTUI Babel transform graph, and inherit glob/minimatch advisories. The Companion does not perform package installation, registry fetching, signature verification, or npm workspace scanning. The installed SDK still contains these modules; their use by other OpenCode host/plugin features is outside this package-only assessment. | **Do not count these as separate exploit paths/advisories.** Reachability in the OpenCode host is not fully known; inherited exposure remains part of the owner-accepted residual risk. |
+| `@opencode/plugin@2.4.0` (direct runtime dependency) and `@opencode/util@2.4.0` (transitive); `@opentui/solid@0.9.4` (declared peer and development dependency in package metadata, present in the installed tree). | Audit marks the SDK and OpenTUI packages affected because their dependency graph reaches the above vulnerable packages. The Companion imports SDK GUI/TUI interfaces and the TUI JSX runtime; it does not directly import glob/minimatch or npm tooling APIs. | No audit-compatible SDK fix was offered for the pinned `@opencode/plugin@2.4.0` graph. For OpenTUI, audit reports `@opentui/solid@0.9.9` as a non-major compatible fix; it fits the declared `^0.9.4` range and SDK peer `>=0.9.4`. **Compatible remediation recommended for a separately authorized package revision**, followed by a fresh lock, package tests, install and runtime checks. Do not mutate this reviewed installation. |
 
-The stable destination has been created and verified at the exact path above.
+### Overall classification and recommendation
 
-Migration is prepared but not applied:
+- **Blocking release:** none established from this assessment. The two advisories are availability issues with pattern/cancellation preconditions; there is no evidence the Companion exposes an attacker-controlled pattern input. This is not proof of zero exposure.
+- **Compatible remediation deferred:** the owner elected to retain current dependencies and defer updating the OpenTUI peer/dev pin from `0.9.4` to `0.9.9` to a separate maintenance revision with its own compatibility validation. Audit identifies this as a compatible route for the OpenTUI/Babel-resolver branch; it will not by itself remove the separately pinned OpenCode SDK/util branch.
+- **Documented residual risk accepted:** the owner accepts the two documented advisory risks for the current local Companion 0.1.1 installation only. The advisories remain present in the dependency graph; acceptance is not a claim of vulnerability-free software or fully characterized runtime exposure.
+- **Insufficient evidence:** whether any OpenCode host path supplies attacker-controlled patterns or exercises these vulnerable branches in this plugin's runtime; actual TUI and visible Desktop behavior.
 
-1. Back up only each config file that will change to an owner-only,
-   timestamped location, preserving permissions; do not expose file contents.
-2. Change only the two existing Companion `plugins` entries to the same stable
-   path. Preserve both registrations; deduplicate only if actual topology and
-   owner-authorized runtime evidence establish a duplicate contribution.
-3. Compare sanitized before/after paths and verify unrelated configuration is
-   unchanged.
-4. Roll back by restoring only prior Companion path(s), or the backup only if
-   no unrelated config edits occurred afterward.
-5. Reload/restart only after the owner's next explicit authorization.
+### Owner residual-risk acceptance
 
-No config backup or change was made. Migration and activation remain separately
-unauthorized.
+On 2026-11-27, the owner accepted the documented residual risks from
+GHSA-3g3m-2fjr-6pw4 and GHSA-g3hv-75wg-m249 for this current local
+`devlog-companion@0.1.1` installation at
+`/home/ludo/.local/share/opencode/plugins/devlog-companion/0.1.1-30ca3577302bfa0c41ec663a812dad5ed03b8d40`.
+The decision retains the existing pinned dependencies and explicitly does not
+assert the package is vulnerability-free or that runtime exposure has been
+fully characterized. The `@opentui/solid@0.9.9` update is deferred to a
+separate maintenance revision with independent compatibility validation; no
+new Engineering Story is required solely for that maintenance work.
 
-Configuration changes are expected to take effect only after the applicable
-OpenCode server/CLI/Desktop process reload or restart; the exact Desktop refresh
-behavior was not tested. Do not launch or reload as part of this preparation.
+No dependency, shrinkwrap, installed package content, configuration, or artifact
+identity was changed for this acceptance record. The existing source commit,
+release archive, stable installation, and configuration backups are preserved.
+
+## Rollback availability
+
+The pre-migration config backups remain available at the path above. To roll
+back configuration, restore only the previous Companion paths, or restore a
+whole backup only if no unrelated configuration edits have occurred since it
+was made. The prior temporary package and source worktrees were not deleted.
+Do not delete the stable version directory or alter active config as part of
+this assessment.
 
 ## Readiness
 
-**CLEAN-COMMIT PACKAGE AND STABLE INSTALLATION VERIFIED.** Stop before
-configuration migration or activation. Do not clean existing
-installations/worktrees or claim Story acceptance.
+**SECURITY RISK ACCEPTED; FUNCTIONAL VALIDATION PENDING — NOT ACCEPTED.**
+Perform the manual Desktop/TUI/Claude checklist below during ordinary
+engineering use and record each item as PASS / FAIL / NOT EVALUATED. Final Story
+acceptance remains the owner's decision. Deferred Context Inspector/Context
+Trace capabilities, remote topologies, and other existing non-goals remain
+deferred or unqualified.
