@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "GUI-only DevLog Companion for OpenCode Desktop",
+  "description": "Native DevLog Companion contributions for OpenCode Desktop and TUI",
   "exports": {
-    "./gui-experimental": "./dist/gui-experimental.cjs"
+    "./gui-experimental": "./dist/gui-experimental.cjs",
+    "./tui": "./src/tui.tsx"
   },
   "files": [
     "src/gui.tsx",
+    "src/tui.tsx",
     "src/gui-presence.js",
+    "src/tui-projection.js",
     "src/context-inspector.js",
     "src/presentation.js",
     "src/devlog-mark.svg",
@@ -27,6 +30,7 @@
     "@opencode/plugin": "2.4.0"
   },
   "devDependencies": {
+    "@opentui/solid": "0.9.4",
     "solid-js": "1.9.17",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "vite": "7.3.7",
