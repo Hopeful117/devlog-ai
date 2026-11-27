@@ -1,9 +1,11 @@
 # DevLog Companion for OpenCode Desktop (visual milestone)
 
 This local package exports only its experimental Desktop GUI. Its default
-build presents an `IDLE` visual state; it does not call DevLog, register an RPC
-endpoint, load the server observer, or read Context Trace. It does not depend on
-or load the Claude Companion.
+build derives bounded in-memory presence from the currently routed session's
+already-loaded OpenCode GUI data. It adds no Companion RPC, server observer,
+DevLog request, or Context Trace read. Route filtering is presentation scoping,
+not server authorization or isolation from another trusted GUI plugin. It does
+not depend on or load the Claude Companion.
 
 ## Development
 
@@ -22,6 +24,14 @@ or load the Claude Companion.
   package validation. The package dry-run also runs the normal build first.
 - Reduced-motion preferences suppress the nonessential SVG animations while
   preserving the visual state distinctions.
+- `UNKNOWN` is rendered neutrally when the route/cache is not ready or the
+  observed activity does not establish a business-task outcome. Direct tool
+  completion alone does not show `READY`; Code Mode nested rows have no call ID
+  and cannot be correlated to a nested business result. `DISCONNECTED` is not
+  claimed without reliable evidence for that boundary.
+- This is a local presentation feature, not a per-session security boundary.
+  The adapter reads only the current route and keeps only a sanitized,
+  in-memory projection; it does not enumerate sessions or retain raw tool data.
 - Desktop must load this local plugin directory from the global
   `opencode.json(c)` of a dedicated development profile. Do not add it to the
   normal profile.

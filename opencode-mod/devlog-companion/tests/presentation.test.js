@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   PRESENTATION_STATES,
   READY_PREVIEW_MS,
+  livePresentationDescriptor,
   normalizePresentationState,
   presentationDescriptor,
   transitionPresentationState,
@@ -24,6 +25,16 @@ test("missing and unsupported state inputs safely normalize to IDLE", () => {
     assert.equal(normalizePresentationState(input), "IDLE");
     assert.equal(presentationDescriptor(input).state, "IDLE");
   }
+});
+
+test("live UNKNOWN has a neutral visual instead of inheriting IDLE", () => {
+  const unknown = livePresentationDescriptor("UNKNOWN");
+  assert.equal(unknown.state, "UNKNOWN");
+  assert.equal(unknown.label, "UNKNOWN");
+  assert.equal(unknown.color, "#8b949e");
+  assert.equal(unknown.motion, "none");
+  assert.equal(unknown.disconnected, false);
+  assert.equal(presentationDescriptor("UNKNOWN").state, "IDLE");
 });
 
 test("each supported presentation state has a distinct visual descriptor", () => {

@@ -3,17 +3,22 @@ import {
   Panel,
   Plugin,
   type MenuItem as MenuItemDefinition,
+  type MountedSession,
   type PanelTab,
 } from "@opencode/plugin/gui";
-import { For, Show, createSignal, onCleanup } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js";
 import logo from "./devlog-mark.svg?raw";
 import {
   PRESENTATION_STATES,
   READY_PREVIEW_MS,
+  livePresentationDescriptor,
   normalizePresentationState,
-  presentationDescriptor,
   transitionPresentationState,
 } from "./presentation.js";
+import {
+  deriveGuiPresence,
+  subscribeGuiSessionEvents,
+} from "./gui-presence.js";
 
 const PREVIEW_BUILD = import.meta.env.MODE === "preview";
 
@@ -36,8 +41,7 @@ function PresenceAvatar(props: {
   state: string;
   reducedMotion: boolean;
 }) {
-  const visual = () =>
-    presentationDescriptor(props.state, props.reducedMotion);
+  const visual = () => livePresentationDescriptor(props.state, props.reducedMotion);
   const satellitePositions = [
     { cx: 10, cy: 3.5 },
     { cx: 16.5, cy: 13 },
@@ -140,8 +144,10 @@ export default Plugin.define({
   setup(ctx) {
     const panelKey = `${ctx.id}:${activityTab.id}`;
 
-    function CompanionPanel() {
-      const [state, setState] = createSignal("IDLE");
+    function CompanionPanel(props: { session: MountedSession }) {
+      const [previewState, setPreviewState] = createSignal("IDLE");
+      const [eventVersion, setEventVersion] = createSignal(0);
+      const [interrupted, setInterrupted] = createSignal(false);
       const reducedMotion = useReducedMotion();
       let readyTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -152,20 +158,66 @@ export default Plugin.define({
 
       const selectState = (selected: unknown) => {
         clearReadyTimer();
-        const next = transitionPresentationState(state(), {
+        const next = transitionPresentationState(previewState(), {
           type: "SELECT",
           state: normalizePresentationState(selected),
         });
-        setState(next);
+        setPreviewState(next);
         if (PREVIEW_BUILD && next === "READY") {
           readyTimer = setTimeout(() => {
-            setState((current) =>
+            setPreviewState((current) =>
               transitionPresentationState(current, { type: "READY_TIMEOUT" }),
             );
             readyTimer = undefined;
           }, READY_PREVIEW_MS);
         }
       };
+
+      createEffect(() => {
+        if (PREVIEW_BUILD) return;
+        const session = props.session;
+        const sessionID = session.id;
+        const data = session.server.data;
+        // Read route identity here so a new visit/location replaces subscriptions.
+        session.key;
+        session.visit;
+        session.directory;
+        setInterrupted(false);
+        setEventVersion((current) => current + 1);
+
+        const unsubscribe = subscribeGuiSessionEvents(data, sessionID, {
+          refresh: () => setEventVersion((current) => current + 1),
+          started: () => {
+            setInterrupted(false);
+            setEventVersion((current) => current + 1);
+          },
+          interrupted: () => {
+            setInterrupted(true);
+            setEventVersion((current) => current + 1);
+          },
+        });
+
+        onCleanup(() => {
+          for (const dispose of unsubscribe) {
+            try {
+              dispose();
+            } catch {
+              // A presentation cleanup failure must not affect host execution.
+            }
+          }
+        });
+      });
+
+      const liveState = createMemo(() => {
+        eventVersion();
+        const session = props.session;
+        const data = session.server.data;
+        if (session.pending || data.session.message.loading(session.id)) return "UNKNOWN";
+        const messages = data.session.message.list(session.id);
+        if (messages.length === 0) return "UNKNOWN";
+        return deriveGuiPresence(messages, { interrupted: interrupted() });
+      });
+      const state = () => PREVIEW_BUILD ? previewState() : liveState();
 
       onCleanup(clearReadyTimer);
 
@@ -206,8 +258,16 @@ export default Plugin.define({
           </div>
           <p style={{ margin: "0", "line-height": "1.4" }}>
             {PREVIEW_BUILD
-              ? "Simulated only. No live DevLog activity or connectivity is observed."
-              : "Presentation only. Live DevLog activity is not connected."}
+                ? "Simulated only. No live DevLog activity or connectivity is observed."
+              : state() === "IDLE"
+                ? "No recognized DevLog activity is currently observed in this session."
+                : state() === "WORKING"
+                  ? "DevLog activity or a task is in progress."
+                  : state() === "READY"
+                    ? "A successful DevLog task outcome was observed."
+                    : state() === "ERROR"
+                      ? "A DevLog tool or task failure was observed."
+                      : "Current-session evidence is unavailable or inconclusive."}
           </p>
           {PREVIEW_BUILD ? (
         <fieldset class="devlog-companion__preview">
@@ -248,7 +308,7 @@ export default Plugin.define({
       region: "side",
       transient: true,
       list: (input) => input.open.includes(activityTab.id) ? [activityTab] : [],
-      render: () => <CompanionPanel />,
+      render: (props) => <CompanionPanel session={props.session} />,
     });
 
     ctx.add(MenuItem, (): MenuItemDefinition => {
