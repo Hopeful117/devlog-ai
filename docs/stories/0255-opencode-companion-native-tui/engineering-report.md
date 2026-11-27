@@ -8,7 +8,9 @@ limitation. Package validation and independent engineering/security review pass.
 Local runtime evidence is partial: the status slot was observed, but panel/history
 interaction was not independently verified by the automated harness.
 
-Delivery status at report creation: **branch, commit, push and PR pending**.
+Delivery: branch `story/0255-opencode-companion-native-tui`; implementation
+commit `fee58e9f3f4dd505000e3380e5d7e1244ca4acf4`; PR
+[#254](https://github.com/Hopeful117/devlog-ai/pull/254) is open against `main`.
 Merge remains gated on the owner's final PR validation.
 
 ## Story and Repository
@@ -101,7 +103,9 @@ Merge remains gated on the owner's final PR validation.
 
 ## Delivery
 
-- Commit: pending at report creation.
-- Pull request: pending at report creation; no repository PR template was found.
+- Commit: `fee58e9f3f4dd505000e3380e5d7e1244ca4acf4`
+  (`feat(story-0255): add native OpenCode TUI Companion`).
+- Pull request: [#254](https://github.com/Hopeful117/devlog-ai/pull/254),
+  open against `main`; no repository PR template was found.
 - Merge: not performed. Owner validation of the final PR is required first.
 - No deployment or release is claimed.
