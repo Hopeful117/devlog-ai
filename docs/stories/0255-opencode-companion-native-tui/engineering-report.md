@@ -10,8 +10,9 @@ interaction was not independently verified by the automated harness.
 
 Delivery: branch `story/0255-opencode-companion-native-tui`; implementation
 commit `fee58e9f3f4dd505000e3380e5d7e1244ca4acf4`; PR
-[#254](https://github.com/Hopeful117/devlog-ai/pull/254) is open against `main`.
-Merge remains gated on the owner's final PR validation.
+[#254](https://github.com/Hopeful117/devlog-ai/pull/254) is merged into `main`
+(delivery status reconciled for Story 0256). The merge does not change the
+recorded owner acceptance or runtime-evidence limits.
 
 ## Story and Repository
 
@@ -106,6 +107,6 @@ Merge remains gated on the owner's final PR validation.
 - Commit: `fee58e9f3f4dd505000e3380e5d7e1244ca4acf4`
   (`feat(story-0255): add native OpenCode TUI Companion`).
 - Pull request: [#254](https://github.com/Hopeful117/devlog-ai/pull/254),
-  open against `main`; no repository PR template was found.
-- Merge: not performed. Owner validation of the final PR is required first.
-- No deployment or release is claimed.
+  merged into `main`; no repository PR template was found.
+- Merge: completed after the final PR validation. No deployment or release is
+  claimed.

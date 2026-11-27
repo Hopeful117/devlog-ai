@@ -1,6 +1,6 @@
 {
   "name": "devlog-companion",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Native DevLog Companion contributions for OpenCode Desktop and TUI",
@@ -9,6 +9,7 @@
     "./tui": "./src/tui.tsx"
   },
   "files": [
+    "npm-shrinkwrap.json",
     "src/gui.tsx",
     "src/tui.tsx",
     "src/gui-presence.js",
@@ -28,6 +29,10 @@
   },
   "dependencies": {
     "@opencode/plugin": "2.4.0"
+  },
+  "peerDependencies": {
+    "@opentui/solid": "^0.9.4",
+    "solid-js": "^1.9.12"
   },
   "devDependencies": {
     "@opentui/solid": "0.9.4",
