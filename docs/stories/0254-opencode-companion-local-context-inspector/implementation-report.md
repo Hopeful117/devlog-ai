@@ -6,10 +6,10 @@
 - Base HEAD: `35b2b64277f898befcc3b38584598a4cc1ea87f2`
 - Branch: `story/0254-opencode-context-inspector`
 - Implementation commit: `4080597d` (`feat(story-0254): add OpenCode context inspector`)
-- Pull request: [#253](https://github.com/Hopeful117/devlog-ai/pull/253), open
-  against `main`; owner validation and merge pending
+- Pull request: [#253](https://github.com/Hopeful117/devlog-ai/pull/253), merged
+  into `main` (delivery status reconciled for Story 0256).
 - Push: completed
-- Merge/deployment: not performed
+- Deployment: not performed
 - Owner acceptance: pending
 
 The implementation worktree is kept separate from the active development
@@ -65,11 +65,9 @@ fields remain excluded under the projection contract.
 - The reviewer initially reported a stale bundle, then rechecked the actual
   one-line artifact and withdrew that finding. The bundle contains the Context
   UI and projection logic. No production correction was indicated by review.
-- One **minor confirmed finding outside Story 0254 scope** remains in the
-  pre-existing Story 0253 documentation changes: its implementation report has
-  conflicting PR-open versus merged wording. It was not changed in this
-  finalization to preserve the unrelated Story 0253 work; owner direction is
-  needed before editing that report.
+- The earlier report noted a conflicting PR-open versus merged statement in
+  Story 0253 and left that unrelated record untouched at that time. Story 0256
+  does not modify the Story 0253 report.
 
 ## Automated validation
 

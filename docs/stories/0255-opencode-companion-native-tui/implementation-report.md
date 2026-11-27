@@ -257,5 +257,6 @@ RUNTIME EVIDENCE LIMITATION.** Tests, typecheck, build, package dry-run,
 engineering review, and security review pass. The owner accepted the partial
 runtime evidence and directed Story closure. The tested version/topology and
 full lifecycle checklist remain incomplete; this is not a compatibility claim
-for other versions or topologies. Final PR validation is still required before
-merge.
+for other versions or topologies. Final PR validation was still required at the
+time this report was prepared; PR #254 was subsequently merged into `main`.
+This delivery update does not expand runtime evidence.

@@ -14,6 +14,89 @@ unknown; host completion does not establish DevLog task success. Raw prompts,
 tool arguments/results, credentials, and raw error payloads are not retained by
 the TUI projection.
 
+## Stable local installation
+
+This package is private and is not published to a registry. Install a reviewed
+package artifact in a user-owned directory, not from a source checkout or Story
+worktree. Keep each version immutable so configuration and rollback identify an
+exact copy:
+
+```text
+${XDG_DATA_HOME:-~/.local/share}/opencode/plugins/devlog-companion/
+  <package-version>-<full-source-commit-sha>/
+```
+
+For a reviewed clean source commit:
+
+1. From `opencode-mod/devlog-companion`, run `npm run pack:dry-run`, then
+   `npm pack --ignore-scripts`. Record the source commit and package version.
+2. Extract the resulting `devlog-companion-<version>.tgz` into a new empty
+   directory named with that version and full commit SHA. Do not overwrite an
+   existing version directory.
+3. In the extracted package directory, run
+   `npm ci --omit=dev --ignore-scripts`. The shipped `npm-shrinkwrap.json`
+   locks the package dependency graph. `@opencode/plugin` is an exact runtime
+   dependency; `@opentui/solid` (`^0.9.4`) and `solid-js` (`^1.9.12`) are host
+   peer dependencies. Do not bundle a second OpenTUI or Solid runtime.
+4. Before configuring OpenCode, verify the archive's package version/exports,
+   `npm ls --omit=dev`, and module resolution from this installed path. If any
+   check fails, do not activate the package.
+
+The package exports two separate native entrypoints:
+
+- `devlog-companion/gui-experimental` — experimental Desktop GUI part.
+- `devlog-companion/tui` — native CLI/TUI TSX part.
+
+Add the installed absolute package directory as a local plugin in the dedicated
+OpenCode profile's `opencode.json`/`opencode.jsonc` `plugin` list. A local TUI
+may also have an explicit client-local entry in `cli.json`; the CLI can receive
+TUI parts from its connected server, while `cli.json` remains a local loading
+mechanism when using a remote server. This repository has not verified actual
+duplicate-loading behavior or qualified the active topology. During migration,
+preserve the existing `cli.json` entry and point it to the same stable artifact.
+Do not remove either registration unless owner-authorized runtime evidence
+establishes both the active topology and an actual duplicate contribution.
+
+The configured path must be the exact versioned directory, not a floating
+reference or symlink. Preserve every unrelated plugin entry and setting. Back
+up only the configuration files that will change, verify the intended diff
+before activation, and retain prior package directories and backups until the
+owner has validated the replacement and explicitly authorized cleanup.
+
+### Explicit update and rollback
+
+For an update, repeat the reviewed-commit packaging and staging steps into a new
+version+commit directory, verify it before changing configuration, then change
+only the Companion path after backing up the affected file. Never update in
+place or automatically at startup. For rollback, restore only the previous
+Companion path (or the saved config if no unrelated edits have occurred), verify
+unrelated entries remain intact, and retain both artifacts. OpenCode launch or
+reload, active configuration edits, and removal of old artifacts require the
+owner's explicit authorization. This guide does not change the active profile.
+
+### Removal
+
+Removal is not automatic. After explicit owner authorization, back up only the
+configuration file(s) to be edited, remove only the Companion plugin reference
+from the appropriate `plugin` list, and verify every unrelated setting and
+plugin entry remains unchanged. Account for the active topology: the server
+configuration may supply the TUI part on same-host connections, while a
+client-local `cli.json` entry may also be active. Preserve existing registrations
+unless runtime evidence from the actual topology demonstrates duplicate loading
+and the owner authorizes deduplication. Apply removal only to the relevant
+source(s), then reload/restart only after separate authorization. Keep the installed version directory and
+backup until the owner confirms no active configuration references it and
+explicitly authorizes deleting that exact version directory. Do not remove
+source worktrees or the independent Claude Companion as part of OpenCode
+removal.
+
+Do not put credentials in plugin configuration or run a DevLog operation just
+to validate installation. In a repository checkout, use Story 0256's
+`docs/stories/0256-devlog-companion-stabilization-installation/everyday-workflow-checklist.md`
+with normal existing activity; mark unavailable checks `NOT EVALUATED`. The
+evidence-qualified compatibility matrix is in the same Story directory. These
+Story documents are not included in the package archive.
+
 ## Development
 
 - Node.js 26.10.0 is the inventoried development runtime.

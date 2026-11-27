@@ -18,8 +18,9 @@ remain incomplete.
 
 On 2026-11-27 the owner explicitly accepted this runtime evidence limitation
 and directed Story closure. This accepts the stated limitation for delivery; it
-does not claim untested interactions or topologies are supported. Final PR
-validation remains required before merge.
+does not claim untested interactions or topologies are supported. PR #254 was
+subsequently merged into `main`; merge does not imply additional runtime
+qualification.
 
 Story number 0255 was not present in `origin/main` at the preparation revision
 `03d22b118f1c6c747b99d90283b0c1ca0539cbf2`.

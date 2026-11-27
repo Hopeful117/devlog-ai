@@ -58,8 +58,9 @@ successful build or test suite is not TUI runtime evidence.
 - Cleanup verified: `YES` — isolated TUI and server stopped and temporary
   profile removed; shared service and normal configuration were untouched.
 - Owner acceptance: `YES` — owner explicitly accepts the partial runtime
-  evidence limitation and directs Story closure (2026-11-27). Final PR
-  validation remains required before merge.
+  evidence limitation and directs Story closure (2026-11-27). PR #254 was
+  subsequently merged into `main`; this does not upgrade the partial runtime
+  evidence recorded above.
 
 The adapter's status-slot rendering is confirmed in the isolated local
 topology. The panel command/history rendering was not independently confirmed
