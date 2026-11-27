@@ -4,9 +4,12 @@
 
 - Worktree: `/tmp/opencode/devlog-ai-story-0254-main`
 - Base HEAD: `35b2b64277f898befcc3b38584598a4cc1ea87f2`
-- Branch: `story/0254-opencode-context-inspector` (created locally to preserve
-  the uncommitted work; no commit made)
-- Delivery state: uncommitted; no commit, push, PR, merge, or deployment
+- Branch: `story/0254-opencode-context-inspector`
+- Implementation commit: `4080597d` (`feat(story-0254): add OpenCode context inspector`)
+- Pull request: [#253](https://github.com/Hopeful117/devlog-ai/pull/253), open
+  against `main`; owner validation and merge pending
+- Push: completed
+- Merge/deployment: not performed
 - Owner acceptance: pending
 
 The implementation worktree is kept separate from the active development
