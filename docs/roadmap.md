@@ -117,6 +117,9 @@ Potential future capabilities include:
 - technical debt analysis,
 - advanced RAG capabilities,
 - collaboration tools integration,
+- OpenCode Companion Code Mode context inspection, deferred until a reliable,
+  proportionate native interface exposes the exact nested result with identity
+  and provenance,
 - autonomous documentation workflows.
 
 The V1 priority remains building a trustworthy project memory system.

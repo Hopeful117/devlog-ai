@@ -45,6 +45,17 @@ another trusted GUI plugin. It does not depend on or load the Claude Companion.
   An inspected transcript window with no recognized operations is distinct
   from a loading/unavailable transcript and does not claim that older,
   uninspected transcript content has no DevLog activity.
+- Context includes an in-panel picker for eligible direct
+  `get_engineering_context` results already represented in the loaded History
+  window. The History action and Context picker select the same native result.
+  Direct MCP inspection is supported as a secondary capability. The owner
+  primarily uses Code Mode; nested Code Mode context inspection is deferred
+  because the examined native GUI interfaces do not expose the exact nested
+  result with reliable identity and provenance. An outer execution result is
+  not treated as an exact nested MCP result. The picker makes no
+  transcript/backend request.
+- Context is local inspection of an observed tool result, not a retrieved
+  backend Context Trace. It is not full parity with Claude's Context Inspector.
 - This is a local presentation feature, not a per-session security boundary.
   The adapter reads only the current route and keeps only a sanitized,
   in-memory projection; it does not enumerate sessions or retain raw tool data.

@@ -10,6 +10,7 @@
   "files": [
     "src/gui.tsx",
     "src/gui-presence.js",
+    "src/context-inspector.js",
     "src/presentation.js",
     "src/devlog-mark.svg",
     "dist"
