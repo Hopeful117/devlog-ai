@@ -385,3 +385,56 @@ configuration. Pull-request validation remains required before merge.
 At the time this report was first drafted, no commit or push had been created.
 Delivery state is tracked separately by the resulting Git history and pull
 request; human PR validation remains required before merge.
+
+## Desktop visual milestone follow-up (2026-11-27)
+
+- Product focus was redirected to the first static OpenCode Desktop Companion
+  panel. The package was narrowed to a GUI-only export for this milestone:
+  its export map exposes only `./gui-experimental`, and its package file allowlist
+  excludes the server observer, RPC contract, and projection code. Those source
+  files remain in the repository for later authorized integration work. The
+  panel now presents the DevLog mark, static `IDLE`, and a closable tab with an
+  OpenCode side-panel launcher. It does not call DevLog or register/call RPC.
+- Validation: 16 Node tests passed (including a GUI-only export/package
+  allowlist regression); TypeScript check, GUI bundle build, and `npm pack
+  --dry-run` passed. The dry-run package contained only five files and no server
+  or RPC source.
+- A Desktop 2.4.2 launch was attempted with a temporary HOME/XDG profile and a
+  separate Electron `--user-data-dir`. The window startup failed at the
+  Wayland/Vulkan GPU initialization boundary. The Desktop log also reported
+  loading its V2 background service; a read-only bundled-CLI plugin-list probe
+  then failed because the standard service port `49374` was already occupied by
+  the pre-existing normal-profile service. This shows that the proposed
+  environment variables and Electron data-directory flag did not establish
+  isolation from the existing service. The temporary Desktop did not reach
+  plugin/panel validation. No existing service was stopped, reconfigured, or
+  signaled.
+- No Companion panel load, rendering, opening, closing, or Claude runtime
+  regression result is claimed. Desktop visual validation remains
+  **NOT_EVALUATED**; the GUI API/version pairing remains experimental and
+  unqualified. The temporary profile was removed. The normal Desktop install,
+  normal OpenCode profile, Claude Companion, Preflight Gate, and Story 0250
+  evidence were not intentionally modified. No OpenCode runtime harness
+  qualification or real DevLog operation was performed.
+
+## Owner-confirmed Desktop visual milestone update (2026-11-27)
+
+- After the report above was written, the owner authorized manual installation
+  in the existing OpenCode profile. The global
+  `~/.config/opencode/opencode.jsonc` was backed up to
+  `~/.config/opencode/opencode.jsonc.bak-companion-20261127-024432`, and the
+  local Companion directory was added to its existing `plugins` array. The
+  bundled OpenCode 2.4.2 CLI reported `Configuration reloaded`; no service
+  restart or port change was made.
+- The active server's read-only plugin API reported `devlog-companion` as
+  `active`, with `gui: true` and no server feature. The other three local
+  plugin records remained active.
+- The owner then confirmed: “le plugin fonctionne et que Devlog apparaît bien
+  dans le panneau latéral.” This is owner-reported visual evidence that the
+  plugin works and appears in the sidebar, and supersedes the earlier
+  `NOT_EVALUATED` statement for basic discovery/visibility. No screenshot was
+  captured by the agent. This confirmation does not independently establish
+  all individual interactions, a full version compatibility matrix, live MCP
+  integration, or runtime qualification; the GUI API remains experimental.
+- The approved global plugin entry and backup remain in place for manual
+  testing. Story 0250 and `runtime-tests/` remain preserved and suspended.

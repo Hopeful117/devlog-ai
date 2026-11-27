@@ -1,24 +1,25 @@
 {
-  "name": "@devlog-ai/opencode-companion",
+  "name": "devlog-companion",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Isolated OpenCode V2 DevLog Companion compatibility spike",
+  "description": "GUI-only DevLog Companion Desktop visual milestone",
   "exports": {
-    ".": "./src/server.js",
-    "./rpc": "./src/rpc.js",
     "./gui-experimental": "./dist/gui-experimental.cjs"
   },
   "files": [
-    "src",
+    "src/gui.tsx",
+    "src/presentation.js",
+    "src/devlog-mark.svg",
     "dist"
   ],
   "scripts": {
     "test": "node --test",
     "typecheck": "tsc --noEmit",
     "build:gui": "vite build",
-    "build": "npm run test && npm run typecheck && npm run build:gui",
-    "pack:dry-run": "npm pack --dry-run"
+    "build": "npm run build:gui && npm run test && npm run typecheck",
+    "build:gui:preview": "vite build --mode preview",
+    "pack:dry-run": "npm run build && npm pack --dry-run"
   },
   "dependencies": {
     "@opencode/plugin": "2.4.0"
