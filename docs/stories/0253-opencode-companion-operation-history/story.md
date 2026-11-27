@@ -11,7 +11,8 @@ The owner approved this Story and its scoped implementation direction on
 validation described here. Changing the active Desktop plugin path, reloading
 Desktop, and triggering a new real DevLog operation require separate owner
 approval. Delivery was requested by the owner on 2026-11-27; branch creation,
-commit/push, PR, and merge remain subject to the delivery approval gates.
+commit/push, and PR creation were authorized and completed. PR #252 is open;
+GitHub checks, PR review, and merge remain pending their approval gates.
 
 Implementation evidence is recorded in
 [implementation-report.md](implementation-report.md); use

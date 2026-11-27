@@ -4,12 +4,13 @@
 
 **Owner accepted on 2026-11-27 after implementation and focused Desktop
 validation.** Route change/return was skipped; direct-tool and running-to-
-terminal scenarios remain unvalidated. No commit or push has been created.
+terminal scenarios remain unvalidated. PR #252 is open; merge is pending.
 
 ## Repository and governance
 
 - Worktree: `/tmp/opencode/devlog-ai-story-0251`
-- Branch: `story/0252-devlog-opencode-live-presence`
+- Implementation branch: `story/0252-devlog-opencode-live-presence`.
+- Delivery branch: `story/0253-opencode-companion-operation-history`.
 - Implementation started from a worktree whose tracked tree matched
   `origin/main` at `fa96f5a28ab367c0ae11017b484e7031d56da6ab`.
 - The pre-existing untracked
@@ -148,8 +149,11 @@ cross-route lifecycle result.
 ## Git and readiness
 
 - `git diff --check`: passed.
-- Commit created: NO.
-- Push performed: NO.
+- Commit: `403b3b7fa680598fbb613cfc100fd42cff751fe2`.
+- Branch pushed to `origin`: YES.
+- Pull request: #252, open against `main`.
+- Merge performed: NO; GitHub checks are still pending and PR review/merge
+  approval remains outstanding.
 - Active plugin path changed: NO.
 - Desktop reloaded/launched: NO.
 - Real DevLog operations: one read-only `get_engineering_context` operation,

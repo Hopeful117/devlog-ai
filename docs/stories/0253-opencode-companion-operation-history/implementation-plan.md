@@ -2,8 +2,8 @@
 
 ## Approval and authorization status
 
-**Implemented; automated validation passed; manual Desktop validation pending.**
-This is the owner-authorized plan (2026-11-27). Implementation is
+**Implemented and owner-accepted; delivery PR #252 is open.** This is the
+owner-authorized plan (2026-11-27). Implementation is
 authorized within the approved GUI-only scope. Changing the active Desktop
 plugin path, reloading Desktop, and any new real DevLog operation remain
 separate gates.
