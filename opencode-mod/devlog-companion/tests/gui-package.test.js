@@ -5,7 +5,7 @@ import test from "node:test";
 const packageManifest = new URL("../package.json", import.meta.url);
 const productionBundle = new URL("../dist/gui-experimental.cjs", import.meta.url);
 
-test("visual milestone exposes only the experimental GUI plugin part", async () => {
+test("GUI package exposes only the experimental GUI plugin part", async () => {
   const manifest = JSON.parse(await readFile(packageManifest, "utf8"));
   assert.equal(manifest.name, "devlog-companion");
   assert.deepEqual(manifest.exports, {

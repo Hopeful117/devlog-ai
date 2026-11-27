@@ -26,6 +26,9 @@ const TASK_STATUSES = new Set([
 const MAX_MESSAGES = 40;
 const MAX_PARTS_PER_MESSAGE = 80;
 const MAX_CODE_MODE_ROWS = 80;
+const MAX_HISTORY_ROWS = 20;
+const MAX_HISTORY_TOOL_NAMES_PER_ROW = 8;
+const MAX_NATIVE_CALL_ID_LENGTH = 128;
 const MAX_RESULT_TEXT = 8192;
 const MAX_RESULT_BLOCKS = 8;
 
@@ -54,6 +57,24 @@ function isGuiCodeModeDevLogToolName(name) {
     isGuiDevLogToolName(name.slice("devlog.".length));
 }
 
+/**
+ * Return the allowlisted display name without retaining any host payload.
+ * @param {unknown} name
+ * @returns {string | undefined}
+ */
+function normalizedDevLogToolName(name) {
+  if (typeof name !== "string") return;
+  if (name.startsWith("mcp__devlog__")) {
+    const normalized = name.slice("mcp__devlog__".length);
+    return DEVLOG_TOOL_NAMES.has(normalized) ? normalized : undefined;
+  }
+  if (DEVLOG_TOOL_NAMES.has(name)) return name;
+  if (name.startsWith("devlog.")) {
+    const normalized = name.slice("devlog.".length);
+    return DEVLOG_TOOL_NAMES.has(normalized) ? normalized : undefined;
+  }
+}
+
 /** @param {unknown} value */
 function parseText(value) {
   if (typeof value !== "string" || value.length > MAX_RESULT_TEXT) return;
@@ -67,11 +88,11 @@ function parseText(value) {
 
 /**
  * @param {unknown} content
- * @returns {"WORKING" | "READY" | "ERROR" | "UNKNOWN"}
+ * @returns {{statuses: string[]; isError: boolean}}
  */
-function decodeTaskOutcome(content) {
-  if (!Array.isArray(content)) return "UNKNOWN";
-  let taskStatus = "UNKNOWN";
+function taskStatusEvidence(content) {
+  if (!Array.isArray(content)) return { statuses: [], isError: false };
+  const statuses = new Set();
   let isError = false;
   const blocks = content.slice(0, MAX_RESULT_BLOCKS);
 
@@ -82,13 +103,27 @@ function decodeTaskOutcome(content) {
     const decoded = parseText(block.text);
     if (!decoded) continue;
     if (decoded.isError === true) isError = true;
-    const candidate = decoded.aiTaskStatus ?? decoded.taskStatus;
-    if (typeof candidate !== "string" || candidate.length > 40) continue;
-    const normalized = candidate.toUpperCase();
-    if (TASK_STATUSES.has(normalized)) taskStatus = normalized;
+    for (const candidate of [decoded.aiTaskStatus, decoded.taskStatus]) {
+      if (typeof candidate !== "string" || candidate.length > 40) continue;
+      const normalized = candidate.toUpperCase();
+      if (TASK_STATUSES.has(normalized)) statuses.add(normalized);
+    }
   }
+  return { statuses: [...statuses], isError };
+}
 
-  if (isError || ["FAILED", "CANCELLED", "REJECTED"].includes(taskStatus)) {
+/**
+ * @param {unknown} content
+ * @returns {"WORKING" | "READY" | "ERROR" | "UNKNOWN"}
+ */
+function decodeTaskOutcome(content) {
+  const evidence = taskStatusEvidence(content);
+  if (evidence.isError) return "ERROR";
+  // Conflicting explicit task statuses are inconclusive, not a terminal result.
+  if (evidence.statuses.length !== 1) return "UNKNOWN";
+  const [taskStatus] = evidence.statuses;
+
+  if (["FAILED", "CANCELLED", "REJECTED"].includes(taskStatus)) {
     return "ERROR";
   }
   if (["SUBMITTED", "PENDING", "RUNNING"].includes(taskStatus)) {
@@ -96,6 +131,207 @@ function decodeTaskOutcome(content) {
   }
   if (taskStatus === "COMPLETED" || taskStatus === "SUCCEEDED") return "READY";
   return "UNKNOWN";
+}
+
+/**
+ * Extract only an explicitly returned, recognized task status.
+ * This intentionally does not treat generic `status` or host completion as a
+ * DevLog task outcome.
+ *
+ * @param {unknown} content
+ * @returns {string | undefined}
+ */
+function explicitTaskStatus(content) {
+  const evidence = taskStatusEvidence(content);
+  if (evidence.isError || evidence.statuses.length !== 1) return;
+  return evidence.statuses[0];
+}
+
+/**
+ * Keep only native IDs within the projection's explicit size budget.
+ * Oversized values are omitted rather than truncated into a different ID.
+ * @param {unknown} value
+ * @returns {string | undefined}
+ */
+function boundedNativeCallId(value) {
+  return typeof value === "string" &&
+    value.length > 0 &&
+    value.length <= MAX_NATIVE_CALL_ID_LENGTH
+    ? value
+    : undefined;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number | undefined}
+ */
+function nativeTimestamp(value) {
+  return typeof value === "number" &&
+    Number.isFinite(value) &&
+    value > 0 &&
+    value <= 8.64e15
+    ? value
+    : undefined;
+}
+
+/**
+ * @param {Record<string, any>} part
+ * @returns {{observedAt?: number; durationMs?: number}}
+ */
+function nativePartTiming(part) {
+  const timing = isRecord(part.time) ? part.time : {};
+  const stateTiming = isRecord(part.state?.time) ? part.state.time : {};
+  const startedAt = nativeTimestamp(
+    timing.ran ?? stateTiming.ran ?? timing.start ?? stateTiming.start,
+  );
+  const completedAt = nativeTimestamp(
+    timing.completed ?? stateTiming.completed ?? timing.end ?? stateTiming.end,
+  );
+  return {
+    observedAt: completedAt ?? startedAt,
+    durationMs:
+      startedAt !== undefined &&
+      completedAt !== undefined &&
+      completedAt >= startedAt
+        ? completedAt - startedAt
+        : undefined,
+  };
+}
+
+/**
+ * Derive a fresh, bounded History projection from a transcript snapshot.
+ * Recomputing from the transcript (rather than appending event notifications)
+ * means repeated native updates replace rows instead of duplicating them.
+ * The returned rows contain no transcript or tool payload objects.
+ *
+ * @param {unknown} messages
+ * @returns {Array<{
+ *   source: "direct-tool" | "code-mode",
+ *   toolName?: string,
+ *   toolNames?: string[],
+ *   additionalToolNameCount?: number,
+ *   hostCallId?: string,
+ *   platformOutcome: "RUNNING" | "COMPLETED" | "ERROR" | "UNKNOWN",
+ *   taskOutcome?: string,
+ *   observedAt?: number,
+ *   durationMs?: number
+ * }> | null}
+ */
+export function deriveGuiHistory(messages) {
+  if (!Array.isArray(messages)) return null;
+  /** @type {Array<{
+   *   source: "direct-tool" | "code-mode",
+   *   toolName?: string,
+   *   toolNames?: string[],
+   *   additionalToolNameCount?: number,
+   *   hostCallId?: string,
+   *   platformOutcome: "RUNNING" | "COMPLETED" | "ERROR" | "UNKNOWN",
+   *   taskOutcome?: string,
+   *   observedAt?: number,
+   *   durationMs?: number
+   * }>} */
+  const rows = [];
+
+  for (const message of messages.slice(-MAX_MESSAGES)) {
+    if (!isRecord(message) || message.type !== "assistant") continue;
+    const parts = Array.isArray(message.content)
+      ? message.content.slice(-MAX_PARTS_PER_MESSAGE)
+      : [];
+    for (const part of parts) {
+      if (!isRecord(part) || part.type !== "tool") continue;
+      const status = part.state?.status;
+      const timing = nativePartTiming(part);
+
+      if (isGuiDevLogToolName(part.name ?? part.tool)) {
+        rows.push({
+          source: "direct-tool",
+          toolName: normalizedDevLogToolName(part.name ?? part.tool),
+          hostCallId: boundedNativeCallId(part.id ?? part.callID),
+          platformOutcome:
+            status === "running"
+              ? "RUNNING"
+              : status === "completed"
+                ? "COMPLETED"
+                : status === "error"
+                  ? "ERROR"
+                  : "UNKNOWN",
+          taskOutcome:
+            status === "completed"
+              ? explicitTaskStatus(part.state?.content)
+              : undefined,
+          ...timing,
+        });
+        continue;
+      }
+
+      if (part.name !== "execute" && part.tool !== "execute") continue;
+      const toolNames = new Set();
+      /** @type {unknown[]} */
+      const nestedRows = [];
+      let inspectedNestedRows = 0;
+      /** @param {unknown[]} rows */
+      const addNestedRows = (rows) => {
+        const remaining = MAX_CODE_MODE_ROWS - inspectedNestedRows;
+        const boundedRows = rows.slice(0, remaining);
+        nestedRows.push(...boundedRows);
+        inspectedNestedRows += boundedRows.length;
+      };
+      const metadata = part.state?.metadata;
+      if (isRecord(metadata) && Array.isArray(metadata.toolCalls)) {
+        addNestedRows(metadata.toolCalls);
+      }
+      const blocks = Array.isArray(part.state?.content)
+        ? part.state.content.slice(0, MAX_RESULT_BLOCKS)
+        : [];
+      for (const block of blocks) {
+        if (inspectedNestedRows >= MAX_CODE_MODE_ROWS) break;
+        if (!isRecord(block) || block.type !== "text") continue;
+        const decoded = parseText(block.text);
+        if (Array.isArray(decoded?.toolCalls)) {
+          addNestedRows(decoded.toolCalls);
+        }
+      }
+      for (const nestedRow of nestedRows) {
+        if (!isRecord(nestedRow)) continue;
+        const name = nestedRow.tool ?? nestedRow.name;
+        if (isGuiCodeModeDevLogToolName(name)) {
+          const normalized = normalizedDevLogToolName(
+            typeof name === "string" && name.startsWith("devlog.")
+              ? name.slice("devlog.".length)
+              : name,
+          );
+          if (normalized) toolNames.add(normalized);
+        }
+      }
+      if (toolNames.size === 0) continue;
+      const allToolNames = [...toolNames];
+      rows.push({
+        source: "code-mode",
+        toolNames: allToolNames.slice(0, MAX_HISTORY_TOOL_NAMES_PER_ROW),
+        ...(allToolNames.length > MAX_HISTORY_TOOL_NAMES_PER_ROW
+          ? {
+              additionalToolNameCount:
+                allToolNames.length - MAX_HISTORY_TOOL_NAMES_PER_ROW,
+            }
+          : {}),
+        hostCallId: boundedNativeCallId(part.id ?? part.callID),
+        platformOutcome:
+          status === "running"
+            ? "RUNNING"
+            : status === "completed"
+              ? "COMPLETED"
+              : status === "error"
+                ? "ERROR"
+                : "UNKNOWN",
+        // The outer execute result cannot establish an individual nested
+        // DevLog outcome; name-only rows intentionally stay unknown.
+        taskOutcome: undefined,
+        ...timing,
+      });
+    }
+  }
+
+  return rows.slice(-MAX_HISTORY_ROWS).reverse();
 }
 
 /**
@@ -249,6 +485,9 @@ export const guiPresenceLimits = Object.freeze({
   maxMessages: MAX_MESSAGES,
   maxPartsPerMessage: MAX_PARTS_PER_MESSAGE,
   maxCodeModeRows: MAX_CODE_MODE_ROWS,
+  maxHistoryRows: MAX_HISTORY_ROWS,
+  maxHistoryToolNamesPerRow: MAX_HISTORY_TOOL_NAMES_PER_ROW,
+  maxNativeCallIdLength: MAX_NATIVE_CALL_ID_LENGTH,
   maxResultText: MAX_RESULT_TEXT,
   maxResultBlocks: MAX_RESULT_BLOCKS,
 });
