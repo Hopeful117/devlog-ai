@@ -5,11 +5,12 @@
 - Repository: `Hopeful117/devlog-ai`.
 - Branch: dedicated Story 0256 branch (created under the follow-up owner
   authorization).
-- HEAD: `7846fbd88b250ea54a54d586a7a25701d86a6bfa`, matching `origin/main` at
-  the start of implementation.
-- Worktree: only the approved Story 0256 package/documentation and specifically
-  scoped 0254/0255 delivery-record changes are included.
-- Local commit: authorized; its full SHA is recorded in the final handoff.
+- Package source commit: `30ca3577302bfa0c41ec663a812dad5ed03b8d40` on
+  `story/0256-devlog-companion-stabilization-installation`.
+- The package source tree was clean when the release artifact was built.
+- A documentation-only follow-up records the final artifact/install evidence;
+  it does not change package source contents.
+- Push: not authorized or performed.
 - Push: not authorized or performed.
 
 ## Governance and scope
@@ -22,8 +23,7 @@
 - Active configuration, Claude files and settings, remote hosts, and existing
   development worktrees were not changed. Stable installation was separately
   authorized and is recorded below.
-- OpenCode was not launched or reloaded. No cleanup or push occurred. A local
-  source commit is authorized and will be recorded in the final handoff.
+- OpenCode was not launched or reloaded. No cleanup or push occurred.
 
 ## Implementation summary
 
@@ -98,6 +98,24 @@ Commands and outcomes:
   remains **NOT EVALUATED**; no host compatibility claim is made.
 - `git diff --check` — **PASS**.
 - Story 0256 relative-link and whitespace validation — **PASS**.
+- Post-commit `npm run pack:dry-run` — **PASS** from clean package source
+  commit `30ca3577302bfa0c41ec663a812dad5ed03b8d40`.
+- Final release artifact — version `0.1.1`, 11 files, SHA-256
+  `257b55a142c647f70f142e71a3c8610c3490f2f841a3e9d9ee9724e5c6caf974`,
+  npm shasum `5daba09d33a77c03d0c41776995e5fb807acbde0`. Compared with the
+  previously verified staging artifact: same 11-file set; only
+  `package/README.md` differs due to final documentation updates.
+- Stable installation — **PASS** at
+  `/home/ludo/.local/share/opencode/plugins/devlog-companion/0.1.1-30ca3577302bfa0c41ec663a812dad5ed03b8d40`.
+  The user-owned parent and installation directory are mode `0700`; all 11
+  packaged files match the final archive byte-for-byte.
+- Stable `npm ci --omit=dev --ignore-scripts` — **PASS**, 391 packages.
+  `npm ls` resolves `@opencode/plugin@2.4.0`, `@opentui/solid@0.9.4`, and
+  `solid-js@1.9.17`; GUI, TUI, SDK and JSX runtime module targets resolve under
+  the stable installation, with no source-worktree paths in the shrinkwrap.
+- `npm audit --omit=dev` — 26 moderate, 0 high/critical. No audit fix was
+  applied. This is a dependency risk requiring owner review before activation;
+  reachability/exploitability has not been established.
 
 The first package regression run failed because npm's `files` whitelist omitted
 `npm-shrinkwrap.json`. The whitelist was corrected; the subsequent full test
@@ -110,16 +128,17 @@ and package dry-run pass verifies that the lock is present in the archive.
   and checks above add that evidence. The compatibility matrix was clarified
   to distinguish the prior source/plugin smoke test from package installation.
   Host loading remains unverified.
-- Security review: **PASS**, no actionable findings.
+- Security review: initial package review **PASS**, no actionable findings.
+  Follow-up assessment of the stable install audit: no confirmed exploitable
+  issue established from the summary, but runtime dependency risk is
+  insufficiently characterized and requires owner review before activation.
 
 ## Not validated / remaining gates
 
-- The archive was installed only in temporary test staging, not the user-owned
-  stable directory. No stable version directory was created.
-- The earlier temporary archive was built before the authorized Story 0256
-  commit. The stable release must be rebuilt from the clean reviewed commit
-  using its full SHA in the destination name; do not reuse the temporary
-  artifact without comparing the new archive.
+- Actual OpenCode host loading, especially the GUI CJS bundle's externalized
+  SDK import, remains **NOT EVALUATED**; OpenCode was not launched.
+- The stable package is staged but not activated. Owner review of the moderate
+  dependency audit findings is recommended before activation.
 - OpenCode host peer/runtime loading, especially the GUI CJS bundle's
   externalized SDK import, remains **NOT EVALUATED**; OpenCode was not launched.
 - Active Desktop/TUI configuration was inventoried read-only below; no entry was
@@ -139,14 +158,10 @@ Read-only inspection of only the Companion plugin entries found:
 
 | Config | Current Companion path | Proposed value |
 |---|---|---|
-| `/home/ludo/.config/opencode/opencode.jsonc` (`plugins[0]`) | `/tmp/opencode/devlog-ai-story-0251/opencode-mod/devlog-companion` | `${XDG_DATA_HOME:-/home/ludo/.local/share}/opencode/plugins/devlog-companion/0.1.1-<reviewed-source-commit-sha>` |
+| `/home/ludo/.config/opencode/opencode.jsonc` (`plugins[0]`) | `/tmp/opencode/devlog-ai-story-0251/opencode-mod/devlog-companion` | `/home/ludo/.local/share/opencode/plugins/devlog-companion/0.1.1-30ca3577302bfa0c41ec663a812dad5ed03b8d40` |
 | `/home/ludo/.config/opencode/cli.json` (`plugins[0]`) | `/home/ludo/.local/share/opencode/worktree/25d67b/story-0255-tui-preparation/opencode-mod/devlog-companion` | Same stable path. Preserve the explicit entry; do not deduplicate unless owner-authorized evidence establishes actual duplicate loading in the active topology. |
 
-The stable destination parent
-`/home/ludo/.local/share/opencode/plugins/devlog-companion` was absent when
-checked. The exact destination is
-`/home/ludo/.local/share/opencode/plugins/devlog-companion/0.1.1-<reviewed-source-commit-sha>`;
-it must be rechecked before creation and must not overwrite an existing path.
+The stable destination has been created and verified at the exact path above.
 
 Migration is prepared but not applied:
 
@@ -170,8 +185,6 @@ behavior was not tested. Do not launch or reload as part of this preparation.
 
 ## Readiness
 
-**SOURCE PACKAGE AND EXTRACTED TEMPORARY INSTALLATION CHECKS PASS.** The
-follow-up owner authorization now permits committing and installing the stable
-artifact. Continue only through clean-commit packaging and stable installation;
-stop before configuration migration or activation. Do not clean existing
+**CLEAN-COMMIT PACKAGE AND STABLE INSTALLATION VERIFIED.** Stop before
+configuration migration or activation. Do not clean existing
 installations/worktrees or claim Story acceptance.

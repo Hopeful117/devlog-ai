@@ -17,12 +17,16 @@ independent observations. Unknown versions/topologies remain unqualified.
 | Evidence | Result |
 |---|---|
 | Source package version after Story 0256 changes | `0.1.1` |
-| Temporary package artifact identity | SHA-256 `64f9b58bca27085b25417061b1e9e76e022cd724de367c2f6a36629b70c23b43`; npm shasum `069805833b3a387b6e2ee0442888a0eb7c084a3a` |
-| Artifact identity convention | Package version plus full source commit SHA in a user-owned, immutable directory |
+| Reviewed package source commit | `30ca3577302bfa0c41ec663a812dad5ed03b8d40` |
+| Final release artifact identity | SHA-256 `257b55a142c647f70f142e71a3c8610c3490f2f841a3e9d9ee9724e5c6caf974`; npm shasum `5daba09d33a77c03d0c41776995e5fb807acbde0` |
+| Artifact identity convention | Package version plus full source commit SHA in the user-owned immutable directory |
 | Packaged lock | `npm-shrinkwrap.json` is included by the package whitelist and asserted by the package test |
 | Dependency contract | `@opencode/plugin@2.4.0` runtime dependency; `@opentui/solid ^0.9.4` and `solid-js ^1.9.12` peer dependencies |
-| Extracted archive install and static module resolution | **PASS** in temporary isolated staging `/tmp/opencode/story-0256-final-extracted/package`: `npm ci --omit=dev --ignore-scripts` installed 391 packages; `@opencode/plugin@2.4.0`, `@opentui/solid@0.9.4`, `solid-js@1.9.17`, GUI bundle path, TUI TSX path, and native ESM imports resolved. Every resolved target is inside extracted staging. This is not the stable user-owned installation or OpenCode runtime loading. |
-| Stable user-owned installation | `NOT INSTALLED` — blocked because the approved version+source-commit directory identity cannot represent the current uncommitted package changes; committing is not authorized |
+| Stable user-owned installation | **PASS** at `~/.local/share/opencode/plugins/devlog-companion/0.1.1-30ca3577302bfa0c41ec663a812dad5ed03b8d40`; all 11 archived files match the release tarball |
+| Installed dependency resolution | **PASS** — locked `npm ci --omit=dev --ignore-scripts`; 391 packages; `@opencode/plugin@2.4.0`, `@opentui/solid@0.9.4`, `solid-js@1.9.17`; all resolved paths are under the stable installation |
+| Dependency audit | **26 moderate, 0 high/critical** in `npm audit --omit=dev`; no automatic fixes applied; reachability/impact not established; owner risk review required before activation |
+| GUI/TUI static exports | **PASS** — GUI resolves to `dist/gui-experimental.cjs`; TUI resolves to `src/tui.tsx`; SDK GUI/TUI and OpenTUI JSX/ Solid modules resolve under stable path; no server entry is packaged |
+| Node CommonJS SDK GUI resolution | **NOT RESOLVED** — `@opencode/plugin/gui` has an ESM import condition and no Node `require` condition |
 | OpenCode host loading | `NOT EVALUATED` — OpenCode was not launched; actual Desktop CJS/SDK loading and TUI host activation are not inferred from static module resolution |
 | Active configuration migration or OpenCode activation | `NOT EVALUATED` — not authorized/performed |
 
