@@ -1,11 +1,13 @@
-# DevLog Companion for OpenCode Desktop (visual milestone)
+# DevLog Companion for OpenCode Desktop
 
 This local package exports only its experimental Desktop GUI. Its default
-build derives bounded in-memory presence from the currently routed session's
-already-loaded OpenCode GUI data. It adds no Companion RPC, server observer,
-DevLog request, or Context Trace read. Route filtering is presentation scoping,
-not server authorization or isolation from another trusted GUI plugin. It does
-not depend on or load the Claude Companion.
+build derives bounded in-memory presence and recent DevLog activity from the
+currently routed session's already-loaded OpenCode GUI data. Now remains the
+default view; History is reconstructed from the same loaded transcript rather
+than appended from event notifications. It adds no Companion RPC, server
+observer, transcript request, DevLog request, or Context Trace read. Route
+filtering is presentation scoping, not server authorization or isolation from
+another trusted GUI plugin. It does not depend on or load the Claude Companion.
 
 ## Development
 
@@ -29,6 +31,20 @@ not depend on or load the Claude Companion.
   completion alone does not show `READY`; Code Mode nested rows have no call ID
   and cannot be correlated to a nested business result. `DISCONNECTED` is not
   claimed without reliable evidence for that boundary.
+- History is bounded to the last 20 recognized rows from at most 40 loaded
+  messages, 80 parts per message, and 80 Code Mode rows per outer execution.
+  Code Mode names are reconciled as a distinct-name union of available metadata
+  and result rows, grouped under the outer execution, with at most eight names
+  retained per row. Outer completion does not establish nested success. Host
+  timestamps/durations are shown only when supplied by the native tool part.
+  Conflicting explicit task statuses remain unknown; pending statuses are
+  labeled last-reported. Unknown or missing outcomes remain explicit.
+- History contains only allowlisted tool names, host outcome, explicit task
+  status, native host call ID, and native timing when available. It does not
+  retain or render raw prompts, inputs, outputs, credentials, or error payloads.
+  An inspected transcript window with no recognized operations is distinct
+  from a loading/unavailable transcript and does not claim that older,
+  uninspected transcript content has no DevLog activity.
 - This is a local presentation feature, not a per-session security boundary.
   The adapter reads only the current route and keeps only a sanitized,
   in-memory projection; it does not enumerate sessions or retain raw tool data.

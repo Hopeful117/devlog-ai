@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "GUI-only DevLog Companion Desktop visual milestone",
+  "description": "GUI-only DevLog Companion for OpenCode Desktop",
   "exports": {
     "./gui-experimental": "./dist/gui-experimental.cjs"
   },

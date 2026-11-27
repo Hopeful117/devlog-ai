@@ -17,10 +17,26 @@ import {
 } from "./presentation.js";
 import {
   deriveGuiPresence,
+  deriveGuiHistory,
   subscribeGuiSessionEvents,
 } from "./gui-presence.js";
 
 const PREVIEW_BUILD = import.meta.env.MODE === "preview";
+const HISTORY_VIEWS = ["now", "history"] as const;
+type CompanionView = (typeof HISTORY_VIEWS)[number];
+
+function formatDuration(durationMs: number) {
+  if (durationMs < 1000) return `${Math.round(durationMs)} ms`;
+  return `${(durationMs / 1000).toFixed(1)} s`;
+}
+
+function formatObservedTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
 
 function useReducedMotion() {
   const [reducedMotion, setReducedMotion] = createSignal(false);
@@ -146,6 +162,7 @@ export default Plugin.define({
 
     function CompanionPanel(props: { session: MountedSession }) {
       const [previewState, setPreviewState] = createSignal("IDLE");
+      const [activeView, setActiveView] = createSignal<CompanionView>("now");
       const [eventVersion, setEventVersion] = createSignal(0);
       const [interrupted, setInterrupted] = createSignal(false);
       const reducedMotion = useReducedMotion();
@@ -217,6 +234,21 @@ export default Plugin.define({
         if (messages.length === 0) return "UNKNOWN";
         return deriveGuiPresence(messages, { interrupted: interrupted() });
       });
+      const historyView = createMemo(() => {
+        eventVersion();
+        const session = props.session;
+        const data = session.server.data;
+        if (session.pending || data.session.message.loading(session.id)) {
+          return { kind: "unavailable" as const, rows: [] };
+        }
+        const messages = data.session.message.list(session.id);
+        const rows = deriveGuiHistory(messages);
+        if (rows === null) return { kind: "unavailable" as const, rows: [] };
+        return {
+          kind: rows.length === 0 ? "empty" as const : "available" as const,
+          rows,
+        };
+      });
       const state = () => PREVIEW_BUILD ? previewState() : liveState();
 
       onCleanup(clearReadyTimer);
@@ -243,61 +275,199 @@ export default Plugin.define({
               {ctx.t("panel.title")}
             </h2>
           </header>
-          <div
-            class="devlog-companion__presence"
-            style={{ display: "flex", "align-items": "center", gap: "8px" }}
-          >
-            <PresenceAvatar state={state()} reducedMotion={reducedMotion()} />
-            <p
-              role="status"
-              aria-live="polite"
-              style={{ margin: "0", "font-weight": "600" }}
-            >
-              {PREVIEW_BUILD ? `Simulated preview · ${state()}` : state()}
-            </p>
-          </div>
-          <p style={{ margin: "0", "line-height": "1.4" }}>
-            {PREVIEW_BUILD
-                ? "Simulated only. No live DevLog activity or connectivity is observed."
-              : state() === "IDLE"
-                ? "No recognized DevLog activity is currently observed in this session."
-                : state() === "WORKING"
-                  ? "DevLog activity or a task is in progress."
-                  : state() === "READY"
-                    ? "A successful DevLog task outcome was observed."
-                    : state() === "ERROR"
-                      ? "A DevLog tool or task failure was observed."
-                      : "Current-session evidence is unavailable or inconclusive."}
-          </p>
-          {PREVIEW_BUILD ? (
-        <fieldset class="devlog-companion__preview">
-          <legend>Simulated preview — no live DevLog data</legend>
-          <div
+          <nav
+            aria-label="Companion views"
             role="group"
-            aria-label="Select simulated presence state"
-            style={{ display: "flex", "flex-wrap": "wrap", gap: "6px" }}
+            style={{ display: "flex", gap: "8px", "border-bottom": "1px solid var(--border-base, currentColor)" }}
           >
-            <For each={PRESENTATION_STATES}>
-              {(candidate) => (
+            <For each={HISTORY_VIEWS}>
+              {(view) => (
                 <button
                   type="button"
-                  aria-pressed={state() === candidate}
-                  onClick={() => selectState(candidate)}
+                  id={`devlog-companion-tab-${view}`}
+                  aria-pressed={activeView() === view}
+                  onClick={() => setActiveView(view)}
                   style={{
                     color: "inherit",
                     background: "transparent",
-                    border: "1px solid currentColor",
-                    "border-radius": "4px",
-                    padding: "4px 7px",
+                    border: "0",
+                    "border-bottom": activeView() === view
+                      ? "2px solid var(--text-accent, currentColor)"
+                      : "2px solid transparent",
+                    padding: "6px 8px",
                     cursor: "pointer",
+                    opacity: activeView() === view ? "1" : "0.7",
                   }}
                 >
-                      {candidate}
-                    </button>
-                  )}
-                </For>
+                  {view === "now" ? "Now" : "History"}
+                </button>
+              )}
+            </For>
+          </nav>
+          <Show when={activeView() === "now"}>
+            <div
+              id="devlog-companion-panel-now"
+              class="devlog-companion__now"
+              style={{ display: "flex", "flex-direction": "column", gap: "12px" }}
+            >
+              <div
+                class="devlog-companion__presence"
+                style={{ display: "flex", "align-items": "center", gap: "8px" }}
+              >
+                <PresenceAvatar state={state()} reducedMotion={reducedMotion()} />
+                <p
+                  role="status"
+                  aria-live="polite"
+                  style={{ margin: "0", "font-weight": "600" }}
+                >
+                  {PREVIEW_BUILD ? `Simulated preview · ${state()}` : state()}
+                </p>
               </div>
-            </fieldset>
+              <p style={{ margin: "0", "line-height": "1.4" }}>
+                {PREVIEW_BUILD
+                    ? "Simulated only. No live DevLog activity or connectivity is observed."
+                  : state() === "IDLE"
+                    ? "No recognized DevLog activity is currently observed in this session."
+                    : state() === "WORKING"
+                      ? "DevLog activity or a task is in progress."
+                      : state() === "READY"
+                        ? "A successful DevLog task outcome was observed."
+                        : state() === "ERROR"
+                          ? "A DevLog tool or task failure was observed."
+                          : "Current-session evidence is unavailable or inconclusive."}
+              </p>
+            </div>
+          </Show>
+          <Show when={activeView() === "history"}>
+            <div
+              id="devlog-companion-panel-history"
+              aria-live="polite"
+              class="devlog-companion__history"
+              style={{ display: "flex", "flex-direction": "column", gap: "8px" }}
+            >
+              <h3 style={{ margin: "4px 0", "font-size": "0.95rem" }}>
+                Recent DevLog activity
+              </h3>
+              <Show
+                when={!PREVIEW_BUILD}
+                fallback={<p style={{ margin: "0", opacity: "0.7" }}>History is unavailable in this preview build.</p>}
+              >
+                <Show
+                  when={historyView().kind !== "unavailable"}
+                  fallback={<p style={{ margin: "0", opacity: "0.7" }}>Current session history is loading or unavailable.</p>}
+                >
+                  <Show
+                    when={historyView().kind !== "empty"}
+                    fallback={<p style={{ margin: "0", opacity: "0.7" }}>No recognized DevLog activity in the inspected transcript window.</p>}
+                  >
+                    <ol
+                      aria-label="Recent DevLog activity"
+                      style={{
+                        margin: "0",
+                        padding: "0",
+                        "list-style": "none",
+                        display: "flex",
+                        "flex-direction": "column",
+                        gap: "8px",
+                      }}
+                    >
+                      <For each={historyView().rows}>
+                        {(row) => {
+                          const toolLabel = row.source === "direct-tool"
+                            ? row.toolName ?? "DevLog tool"
+                            : `Code Mode · ${(row.toolNames ?? []).join(", ")}${
+                                row.additionalToolNameCount
+                                  ? ` · +${row.additionalToolNameCount} more tool names`
+                                  : ""
+                              }`;
+                          const hostLabel = row.platformOutcome === "RUNNING"
+                            ? "Host execution running"
+                            : row.platformOutcome === "COMPLETED"
+                              ? "Host execution completed"
+                              : row.platformOutcome === "ERROR"
+                                ? "Host execution error"
+                                : "Host execution state unknown";
+                          return (
+                            <li
+                              style={{
+                                display: "flex",
+                                "flex-direction": "column",
+                                gap: "3px",
+                                padding: "8px",
+                                border: "1px solid var(--border-base, currentColor)",
+                                "border-radius": "6px",
+                              }}
+                            >
+                              <span style={{ "font-weight": "600", "overflow-wrap": "anywhere" }}>
+                                {toolLabel}
+                              </span>
+                              <span style={{ "font-size": "0.85em", opacity: "0.78" }}>
+                                {hostLabel}
+                                {row.taskOutcome
+                                  ? ` · ${
+                                      ["SUBMITTED", "PENDING", "RUNNING", "POLL_TIMEOUT"]
+                                        .includes(row.taskOutcome)
+                                        ? "Last reported DevLog task status"
+                                        : "Reported DevLog task status"
+                                    }: ${row.taskOutcome}`
+                                  : row.source === "direct-tool" && row.platformOutcome === "COMPLETED"
+                                    ? " · DevLog task outcome unavailable"
+                                    : row.source === "code-mode"
+                                      ? " · Nested outcome unknown"
+                                      : ""}
+                              </span>
+                              <Show when={row.observedAt !== undefined || row.durationMs !== undefined}>
+                                <span style={{ "font-size": "0.8em", opacity: "0.65" }}>
+                                  {row.observedAt !== undefined
+                                    ? `Observed ${formatObservedTime(row.observedAt)}`
+                                    : ""}
+                                  {row.observedAt !== undefined && row.durationMs !== undefined ? " · " : ""}
+                                  {row.durationMs !== undefined
+                                    ? `Duration ${formatDuration(row.durationMs)}`
+                                    : ""}
+                                </span>
+                              </Show>
+                            </li>
+                          );
+                        }}
+                      </For>
+                    </ol>
+                  </Show>
+                </Show>
+              </Show>
+            </div>
+          </Show>
+          {PREVIEW_BUILD ? (
+            <Show when={activeView() === "now"}>
+              <fieldset class="devlog-companion__preview">
+                <legend>Simulated preview — no live DevLog data</legend>
+                <div
+                  role="group"
+                  aria-label="Select simulated presence state"
+                  style={{ display: "flex", "flex-wrap": "wrap", gap: "6px" }}
+                >
+                  <For each={PRESENTATION_STATES}>
+                    {(candidate) => (
+                      <button
+                        type="button"
+                        aria-pressed={state() === candidate}
+                        onClick={() => selectState(candidate)}
+                        style={{
+                          color: "inherit",
+                          background: "transparent",
+                          border: "1px solid currentColor",
+                          "border-radius": "4px",
+                          padding: "4px 7px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {candidate}
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </fieldset>
+            </Show>
           ) : null}
         </section>
       );
